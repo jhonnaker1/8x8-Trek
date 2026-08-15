@@ -319,16 +319,38 @@ legends, and the briefing pages with the Class IX spec table.
 **Note:** the message prose is copyrightable. Use the extracted catalogue as a
 checklist of *which situations need a message*, not as text to copy.
 
+## Done
+
+- `git init` + public repo: **github.com/jhonnaker1/8x8-Trek**, MIT.
+  `reference/` is gitignored — the shareware terms require any distributed copy
+  to be complete and unmodified, and ours is neither.
+- C128-VDC skeleton stood up: `core/ega.h`, `c128/src/{vdc,egavdc,layout,main}`,
+  builds to 2,329 bytes with cl65.
+- EGA→VDC colour mapping derived, implemented and proven (`make test`).
+
 ## Open questions / next steps
 
-1. Stand up the C128-VDC skeleton: fixed-point math layer, 80×25 panel layout
-   traced off `console_screenshot.jpg`, driven through `commodore-uno/c128/src/vdc.c`.
-2. Breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm the real
+1. **Verify the C128 build on screen** — `cd c128 && make run`. Nothing has
+   actually been *seen* yet: a Claude Code session on this machine can't
+   screenshot an emulator (`screencapture` has no display access; driving VICE's
+   remote monitor halts emulation and wedges the GUI). Most likely thing to be
+   wrong is the PETSCII box-drawing screen codes in `layout.h`, derived by hand.
+   If borders render as letters, that's where to look.
+2. **Capture the original at full 640×350** in DOSBox-X and correct the
+   provisional panel table in `c128/src/layout.c`. The only layout source so far
+   is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for
+   exact column boundaries. Everything reads that one table, so it's a
+   single-site edit. The same capture settles which glyphs the original uses.
+3. Breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm the real
    constants — laser falloff, the no-damage threshold, boarding gates, scoring
    weights. `combat-model.md` has the 1978 values as the hypothesis to test.
-   Also the go-to for screenshots when graphics/layout need checking.
-3. Not yet decided: whether to `git init` this directory.
-4. Not yet decided: where Atari VBXE (HR) sits in the port order now that it's
+4. Custom charset. The port currently uses the KERNAL's stock character set;
+   EGA Trek's panels want CP437-style glyphs. `commodore-uno/c128/src/vdc.c` has
+   the upload path, including the VDC's 16-byte-per-glyph slot padding, and
+   `tools/gen_charset.py` the generator precedent.
+5. Game core — nothing exists yet beyond `core/ega.h`. Galaxy state, the 64-entry
+   distance table, the message ring buffer.
+6. Not yet decided: where Atari VBXE (HR) sits in the port order now that it's
    first-tier. It shares the Amiga's 640×200×16 target, so the two could share
    a bitmap-layer design even though the CPUs and framebuffer access differ
    wildly (flat chip RAM vs an 8K banked MEMAC window).
