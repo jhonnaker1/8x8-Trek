@@ -1,6 +1,9 @@
 # EGA Trek remake — project notes
 
-Status as of 2026-08-14. Research and design decisions only; **no code written yet.**
+Status as of 2026-08-15. The C128-VDC port is playable to the extent that a
+galaxy generates and the ship moves through it; there is no combat, damage,
+docking or supply yet. Every game constant is provisional pending the
+debugger session against the original.
 
 ## What this is
 
@@ -356,29 +359,101 @@ checklist of *which situations need a message*, not as text to copy.
   the `$D600` pokes, out of reach of `cc`. Worth lifting into its own header so
   a native test can feed it PETSCII `$C1`-`$DA` and assert screen codes 1-26.
 
+- **Milestone 2: the shared core (2026-08-15, `a61ef60`).** Galaxy generation
+  and movement, with the console showing live state. `core/trek.{h,c}` compiles
+  unmodified under both `cc` and `cl65` — the architectural claim of this repo,
+  now exercised rather than asserted. `c128/src/ui.c` is presentation only; the
+  core formats no text. Binary 9,738 bytes.
+
+  Design points worth keeping: the galaxy is four flat byte arrays, not an array
+  of structs, so the 68000 alignment tax `commodore-uno` documents for its `Card`
+  cannot apply on the Amiga leg. The PRNG is owned rather than taken from libc,
+  so one seed reproduces one galaxy on every platform — which is what will make a
+  cross-platform comparison meaningful. Distance is the precomputed 64-entry 8.8
+  table NOTES specified; no runtime `sqrt` exists anywhere.
+
+- **Caught by the core test on its first run: the energy economy was inverted.**
+  A one-quadrant hop at warp 5 cost 50 units but took 0.2 stardates, and the
+  converter yields 400/stardate — so travelling *earned* 80. The clamp at
+  `ENERGY_MAX` disguised it as "nothing happened". That contradicts the manual
+  outright (l.261-264). Both travel scales now lose against the converter, and
+  the test asserts that direction rather than merely that energy changed.
+
+- **Fixed: `q` never quit — and neither did any other letter command.**
+  `input.c`'s key table was written with C character literals, which cc65
+  translated to PETSCII (`CD D7 D1` in the linked binary where `4D 57 51` was
+  meant), while `main.c` compared against numeric ASCII. Digits worked, because
+  cc65 leaves those alone — which is exactly what hid it, since coordinates
+  echoed correctly and the input path looked healthy. Key values now live once
+  in `input.h` and are included by both sides, so the two spellings cannot drift
+  again.
+
+- **KERNAL keyboard input replaced with a direct CIA1 matrix scan.** `cgetc()`
+  blocks forever in this port. `commodore-uno`'s C128 port reached the same
+  conclusion from a different direction, recording that `kbhit()`/`cgetc()` "go
+  completely dead" there. Matrix positions were transcribed from VICE's own
+  keymap (`share/vice/C128/gtk3_sym.vkm`), not a published table, per that
+  port's warning that a "standard" reference was already wrong for several keys.
+  The keymap's *row* is the bit strobed low on `PRA`, its *column* the bit read
+  from `PRB`; `commodore-uno` stores that pair under struct fields named the
+  other way round, which is easy to misread. The write/read pair needs `SEI`/
+  `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
+
 ## Open questions / next steps
 
-1. **Make `ascii_to_screencode` testable.** Lift it out of `vdc.c` into its own
-   header so `cc` can reach it, then assert PETSCII `$C1`-`$DA` → screen codes
-   1-26 alongside the existing colour test. See the PETSCII entry under Done —
-   that bug shipped precisely because this one function was untestable.
-   (Verifying the build on screen is done: a session here still can't screenshot
-   an emulator, so Jamie ran `make run` and sent the capture back.)
-2. **Capture the original at full 640×350** in DOSBox-X and correct the
+1. **Close the encoding-mismatch class with `make verify`.** Three separate bugs
+   this session were the same defect wearing different hats: blank panel titles,
+   a PETSCII key table, and the dispatch constants that made `q` a no-op.
+   **Neither test suite can see any of them**, because native `cc` does not
+   perform the character-set translation `cl65` does — the tests pass either
+   way, and only the linked binary shows the truth. Each time, the thing that
+   actually found it was grepping the PRG for an expected byte pattern, done by
+   hand.
+
+   Make that a build step: a `make verify` target that checks the linked
+   `trek128.prg` contains the key table as ASCII (`4D 57 51`) and not PETSCII
+   (`CD D7 D1`). Cheap, and it turns "caught by playing" into "caught by
+   building". Lifting `ascii_to_screencode` out of `vdc.c` into its own header
+   so `cc` can reach it is worth doing too, but it is the smaller half — a
+   native test of that function still would not have caught the key table.
+
+2. **Returning to BASIC wedges the C128.** Quit currently parks with the console
+   readable and RUN/STOP+RESTORE as the way out, which works but is a
+   workaround, not a fix. Undiagnosed: this program runs at 2MHz, drives the VDC
+   directly, and scans CIA1 behind the KERNAL's back, so there are several
+   candidates and no way to observe the machine from a session on this host.
+   `c128/src/main.c` carries a bisect recipe — return immediately from `main()`
+   with no `vdc_init()`, confirm a clean exit, then add back the 2MHz switch,
+   the VDC writes, and the CIA scanning in turn.
+
+3. **Seed the RNG from something varying.** `GAME_SEED` is fixed, deliberately —
+   it makes a side-by-side against DOSBox-X repeatable — but it means every run
+   is the same galaxy. Wire it to timing once there is a title screen.
+4. **Capture the original at full 640×350** in DOSBox-X and correct the
    provisional panel table in `c128/src/layout.c`. The only layout source so far
    is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for
    exact column boundaries. Everything reads that one table, so it's a
    single-site edit. The same capture settles which glyphs the original uses.
-3. Breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm the real
+5. Breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm the real
    constants — laser falloff, the no-damage threshold, boarding gates, scoring
    weights. `combat-model.md` has the 1978 values as the hypothesis to test.
-4. Custom charset. The port currently uses the KERNAL's stock character set;
+   **Everything in `core/trek.h` marked PROVISIONAL is waiting on this**: the
+   enemy-count-per-level formula, both travel energy scales, impulse timing,
+   starting energy and torpedoes, and the 30-stardate mission length. Only the
+   shield ceiling (2500) and the converter rate (400/stardate) come from the
+   manual.
+6. Custom charset. The port currently uses the KERNAL's stock character set;
    EGA Trek's panels want CP437-style glyphs. `commodore-uno/c128/src/vdc.c` has
    the upload path, including the VDC's 16-byte-per-glyph slot padding, and
    `tools/gen_charset.py` the generator precedent.
-5. Game core — nothing exists yet beyond `core/ega.h`. Galaxy state, the 64-entry
-   distance table, the message ring buffer.
-6. Not yet decided: where Atari VBXE (HR) sits in the port order now that it's
+7. **Game core, next pieces.** Galaxy state, the distance table and the message
+   log now exist. Still missing, roughly in dependency order: the 12 ship systems
+   with percentage repair, combat (lasers and torpedoes), enemy AI and return
+   fire, docking and resupply, then win/lose and scoring. `combat-model.md` has
+   the 1978 formulas as the starting model — 1/distance falloff with a (2,3)
+   random multiplier, the 15% no-damage threshold, ray-marched torpedoes with no
+   accuracy roll, and `1000*(kills/stardates)^2` for score.
+8. Not yet decided: where Atari VBXE (HR) sits in the port order now that it's
    first-tier. It shares the Amiga's 640×200×16 target, so the two could share
    a bitmap-layer design even though the CPUs and framebuffer access differ
    wildly (flat chip RAM vs an 8K banked MEMAC window).
