@@ -363,6 +363,16 @@ checklist of *which situations need a message*, not as text to copy.
    a bitmap-layer design even though the CPUs and framebuffer access differ
    wildly (flat chip RAM vs an 8K banked MEMAC window).
 
+   **An argument for VBXE that hasn't been weighed: it is the only leg with an
+   automatable verification loop.** AltirraSDL plus AltirraBridge
+   (`~/AltirraBridge-nightly-macos-arm64`) can drive an Atari headlessly —
+   screenshots, frame-stepping, memory and CPU reads, breakpoints, injected
+   input. VICE offers nothing equivalent here: its remote monitor halts
+   emulation on connect and `screencapture` has no display access, so the C128
+   leg can only be checked by eye. Item 1 above is unresolved for exactly that
+   reason. A port whose output can be asserted on in a test is a materially
+   different proposition from one that cannot.
+
 ## Platform suitability (from the Uno lineup)
 
 Ranked for *this* game, whose demands are the opposite of Uno's — high information
