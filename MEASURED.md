@@ -84,7 +84,10 @@ Note the kill/day term rewards finishing fast, while the flat −300 punishes no
 finishing at all — so an aggressive short game and a thorough long one are both
 viable, which is a more interesting shape than the ancestor's pure rate.
 
-### Enemy count per level — random, not fixed
+### Enemy count per level — UNRESOLVED
+
+Read this section in order; the first model it proposes is contradicted by the
+readings that follow it, and the conclusion is that we do not yet know.
 
 One new game per command level:
 
@@ -106,11 +109,49 @@ enemies = level * 10 + random(0..~12)
 
 **Fitted, not confirmed.** Five samples fix the base convincingly, since every
 reading lands at or above `level × 10`, but they only bound the spread from
-below — the true upper limit may exceed the 12 we happened to see. Several new
-games at a single level would tighten it.
+below — the true upper limit may exceed the 12 we happened to see.
 
 The core test asserts the *band* rather than a single number, across all five
 levels and 199 seeds. Asserting an exact count would be asserting a fiction.
+
+#### …and then three level-3 games in a row all gave 42
+
+Which contradicts the model above. Under `level × 10 + rand(0..12)`, three
+consecutive identical draws is roughly a 1-in-169 event. The count is very
+probably **not drawn afresh per game**.
+
+But it does not simply resolve to "deterministic per level" either:
+
+| Level | Readings |
+|---|---|
+| 1 | 18 |
+| 2 | 32 |
+| 3 | **40**, then **42, 42, 42** |
+| 4 | 42 |
+| 5 | 53 |
+
+Level 3 gave two different answers, and levels 3 and 4 both gave 42 — an odd
+shape for a difficulty ladder. Gaps of 14, 10, 0, 11 are no more regular than
+the random reading was.
+
+**Leading hypothesis:** the seed is fixed for the lifetime of the *program*,
+not the game, so games started without leaving EGA Trek reproduce the same
+galaxy, while a fresh launch draws again. That would explain 42 three times in
+one sitting and 40 in an earlier one.
+
+**Discriminating experiment**, not yet run:
+
+1. Quit all the way out to DOS. Relaunch. Play level 3, note the count.
+2. Without exiting, start a second level-3 game. Note it.
+3. Quit to DOS again, relaunch, level 3 once more.
+
+If readings 1 and 2 match but 3 differs, the seed is per-launch. If all three
+match, something else is going on and `level × 10` is wrong too.
+
+**The code has not been changed on this evidence.** The current model produces
+counts consistent with every reading taken so far (42 falls inside level 3's
+band and level 4's), so nothing is failing — but its *shape* is in doubt, and
+churning it on ambiguous data would be worse than leaving it flagged.
 
 ### Ranks
 
@@ -135,8 +176,10 @@ nothing in it at all.
 
 ## Still outstanding
 
-1. ~~Enemy count per level~~ — **done**, see above. Spread bound could be
-   tightened with several runs at one level.
+1. **Enemy count per level — REOPENED.** Three level-3 games in a row all
+   gave 42, contradicting the per-game random model. See the discriminating
+   experiment above: relaunch-vs-replay tells us whether the seed is fixed
+   per program launch.
 
 2. **Travel costs.** Energy and time for a warp jump of known distance at a
    known warp factor, and the same for impulse. Needs `E` before and after,
