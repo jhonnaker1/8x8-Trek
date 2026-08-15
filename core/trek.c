@@ -135,14 +135,18 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     for (i = 0; i < GAL_CELLS; i++) {
         gal_enemies[i] = 0;
         gal_base[i]    = BASE_NONE;
-        gal_stars[i]   = (uint8_t)(1 + trek_rand_n(8));   /* 1..8 */
+        /* 0..8. CONFIRMED that empty quadrants exist: the original's chart
+           showed 000 at quadrant 8,3 -- no enemies, no base, no stars. An
+           earlier draft forced at least one star per quadrant. */
+        gal_stars[i]   = trek_rand_n(9);
         gal_known[i]   = 0;
     }
 
-    /* PROVISIONAL enemy count. Higher command levels face more ships
-       (manual l.229-232); the exact table is one of the things to read out
-       of EGATREK.EXE. */
-    total = (uint16_t)(12 + level * 4);
+    /* Fitted from five readings of the original, one per command level --
+       see the note in trek.h. Higher levels face more ships (manual
+       l.229-232), but the count is random within a level's range rather
+       than fixed. */
+    total = (uint16_t)(level * ENEMY_PER_LEVEL + trek_rand_n(ENEMY_SPREAD));
     ship.enemies_left = total;
 
     while (total) {
@@ -167,9 +171,10 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     }
 
     ship.energy       = ENERGY_START;
-    ship.shields      = 0;
+    ship.impulse      = IMPULSE_START;
+    ship.shields      = SHIELD_START;    /* full, and lowered -- see trek.h */
     ship.torps        = TORPS_START;
-    ship.warp         = 50;              /* warp 5.0 */
+    ship.warp         = WARP_START;
     ship.shields_up   = 0;
     ship.stardate     = STARDATE_START;
     ship.stardate_end = (uint16_t)(STARDATE_START + MISSION_TENTHS);
@@ -203,6 +208,53 @@ static void advance_time(uint16_t tenths) {
     else ship.energy = (uint16_t)(ship.energy + gain);
 }
 
+/* Pool access by the 1/2/3 numbering the original's dialog uses. Returning
+   pointers keeps trek_divert free of a switch per side. */
+static uint16_t *pool(uint8_t which) {
+    switch (which) {
+        case POOL_MAIN:    return &ship.energy;
+        case POOL_IMPULSE: return &ship.impulse;
+        case POOL_SHIELDS: return &ship.shields;
+        default:           return 0;
+    }
+}
+
+static uint16_t pool_max(uint8_t which) {
+    switch (which) {
+        case POOL_MAIN:    return ENERGY_MAX;
+        case POOL_IMPULSE: return IMPULSE_MAX;
+        case POOL_SHIELDS: return SHIELD_MAX;
+        default:           return 0;
+    }
+}
+
+uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost) {
+    uint16_t *src = pool(from);
+    uint16_t *dst = pool(to);
+    uint16_t cap, room, wasted = 0;
+
+    if (lost) *lost = 0;
+    if (!src || !dst || from == to) return DIVERT_ILLOGICAL;
+    if (amount > *src) return DIVERT_SHORT;
+
+    cap = pool_max(to);
+    room = (uint16_t)(*dst >= cap ? 0 : cap - *dst);
+
+    /* Anything over the destination's ceiling is destroyed, not returned --
+       see the note in trek.h. This is why energy is not conserved here. */
+    if (amount > room) {
+        wasted = (uint16_t)(amount - room);
+        *dst = cap;
+    } else {
+        *dst = (uint16_t)(*dst + amount);
+    }
+
+    *src = (uint16_t)(*src - amount);
+    if (lost) *lost = wasted;
+
+    return DIVERT_OK;
+}
+
 uint8_t trek_set_warp(uint8_t tenths) {
     if (tenths < WARP_MIN || tenths > WARP_MAX) return 0;
     ship.warp = tenths;
@@ -224,15 +276,17 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
     /* PROVISIONAL: IMPULSE_ENERGY_UNIT per sector of distance. Nothing in
        the manual fixes impulse cost; it is set above the converter's output
        over the same interval so crossing a quadrant is a net loss. */
+    /* Drawn from the impulse engines' own pool, not the main banks --
+       confirmed on screen: the original tracks them separately. */
     cost = (uint16_t)(((d >> 4) * IMPULSE_ENERGY_UNIT) >> 4);
-    if (cost > ship.energy) return MOVE_NO_ENERGY;
+    if (cost > ship.impulse) return MOVE_NO_ENERGY;
 
     sector[(ship.sec_y << 3) | ship.sec_x] = SEC_EMPTY;
     ship.sec_y = sy;
     ship.sec_x = sx;
     sector[target] = SEC_SHIP;
 
-    ship.energy = (uint16_t)(ship.energy - cost);
+    ship.impulse = (uint16_t)(ship.impulse - cost);
     advance_time((uint16_t)(d >> 8));   /* PROVISIONAL: 0.1 stardate/sector */
     return MOVE_OK;
 }

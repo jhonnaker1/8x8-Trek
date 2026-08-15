@@ -70,18 +70,43 @@ static void test_generation(void) {
     puts("galaxy generation");
 
     trek_new_game(3, 12345);
-    expect = 12 + 3 * 4;
+    expect = 3 * ENEMY_PER_LEVEL;   /* lower bound; the rest is random */
 
     for (i = 0; i < GAL_CELLS; i++) {
         enemies += gal_enemies[i];
         if (gal_base[i] != BASE_NONE) bases++;
-        if (gal_stars[i] < 1 || gal_stars[i] > 8) starless++;
+        if (gal_stars[i] > 8) starless++;
     }
 
-    ok(enemies == expect,       "enemy total matches the level formula");
-    ok(ship.enemies_left == (uint16_t)expect, "enemies_left agrees with the galaxy");
+    /* A range, not an equality: the original's count is random within the
+       level's band, so pinning it to one number would be asserting a
+       fiction. */
+    ok(enemies >= expect && enemies < expect + ENEMY_SPREAD,
+       "enemy total sits inside the fitted level band");
+    ok(ship.enemies_left == (uint16_t)enemies,
+       "enemies_left agrees with the galaxy");
+
+    /* Every level's band must start at level*10 and stay inside the spread,
+       across many seeds -- this is what would notice a base or spread that
+       drifted away from the five readings taken off the original. */
+    {
+        uint8_t lvl;
+        uint16_t seed;
+        int bad = 0;
+        for (lvl = 1; lvl <= 5; lvl++) {
+            for (seed = 1; seed < 200; seed++) {
+                trek_new_game(lvl, seed);
+                if (ship.enemies_left < (uint16_t)(lvl * ENEMY_PER_LEVEL) ||
+                    ship.enemies_left >= (uint16_t)(lvl * ENEMY_PER_LEVEL + ENEMY_SPREAD))
+                    bad++;
+            }
+        }
+        ok(bad == 0, "all five levels stay in band across 199 seeds");
+    }
+
+    trek_new_game(3, 12345);   /* restore the state the rest of this test uses */
     ok(bases >= 2 && bases <= 4, "between two and four bases placed");
-    ok(starless == 0,            "every quadrant has 1..8 stars");
+    ok(starless == 0,            "every quadrant has 0..8 stars");
 
     {
         int over = 0;
@@ -95,6 +120,12 @@ static void test_generation(void) {
        "ship coordinates are in range");
     ok(ship.energy == ENERGY_START && ship.torps == TORPS_START,
        "ship starts fully supplied");
+    /* Three pools, as the original's ENGINEERING REPORT shows. Shields start
+       charged and lowered -- charge and raised-state are independent. */
+    ok(ship.impulse == IMPULSE_START, "impulse engines start with their own pool");
+    ok(ship.shields == SHIELD_START,  "shields start fully charged");
+    ok(ship.shields_up == 0,          "...but lowered");
+    ok(ship.warp == WARP_START,       "opens at warp 1.0 like the original");
 }
 
 static void test_determinism(void) {
@@ -251,6 +282,55 @@ static void test_warp(void) {
     ok(r == MOVE_SAME_PLACE, "warping to where we already are is refused");
 }
 
+/* Energy transfer, including the rule that surplus poured into a full pool
+   is destroyed rather than refused or returned. */
+static void test_divert(void) {
+    uint16_t lost;
+    uint8_t r;
+
+    puts("energy transfer");
+
+    /* Every pool starts at its maximum, so at the opening of a game there is
+       nowhere for energy to go and ANY transfer destroys what it moves. Room
+       has to be made first -- which is why the observed 5000 -> 4500 into
+       full shields was not bad luck but the only possible outcome. */
+    trek_new_game(3, 111);
+    ok(ship.energy == ENERGY_MAX && ship.impulse == IMPULSE_MAX &&
+       ship.shields == SHIELD_MAX, "all three pools start full");
+
+    ship.energy = (uint16_t)(ENERGY_MAX - 500);   /* make exactly 500 of room */
+    r = trek_divert(POOL_SHIELDS, POOL_MAIN, 500, &lost);
+    ok(r == DIVERT_OK,                     "shields -> main accepted");
+    ok(ship.shields == SHIELD_START - 500, "shields debited");
+    ok(ship.energy == ENERGY_MAX,          "main credited, at its ceiling");
+    ok(lost == 0,                          "nothing lost when there is room");
+
+    ok(trek_divert(POOL_MAIN, POOL_MAIN, 10, &lost) == DIVERT_ILLOGICAL,
+       "same pool both ways is illogical");
+    ok(trek_divert(POOL_MAIN, 9, 10, &lost) == DIVERT_ILLOGICAL,
+       "a pool that does not exist is illogical");
+    ok(trek_divert(POOL_IMPULSE, POOL_MAIN, 60000, &lost) == DIVERT_SHORT,
+       "cannot divert more than the source holds");
+
+    /* The exact transfer observed in DOSBox-X: 500 from main into shields
+       that were already full. Main fell to 4500, shields stayed at 2500,
+       and the energy was gone. */
+    trek_new_game(3, 222);
+    r = trek_divert(POOL_MAIN, POOL_SHIELDS, 500, &lost);
+    ok(r == DIVERT_OK,                        "main -> full shields accepted");
+    ok(ship.energy == ENERGY_START - 500,     "main debited the full 500");
+    ok(ship.shields == SHIELD_MAX,            "shields unchanged at maximum");
+    ok(lost == 500,                           "all 500 reported destroyed");
+
+    /* Partial overflow: half lands, half is destroyed. */
+    trek_new_game(3, 333);
+    trek_divert(POOL_SHIELDS, POOL_MAIN, 200, &lost);   /* make 200 of room */
+    r = trek_divert(POOL_MAIN, POOL_SHIELDS, 500, &lost);
+    ok(r == DIVERT_OK,             "partial overflow accepted");
+    ok(ship.shields == SHIELD_MAX, "shields back to the ceiling");
+    ok(lost == 300,                "the 300 that did not fit is destroyed");
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -258,6 +338,7 @@ int main(void) {
     test_determinism();
     test_quadrant_contents();
     test_reveal();
+    test_divert();
     test_impulse();
     test_warp();
 

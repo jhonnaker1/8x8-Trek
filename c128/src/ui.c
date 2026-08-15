@@ -184,12 +184,17 @@ void ui_draw_status(void) {
 
     clear_panel(P_STATUS);
 
+    /* Nine rows, no blank spacers. The previous layout used spacers and ran
+       ENEMIES onto the panel's bottom border -- visible in the first VICE
+       capture, where the border line ran straight through the word. The
+       mission-deadline row is gone with them: the original's panel shows no
+       such figure, and ours was invented.
+
+       Energy is three separate pools, as the original's ENGINEERING REPORT
+       shows -- main banks, impulse engines, and shield charge. */
     scr_puts(lx, y, "STARDATE", COL_LABEL);
     put_tenths(vx, y, ship.stardate, COL_VALUE);
     y++;
-    scr_puts(lx, y, "ENDS", COL_LABEL);
-    put_tenths(vx, y, ship.stardate_end, COL_VALUE);
-    y += 2;
 
     scr_puts(lx, y, "QUADRANT", COL_LABEL);
     put_num(vx, y, (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
@@ -201,11 +206,16 @@ void ui_draw_status(void) {
     put_num(vx, y, (uint16_t)(ship.sec_y + 1), 1, COL_VALUE);
     scr_put((unsigned char)(vx + 1), y, 44, COL_VALUE);
     put_num((unsigned char)(vx + 2), y, (uint16_t)(ship.sec_x + 1), 1, COL_VALUE);
-    y += 2;
+    y++;
 
     scr_puts(lx, y, "ENERGY", COL_LABEL);
     put_num(vx, y, ship.energy, 5, COL_VALUE);
     y++;
+    scr_puts(lx, y, "IMPULSE", COL_LABEL);
+    put_num(vx, y, ship.impulse, 5, COL_VALUE);
+    y++;
+    /* Green when raised: the charge figure alone does not say whether the
+       shields are actually up. */
     scr_puts(lx, y, "SHIELDS", COL_LABEL);
     put_num(vx, y, ship.shields, 5,
             ship.shields_up ? EGA_TO_VDC(EGA_LTGREEN) : COL_VALUE);

@@ -42,14 +42,46 @@
 #define BASE_RESEARCH   2
 #define BASE_SUPPLY     3
 
-/* PROVISIONAL -- not yet confirmed against EGATREK.EXE in a debugger. The
-   manual fixes the shield ceiling (l.501) and the converter rate (l.265);
-   the rest are plausible starting values chosen to make the game playable,
-   and are expected to change. */
-#define ENERGY_START    3000
-#define ENERGY_MAX      3000
-#define SHIELD_MAX      2500     /* manual l.501 */
+/* CONFIRMED against the original running in DOSBox-X, 2026-08-15, by reading
+   its ENGINEERING REPORT (the E command) at the start of a level-3 game:
+
+       1) Main Energy:      5000.0   100%
+       2) Impulse Engines:   500.0   100%
+       3) Shields:          2500.0   100%
+
+   Energy is held in THREE separate pools, not one, and the E command diverts
+   between them -- which is why the manual's energy dialog is numbered 1/2/3.
+   Shields start FULL. Shield charge and shields-raised are different things;
+   an earlier draft here conflated "not raised" with "no charge", and the
+   manual's remark about raising shields drawing "a small amount of energy
+   from the main energy banks" (l.339) is the raise cost, not the charge.
+
+   The percentage beside each figure is CHARGE, not state of repair -- 4500
+   of 5000 reads 90%, 2000 of 2500 reads 80%. Damage is shown by colouring
+   the row red instead ("Systems marked in red are damaged"). So these three
+   maxima are confirmed values, not guesses. */
+#define ENERGY_START    5000
+#define ENERGY_MAX      5000
+#define IMPULSE_START    500
+#define IMPULSE_MAX      500
+#define SHIELD_START    2500
+#define SHIELD_MAX      2500     /* manual l.501, confirmed on screen */
+
+/* STILL PROVISIONAL -- no reading taken yet. */
 #define TORPS_START     10
+
+/* Enemy count, FITTED from five readings of the original (one per command
+   level): 18, 32, 40, 42, 53. Those are not a straight line -- level 4 only
+   just exceeds level 3 -- so the count is random within a level-dependent
+   range. Subtracting a level*10 base leaves 8, 12, 10, 2, 3: small,
+   non-negative, and uncorrelated with level.
+
+   Fitted, not confirmed. Five samples fix the base convincingly (every
+   reading is at or above level*10) but only bound the spread from below --
+   the true upper limit could exceed the 12 we happened to see. More new
+   games at a single level would tighten it. */
+#define ENEMY_PER_LEVEL   10
+#define ENEMY_SPREAD      13     /* trek_rand_n(13) gives the observed 0..12 */
 #define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */
 
 /* Stardates are carried in tenths, so these exceed cc65's 16-bit signed int
@@ -60,6 +92,8 @@
 #define WARP_MIN        10       /* tenths: warp 1.0 */
 #define WARP_MAX        80       /* tenths: warp 8.0, emergency (manual l.250) */
 #define WARP_CRUISE     60       /* tenths: warp 6.0, safe cruising */
+#define WARP_START      10       /* CONFIRMED: the original opens at warp 1.0,
+                                    not the 5.0 an earlier draft assumed */
 
 /* Travel must cost more than the converter replaces while you travel, or
    energy stops being a resource and the whole supply/docking loop collapses.
@@ -88,8 +122,9 @@ extern uint8_t sector[QUAD_CELLS];
 typedef struct {
     uint8_t  quad_y, quad_x;
     uint8_t  sec_y, sec_x;
-    uint16_t energy;
-    uint16_t shields;
+    uint16_t energy;        /* main banks -- warp drive draws from here */
+    uint16_t impulse;       /* impulse engines have their own pool */
+    uint16_t shields;       /* shield charge, separate from shields_up */
     uint8_t  torps;
     uint8_t  warp;          /* tenths, 10..80 */
     uint8_t  shields_up;
@@ -124,6 +159,27 @@ uint16_t trek_dist(uint8_t dy, uint8_t dx);
 
 void trek_new_game(uint8_t level, uint16_t seed);
 void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
+
+/* Energy transfer between the three pools -- the E command.
+ *
+ * CONFIRMED in DOSBox-X: transferring into a pool that is already at its
+ * maximum destroys the surplus. Diverting 500 from main into full shields
+ * left main at 4500 and shields still at 2500; the energy simply vanished.
+ * The original has strings for exactly this ("ILLOGICAL", "ENERGY LOST"),
+ * which we had extracted from the binary long before seeing it happen.
+ * Total energy is therefore NOT conserved across a careless transfer.
+ *
+ * `lost` receives the amount destroyed, so the UI can report it; pass NULL
+ * if the caller does not care. */
+#define POOL_MAIN        1
+#define POOL_IMPULSE     2
+#define POOL_SHIELDS     3
+
+#define DIVERT_OK        0
+#define DIVERT_ILLOGICAL 1   /* same pool, or a pool that does not exist */
+#define DIVERT_SHORT     2   /* source does not hold that much */
+
+uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
 
 uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);
