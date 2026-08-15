@@ -55,8 +55,10 @@ static void test_no_16bit_overflow(void) {
 
     ok((d_max >> 4) * w_max <= 65535UL,
        "warp cost intermediate (d>>4)*warp fits uint16");
-    ok(d_max * 25UL <= 65535UL,
-       "warp time numerator d*25 fits uint16");
+    ok((d_max >> 4) * 39UL <= 65535UL,
+       "warp time numerator (d>>4)*39 fits uint16");
+    ok(w_max * w_max <= 65535UL,
+       "squared warp fits uint16 before scaling");
     ok((d_max >> 4) * 20UL <= 65535UL,
        "impulse cost intermediate (d>>4)*20 fits uint16");
     ok(d_max * w_max > 65535UL,

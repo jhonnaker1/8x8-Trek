@@ -101,11 +101,20 @@
    faster than you can regenerate it."
 
    The first draft of these was too cheap and a one-quadrant hop at warp 5
-   turned a profit; the core test now asserts a net loss. Both scales are
-   PROVISIONAL pending the debugger. Units work out to
-   energy = distance_in_quadrants * warp_factor * 10 * WARP_ENERGY_SCALE. */
-#define WARP_ENERGY_SCALE     3
-#define IMPULSE_ENERGY_UNIT  60  /* per sector of distance */
+   turned a profit; the core test now asserts a net loss. Units work out to
+   energy = distance_in_quadrants * warp_factor * 10 * WARP_ENERGY_SCALE.
+
+   Warp cost is MEASURED at two points -- roughly 194 units for one quadrant
+   at warp 5 and 710 at warp 8 -- giving cost = 1.5 * distance * warp^3. The
+   exponent (2.76 from those two) is well supported; the 1.5 is not precise.
+   It lives in trek_move_warp rather than here because the expression has to
+   be staged to stay inside 16 bits. Earlier linear and quadratic guesses
+   predicted 320 and 512 at warp 8 and were both refuted.
+
+   IMPULSE_ENERGY_UNIT is MEASURED: sector 6,6 -> 6,5, a distance of exactly
+   1, cost 6.3 units (493.8 -> 487.5); an earlier hop cost 6.2. The previous
+   value of 60 was ten times too expensive. */
+#define IMPULSE_ENERGY_UNIT   6  /* per sector -- measured, see above */
 
 /* Galaxy, as four flat byte arrays rather than an array of structs. Flat
    arrays carry no padding, so the 68000 alignment tax the commodore-uno

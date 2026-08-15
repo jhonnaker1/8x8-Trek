@@ -307,13 +307,49 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
        (l.255). Shifted in two stages rather than one so the intermediate
        stays inside 16 bits: d maxes at 2534 and warp at 80, whose product
        would overflow. */
-    cost = (uint16_t)((((d >> 4) * ship.warp) >> 4) * WARP_ENERGY_SCALE);
+    /* MEASURED: cost = 1.5 * distance * warp^3, from two readings off the
+       original -- ~194 for one quadrant at warp 5, ~710 at warp 8. Warp rose
+       x1.6 and cost x3.66, which puts the exponent at 2.76; cube reproduces
+       both within 8%, while the linear model this replaces predicted 320 at
+       warp 8. Fitted from two points, so the exponent is well supported but
+       the 1.5 is not precise.
+
+       Staged to stay in 16 bits: warp^3 is built in two steps from tenths
+       (max 512), and the distance factor is divided down before the multiply
+       rather than after, which a single expression could not do without
+       overflowing. */
+    {
+        uint16_t d44 = (uint16_t)(d >> 4);                      /* max 158 */
+        uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
+                                   (uint16_t)ship.warp) / 10);  /* max 640 */
+        wc = (uint16_t)((wc * (uint16_t)ship.warp) / 100);      /* warp^3 */
+        cost = (uint16_t)(((((d44 * 3u) >> 2) * wc) >> 3));     /* max 7552 */
+    }
     if (ship.shields_up) cost = (uint16_t)(cost * 2);
     if (cost > ship.energy) return MOVE_NO_ENERGY;
 
-    /* time = distance / warp, in tenths of a stardate. Scaled by 25/64
-       rather than 100/256 to keep the numerator under 65535. */
-    tenths = (uint16_t)((uint16_t)(d * 25) / (uint16_t)(64 * ship.warp));
+    /* MEASURED: time goes as distance / warp SQUARED, not distance / warp.
+       Three readings off the original -- 1 quadrant at warp 8 in 0.2
+       stardates, 1 at warp 5 in ~0.4, and 4 at warp 2 in 11.0. Warp 2 to 8
+       is four times the speed but 13.75 times the time per quadrant; 1/warp
+       predicts 4, 1/warp^2 predicts 16. The fitted constant is 10, giving
+       0.16 / 0.4 / 10.0 against those observations.
+
+       The previous distance/warp model was five times too fast at warp 2,
+       which is what let a 4-quadrant trip look like 2 stardates instead of
+       11 -- and that error is why the energy reading for that trip clipped
+       against the 5000 ceiling and was lost.
+
+       Held in 16 bits by scaling distance down to 4.4 fixed point and the
+       squared warp down by the same 16, rather than by a single multiply
+       that would overflow. */
+    {
+        uint16_t d44 = (uint16_t)(d >> 4);                       /* max 158 */
+        uint16_t wsq = (uint16_t)(((uint16_t)ship.warp *
+                                   (uint16_t)ship.warp) >> 4);   /* max 400 */
+        if (wsq == 0) wsq = 1;
+        tenths = (uint16_t)((d44 * 39u) / wsq);                  /* max 6162 */
+    }
 
     ship.quad_y = qy;
     ship.quad_x = qx;

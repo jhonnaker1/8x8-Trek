@@ -193,6 +193,160 @@ game**, which is how the protocols in "Still outstanding" are written. Any
 experiment phrased as "play game A, then play game B and compare" is invalid
 here.
 
+### Travel costs — converter rate confirmed, impulse measured, warp pending
+
+All readings taken inside one game, with main energy first dropped to 3000 by
+diverting 2000 into already-full shields, so the 5000 ceiling could not clip
+the result. Without that step the first attempt showed no energy use at all —
+the jump cost less than the converter replaced, and the cap hid it.
+
+**Converter rate: 400 per stardate, confirmed.** An impulse hop showed main
+rising 3005.7 → 3022.4 with the Date apparently unchanged at 3501.8.
+`16.7 ÷ 400 = 0.042` stardates, which rounds to the same displayed figure. The
+manual's rate (l.265) is what the code actually does.
+
+**Impulse: about 6.3 energy per sector, about 0.042 stardates per sector.**
+Sector 6,6 → 6,5 is a distance of exactly 1; impulse fell 493.8 → 487.5. An
+earlier hop cost 6.2. Impulse draws **only** from its own pool — main rose
+across the same move, which independently confirms the three-pool model.
+
+Our previous values were 60 energy and 0.1 stardates per sector: ten times too
+expensive, and about twice too slow.
+
+**Warp: roughly 194 units for one quadrant at warp 5, ±20.** From
+`+5.7 = 400 × 0.5 − cost` over an interval containing one such jump. The error
+bar comes from the Date display rounding to a tenth.
+
+**Warp 8, one quadrant: about 710 units.** Main 3039.0 → 2409.3 over 0.2
+stardates, so 629.7 spent plus 80 refilled. A clean reading — impulse (481.3)
+and shields (2407.0) were identical across both frames, so nothing but the
+warp touched main. The `>>ALERT<<` was a cloaked Vandal present in the
+quadrant, not damage taken.
+
+**Both earlier candidates are refuted.** Linear (`40 × warp`) predicted 320,
+quadratic (`8 × warp²`) predicted 512. Neither is close to 710.
+
+| Warp | Cost, one quadrant | Ratio to warp 5 |
+|---|---|---|
+| 5 | ~194 | — |
+| 8 | ~710 | ×3.66 |
+
+Warp rose ×1.6 and cost ×3.66. Square would give ×2.56, cube ×4.10. The
+exponent sits **between square and cube, nearer cube**.
+
+`1.33 × warp³ + 27` passes through both points exactly. That is not evidence:
+two points fit any two-parameter curve, and quoting it as a result would be
+numerology. **A third warp factor is needed**, and a low one discriminates
+best — the candidate curves are far apart at the bottom of the range and
+bunched at the top.
+
+**Flight time goes as distance / warp², not distance / warp.** This came out
+of an attempt to measure the warp-2 cost, which failed — 4 quadrants at warp 2
+took **11.0 stardates**, the converter returned 4400 against 2591 of headroom,
+and main clipped at 5000. The cost was lost, but the timing was the more
+valuable result.
+
+| Warp | Distance | Stardates | per quadrant |
+|---|---|---|---|
+| 8 | 1 | 0.2 | 0.20 |
+| 5 | 1 | ~0.4 | ~0.40 |
+| 2 | 4 | 11.0 | 2.75 |
+
+Warp 2 → 8 is four times the speed but 13.75 times the time per quadrant.
+`1/warp` predicts a factor of 4, `1/warp²` predicts 16. Fitting all three
+gives `time ≈ 10 × distance / warp²`, reproducing 0.16 / 0.4 / 10.0 against
+0.2 / 0.4 / 11.0.
+
+The old `distance/warp` model was five times too fast at warp 2 — which is
+exactly why that trip was expected to take 2 stardates, why the headroom was
+sized for 800 units of refill instead of 4400, and why the reading clipped.
+
+**The cost figures are unaffected**, since they were computed from *measured*
+elapsed time rather than modelled.
+
+#### Cost model applied: 1.5 × distance × warp³
+
+Correcting the time model made the cost model's error visible: longer flights
+mean more refill, and at warp 5 the corrected timing put 160 units back
+against a modelled cost of 150, so travel turned a profit again and the core
+test caught it — the same assertion that caught the original inversion.
+
+Two well-separated points give an exponent of 2.76, so cube is adopted. It
+reproduces 187 against 194 at warp 5, and 768 against 710 at warp 8. The
+exponent is well supported; the leading 1.5 is not precise.
+
+**Distance has still never been varied at fixed warp.** Both cost readings are
+one-quadrant jumps, so linearity in distance remains an assumption. The next
+measurement should be **2 quadrants at warp 8**, where the flight is short
+enough (~0.3 stardates, ~125 refilled) that a predicted ~1536 cost is not
+swamped — and where a clean result would confirm or break linearity in one
+reading.
+
+**Stardate precision is a problem for our model.** The original resolves time
+far finer than it displays: 0.042 stardates elapsed while the panel showed no
+change. Our `stardate` is in tenths, so a one-sector impulse hop rounds to zero
+elapsed time and earns no converter output. Storing elapsed hundredths since
+mission start would fit `uint16_t` comfortably (a 30-stardate mission is 3000)
+and display as `3500.0 + elapsed/100`. Not yet done — it touches the UI's
+`put_tenths` as well, and belongs in its own change rather than bundled into a
+measurement.
+
+**The main viewer confirms the distance model.** It reads `∅ 45.0` and
+`△ 1.41` — bearing in degrees, distance in sectors. 1.41 is √2, an object one
+sector diagonally away, so distance is plain Euclidean in sector units. Our
+8.8 table gives 362/256 = 1.414 for that case.
+
+### Cloaking, seen in the viewer
+
+The main viewer labelled a contact `VANDAL (CLOAKED)` while the status panel
+showed `>>ALERT<<`. So cloaking is a state the viewer reports rather than an
+absence of information, and a cloaked Vandal still raises the alert. The
+binary's strings carry `Vandal activates cloaking device.` as a response to
+being fired on, so the mechanic has at least two faces: entering cloaked, and
+cloaking under fire.
+
+### The Vandal Death Pod
+
+Observed live, mid-measurement: *"Vandal Death Pod enters quadrant: 93 unit
+hit on Lexington."* Shields absorbed it, 2500 → 2407.
+
+**Not in the manual at all.** The binary's strings carry both this message and,
+at line 535 of `reference/strings.txt`, a variant where the Lexington is
+destroyed outright; the end-of-game text at line 495 lists death by Vandal
+death pod among the ways a mission can end. So it is a lethal random event that
+can arrive in a quiet quadrant with no enemies on the scan and the status
+still Green.
+
+Practically, it is a third hazard to measurement alongside the tractor beam and
+ordinary combat.
+
+### Incidental findings from a spoiled travel run
+
+A travel-cost run was contaminated before it produced a usable point, but
+confirmed three things on the way.
+
+**The long-range tractor beam is real, and it is a hazard to measurement.**
+The Lexington was seized mid-experiment and dragged into quadrant 3-3, which
+held four Mongols. This is one of the mechanics found only in the binary's
+strings — the manual never mentions it. Practically: any measurement run can
+be ended at any moment by being yanked into a fight, so travel readings must
+be taken over the shortest possible sequence, one move at a time, and
+abandoned the instant anything else happens.
+
+**Energy is fractional.** The report showed `3829.2`. The original tracks
+energy as a real, not an integer. Our core uses `uint16_t` throughout by
+design, so it cannot reproduce tenths — acceptable for a port, but it means
+our figures will drift from the original's by sub-unit amounts over a long
+game, and any future comparison should be made to a tolerance rather than
+expecting equality.
+
+**Enemy fire is heavy.** Three simultaneous hits of 299, 300 and 196 units,
+from Mongols at varying distances, with shields down. Against a 2500 shield
+pool that is a serious threat, and it gives an order of magnitude for the
+combat work: hits are hundreds of units, not tens. Damage is printed per hit
+with the firing ship's sector, which is exactly the instrumentation the combat
+measurements will need.
+
 ### Ranks
 
 The Hall of Fame keeps a separate entry per command level, confirming the
