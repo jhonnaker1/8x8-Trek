@@ -333,17 +333,37 @@ checklist of *which situations need a message*, not as text to copy.
   `reference/` is gitignored — the shareware terms require any distributed copy
   to be complete and unmodified, and ours is neither.
 - C128-VDC skeleton stood up: `core/ega.h`, `c128/src/{vdc,egavdc,layout,main}`,
-  builds to 2,329 bytes with cl65.
+  builds to 2,353 bytes with cl65.
 - EGA→VDC colour mapping derived, implemented and proven (`make test`).
+- **Milestone 1 seen running in VICE (2026-08-15).** All ten panels draw with
+  titles inset in the top border, and the sixteen-colour ramp renders. Both
+  things flagged as likely-wrong turned out right: the hand-derived PETSCII
+  box-drawing screen codes in `layout.h` are correct, and the colour mapping
+  holds on emulated hardware.
+- **Fixed: panel titles rendered as blank space.** cc65 translates string
+  literals to PETSCII for Commodore targets, so an uppercase `A` in the source
+  reaches the driver as PETSCII `$C1` (193), not ASCII `$41` — confirmed in the
+  linked binary, where `"6=BROWN"` assembles to `36 3d c2 d2 cf d7 ce`.
+  `ascii_to_screencode` covered 32-63, 64-95 and 97-122, so every letter fell
+  through to its `return 32` and became a space, while digits and punctuation —
+  which PETSCII leaves at their ASCII values — came through fine. The screen
+  read `0-15` where `EGA PALETTE 0-15` was written. One added range in
+  `vdc.c` fixes it.
+
+  **This is the silent-failure class again, and the existing test could not
+  have caught it.** `test_egavdc.c` works because `egavdc.h` is a header the
+  native compiler can include; `ascii_to_screencode` sits in `vdc.c` next to
+  the `$D600` pokes, out of reach of `cc`. Worth lifting into its own header so
+  a native test can feed it PETSCII `$C1`-`$DA` and assert screen codes 1-26.
 
 ## Open questions / next steps
 
-1. **Verify the C128 build on screen** — `cd c128 && make run`. Nothing has
-   actually been *seen* yet: a Claude Code session on this machine can't
-   screenshot an emulator (`screencapture` has no display access; driving VICE's
-   remote monitor halts emulation and wedges the GUI). Most likely thing to be
-   wrong is the PETSCII box-drawing screen codes in `layout.h`, derived by hand.
-   If borders render as letters, that's where to look.
+1. **Make `ascii_to_screencode` testable.** Lift it out of `vdc.c` into its own
+   header so `cc` can reach it, then assert PETSCII `$C1`-`$DA` → screen codes
+   1-26 alongside the existing colour test. See the PETSCII entry under Done —
+   that bug shipped precisely because this one function was untestable.
+   (Verifying the build on screen is done: a session here still can't screenshot
+   an emulator, so Jamie ran `make run` and sent the capture back.)
 2. **Capture the original at full 640×350** in DOSBox-X and correct the
    provisional panel table in `c128/src/layout.c`. The only layout source so far
    is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for

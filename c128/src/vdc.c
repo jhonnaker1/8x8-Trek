@@ -45,19 +45,32 @@ void wait_vsync(void) {
     while (VIC_RASTER == 0) {}
 }
 
-/* ASCII -> C64/C128 screen code, used by scr_puts only.
+/* String literal -> C64/C128 screen code, used by scr_puts only.
+ *
+ * What arrives here is PETSCII, not ASCII. cc65 translates string literals to
+ * the target character set for Commodore targets, so an uppercase 'A' written
+ * in the source reaches this function as PETSCII $C1 (193), not ASCII $41.
+ * Confirmed in the linked binary -- "6=BROWN" assembles to
+ * 36 3d c2 d2 cf d7 ce. Digits and punctuation survive translation at their
+ * ASCII values; letters do not.
+ *
+ * Missing the 193-218 range failed silently rather than loudly: those bytes
+ * matched no branch and fell through to `return 32`, so every panel title
+ * rendered as spaces while digits came through untouched. The screen read
+ * "0-15" where "EGA PALETTE 0-15" was written, and "U.S.S. LEXINGTON" as three
+ * periods. Nothing looked broken -- it looked empty.
  *
  * Everything else in this driver takes a RAW screen code. That split is
- * deliberate: the PETSCII box-drawing glyphs the console is built from live
- * at screen codes 64-127, which is exactly the range this function rewrites
- * (it maps 64-95 down by 64 for uppercase). Routing panel glyphs through it
- * would silently turn borders into letters. Strings are text and get
- * converted; glyphs are glyphs and do not. */
+ * deliberate: the box-drawing glyphs the console is built from live at screen
+ * codes 64-127, which overlaps the ranges rewritten below. Routing panel
+ * glyphs through here would silently turn borders into letters. Strings are
+ * text and get converted; glyphs are glyphs and do not. */
 static unsigned char ascii_to_screencode(char c) {
     unsigned char u = (unsigned char)c;
-    if (u >= 32 && u <= 63) return u;
-    if (u >= 64 && u <= 95) return u - 64;
-    if (u >= 97 && u <= 122) return u - 96;
+    if (u >= 32 && u <= 63) return u;           /* space, digits, punctuation */
+    if (u >= 64 && u <= 95) return u - 64;      /* @A-Z[\]^_ -- lowercase in source */
+    if (u >= 97 && u <= 122) return u - 96;     /* untranslated ASCII lowercase */
+    if (u >= 193 && u <= 218) return u - 192;   /* PETSCII A-Z -- uppercase in source */
     return 32;
 }
 

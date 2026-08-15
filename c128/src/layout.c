@@ -13,7 +13,7 @@ const Panel panels[PANEL_COUNT] = {
     {  0, 13, 20,  4, "LASERS" },
     {  0, 17, 20,  4, "COMMAND" },
     { 20, 13, 26,  8, "MAIN VIEWER" },
-    { 46, 13, 34,  8, "COMMUNICATORS" },
+    { 46, 13, 34,  8, "COMMUNICATIONS" },
 
     {  0, 21, 20,  4, "U.S.S. LEXINGTON" },
     { 20, 21, 26,  4, "SYSTEMS STATUS" },
