@@ -84,10 +84,10 @@ Note the kill/day term rewards finishing fast, while the flat −300 punishes no
 finishing at all — so an aggressive short game and a thorough long one are both
 viable, which is a more interesting shape than the ancestor's pure rate.
 
-### Enemy count per level — UNRESOLVED
+### Enemy count per level — RESOLVED (random confirmed, spread still loose)
 
-Read this section in order; the first model it proposes is contradicted by the
-readings that follow it, and the conclusion is that we do not yet know.
+Read this section in order. It records two wrong turns before the answer: a fit
+from non-independent samples, then a hypothesis that a relaunch disproved.
 
 One new game per command level:
 
@@ -155,27 +155,43 @@ count for a given level is stable. The lone 40 is the odd one out — it was the
 *first* game after launch, before any Play Again, which is the one reading
 taken from a different state than all the others.
 
-**Discriminating experiment**, not yet run. The point is to vary the one thing
-that has never been varied — relaunching:
+#### Resolved by relaunching: the prediction was wrong, the model stands
 
-| # | Do | Expected if the hypothesis holds |
-|---|---|---|
-| A | Quit to the DOS prompt. Relaunch. Level 3. | 40, matching the original first-after-launch reading |
-| B | Play Again, level 3, without exiting | 42 |
-| C | Quit to DOS, relaunch, level 3 | same as A |
+A fresh launch from the DOS prompt, level 3, gave **35**. The hypothesis above
+predicted 40. It was wrong.
 
-If A and C agree and B differs, the galaxy is a function of launch state plus
-how many games have been played, and **the original is reproducible** — which
-would be a considerable gift for every measurement after this one, since the
-travel-cost and combat experiments both want the same galaxy under both arms
-of a comparison.
+Level 3 has now produced three distinct counts:
 
-If A, B and C all agree, then `level × 10` is wrong too and this starts over.
+| Reading | Context |
+|---|---|
+| 40 | launch 1, first game |
+| 42, 42, 42 | launch 1, via Play Again |
+| 35 | launch 2, first game |
 
-**The code has not been changed on this evidence.** The current model produces
-counts consistent with every reading taken so far (42 falls inside level 3's
-band and level 4's), so nothing is failing — but its *shape* is in doubt, and
-churning it on ambiguous data would be worse than leaving it flagged.
+Two conclusions, one of them costly:
+
+- **A random component is confirmed.** The same command level yields different
+  counts, so the count is genuinely drawn, not a function of level alone. The
+  fit committed in `ecde3a4` survives — the observed 35–42 sits entirely inside
+  the band that model gives level 3 (30–42); its lower half simply has not been
+  sampled.
+- **Per-launch reproducibility is dead.** Two fresh launches gave 40 and 35, so
+  there is no stable galaxy to anchor experiments to. That was the outcome
+  worth hoping for and it did not happen.
+
+Still unexplained: why three consecutive Play Again games at one level returned
+identical counts, when a fourth reading at the same level from a different
+launch did not. Under a uniform 30–42 draw that is a 1-in-169 event; under the
+narrower 35–42 actually observed, about 1 in 64. Uncommon, not impossible.
+Possibly Play Again reseeds from a value that only changes on launch. Not worth
+more readings right now — it does not affect the model, only the explanation.
+
+**Practical consequence for everything that follows.** Since a galaxy cannot be
+reproduced, no measurement may rely on comparing two games. Travel costs and
+combat damage must be taken as **before-and-after readings inside a single
+game**, which is how the protocols in "Still outstanding" are written. Any
+experiment phrased as "play game A, then play game B and compare" is invalid
+here.
 
 ### Ranks
 
@@ -200,10 +216,10 @@ nothing in it at all.
 
 ## Still outstanding
 
-1. **Enemy count per level — REOPENED.** Three level-3 games in a row all
-   gave 42, contradicting the per-game random model. See the discriminating
-   experiment above: relaunching from DOS is the one variable never tested --
-   every reading so far came via Play Again, so none were independent samples.
+1. **Enemy count — spread bound.** Randomness is confirmed and the committed
+   band contains every reading, but only 35..42 of level 3's 30..42 has been
+   sampled. Low-value now; the model is consistent either way.
+
 
 2. **Travel costs.** Energy and time for a warp jump of known distance at a
    known warp factor, and the same for impulse. Needs `E` before and after,
