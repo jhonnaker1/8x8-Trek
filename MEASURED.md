@@ -116,9 +116,25 @@ levels and 199 seeds. Asserting an exact count would be asserting a fiction.
 
 #### …and then three level-3 games in a row all gave 42
 
-Which contradicts the model above. Under `level × 10 + rand(0..12)`, three
-consecutive identical draws is roughly a 1-in-169 event. The count is very
-probably **not drawn afresh per game**.
+Which contradicts the model above — and then a second fact undermined the
+reasoning that produced it.
+
+The first response to the three 42s was that under `level × 10 + rand(0..12)`,
+three identical draws is a 1-in-169 event. **That argument was wrong**, because
+it assumed independent samples. Every reading here — the five-level survey and
+the three repeats alike — was taken via the game's own **Play Again** prompt,
+within one program lineage. Nobody relaunched from DOS.
+
+If Play Again does not reseed, three identical level-3 results are not a
+coincidence at all; they are the expected outcome. And the same objection
+applies retroactively to the five-level survey: those five numbers were never
+five independent draws, so the "random spread" they appeared to show is
+unsupported. The remainders 8, 12, 10, 2, 3 may be nothing more than one seed's
+worth of arithmetic.
+
+What survives is weaker but real: **every reading lands at or above
+`level × 10`**, across five levels. That is consistent with a `level × 10`
+base. It is not evidence of a per-game random term.
 
 But it does not simply resolve to "deterministic per level" either:
 
@@ -134,19 +150,27 @@ Level 3 gave two different answers, and levels 3 and 4 both gave 42 — an odd
 shape for a difficulty ladder. Gaps of 14, 10, 0, 11 are no more regular than
 the random reading was.
 
-**Leading hypothesis:** the seed is fixed for the lifetime of the *program*,
-not the game, so games started without leaving EGA Trek reproduce the same
-galaxy, while a fresh launch draws again. That would explain 42 three times in
-one sitting and 40 in an earlier one.
+**Leading hypothesis:** Play Again does not reseed, so within one launch the
+count for a given level is stable. The lone 40 is the odd one out — it was the
+*first* game after launch, before any Play Again, which is the one reading
+taken from a different state than all the others.
 
-**Discriminating experiment**, not yet run:
+**Discriminating experiment**, not yet run. The point is to vary the one thing
+that has never been varied — relaunching:
 
-1. Quit all the way out to DOS. Relaunch. Play level 3, note the count.
-2. Without exiting, start a second level-3 game. Note it.
-3. Quit to DOS again, relaunch, level 3 once more.
+| # | Do | Expected if the hypothesis holds |
+|---|---|---|
+| A | Quit to the DOS prompt. Relaunch. Level 3. | 40, matching the original first-after-launch reading |
+| B | Play Again, level 3, without exiting | 42 |
+| C | Quit to DOS, relaunch, level 3 | same as A |
 
-If readings 1 and 2 match but 3 differs, the seed is per-launch. If all three
-match, something else is going on and `level × 10` is wrong too.
+If A and C agree and B differs, the galaxy is a function of launch state plus
+how many games have been played, and **the original is reproducible** — which
+would be a considerable gift for every measurement after this one, since the
+travel-cost and combat experiments both want the same galaxy under both arms
+of a comparison.
+
+If A, B and C all agree, then `level × 10` is wrong too and this starts over.
 
 **The code has not been changed on this evidence.** The current model produces
 counts consistent with every reading taken so far (42 falls inside level 3's
@@ -178,8 +202,8 @@ nothing in it at all.
 
 1. **Enemy count per level — REOPENED.** Three level-3 games in a row all
    gave 42, contradicting the per-game random model. See the discriminating
-   experiment above: relaunch-vs-replay tells us whether the seed is fixed
-   per program launch.
+   experiment above: relaunching from DOS is the one variable never tested --
+   every reading so far came via Play Again, so none were independent samples.
 
 2. **Travel costs.** Energy and time for a warp jump of known distance at a
    known warp factor, and the same for impulse. Needs `E` before and after,
