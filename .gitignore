@@ -1,0 +1,23 @@
+# Reference material — deliberately NOT tracked.
+#
+# reference/ holds Nels Anderson's EGA Trek (1988-92) shareware package and
+# material derived from it. Its licence (reference/manual.txt, "SHAREWARE")
+# requires that any distributed copy include egatrek.exe, egatrek.doc,
+# egatrek.ref, orderfrm.txt, egatrek.txt and file_id.diz *unmodified*. What is
+# on disk here is neither complete (no orderfrm.txt, no file_id.diz) nor
+# unmodified (manual.txt is egatrek.doc with control codes stripped;
+# EGATREK_unpacked.exe is LZEXE-unpacked; strings.txt is extracted). Publishing
+# it would be redistribution on terms the licence does not grant.
+#
+# Fetch it yourself from the Internet Archive item `EGATrek`.
+reference/
+
+# Build output
+build/
+*.o
+*.prg
+*.xex
+*.d64
+*.adf
+
+.DS_Store
