@@ -7,8 +7,34 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: design only. No code yet.** Research and decisions are recorded in
-> [`NOTES.md`](NOTES.md); this README summarises where things stand.
+> **Status: first code landed.** The C128-VDC port has a working build — VDC
+> driver, EGA→VDC colour mapping, and the nine-panel console skeleton. Research
+> and decisions are recorded in [`NOTES.md`](NOTES.md).
+
+## The original, and why I'm doing this
+
+EGA Trek was written by **Nels Anderson** and released as shareware between 1988
+and 1992. It took the 1978 *Super Star Trek* everyone had typed out of a BASIC
+listing and gave it a real command console — nine panels of scanners, gauges,
+damage reports and incoming messages, all live at once, in 16 colours at
+640×350. Nothing else on a PC looked like that. You weren't reading a game
+report any more; you were sitting in the chair.
+
+I loved this game. I spent hours in that console, and the shape of it — where
+the galaxy chart sat, the way messages stacked up faster than you could
+acknowledge them, the sinking feeling when a system dropped off the status
+list mid-fight — has stuck with me for decades.
+
+Anderson asked for suggestions in the manual, and said outright that many of
+the game's features came from the people who played it and wrote in. That's
+the spirit I want to keep going. This project isn't trying to replace EGA Trek
+— the original still runs, and you should go play it. It's trying to carry the
+game onto the machines it never reached, as faithfully as each one allows.
+
+**All credit for the design, and for the game itself, belongs to Nels
+Anderson.** EGA Trek remains his work under its own shareware terms; this
+remake is a separate implementation, and nothing here relicenses or replaces
+it. If you enjoy the original, register it — that was always the deal.
 
 ## Why not DOS
 
@@ -26,11 +52,11 @@ binary and absent from the docs.
 
 ## Targets
 
-| Platform | Display | Notes |
-|---|---|---|
-| **Commodore 128 (VDC)** | 80×25 text, 8×8 cell | The console is an 80×25 grid at EGA's 8×14 — the VDC maps it **1:1**, and shares EGA's 16-colour RGBI palette, so the original colours reproduce exactly. Per-cell foreground only; coloured panel fills need the reverse-video bit. |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×200 hires, 16 colours | Same width and colour count as mode 10h, and EGA's 2-bit-per-gun levels land exactly on `$0/$5/$A/$F`, so the palette is reproduced rather than approximated. One binary for PAL and NTSC. |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 640×200 bitmap, 16 colours | VBXE's **HR** overlay mode is 640×N at 4bpp — the same spec as the Amiga target, with a blitter. Verified against Altirra's `vbxe.cpp`, not the documentation. |
+| Platform | Display | Status | Notes |
+|---|---|---|---|
+| **Commodore 128 (VDC)** | 80×25 text, 8×8 cell | In progress | The console is an 80×25 grid at EGA's 8×14 — the VDC maps it **1:1**. Same sixteen colours as EGA but at different indices (`I R G B` vs `R G B I`), so conversion is a 4-bit rotate; 15 of 16 exact, EGA's brown reads olive. Per-cell foreground only; coloured panel fills need the reverse-video bit. |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×200 hires, 16 colours | Designed | Same width and colour count as mode 10h, and EGA's 2-bit-per-gun levels land exactly on `$0/$5/$A/$F`, so the palette is reproduced rather than approximated. One binary for PAL and NTSC. |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 640×200 bitmap, 16 colours | Designed | VBXE's **HR** overlay mode is 640×N at 4bpp — the same spec as the Amiga target, with a blitter. Verified against Altirra's `vbxe.cpp`, not the documentation. |
 
 Ordering between the Amiga and VBXE legs is still open. The 40-column colour
 machines (C64, Plus/4, CBM-II, MEGA65, CoCo 3) are viable but need a paged UI,
@@ -39,6 +65,19 @@ since a nine-panel console does not fit in 40 columns.
 The core obeys 8-bit rules from line one even where the host doesn't force it —
 no `float`, `double`, `malloc` or `long`; explicit-width types throughout; 8.8
 fixed point with a precomputed distance table instead of runtime `sqrt`.
+`core/` is compiled by each platform rather than copied into it, so it cannot
+drift.
+
+## Building
+
+Needs [cc65](https://cc65.github.io/) on your `PATH`; `make run` also needs
+[VICE](https://vice-emu.sourceforge.io/).
+
+```sh
+cd c128 && make        # build/trek128.prg
+cd c128 && make run    # launch it in x128 (the picture is on the VDC window)
+cd c128 && make test    # prove the EGA->VDC colour mapping natively
+```
 
 ## Reference material is not in this repository
 
