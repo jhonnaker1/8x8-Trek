@@ -275,12 +275,39 @@ Two well-separated points give an exponent of 2.76, so cube is adopted. It
 reproduces 187 against 194 at warp 5, and 768 against 710 at warp 8. The
 exponent is well supported; the leading 1.5 is not precise.
 
-**Distance has still never been varied at fixed warp.** Both cost readings are
-one-quadrant jumps, so linearity in distance remains an assumption. The next
-measurement should be **2 quadrants at warp 8**, where the flight is short
-enough (~0.3 stardates, ~125 refilled) that a predicted ~1536 cost is not
-swamped — and where a clean result would confirm or break linearity in one
-reading.
+#### Distance linearity: refuted
+
+Two quadrants at warp 8. Main 5000.0 → 3985.5 over 0.4 stardates, so 1014.5
+spent plus 160 refilled: **cost ≈ 1174.5**.
+
+Against ~710 for one quadrant at the same warp, that is a ratio of **1.65, not
+2.0**. The linear model predicted 1536 and was over by 31%.
+
+**Time is linear in distance** across the same pair — 0.2 → 0.4 stardates —
+so only the cost needed changing.
+
+A fixed overhead per jump plus a per-distance term fits both points: `a + b·d`
+gives a ≈ 245, b ≈ 465 at warp 8. Normalised by warp³ that is roughly
+
+```
+cost = (0.5 + 0.9 x distance) x warp^3
+```
+
+which reproduces all three readings: 171 against 194 at warp 5 (−12%), 704
+against 710 (−1%), and 1152 against 1174.5 (−2%). The warp-5 point is the
+weakest of the three — its interval contained impulse hops as well as the
+jump — so the two 8s carry the fit.
+
+**Where this stops being worth refining.** The remaining ambiguity is whether
+the sublinearity is a genuine fixed overhead per jump or a fractional power of
+distance. Both forms fit the readings we have and predict the same thing for
+one- and two-quadrant jumps; they only separate at four or more quadrants, and
+then by about 8% — inside the noise our ±0.1-stardate date resolution allows.
+For a port, either is indistinguishable in play.
+
+Travel is therefore called done at three cost points and three time points.
+The next measurement effort belongs on **combat**, which has no readings at
+all and is a far larger body of unknowns.
 
 **Stardate precision is a problem for our model.** The original resolves time
 far finer than it displays: 0.042 stardates elapsed while the panel showed no
@@ -375,10 +402,10 @@ nothing in it at all.
    sampled. Low-value now; the model is consistent either way.
 
 
-2. **Travel costs.** Energy and time for a warp jump of known distance at a
-   known warp factor, and the same for impulse. Needs `E` before and after,
-   since the panel gauges are analog. `WARP_ENERGY_SCALE` and
-   `IMPULSE_ENERGY_UNIT` are still invented.
+2. ~~Travel costs~~ — **done.** Three cost points, three time points; further
+   refinement is inside the noise. See above.
+
+
 3. **Torpedo count at start**, and whether it varies by level.
 4. **Combat.** Laser damage against distance, the effect of the temperature
    and efficiency gauges, enemy return fire, and the boarding-party mechanic

@@ -322,8 +322,17 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
         uint16_t d44 = (uint16_t)(d >> 4);                      /* max 158 */
         uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
                                    (uint16_t)ship.warp) / 10);  /* max 640 */
+        uint16_t f;
         wc = (uint16_t)((wc * (uint16_t)ship.warp) / 100);      /* warp^3 */
-        cost = (uint16_t)(((((d44 * 3u) >> 2) * wc) >> 3));     /* max 7552 */
+
+        /* Cost is SUBLINEAR in distance: two quadrants at warp 8 cost 1174,
+           only 1.65x the 710 that one quadrant cost, where a linear model
+           demanded 2x. A fixed overhead per jump plus a per-distance term
+           fits -- roughly (0.5 + 0.9 * distance) * warp^3, in 1/256ths
+           below. Time, by contrast, IS linear in distance (0.2 -> 0.4
+           stardates over the same pair), so only the cost needed changing. */
+        f = (uint16_t)(128 + d44 * 14);                         /* max 2340 */
+        cost = (uint16_t)((wc * (f >> 5)) >> 3);                /* max 4672 */
     }
     if (ship.shields_up) cost = (uint16_t)(cost * 2);
     if (cost > ship.energy) return MOVE_NO_ENERGY;
