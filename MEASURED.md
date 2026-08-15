@@ -380,6 +380,113 @@ The Hall of Fame keeps a separate entry per command level, confirming the
 manual's table (l.238-244): Lt. Commander, Commander, Captain, Commodore,
 Admiral for levels 1 through 5.
 
+## Session 2 — 2026-08-15, combat
+
+The run that produced these readings was a wreck from the first stardate: a
+long-range tractor beam pulled the ship into quadrant 6,5 at date 3500.6 and
+the ambush volley destroyed the short-range scanner, life support and the
+shield generators outright. It was kept alive purely as a laboratory, and it
+turned out to be a good one — laser measurement needs only the energy we
+choose, the target's sector, and the efficiency figure the game prints.
+
+### Laser damage — RESOLVED, linear in distance
+
+Two volleys at a fixed 300 units per target, from sector 8,2:
+
+| Target | distance | energy | damage | eff printed | damage ÷ eff |
+|---|---|---|---|---|---|
+| 7,3 | 1.414 | 300 | 236 | 85% | 277.6 |
+| 5,4 | 3.606 | 300 | 195 | 89% | 219.1 |
+| 2,1 | 6.083 | 300 | 145 | 93% | 155.9 |
+| 1,6 | 8.062 | 300 |  84 | 82% | 102.4 |
+
+Least squares on the last column gives slope −26.25, intercept 314.6, and
+every residual under 1.1 on values spanning 102 to 278 — R² ≈ 0.9999. Laser
+falloff is LINEAR in distance. Both the inverse-square shape of Super Star
+Trek's combat math and every nonlinear guess we had are refuted.
+
+An intercept of 1.05 × energy is not physical — a laser cannot deliver more
+than is put into it. The efficiency figures above are the ones printed AFTER
+each shot, and the shot's own heating is already in them. Each shot costs 3-4
+points, so refitting against pre-shot efficiency (post + 3) moves the
+intercept to 303 against 300 fired, and the zero crossing to d = 11.99:
+
+    damage = energy * efficiency * (1 - distance / 12)
+
+Intercept equal to the energy spent and a round 12 for the range constant is
+a designed formula rather than a fitted curve, so the pre-shot reading of the
+efficiency is taken as correct. That also fixes the order of operations:
+damage is computed at the efficiency in force when the trigger is pulled, and
+the printed figure is what is left afterwards.
+
+The pre-shot efficiencies are themselves reconstructed (post + 3), not read,
+so the 1/12 is the weaker half of this result. Reading the gauge immediately
+before a volley would settle it.
+
+NOT yet tested: linearity in energy. Every reading above is at 300. The
+manual's claim that laser repair scales damage linearly ("100% working lasers
+will do twice the damage of 50%") implies energy does too, but implication is
+not measurement.
+
+### Efficiency and heat
+
+Each 300-unit shot costs 3-4 percentage points of efficiency, reported as
+"Lasers overheat. Now running at N% efficiency." The message appears after
+every shot, not only at a warning threshold. The manual (l.329-331) says the
+gauge combines heat and battle damage, and "Laser efficiency reduced by
+damage." is printed as its own line at the start of a volley when the laser
+system itself is damaged — so the single printed percentage carries both
+terms, which is what makes it usable as one divisor.
+
+### Laser targeting does NOT need the scanner
+
+Predicted that a short-range scanner at 0% would prevent the laser control
+officer from acquiring targets — the binary carries "SCIENCE: Information not
+available; scanners damaged." and the manual says the scanner is dead below
+50%. Refuted directly: with the scanner at 0% the officer still prompted
+"Amount to fire at 7-3:" and the main viewer still identified the target as
+MONGOL COMMANDER. There is no scanner prerequisite for firing.
+
+### Laser energy comes from main
+
+"Captain, we have insufficient energy! May I suggest the use of a torpedo?"
+fired on the third target of the second volley, with main energy below 300.
+Lasers draw from the main banks, not a weapons pool.
+
+### Enemy return fire — has a hidden per-ship term
+
+Three volleys of incoming fire, ship at sector 8,2 throughout:
+
+| Mongol at | distance | volley 1 | volley 2 | volley 3 |
+|---|---|---|---|---|
+| 7,3 (6,3 in v1) | 1.41 (2.24 in v1) | 584 | 388 | 133 |
+| 5,4 | 3.61 | — | — | 91 |
+| 2,1 | 6.08 | 176 | 100 | 30 |
+| 1,6 | 8.06 | 117 |  79 | 53 |
+
+This cannot be fitted the way our lasers can. The first row is one ship — the
+scanner reported "The commander has moved. He is now at 7-3" — which moved
+CLOSER and hit for LESS, twice. Distance alone cannot produce that.
+
+Output decays every volley, and unevenly: 2,1 fell to 30% of its previous
+shot while 1,6 only fell to 67%. 2,1 is the ship we hit for 145. That points
+at enemy fire scaling with the firing ship's remaining strength, which would
+make return fire a readout of enemy hit points — hit a Mongol and its next
+shot reports how much came off it. Plausible, unconfirmed, and worth testing
+deliberately because it would remove the need to measure enemy HP by killing
+things and summing.
+
+### Incidental
+
+- Enemies retreat across quadrant boundaries mid-fight: "Scout escapes to
+  quad 6-4", with the chart moving 6,5 from 403 to 303 and 6,4 from 403 to
+  503 in the same instant. It came back a turn later.
+- Enemies also arrive mid-fight: "A Mongol has appeared at 5-4".
+- The scanner names the class when either happens (Scout, commander).
+- The galaxy Mongol counter decremented 42 → 41 on the kill.
+- EnTorp tubes took damage to 62%, which by the manual's rule (34-66% = one
+  tube) leaves a single tube. Torpedoes were not measurable in this run.
+
 ## Applied to the code
 
 | Constant | Was | Now |
@@ -406,9 +513,14 @@ nothing in it at all.
    refinement is inside the noise. See above.
 
 
-3. **Torpedo count at start**, and whether it varies by level.
-4. **Combat.** Laser damage against distance, the effect of the temperature
-   and efficiency gauges, enemy return fire, and the boarding-party mechanic
-   that appears nowhere in the manual. The game prints damage figures, so this
-   is measurable the same way.
-5. **Casualty scoring weight**, which needs a game where casualties occur.
+3. **Torpedo count at start**, and whether it varies by level. Still not
+   taken — the scanner panel that carries the count was destroyed before it
+   could be read.
+4. ~~Laser damage against distance~~ — **done.** Linear, `1 - d/12`.
+5. **Laser damage against energy.** Every reading is at 300 units; linearity
+   in energy is assumed, not measured. One volley with two different amounts
+   at known distances settles it.
+6. **Enemy hit points**, and whether return-fire strength tracks them.
+7. **Torpedoes** — damage, and accuracy against distance and shield state.
+8. **The boarding-party mechanic**, which appears nowhere in the manual.
+9. **Casualty scoring weight**, which needs a game where casualties occur.
