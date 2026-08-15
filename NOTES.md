@@ -286,7 +286,15 @@ Everything in [`reference/`](reference):
   half-scale capture of the real 640×350 — so every coordinate in it doubles to
   a true mode 10h pixel position. Usable directly as the layout source.
 - `combat-model.md` — combat math from the 1978 ancestor.
-- `superstartrek.bas` — the 1978 listing itself.
+- `superstartrek.bas` — the 1978 listing itself (`SUPER STARTREK - MAY 16,1978`).
+  Its own header carries the credit chain: original by **Mike Mayfield**;
+  modified version published in DEC's *101 BASIC Games* by **Dave Ahl**;
+  reworked and debugged by **Bob Leedom** (Westinghouse, April & December
+  1974); converted to Microsoft 8K BASIC by **John Gorders**, 16 March 1978.
+  Attributed in the README — this project joins that chain rather than
+  starting one, and Anderson's own manual says he did the same thing (found
+  it on a DEC System 10 in 1974, then ported it to the ZX81, Apple ][, Prime
+  50-series and MS-DOS himself).
 - `unlzexe.c` — from github.com/mywave82/unlzexe.
 
 Sources: Internet Archive item `EGATrek` (holds every release 1988–3.0), and

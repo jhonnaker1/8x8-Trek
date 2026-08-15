@@ -36,6 +36,49 @@ Anderson.** EGA Trek remains his work under its own shareware terms; this
 remake is a separate implementation, and nothing here relicenses or replaces
 it. If you enjoy the original, register it — that was always the deal.
 
+## The lineage
+
+EGA Trek didn't start with Anderson either, and he was the first to say so. In
+his own manual:
+
+> A space combat game similar to EGATrek was one of the first computer games
+> ever written. […] There have probably been more versions of this game written
+> than any other […] I originally discovered the game around 1974 running on a
+> DEC System 10 mini and was soon hooked. I've since written several other
+> versions of the game for computers including the Timex-Sinclair ZX81,
+> Apple ][, Prime 50-series minis and MS-DOS machines, all using BASIC of one
+> sort or another.
+
+So the man who wrote EGA Trek was doing precisely what this project is doing:
+he found a game he loved, and carried it onto every machine he could reach.
+This remake joins a chain rather than starting one.
+
+That chain, as recorded in the header of the 1978 listing itself:
+
+- **Mike Mayfield** — the original *Star Trek*, written for mini and mainframe
+  machines in the early 1970s
+- **Dave Ahl** — the modified version published in DEC's *101 BASIC Games*
+- **Bob Leedom** — the substantial rework and debugging that made it *Super
+  Star Trek*, April and December 1974, at Westinghouse Defense & Electronics
+- **John Gorders** — converted to Microsoft 8K BASIC, 16 March 1978, which is
+  the `SUPER STARTREK - MAY 16,1978` listing this project calibrates against
+- **Nels Anderson** — EGA Trek, 1988–1992, which gave it the nine-panel console
+
+The descent to EGA Trek is not merely stylistic. *Super Star Trek* packs each
+quadrant into its galaxy chart as `K3*100 + B3*10 + S3` — Klingons, starbases,
+stars. Anderson's manual describes his long-range scanner as *"the three digit
+number for each quadrant represents the number of Mongols, type of friendly
+star base, and number of stars (respectively)."* The same encoding, fourteen
+years later. Both use an 8×8 galaxy of 8×8 sectors — which is where this
+project's name comes from.
+
+*Super Star Trek* is used here as **calibration material, not a target**: its
+combat math gives the shape of the curves (damage falloff, the no-damage
+threshold, the scoring formula) while the actual constants get confirmed
+against EGA Trek itself. The working notes are in `reference/combat-model.md`;
+the listing comes from
+[coding-horror/basic-computer-games](https://github.com/coding-horror/basic-computer-games/blob/main/84_Super_Star_Trek/superstartrek.bas).
+
 ## Why not DOS
 
 The original DOS release already exists and is very good. Rebuilding it would
