@@ -25,9 +25,21 @@ case a DOS build is ever wanted, but it's not on the current path.
 **C128-VDC is the first port target.** EGA Trek's console is an 80×25 character
 grid at an 8×14 cell — that is EGA text geometry, and the panels were laid out
 on it. The VDC's 80×25 maps **1:1**; only per-cell pixel detail is lost (8×8 vs
-8×14), not layout. The VDC and EGA also share the same 16-colour RGBI palette,
-so the original colours reproduce exactly. `commodore-uno/c128/src/vdc.c`
-already has the driver, charset redefinition and attribute handling.
+8×14), not layout.
+
+The VDC and EGA carry the same sixteen colours, but **not at the same indices**
+— EGA/CGA is `I R G B` (bit3 intensity), the VDC is `R G B I` (bit0 intensity),
+so the conversion is a 4-bit rotate left. Fifteen of sixteen are then exact;
+EGA 6 is brown only because the CGA palette special-cases it, and the VDC
+renders olive instead. That affects the galaxy chart's base highlight, which
+the manual calls orange (l.289). Implemented in `c128/src/egavdc.h` and proven
+by `c128/test/test_egavdc.c` (`make test`).
+
+Feeding EGA indices straight to the VDC would not be a subtle bug — every
+colour still renders, just as the wrong hue. `commodore-uno/c128/src/vdc.h`
+documents shipping exactly that once ("only shades of blue and green, no red
+or yellow"). `commodore-uno/c128/src/vdc.c` already has the driver, charset
+redefinition and attribute handling.
 
 VDC caveat: attributes carry per-cell *foreground* only; background is global.
 EGA Trek has coloured panel fills. Fix is the reverse-video bit (bit 6) — ink
