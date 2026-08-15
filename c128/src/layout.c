@@ -42,29 +42,14 @@ static void draw_panel(const Panel *p) {
     scr_puts((unsigned char)(p->x + 2), p->y, p->title, TITLE_COL);
 }
 
-/* Milestone 1 check, drawn into the otherwise-empty MAIN VIEWER panel: the
-   sixteen EGA colours in EGA index order, each run through EGA_TO_VDC. If the
-   rotate in egavdc.h is right this reads black, blue, green, cyan, red,
-   magenta, brown, light grey, then the same eight brightened -- i.e. the
-   standard CGA/EGA ramp, directly comparable against the original running in
-   DOSBox-X. A wrong mapping shows the hues out of order, which is the exact
-   failure commodore-uno's vdc.h records having shipped once.
-
-   Index 6 is expected to differ: EGA renders it brown, the VDC olive. */
-static void draw_palette_check(const Panel *p) {
-    unsigned char i;
-    unsigned char x = (unsigned char)(p->x + 2);
-    unsigned char y = (unsigned char)(p->y + 3);
-
-    scr_puts(x, (unsigned char)(p->y + 2), "EGA PALETTE 0-15", EGA_TO_VDC(EGA_LTGRAY));
-    for (i = 0; i < 16; i++) {
-        scr_put((unsigned char)(x + i), y, G_BLOCK, EGA_TO_VDC(i));
-    }
-    scr_puts(x, (unsigned char)(y + 2), "6=BROWN READS OLIVE", EGA_TO_VDC(EGA_DKGRAY));
-}
-
+/* The milestone-1 EGA palette swatch lived in MAIN VIEWER and has been
+   retired: the EGA->VDC mapping it existed to check is now proven natively
+   by core `make test` and by c128 `make test`, and was confirmed on screen
+   in VICE. Leaving it in would have meant a debug aid squatting in a panel
+   that the original uses for the external view and graphical readouts
+   (manual l.294-306). The panel stays empty until there is something real
+   to put in it, rather than filled with something invented. */
 void draw_console(void) {
     unsigned char i;
     for (i = 0; i < PANEL_COUNT; i++) draw_panel(&panels[i]);
-    draw_palette_check(&panels[5]);   /* MAIN VIEWER */
 }

@@ -35,6 +35,9 @@ unsigned char vdc_data_read(void);
 #define VDC_WHITE 15
 
 void vdc_init(void);
+/* Puts back what vdc_init() changed on the machine's behalf, so returning to
+   BASIC leaves a usable C128 rather than one still running at 2MHz. */
+void vdc_shutdown(void);
 void wait_vsync(void);
 void scr_clear(void);
 

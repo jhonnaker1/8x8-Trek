@@ -41,6 +41,19 @@ typedef struct {
 #define PANEL_COUNT 10
 extern const Panel panels[PANEL_COUNT];
 
+/* Indices into panels[]. The UI addresses panels by name so that correcting
+   the geometry above stays a single-site edit. */
+#define P_SCAN      0
+#define P_STATUS    1
+#define P_CHART     2
+#define P_LASERS    3
+#define P_COMMAND   4
+#define P_VIEWER    5
+#define P_COMMS     6
+#define P_BADGE     7
+#define P_SYSTEMS   8
+#define P_DAMAGE    9
+
 void draw_console(void);
 
 #endif

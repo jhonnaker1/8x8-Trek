@@ -1,5 +1,5 @@
 CC65_TARGET = c128
-SRC = src/main.c src/vdc.c src/layout.c
+SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c ../core/trek.c
 OUT = build/trek128.prg
 
 .PHONY: all run test clean
@@ -13,7 +13,7 @@ test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
 
-$(OUT): $(SRC) src/vdc.h src/layout.h src/egavdc.h ../core/ega.h
+$(OUT): $(SRC) src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h ../core/ega.h ../core/trek.h
 	cl65 -t $(CC65_TARGET) -O -o $(OUT) $(SRC)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and

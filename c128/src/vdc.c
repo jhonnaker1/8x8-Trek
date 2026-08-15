@@ -103,6 +103,22 @@ void vdc_init(void) {
     scr_clear();
 }
 
+void vdc_shutdown(void) {
+    /* Back to 1MHz. Leaving the machine at 2MHz would hand BASIC a blanked
+       VIC-IIe screen, which reads as a hung computer. The VDC registers
+       vdc_init() touched are all at their KERNAL defaults already -- screen
+       and attribute bases were never moved, and attribute mode is how the
+       C128 comes up -- so there is nothing else to undo. */
+    C128_CLKRATE &= (unsigned char)~0x01;
+
+    /* Deliberately does NOT clear the screen. BASIC resumes on whichever
+       display the KERNAL owns, and the C128 boots in 40 columns -- so it
+       comes back on the VIC-IIe, in x128's *other* window, not here.
+       Clearing the VDC therefore left the window the player was watching
+       completely black, which reads as a crash rather than as an exit.
+       Leaving the final console up is both more useful and more honest. */
+}
+
 void scr_clear(void) {
     unsigned int i;
     vdc_set_address(VDC_SCREEN_BASE);
