@@ -591,3 +591,64 @@ computed at end-of-game rather than stored -- but the balance of evidence is
 that the mission simply runs until the Mongols are destroyed or the ship is
 lost, and the scoring sheet's "Penalty for incomplete mission" fires on
 quitting or dying with enemies left, not on running out of time.
+
+## Mapping the Turbo Pascal runtime (2026-08-16)
+
+Before reverse engineering the original, it is worth knowing which code is
+Nels Anderson's and which is Borland's. Ghidra has no Turbo Pascal signatures.
+dcc (github.com/nemerle/dcc) does -- `sigs/dcct5p.sig` -- but dcc itself
+cannot get through this binary.
+
+### What dcc actually does on EGATREK
+
+It builds on macOS with Qt5, Boost, and `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`
+(CMake 4.x rejects the bundled cotire module). Then, in order:
+
+1. **It fails to recognise the compiler.** `pattBorl5Init` hard-codes the
+   operand of a `mov [xxxx], es` as `0030`, but that is the address of a
+   data-segment variable and varies per program; ours is `1CA8`. Every other
+   byte of the Turbo Pascal 5 pattern matches. Wildcarding that operand, as
+   the v4 pattern already does, yields "Borland Pascal v5.0 detected".
+2. **Signature matching then works** -- it names INITIALISE, DoubleToFloat,
+   FloatDivide, FloatMult, STACKCHK from the signature file.
+3. **It walks into the game's string pool** at 0x75EE and reports the prose as
+   "80386 instruction 64" (the letter `d`). Its unknown-opcode path calls
+   fatalError and then sets a PROC_BADINST flag it can never reach, so the
+   intent to abandon the procedure was there but unfinished.
+4. Making that non-fatal gets roughly five times further and then
+   **segfaults**. No output file is produced at any point.
+
+Verdict: a 1994 research prototype against a 174KB multi-segment program with
+4970 relocations. Not a route to decompiled C.
+
+### tools/tp_runtime_map.py
+
+The signatures are good even though dcc is not, so this reads the .sig format
+directly and scans. Format is in the script's header; the only trap is that
+the "ht" length field is numKeys * (SymLen + PatLen + 2) while the entries are
+really SymLen + PatLen, so deriving the stride from that field misaligns every
+record after the first. Two signatures need filtering: one is 23 zero bytes
+and matches every run of zeros in the image.
+
+    python3 tools/tp_runtime_map.py <dcc>/sigs/dcct5p.sig \
+        reference/EGATREK_unpacked.exe
+
+### The result
+
+**78 distinct runtime routines**, named -- ASSIGNCRT, CLRSCR, GOTOXY, READKEY,
+TEXTCOLOR, TEXTBACKGROUND, DELAY, SOUND, EXEC, GETENV, GETINTVEC,
+SWAPVECTORS, BlockMove, Read, ReadEOL, CRLF, EXIT, INITIALISE and the
+numbered float and string helpers.
+
+They occupy ONE CONTIGUOUS BAND, 0x2239A..0x2899F of the load module. Nothing
+matched below 0x2239A. So the boundary is clean:
+
+    0x000000 .. 0x2239A   game code and data   140192 bytes  (81%)
+    0x2239A .. 0x02A6E0   Turbo Pascal runtime  33600 bytes  (19%)
+
+Note this CORRECTS the assumption that sent us down this path. "Most of the
+174KB is Borland runtime" was wrong -- the runtime is a fifth of it, and the
+game is the overwhelming bulk. The map is still worth having, because it draws
+a hard line under 26KB of code that never needs reading, and it confirms
+INITIALISE at 0x26920, which is exactly where we located the init routine by
+hand while diagnosing dcc.
