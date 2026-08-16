@@ -634,6 +634,38 @@ units at the same range, had its printed result scroll away -- but 184150
 went 355 -> 292 across those dumps, a fall of exactly **63**, which is what
 `energy * eff * (1 - d/12)` predicts. Eighth confirmation of the model.
 
+### Hit points scale with command level
+
+A level-1 game read through the same table: three battleships in quadrant 7,6
+at **325** each, four more in 8,7 at 325, one in 7,7 at 325 -- nine ships,
+three quadrants, all identical. The 3,2 target was named MONGOL BATTLESHIP in
+the viewer, so this is like-for-like with the level-3 reading of 355.
+
+    30 units across two levels  ->  battleship hp = 310 + 15 * level
+
+Two points define a line; a level-5 game predicting 385 would settle it.
+Whether supply ships scale the same way is untested -- their 120 is a single
+level-3 reading.
+
+Still not found: a Commander or a Scout. Nine ships at level 1 were all
+battleships, so the class mix at low levels is heavily weighted toward them.
+
+### More evidence against a mission deadline
+
+That level-1 game reached stardate **3578** and was still running. Warp
+defaults to 1.0 and our own measured time model (10d / warp^2) puts a
+one-quadrant hop at ~10 stardates there, so a handful of moves burned 78
+stardates. The `MISSION_TENTHS` we invented -- 30 stardates -- would have
+ended it 48 stardates earlier. Independent of the memory scan that found no
+deadline value anywhere in 338KB.
+
+### The galaxy chart is enemies-bases-stars
+
+Confirmed by corroboration rather than by squinting at columns: the message
+"The StarBase in 7-6 reports that it is under attack" arrived while the cell
+for 7,6 read `317`, i.e. 3 enemies, 1 base, 7 stars. An earlier reading in
+this file guessed at the format from column alignment and got it wrong.
+
 ### Enemy fire does track remaining strength after all
 
 With the ship at 3,5 down to 41 of its 355 hit points, its next shot was
@@ -752,7 +784,8 @@ nothing in it at all.
    confirmed exactly on four predicted-in-advance readings.
 5. ~~Laser damage against energy~~ — **done.** Linear; confirmed in the same
    volley at 500 and 250.
-6. ~~Battleship hit points~~ — **done.** 355, read from memory. Supply ships
+6. ~~Battleship hit points~~ — **done.** 355 at level 3, 325 at level 1;
+   scales at 15 per command level. Supply ships
    are 120. Commanders are still bracketed at 441..501 and scouts have never
    been seen; both are now one sighting away, since the table can just be
    read. Level dependence untested.

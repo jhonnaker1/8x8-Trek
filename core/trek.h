@@ -175,6 +175,18 @@
  * it exactly.
  *
  * SCOUT has never been observed at all. */
+/* HIT POINTS SCALE WITH COMMAND LEVEL. A battleship reads 325 in a level-1
+ * game and 355 in a level-3 one -- 30 across two levels, so 15 per level:
+ *
+ *     battleship hp = 310 + 15 * level
+ *
+ * Both readings were confirmed as battleships in the viewer, and nine ships
+ * across three level-1 quadrants all read exactly 325. Two points define a
+ * line, so a level-5 game (predicting 385) would settle it.
+ *
+ * The constants below are the LEVEL-3 values, which is what the core uses
+ * today; the scaling is not modelled yet. Whether supply ships scale the same
+ * way is untested -- 120 is a single level-3 reading. */
 #define HP_BATTLESHIP       355  /* read from memory, level 3 */
 #define HP_SUPPLY           120  /* read from memory, level 3 */
 #define HP_COMMAND          500  /* inferred, bracketed 441..501 */
