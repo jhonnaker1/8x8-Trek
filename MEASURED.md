@@ -69,10 +69,42 @@ Quitting prints an itemised evaluation. Every weight is given explicitly:
 | Stars destroyed | −5 each |
 | Bases hit | −200 each |
 | Penalty for incomplete mission | −300 (flat) |
-| Casualties on board | weight unknown — the count was 0, so no figure was shown |
+| Casualties on board | −1 each |
+| Loss of ship | −200 (flat) |
 
 Quitting immediately at stardate 3500.0 with nothing done scores **−300**,
 which is the incomplete-mission penalty alone. That checks out.
+
+The casualty weight was taken in session 2, from a game quit at 3501.2 after
+a heavy fight: 18 casualties scored −18, so −1 each. That sheet also settles
+two more points and raises one question.
+
+    0     Rescues @ 200 each.......................0
+          Penalty for incomplete mission........-300
+    1     Mongols killed @ 10 each................10
+    1     Commanders killed @ 20 each.............20
+    0     Enemy bases destroyed @ 50 each..........0
+    0.00  Kill/day ratio @ 500 per day.............0
+    18    Casualties on board Lexington..........-18
+    0     Stars destroyed @ -5 each................0
+    0     Bases hit @ -200 each....................0
+          TOTAL.................................-288
+
+The arithmetic closes exactly, so no term is hidden.
+
+MONGOLS AND COMMANDERS ARE COUNTED SEPARATELY. Two ships died in that game, a
+Commander and a standard battleship, and they are itemised as one of each --
+so the +10 is for standard ships only.
+
+LOSS OF SHIP DID NOT APPEAR, because that game was quit rather than lost. The
+binary carries "Penalty for loss of ship.........-200", so the weight is
+known; the line has never been seen to fire.
+
+UNEXPLAINED: the kill/day ratio printed 0.00 against two kills in 1.2 elapsed
+stardates, which is about 1.67 and would have been worth 833. Something gates
+that term. The plausible guess is that it credits only on a completed
+mission, given the incomplete-mission penalty is also present on this sheet,
+but that is a guess and the term should not be implemented from it.
 
 **This supersedes the Super Star Trek model** in `reference/combat-model.md`,
 which had scoring as `1000 × (kills/stardates)²`. EGA Trek's kill-rate term is
@@ -681,4 +713,6 @@ nothing in it at all.
 10. **Torpedo accuracy.** No miss has been observed at all — two for two at
    ranges 1.4 and 3.0, both with shields up. Long range is untested.
 11. **The boarding-party mechanic**, which appears nowhere in the manual.
-12. **Casualty scoring weight**, which needs a game where casualties occur.
+12. ~~Casualty scoring weight~~ — **done.** −1 each.
+13. **The kill/day term.** Printed 0.00 with two kills in 1.2 stardates. See
+    the scoring section; do not implement it until the gate is understood.
