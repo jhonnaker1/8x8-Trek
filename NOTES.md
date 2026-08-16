@@ -486,3 +486,100 @@ factor.**
 
 The C64 is a perfectly good target but the *hard* one for this game — 40 columns
 against a nine-panel console means solving paging first and the game second.
+
+## Driving the original under automation (2026-08-16)
+
+Observational measurement — read a number off the screen, infer a rule — got
+us the laser model, but it has two hard limits: every reading costs a human
+keystroke and a pasted screenshot, and anything statistical (torpedo accuracy,
+the random component of enemy fire) needs more samples than that can supply.
+
+`dosbox-automation` (github.com/dosbox-automation/dosbox-automation) is a
+DOSBox fork with an HTTP REST API: screenshots, scripted input, Lua, and
+read/write access to guest memory and CPU registers. It ships Linux and
+Windows binaries only, but it builds on macOS from source.
+
+### Building it on this machine
+
+Two obstacles, both environmental rather than the project's fault:
+
+1. The `release-macos-arm64` preset hard-codes `"generator": "Xcode"`, and the
+   Xcode generator is broken here — it fails to find a compiler even for a
+   two-line CMake hello-world, so it is a CMake 4.4.2 / Xcode 26.6 problem.
+   Configure by hand with Unix Makefiles and the preset's cache variables:
+
+       cmake -S . -B build/rel-arm64 -G "Unix Makefiles" \
+         -DIS_PRESET_USED=TRUE \
+         -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake \
+         -DVCPKG_TARGET_TRIPLET=arm64-osx \
+         -DCMAKE_OSX_ARCHITECTURES=arm64 \
+         -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+         -DCMAKE_BUILD_TYPE=Release
+
+   All 15 vcpkg dependencies build clean; so does the project.
+
+2. The build does not install resources, and a missing GLSL shader is FATAL --
+   `set_fallback_shader_or_exit` aborts the process. Copy `resources/shaders`
+   and `resources/shader-presets` into
+   `~/Library/Preferences/dosbox-automation/`.
+
+Two smaller traps: `DOSBOX_API_TOKEN` must be exactly 64 hex characters or it
+is silently regenerated, and the MOUNT policy anchors on the directory of the
+`-conf` file. Keeping the conf in `reference/` (already gitignored) is what
+makes `EGATREK.EXE` reachable. Launch:
+
+    DOSBOX_API_TOKEN=$(openssl rand -hex 32) \
+      <build>/dosbox --noprimaryconf --conf reference/trek-auto.conf
+
+### What the instrument can and cannot do
+
+- `GET /video/frame?format=png` returns the screen, so readings no longer need
+  a human in the loop.
+- `GET /video/text` is USELESS for the game. EGA Trek runs in BIOS mode 16
+  (640x350 EGA graphics), so `is_text_mode` is false and the damage figures
+  are bitmap glyphs, not characters. Frames plus reading them is the route.
+- `POST /input/type` types characters but does NOT submit; Enter has to go
+  through `POST /input/sequence` as an explicit `KBD_enter` press/release.
+- `POST /memory/search` takes an integer and a width, which is the wrong shape
+  for this game -- see below.
+
+### The state is Turbo Pascal reals, so scan, do not search
+
+Searching for 2500 with shields visibly at 2500 returns ZERO matches, and
+tenths (25000) and the warp factor as an integer both fail the same way. The
+game is Turbo Pascal and holds its state as `real`: a biased exponent byte
+then a 39-bit mantissa with an implicit leading 1. The integer search cannot
+express that, so pull the region down with `GET /memory/{off}/{len}` and scan
+it locally. `core/../scratchpad/scan.py` in the session did exactly this.
+
+`GET /dos/internals` gives EGATREK's MCB -- segment 483, 338304 bytes -- which
+bounds every scan to linear 7728..346032.
+
+### The ship record
+
+Scanning for known values lands the whole thing in one contiguous block, in
+(current, maximum) pairs six bytes apart:
+
+    181910, 181922, 181928   stardate 3500 (three copies)
+    181934                   impulse 500
+    181940 / 181946          energy 5000 / 5000
+    181952 / 181958          shields 2500 / 2500
+    181964 / 181970          warp 5.0 / 5.0
+    181976 / 181982          9999 / 9999   (unidentified)
+    182000                   3505.000      (unidentified)
+    182012                   3506.699      (unidentified)
+
+### There is probably no mission deadline
+
+`MISSION_TENTHS` (30 stardates) has always been our invention -- the manual
+never mentions a time limit and the console shows no such figure. Scanning the
+entire 338KB for any real between 3500 and 3620 returns exactly three values:
+3502.520, 3505.000 and 3506.699. There is no 3530, and nothing resembling a
+deadline anywhere in the program's memory.
+
+The two near-term values sit right after the ship record and look like event
+timers rather than a mission end. Not yet conclusive -- a deadline could be
+computed at end-of-game rather than stored -- but the balance of evidence is
+that the mission simply runs until the Mongols are destroyed or the ship is
+lost, and the scoring sheet's "Penalty for incomplete mission" fires on
+quitting or dying with enemies left, not on running out of time.
