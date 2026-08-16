@@ -533,6 +533,25 @@ The main viewer shows bearing and distance to the current target: "∠45.0
 confirmed against our own dist_tab, and future readings can be taken off the
 viewer rather than computed from sector numbers.
 
+### Torpedoes — count is 9
+
+Not in the scanner panel where the manual's example puts it. The count is the
+3x3 array of red stars below the shields dial, one star per torpedo: nine at
+the start of a level-3 game, eight after firing one. Three tubes and nine
+torpedoes. Our guess of 10 was wrong. Whether it varies by level is untested.
+
+The command takes a count, then a sector per torpedo in the same two-digit
+form the move command uses:
+
+    Number to fire: 1
+    Sector to fire #1 at: 35
+    Tracking #1
+    Mongol at 3-5 destroyed!
+
+A kill reports only the kill, with no damage figure, so measuring torpedo
+damage needs a target that survives one. The Commander it killed here was
+already carrying 441 from the laser volley.
+
 ### Incidental
 
 - Enemies retreat across quadrant boundaries mid-fight: "Scout escapes to
@@ -557,6 +576,7 @@ viewer rather than computed from sector numbers.
 | enemy count | `12 + level*4`, fixed | `level*10 + rand(0..12)` |
 | laser damage | SST's inverse-square | `energy * eff * (1 - d/12)` |
 | `SHIELD_RAISE_COST` | not modelled | 50 |
+| `TORPS_START` | 10 (guessed) | 9 |
 
 Stars can be zero: the chart showed `000` at quadrant 8,3 — a quadrant with
 nothing in it at all.
@@ -572,10 +592,8 @@ nothing in it at all.
    refinement is inside the noise. See above.
 
 
-3. **Torpedo count at start**, and whether it varies by level. Still not
-   taken. It is not in the scanner panel where the manual's example puts it;
-   the likeliest candidate is the small array of red dots right of the Mongol
-   counter. Firing one torpedo and watching that panel settles it.
+3. ~~Torpedo count at start~~ — **done.** Nine. Whether it varies by level is
+   still untested.
 4. ~~Laser damage against distance~~ — **done.** `energy * eff * (1 - d/12)`,
    confirmed exactly on four predicted-in-advance readings.
 5. ~~Laser damage against energy~~ — **done.** Linear; confirmed in the same

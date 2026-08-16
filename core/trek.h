@@ -67,8 +67,11 @@
 #define SHIELD_START    2500
 #define SHIELD_MAX      2500     /* manual l.501, confirmed on screen */
 
-/* STILL PROVISIONAL -- no reading taken yet. */
-#define TORPS_START     10
+/* MEASURED at command level 3: nine, shown as a 3x3 array of red stars below
+   the shields dial, one per torpedo. Firing one put it out. Three tubes and
+   nine torpedoes is a coherent bit of design; an earlier guess of 10 was
+   wrong. Whether the count varies by level is untested. */
+#define TORPS_START      9
 
 /* Enemy count, FITTED from five readings of the original (one per command
    level): 18, 32, 40, 42, 53. Those are not a straight line -- level 4 only
