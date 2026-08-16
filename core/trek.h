@@ -151,27 +151,34 @@
  * comparisons against it must shift. */
 #define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */
 
-/* Enemy hit points. PROVISIONAL, but bracketed by observation rather than
-   guessed outright:
+/* Enemy hit points.
  *
- * COMMAND is the tightest. A commander survived a single 441-unit laser hit
- * (500 units at range 1.414, lasers at 100%), so it holds more than 441. In
- * an earlier game a commander took roughly 265 and then 236 -- about 501 --
- * and died. 500 satisfies both, which is why it is not a round-number guess.
- * The lower of those two figures is reconstructed from an inferred
- * efficiency, so the upper end of the bracket is softer than the lower.
+ * BATTLESHIP and SUPPLY are READ DIRECTLY out of the original's memory. The
+ * game keeps a table of the current quadrant's enemies as 6-byte records of
+ * three 16-bit words -- y, x, hit points -- and firing on a ship decrements
+ * the third word by exactly the damage the game prints. See MEASURED.md for
+ * the addresses and the method.
  *
- * BATTLESHIP is bounded from below only: one survived 81 + 81 = 162, and the
- * run ended before the third shot. It is also bounded from above by the
- * torpedoes, since one torpedo destroys an undamaged battleship outright.
- * 200 sits just above the measured floor and is the weakest number here.
+ * Three ships in one quadrant all read exactly 355, and the one we targeted
+ * was named MONGOL BATTLESHIP in the viewer; the other two were not
+ * identified, so strictly 355 is confirmed for a battleship and shared by
+ * two unnamed ships. A MONGOL SUPPLY SHIP in another quadrant read 120.
+ * Identical values across ships mean these are fixed per class, not rolled.
  *
- * SCOUT and SUPPLY are unmeasured. Nothing has been observed about either,
- * beyond the manual calling them lesser vessels. */
-#define HP_BATTLESHIP       200
-#define HP_COMMAND          500
-#define HP_SCOUT            100
-#define HP_SUPPLY           150
+ * Level dependence is UNTESTED -- every reading is from one level-3 game,
+ * and neither 355 nor 120 appears as a literal in the binary anywhere near
+ * the other, so they may well be computed from the command level.
+ *
+ * COMMAND is still inferred rather than read: a commander survived a single
+ * 441-unit hit and died to roughly 265 + 236, so it lies between 441 and
+ * about 501. Now that the table is readable, one commander sighting settles
+ * it exactly.
+ *
+ * SCOUT has never been observed at all. */
+#define HP_BATTLESHIP       355  /* read from memory, level 3 */
+#define HP_SUPPLY           120  /* read from memory, level 3 */
+#define HP_COMMAND          500  /* inferred, bracketed 441..501 */
+#define HP_SCOUT            100  /* unmeasured */
 
 /* Per-sector enemy strength, parallel to `sector` and rebuilt with it.
    Non-zero only where sector[] holds an enemy. */

@@ -592,7 +592,62 @@ shots per class to separate the random component from the per-class mean.
 None of that was done here, and no enemy-fire constant should be taken from
 this data.
 
-### Battleship hit points — lower bound only
+### Enemy hit points — READ, not inferred (2026-08-16)
+
+Taken through dosbox-automation rather than by shooting things and summing.
+The original keeps the current quadrant's enemies as a table of 6-byte
+records, three 16-bit words each -- y, x, hit points -- starting at linear
+**184146**, zero-filled past the last entry. The records appear in the same
+order the laser control officer prompts for them.
+
+Method: dump memory, fire a known shot, dump again, look for the value that
+fell by exactly the printed damage. Doing that while the WEAPONS CONTROL
+dialog is still open matters -- no enemy return fire has resolved yet, so our
+shot is the only thing that changed.
+
+A 400-unit shot at range 4.472 printed "251 unit hit on Mongol" and exactly
+one 16-bit value in 338KB fell by exactly 251:
+
+| addr   | before | after |
+|---|---|---|
+| 184150 |    292 |    41 |
+
+Reading the table gave three enemies in that quadrant:
+
+| y,x | hit points |
+|---|---|
+| 3,5 | 355 |
+| 4,7 | 355 |
+| 1,5 | 355 |
+
+**HIT POINTS ARE FIXED PER CLASS, NOT ROLLED** -- three ships to the unit.
+The targeted one was named MONGOL BATTLESHIP in the viewer; the other two
+were never identified, so 355 is confirmed for a battleship and shared by two
+unnamed ships. A MONGOL SUPPLY SHIP in another quadrant read **120**.
+
+Level dependence is untested: every reading is from one level-3 game, and
+neither 355 nor 120 sits near the other as a literal in the unpacked binary,
+so both may be computed from the command level.
+
+This also recovered a laser reading retroactively. The shot before it, 100
+units at the same range, had its printed result scroll away -- but 184150
+went 355 -> 292 across those dumps, a fall of exactly **63**, which is what
+`energy * eff * (1 - d/12)` predicts. Eighth confirmation of the model.
+
+### Enemy fire does track remaining strength after all
+
+With the ship at 3,5 down to 41 of its 355 hit points, its next shot was
+absorbed as **16** units, against 27 and 48 from the two undamaged ships in
+the same volley. So the very first reading of enemy fire -- output falling as
+a ship takes damage -- was right, and the "flat output" counter-reading that
+withdrew it was the shield-state confound rather than evidence against it.
+
+What remains withdrawn is the quantitative part: no enemy-fire constant
+should be taken from any of that data, because the printed figure still
+depends on our shield state. The qualitative claim is now supported by a
+directly-read hit-point value rather than by an inference.
+
+### Battleship hit points — lower bound only (superseded)
 
 Cumulative laser damage until a ship dies gives its hit points directly, now
 that the laser formula is exact. Two shots of 100 units at the battleship at
@@ -697,9 +752,10 @@ nothing in it at all.
    confirmed exactly on four predicted-in-advance readings.
 5. ~~Laser damage against energy~~ — **done.** Linear; confirmed in the same
    volley at 500 and 250.
-6. **Battleship hit points.** Bracketed only as "more than 162, less than one
-   torpedo". Cumulative laser damage settles it exactly — the method works,
-   the run just ended first. Repeat with 100-unit shots at a single target.
+6. ~~Battleship hit points~~ — **done.** 355, read from memory. Supply ships
+   are 120. Commanders are still bracketed at 441..501 and scouts have never
+   been seen; both are now one sighting away, since the table can just be
+   read. Level dependence untested.
 7. **Enemy fire.** Nothing here is usable; see the correction above. Needs a
    run with the shield state held constant and the firing ship's class
    recorded against every hit. Whether the printed figure is the shot fired
