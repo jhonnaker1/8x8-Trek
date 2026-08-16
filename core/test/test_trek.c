@@ -333,6 +333,156 @@ static void test_divert(void) {
     ok(lost == 300,                "the 300 that did not fit is destroyed");
 }
 
+/* Every exact reading taken off the original, replayed. These are the whole
+   point of the laser code: the formula was predicted before firing and came
+   back to the unit four times, so anything but an exact match here is a bug
+   in our arithmetic rather than a difference of opinion about the model.
+
+   Efficiency was 100% for all of them -- the ship was fresh and the lasers
+   cold -- which is also what makes them exact enough to assert on. */
+static void test_laser_readings(void) {
+    puts("laser damage -- readings off the original");
+
+    ok(trek_laser_damage(500, 100, trek_dist(1, 1)) == 441,
+       "500 at range 1.414 delivers 441");
+    ok(trek_laser_damage(250, 100, trek_dist(0, 2)) == 208,
+       "250 at range 2.000 delivers 208");
+    ok(trek_laser_damage(250, 100, trek_dist(4, 2)) == 157,
+       "250 at range 4.472 delivers 157");
+    ok(trek_laser_damage(250, 100, trek_dist(4, 3)) == 146,
+       "250 at range 5.000 delivers 146");
+    ok(trek_laser_damage(100, 100, trek_dist(2, 1)) == 81,
+       "100 at range 2.236 delivers 81");
+
+    /* 157 and 146 are 156.83 and 145.83 exactly; truncation would print one
+       lower for both, which is how we know the original rounds. */
+    ok(trek_laser_damage(250, 100, trek_dist(4, 2)) == 157 &&
+       trek_laser_damage(250, 100, trek_dist(4, 3)) == 146,
+       "rounds to nearest rather than truncating");
+}
+
+static void test_laser_model(void) {
+    uint16_t near_d, far_d, half, full;
+
+    puts("laser damage -- shape of the model");
+
+    near_d = trek_laser_damage(300, 100, trek_dist(1, 1));
+    far_d  = trek_laser_damage(300, 100, trek_dist(7, 7));
+    ok(near_d > far_d, "damage falls with distance");
+
+    /* 12 exceeds the 9.9 diagonal of an 8x8 quadrant, so a laser always
+       delivers something however far the target is -- roughly 17%. */
+    ok(far_d > 0, "still bites at the far corner of the quadrant");
+
+    /* Corner to corner is 7x the range of an adjacent sector. Inverse-square
+       would cut the damage by about 49; the measured linear law cuts it by
+       5. Ten separates the two comfortably. */
+    ok(far_d * 10 > near_d, "and the falloff is gentle, not inverse-square");
+
+    /* Linear in energy: confirmed on the original in a single volley, where
+       500 and 250 were fired at known ranges. */
+    full = trek_laser_damage(500, 100, trek_dist(2, 1));
+    half = trek_laser_damage(250, 100, trek_dist(2, 1));
+    ok(full == half * 2 || full == half * 2 + 1, "linear in energy");
+
+    /* The manual states this outright: 100% lasers do twice the damage of
+       50% ones for the same energy (l.380-384). Half of an odd figure rounds
+       up, so doubling it can land one over. */
+    {
+        uint16_t at_full = trek_laser_damage(400, 100, trek_dist(2, 1));
+        uint16_t at_half = trek_laser_damage(400,  50, trek_dist(2, 1));
+        ok(at_half * 2 == at_full || at_half * 2 == at_full + 1,
+           "linear in efficiency, as the manual states");
+    }
+
+    ok(trek_laser_damage(400, 0, trek_dist(2, 1)) == 0,
+       "dead lasers deliver nothing");
+    ok(trek_laser_damage(0, 100, trek_dist(2, 1)) == 0,
+       "firing nothing delivers nothing");
+    ok(trek_laser_damage(500, 100, LASER_RANGE_ZERO << 8) == 0,
+       "damage is zero at the model's reach");
+
+    /* energy * factor needs 21 bits before it is shifted back down, and int
+       is 16-bit under cc65. The split in scale_256 has to survive the worst
+       case rather than merely the plausible one. */
+    ok(trek_laser_damage(65535, 100, 0) == 65535,
+       "no 16-bit wrap at maximum energy and zero range");
+    ok(trek_laser_damage(ENERGY_MAX, 100, trek_dist(1, 1)) == 4414,
+       "no wrap at a full main bank");
+
+    /* Holding the factor in 256ths quantises the model. The step is rounded,
+       so the error cannot exceed half a step -- energy/512 -- which is why
+       every reading above lands exactly (all were fired at 500 units or
+       less, where half a step is under one unit) and why a full 5000-unit
+       discharge can sit up to 10 out. 4414 above against the true 4410.8 is
+       that effect, not a mistake.
+
+       Asserted against the unquantised model in integers: ours * 3072 must
+       stay within 6*energy of energy * (3072 - dist), plus half a unit for
+       the final rounding. The worst case over all 64 distances is the corner
+       at 6,7. */
+    {
+        unsigned long d67  = trek_dist(6, 7);
+        unsigned long got  = (unsigned long)trek_laser_damage(5000, 100,
+                                 (uint16_t)d67) * 3072ul;
+        unsigned long want = 5000ul * (3072ul - d67);
+        unsigned long slack = 6ul * 5000ul + 1536ul;
+        ok(got < want + slack && want < got + slack,
+           "the 256ths factor stays within half a step of the true model");
+    }
+}
+
+static void test_fire_laser(void) {
+    uint16_t dealt, before;
+    uint8_t  r, cell, q;
+
+    puts("firing the lasers");
+
+    trek_new_game(3, 4242);
+
+    /* Put a known target next to the ship rather than hunting for one, so
+       the arithmetic under test is not at the mercy of galaxy generation. */
+    ship.sec_y = 4; ship.sec_x = 4;
+    cell = (4 << 3) | 5;
+    sector[cell]   = SEC_BATTLESHIP;
+    enemy_hp[cell] = HP_BATTLESHIP;
+
+    r = trek_fire_laser(9, 9, 100, &dealt);
+    ok(r == FIRE_BAD_COORDS, "off-grid coordinates refused");
+
+    r = trek_fire_laser(0, 0, 100, &dealt);
+    ok(r == FIRE_NO_TARGET, "firing at empty space refused");
+    ok(dealt == 0,          "and nothing is reported as delivered");
+
+    before = ship.energy;
+    r = trek_fire_laser(4, 5, (uint16_t)(ship.energy + 1), &dealt);
+    ok(r == FIRE_NO_ENERGY,   "asking for more than the banks hold is refused");
+    ok(ship.energy == before, "and a refused shot costs nothing");
+
+    /* Range 1.0, so the factor is (3072-256)/12 = 235 of 256: 100 units
+       deliver 92. Two of those leave the battleship alive at 200 hp. */
+    r = trek_fire_laser(4, 5, 100, &dealt);
+    ok(r == FIRE_OK,                "a hit that does not kill reports OK");
+    ok(dealt == 92,                 "delivers 92 at range 1.0");
+    ok(ship.energy == before - 100, "the shot costs its energy from main");
+    ok(enemy_hp[cell] == HP_BATTLESHIP - 92, "target loses exactly that much");
+    ok(sector[cell] == SEC_BATTLESHIP,       "and is still there");
+
+    q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    gal_enemies[q]    = 1;
+    ship.enemies_left = 7;
+
+    r = trek_fire_laser(4, 5, 500, &dealt);
+    ok(r == FIRE_KILL,             "enough damage destroys the target");
+    ok(sector[cell] == SEC_EMPTY,  "the sector is cleared");
+    ok(enemy_hp[cell] == 0,        "and its strength with it");
+    ok(gal_enemies[q] == 0,        "the quadrant's count drops");
+    ok(ship.enemies_left == 6,     "and so does the galaxy's");
+
+    r = trek_fire_laser(4, 5, 100, &dealt);
+    ok(r == FIRE_NO_TARGET, "the wreck cannot be fired at again");
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -343,6 +493,9 @@ int main(void) {
     test_divert();
     test_impulse();
     test_warp();
+    test_laser_readings();
+    test_laser_model();
+    test_fire_laser();
 
     puts("");
     if (failures) {

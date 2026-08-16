@@ -151,6 +151,51 @@
  * comparisons against it must shift. */
 #define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */
 
+/* Enemy hit points. PROVISIONAL, but bracketed by observation rather than
+   guessed outright:
+ *
+ * COMMAND is the tightest. A commander survived a single 441-unit laser hit
+ * (500 units at range 1.414, lasers at 100%), so it holds more than 441. In
+ * an earlier game a commander took roughly 265 and then 236 -- about 501 --
+ * and died. 500 satisfies both, which is why it is not a round-number guess.
+ * The lower of those two figures is reconstructed from an inferred
+ * efficiency, so the upper end of the bracket is softer than the lower.
+ *
+ * BATTLESHIP is bounded from below only: one survived 81 + 81 = 162, and the
+ * run ended before the third shot. It is also bounded from above by the
+ * torpedoes, since one torpedo destroys an undamaged battleship outright.
+ * 200 sits just above the measured floor and is the weakest number here.
+ *
+ * SCOUT and SUPPLY are unmeasured. Nothing has been observed about either,
+ * beyond the manual calling them lesser vessels. */
+#define HP_BATTLESHIP       200
+#define HP_COMMAND          500
+#define HP_SCOUT            100
+#define HP_SUPPLY           150
+
+/* Per-sector enemy strength, parallel to `sector` and rebuilt with it.
+   Non-zero only where sector[] holds an enemy. */
+extern uint16_t enemy_hp[QUAD_CELLS];
+
+/* Outcomes of firing. */
+#define FIRE_OK           0   /* hit, target survived */
+#define FIRE_KILL         1   /* hit, target destroyed */
+#define FIRE_BAD_COORDS   2
+#define FIRE_NO_TARGET    3   /* nothing hostile in that sector */
+#define FIRE_NO_ENERGY    4   /* main banks hold less than requested */
+
+/* The measured laser formula, as a pure function so it can be tested against
+   the readings directly. `dist` is 8.8 fixed point, as trek_dist returns;
+   `eff_pct` is the single combined efficiency the original prints. */
+uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist);
+
+/* Fire the lasers at one sector. Deducts `energy` from the main banks
+   whatever the outcome of the shot, as the original does, and applies the
+   damage to whatever is there. `damage` receives the delivered figure; pass
+   NULL if the caller does not care. */
+uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
+                        uint16_t *damage);
+
 /* MEASURED: the POWER DISTRIB report taken immediately after SHUP on a fresh
    game, with nothing else having happened, showed main at 4950 of 5000. This
    is the manual's unquantified "small amount of energy from the main energy
@@ -176,6 +221,8 @@ typedef struct {
     uint16_t impulse;       /* impulse engines have their own pool */
     uint16_t shields;       /* shield charge, separate from shields_up */
     uint8_t  torps;
+    uint8_t  laser_eff;     /* percent -- heat and battle damage combined,
+                               as the original's single gauge reports it */
     uint8_t  warp;          /* tenths, 10..80 */
     uint8_t  shields_up;
     uint16_t stardate;      /* tenths */

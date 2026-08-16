@@ -5,6 +5,7 @@ uint8_t gal_base[GAL_CELLS];
 uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
 uint8_t sector[QUAD_CELLS];
+uint16_t enemy_hp[QUAD_CELLS];
 Ship    ship;
 
 /* ---------------------------------------------------------------- random */
@@ -87,11 +88,24 @@ static uint8_t free_sector(void) {
     return 0xFF;
 }
 
+static uint16_t enemy_strength(uint8_t type) {
+    switch (type) {
+        case SEC_BATTLESHIP: return HP_BATTLESHIP;
+        case SEC_COMMAND:    return HP_COMMAND;
+        case SEC_SCOUT:      return HP_SCOUT;
+        case SEC_SUPPLY:     return HP_SUPPLY;
+        default:             return 0;
+    }
+}
+
 void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
 
-    for (i = 0; i < QUAD_CELLS; i++) sector[i] = SEC_EMPTY;
+    for (i = 0; i < QUAD_CELLS; i++) {
+        sector[i]   = SEC_EMPTY;
+        enemy_hp[i] = 0;
+    }
 
     /* The ship is placed first so its sector is reserved; everything else
        fills in around it. */
@@ -118,6 +132,7 @@ void trek_enter_quadrant(void) {
         else if (i < 8) sector[cell] = SEC_SCOUT;
         else if (i < 9) sector[cell] = SEC_SUPPLY;
         else            sector[cell] = SEC_COMMAND;
+        enemy_hp[cell] = enemy_strength(sector[cell]);
     }
 
     reveal_around(ship.quad_y, ship.quad_x);
@@ -174,6 +189,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.impulse      = IMPULSE_START;
     ship.shields      = SHIELD_START;    /* full, and lowered -- see trek.h */
     ship.torps        = TORPS_START;
+    ship.laser_eff    = 100;
     ship.warp         = WARP_START;
     ship.shields_up   = 0;
     ship.stardate     = STARDATE_START;
@@ -370,4 +386,97 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
 
     trek_enter_quadrant();
     return MOVE_OK;
+}
+
+/* --------------------------------------------------------------- weapons */
+
+/* v * f / 256, rounded to nearest.
+ *
+ * Written as two products because a single one overflows: energy reaches
+ * 5000 and f reaches 256, whose product needs 21 bits while `int` is 16 on
+ * cc65. Splitting v at the byte boundary keeps the high part's multiply
+ * after its own shift, so neither term can exceed 65535 -- the tightest case
+ * is v = 65535, f = 256, which lands exactly on 65535.
+ *
+ * The whole fractional part comes from the low byte, so rounding the low
+ * product alone is exact rather than an approximation. */
+static uint16_t scale_256(uint16_t v, uint16_t f) {
+    uint16_t hi = (uint16_t)(v >> 8);
+    uint16_t lo = (uint16_t)(v & 0xFF);
+    return (uint16_t)(hi * f + (uint16_t)(((lo * f) + 128) >> 8));
+}
+
+/* v * pct / 100, rounded to nearest, by the same splitting argument. Done
+   against 100 rather than through a 256ths factor so that the common case of
+   100% is an exact identity and cannot perturb a measured figure. */
+static uint16_t scale_pct(uint16_t v, uint8_t pct) {
+    uint16_t q = (uint16_t)(v / 100);
+    uint16_t r = (uint16_t)(v % 100);
+    return (uint16_t)(q * pct + (uint16_t)(((r * pct) + 50) / 100));
+}
+
+/* (1 - dist/12) in 256ths, rounded. dist is 8.8 fixed point, so the reach is
+   12 * 256; the divide by 12 lands the result on 0..256 directly. Rounding
+   here rather than truncating is not cosmetic -- truncation puts the 500-unit
+   shot at range 1.414 on 439 against the original's 441.
+ *
+ * Holding the factor in 256ths quantises the model by at most half a step,
+ * so the delivered figure can differ from the real formula by up to
+ * energy/512. That is under one unit at the energies every reading was taken
+ * at, which is why all five reproduce exactly, and just under 10 at a full
+ * 5000-unit discharge. The core test asserts that bound. Finer fixed point
+ * is not available: the products already reach the 16-bit ceiling. */
+static uint16_t laser_factor(uint16_t dist) {
+    uint16_t reach = (uint16_t)(LASER_RANGE_ZERO << 8);
+    if (dist >= reach) return 0;
+    return (uint16_t)((reach - dist + (LASER_RANGE_ZERO / 2)) / LASER_RANGE_ZERO);
+}
+
+/* MEASURED exactly; see trek.h and MEASURED.md. Distance is applied before
+   efficiency so that the readings, all of which were taken at 100%, come
+   back bit for bit. */
+uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
+    uint16_t f = laser_factor(dist);
+
+    if (f == 0 || eff_pct == 0 || energy == 0) return 0;
+    if (eff_pct > 100) eff_pct = 100;
+
+    return scale_pct(scale_256(energy, f), eff_pct);
+}
+
+uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
+                        uint16_t *damage) {
+    uint8_t cell, q;
+    uint16_t d, dealt;
+
+    if (damage) *damage = 0;
+
+    if (sy >= QUAD_DIM || sx >= QUAD_DIM) return FIRE_BAD_COORDS;
+
+    cell = (uint8_t)((sy << 3) | sx);
+    if (!SEC_IS_ENEMY(sector[cell])) return FIRE_NO_TARGET;
+
+    /* The original refuses the shot outright rather than firing what is left
+       -- "Captain, we have insufficient energy!" -- and the energy is not
+       spent when it refuses. */
+    if (energy > ship.energy) return FIRE_NO_ENERGY;
+    ship.energy = (uint16_t)(ship.energy - energy);
+
+    d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
+    dealt = trek_laser_damage(energy, ship.laser_eff, d);
+    if (damage) *damage = dealt;
+
+    if (dealt < enemy_hp[cell]) {
+        enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dealt);
+        return FIRE_OK;
+    }
+
+    enemy_hp[cell] = 0;
+    sector[cell]   = SEC_EMPTY;
+
+    q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    if (gal_enemies[q]) gal_enemies[q]--;
+    if (ship.enemies_left) ship.enemies_left--;
+
+    return FIRE_KILL;
 }
