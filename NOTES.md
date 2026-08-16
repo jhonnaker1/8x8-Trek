@@ -518,10 +518,18 @@ Two obstacles, both environmental rather than the project's fault:
 
    All 15 vcpkg dependencies build clean; so does the project.
 
-2. The build does not install resources, and a missing GLSL shader is FATAL --
-   `set_fallback_shader_or_exit` aborts the process. Copy `resources/shaders`
-   and `resources/shader-presets` into
-   `~/Library/Preferences/dosbox-automation/`.
+2. Resources are located relative to the WORKING DIRECTORY (`support.cpp`
+   looks for `resources/`, and on macOS also `<exe>/../Resources`). There is
+   no `install()` rule in CMakeLists.txt, so running the binary out of
+   `build/rel-arm64/` finds no GLSL shaders and
+   `set_fallback_shader_or_exit` aborts the process outright.
+
+   This was first written up here as a packaging bug in the project. It is
+   not -- verified by running from the source root with the copied shaders
+   removed, where it starts cleanly and auto-selects `crt-hyllian:vga-1440p`.
+   Either run with the working directory at the source root, or copy
+   `resources/shaders` and `resources/shader-presets` into
+   `~/Library/Preferences/dosbox-automation/`, which is what we did.
 
 Two smaller traps: `DOSBOX_API_TOKEN` must be exactly 64 hex characters or it
 is silently regenerated, and the MOUNT policy anchors on the directory of the
