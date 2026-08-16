@@ -116,6 +116,44 @@
    value of 60 was ten times too expensive. */
 #define IMPULSE_ENERGY_UNIT   6  /* per sector -- measured, see above */
 
+/* Weapons.
+ *
+ * Laser damage is CONFIRMED exactly, by writing four predictions down before
+ * firing and having all four come back to the unit:
+ *
+ *     damage = energy * efficiency * (1 - distance / 12)
+ *
+ * From sector 4,4 on a fresh level-3 game with every system at 100%: 500 at
+ * distance 1.414 gave 441 (predicted 441.1), and 250 at 2.000, 4.472 and
+ * 5.000 gave 208, 157 and 146 (predicted 208.3, 156.8, 145.8). The two
+ * energies in one volley confirm linearity in energy at the same time.
+ *
+ * Rounding is to NEAREST, not truncation -- 156.83 printed as 157 and 145.83
+ * as 146, both of which truncation would have put one lower.
+ *
+ * Falloff is LINEAR in distance. Inverse-square, and with it the Super Star
+ * Trek combat math we had kept as a fallback, is refuted. Note that 12
+ * exceeds the 9.9 diagonal of an 8x8 quadrant, so a laser always delivers at
+ * least 17% of its energy however far away the target is.
+ *
+ * Enemy fire uses the SAME law; what differs is the energy each ship commits,
+ * which falls as the ship takes damage. See MEASURED.md.
+ *
+ * `efficiency` is one number combining heat and battle damage, as the
+ * original's single gauge does. Temperature alone costs nothing until some
+ * threshold above 700 of the gauge's 1500 -- 1250 units of fire went out at
+ * a flat 100% in the clean run.
+ *
+ * LASER_RANGE_ZERO is in whole sectors; distances are 8.8 fixed point, so
+ * comparisons against it must shift. */
+#define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */
+
+/* MEASURED: the POWER DISTRIB report taken immediately after SHUP on a fresh
+   game, with nothing else having happened, showed main at 4950 of 5000. This
+   is the manual's unquantified "small amount of energy from the main energy
+   banks" (l.339-341). Lowering shields is free. */
+#define SHIELD_RAISE_COST    50
+
 /* Galaxy, as four flat byte arrays rather than an array of structs. Flat
    arrays carry no padding, so the 68000 alignment tax the commodore-uno
    README documents for its `Card` struct cannot apply here. Indexed
