@@ -503,14 +503,81 @@ first incoming volley (ship at 4,4, shields up) those come out as:
 
 Two ships land within 2 units of each other. Running the wrecked run's first
 volley through the same division, two of its ships come out at EXACTLY 357
-each. One law governs both directions of fire.
+each. Read as: one law governs both directions of fire, with the energy each
+ship commits declining as it takes damage — the commander's implied energy
+fell 718 → 440 → 151 across three volleys, and 2,1 fell 357 → 203 → 61 after
+we hit it for 145.
 
-What varies is the energy each ship commits, and that declines as the ship
-takes damage — the commander's implied energy fell 718 → 440 → 151 across
-three volleys, and 2,1 fell 357 → 203 → 61 after we hit it for 145. So return
-fire is a readout of enemy remaining strength, which should make enemy hit
-points measurable without killing anything and summing. Still to confirm
-deliberately.
+THAT READING DOES NOT SURVIVE MORE DATA EITHER. Later in the clean run, in
+quadrant 8,6 with the ship at 4,4, four enemies fired in one volley and the
+short-range scanner showed all four in light blue — all the same class,
+standard battleships:
+
+| Mongol at | distance | hit | implied energy |
+|---|---|---|---|
+| 2,3 | 2.236 |  92 | 113 |
+| 6,6 | 2.828 | 169 | 221 |
+| 2,5 | 2.236 | 147 | 181 |
+| 3,8 | 4.123 | 134 | 204 |
+
+Same class, same instant, implied energies spread by a factor of two. The
+ship at 2,5 gave 143 in the previous volley and 181 in this one. And 2,3 had
+by then absorbed 162 units of our laser fire with its output flat across
+three volleys — 115, 123, 113 — so damage does not suppress it.
+
+So enemy fire carries a large random component, roughly 110-220 for a
+battleship at these ranges. The earlier clustering (142/144, and the pair at
+exactly 357) was signal read into a handful of draws that happened to land
+near each other; two consecutive commits drew a confident and different
+conclusion from it, both wrong.
+
+And there is a confound underneath all of it. One volley later the same three
+untouched battleships read 240, 251 and 260 implied — against 181, 204, 221
+the volley before, and 142/144 at the start of the run. Enemy output appears
+to climb steadily through an engagement, which it almost certainly does not.
+What changed is OUR shields. Early hits printed
+
+    Shields absorb 181 unit hit from 3-5
+
+and later ones printed
+
+    195 unit hit from Mongol at 2-5
+
+If the printed figure is what PENETRATES rather than what was fired, every
+enemy reading we hold is scaled by a shield state we never controlled, and
+the rising trend is our own shields failing. That one confound accounts for
+both failed readings above: the "declining output" of the wrecked run (where
+the shield generators were destroyed early) and the "clustering" of this one.
+
+What survives: the distance trend is real and strong. What does not: any
+claim that the enemy's law has been identified, or that return fire reports
+enemy remaining strength.
+
+To measure enemy fire properly the shield state has to be held constant and
+known — either shields down throughout, or verified at full before every
+reading — and the firing ship's CLASS recorded against every hit, with enough
+shots per class to separate the random component from the per-class mean.
+None of that was done here, and no enemy-fire constant should be taken from
+this data.
+
+### Battleship hit points — lower bound only
+
+Cumulative laser damage until a ship dies gives its hit points directly, now
+that the laser formula is exact. Two shots of 100 units at the battleship at
+2,3, range 2.236, each delivering exactly 81 as predicted. It survived both,
+so a standard Mongol battleship has MORE THAN 162 hit points. The run ended
+before a third shot — four battleships were firing and the ship was lost.
+
+An upper bound comes free from the torpedoes: one torpedo destroyed an
+undamaged battleship outright, so torpedo damage exceeds battleship hit
+points, which are therefore somewhere above 162.
+
+### Torpedo accuracy
+
+Two torpedoes, two kills, at ranges 1.414 and 3.000, both fired with SHIELDS
+UP. The manual says raised shields throw torpedoes off course; at these
+ranges the penalty is not visible. Nothing measured at long range, and no
+miss has been observed at all, so the accuracy model is untouched.
 
 ### Raising shields costs 50 units
 
@@ -598,13 +665,20 @@ nothing in it at all.
    confirmed exactly on four predicted-in-advance readings.
 5. ~~Laser damage against energy~~ — **done.** Linear; confirmed in the same
    volley at 500 and 250.
-6. **Enemy hit points.** Return fire looks like a direct readout of remaining
-   strength, so this should be measurable without killing anything.
-7. **Enemy energy by ship class.** Implied source energies so far: a Commander
-   at 205 and 718 in two different games, ordinary Mongols at 142/144 and
-   357/357. Wide, and class was not recorded alongside most readings.
+6. **Battleship hit points.** Bracketed only as "more than 162, less than one
+   torpedo". Cumulative laser damage settles it exactly — the method works,
+   the run just ended first. Repeat with 100-unit shots at a single target.
+7. **Enemy fire.** Nothing here is usable; see the correction above. Needs a
+   run with the shield state held constant and the firing ship's class
+   recorded against every hit. Whether the printed figure is the shot fired
+   or the part that penetrated is the first thing to establish, and a single
+   volley taken with shields verified full, then repeated with shields down,
+   would answer it.
 8. **The heat threshold.** 700 of 1500 costs nothing. Where it starts to bite
    is unmeasured.
-9. **Torpedoes** — damage, and accuracy against distance and shield state.
-10. **The boarding-party mechanic**, which appears nowhere in the manual.
-11. **Casualty scoring weight**, which needs a game where casualties occur.
+9. **Torpedo damage.** Needs a target that survives one, so a Commander or a
+   base rather than a standard battleship.
+10. **Torpedo accuracy.** No miss has been observed at all — two for two at
+   ranges 1.4 and 3.0, both with shields up. Long range is untested.
+11. **The boarding-party mechanic**, which appears nowhere in the manual.
+12. **Casualty scoring weight**, which needs a game where casualties occur.
