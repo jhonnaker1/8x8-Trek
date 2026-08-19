@@ -242,6 +242,92 @@ static void do_warp(const char *line) {
     else ui_message("ENGINEERING: ", "INVALID WARP FACTOR");
 }
 
+static const char *sys_name(uint8_t i) {
+    switch (i) {
+        case SYS_CONVERTER:   return "CONVERTER";
+        case SYS_SHIELDS:     return "SHIELDS";
+        case SYS_LIFE:        return "LIFE SUPPORT";
+        case SYS_LASERS:      return "LASERS";
+        case SYS_TUBES:       return "ENTORP TUBES";
+        case SYS_WARP:        return "WARP ENGINES";
+        case SYS_IMPULSE:     return "IMPULSE ENGINE";
+        case SYS_SRSCAN:      return "S.R. SCANNER";
+        case SYS_LRSCAN:      return "L.R. SCANNER";
+        case SYS_COMPUTER:    return "COMPUTER";
+        case SYS_TRANSPORTER: return "TRANSPORTER";
+        default:              return "SHUTTLECRAFT";
+    }
+}
+
+/* Append " y,x" in the original's 1-based presentation. */
+static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
+    uint8_t n = put_u16(buf, (uint16_t)(y + 1));
+    n += put_str(buf + n, ",");
+    n += put_u16(buf + n, (uint16_t)(x + 1));
+    return n;
+}
+
+/* Every command that costs a turn ends here: the enemy shoots back and the
+   console reports it. Without this there is no game, only a shooting
+   gallery. */
+static void enemy_turn(void) {
+    TrekEvent ev[12];
+    uint8_t n, i, k;
+
+    n = trek_enemy_turn(ev, 12);
+
+    for (i = 0; i < n; i++) {
+        k = 0;
+        switch (ev[i].kind) {
+            case EV_SHIELD_HOLD:
+                k  = put_str(linebuf, "SHIELDS ABSORB ");
+                k += put_u16(linebuf + k, ev[i].amount);
+                k += put_str(linebuf + k, " FROM ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                break;
+            case EV_HIT:
+                k  = put_u16(linebuf, ev[i].amount);
+                k += put_str(linebuf + k, " UNIT HIT FROM ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                break;
+            case EV_SYSTEM_HIT:
+                k  = put_str(linebuf, sys_name(ev[i].y));
+                k += put_str(linebuf + k, " NOW AT ");
+                k += put_u16(linebuf + k, ev[i].amount);
+                break;
+            case EV_SHIP_LOST:
+                ui_message("HELM: ", "WE ARE LOST, CAPTAIN.");
+                continue;
+            default:
+                continue;
+        }
+        linebuf[k] = 0;
+        ui_message("DAMAGE: ", linebuf);
+    }
+}
+
+/* One torpedo destroys a standard Mongol outright, confirmed against the
+   original -- nothing has ever survived one to report a damage figure. */
+static void do_torpedo(const char *line) {
+    uint8_t d[8];
+    uint8_t n = grab_digits(line, d, 8);
+
+    if (ship.torps == 0) {
+        ui_message("WEAPONS: ", "CAPTAIN, WE HAVE NO TORPEDOS!");
+        return;
+    }
+    if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
+        ui_message("WEAPONS: ", "GIVE A SECTOR, E.G. T35");
+        return;
+    }
+
+    switch (trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1))) {
+        case TORP_KILL: ui_message("WEAPONS: ", "MONGOL DESTROYED!"); break;
+        case TORP_MISS: ui_message("WEAPONS: ", "TORPEDO MISSED.");   break;
+        default:        ui_message("WEAPONS: ", "TUBES CANNOT FIRE."); break;
+    }
+}
+
 int main(void) {
     unsigned char c;
 
@@ -255,15 +341,31 @@ int main(void) {
 
         c = (unsigned char)cmd[0];
 
-        if (c == KB_M)      do_move(cmd);
-        else if (c == KB_W) do_warp(cmd);
-        else if (c == KB_L) do_lasers();
+        if (c == KB_M)      { do_move(cmd);    enemy_turn(); }
+        else if (c == KB_L) { do_lasers();     enemy_turn(); }
+        else if (c == KB_T) { do_torpedo(cmd); enemy_turn(); }
+        else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M)OVE W)ARP L)ASERS Q)UIT");
+        else if (c)          ui_message("COMPUTER: ", "M)OVE W)ARP L)ASERS T)ORP Q)UIT");
 
         ui_draw_scan();
         ui_draw_chart();
         ui_draw_status();
+
+        if (trek_game_state() != GAME_ON) break;
+    }
+
+    if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
+    else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
+    {
+        int16_t sc = trek_score();
+        uint8_t k = put_str(linebuf, "SCORE ");
+        /* 45 is '-', written numerically for the reason input.h gives: a
+           character literal here would be translated to PETSCII. */
+        if (sc < 0) { linebuf[k++] = 45; sc = (int16_t)(-sc); }
+        k += put_u16(linebuf + k, (uint16_t)sc);
+        linebuf[k] = 0;
+        ui_message("HQ: ", linebuf);
     }
 
     /* Quit has to visibly end the game. Milestone 1 parked here in an

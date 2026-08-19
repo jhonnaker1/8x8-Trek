@@ -483,6 +483,155 @@ static void test_fire_laser(void) {
     ok(r == FIRE_NO_TARGET, "the wreck cannot be fired at again");
 }
 
+static void test_repair(void) {
+    uint8_t i;
+    puts("repair");
+
+    trek_new_game(3, 99);
+    for (i = 0; i < SYS_COUNT; i++)
+        if (ship.sys[i] != 100) break;
+    ok(i == SYS_COUNT, "every system starts intact");
+
+    ship.sys[SYS_SRSCAN] = 5;
+    trek_advance(10);                      /* one full stardate */
+    ok(ship.sys[SYS_SRSCAN] == 25, "one stardate mends 20 points");
+
+    ship.sys[SYS_SRSCAN] = 5;
+    ship.sys[SYS_LASERS] = 5;
+    trek_advance(10);
+    ok(ship.sys[SYS_SRSCAN] == 25 && ship.sys[SYS_LASERS] == 25,
+       "two damaged systems each mend the full amount, not half");
+
+    ship.sys[SYS_SRSCAN] = 95;
+    trek_advance(10);
+    ok(ship.sys[SYS_SRSCAN] == 100, "repair stops at 100");
+
+    /* MEASURED as floor(): 0.172 stardates gave +3, not +3.44. */
+    ship.sys[SYS_SRSCAN] = 0;
+    trek_advance(1);
+    ok(ship.sys[SYS_SRSCAN] == 2, "a tenth of a stardate mends 2, truncated");
+}
+
+static void test_converter_scales_with_repair(void) {
+    uint16_t healthy, broken;
+    puts("energy converter");
+
+    trek_new_game(3, 5150);
+    ship.energy = 1000;
+    trek_advance(10);
+    healthy = ship.energy;
+
+    trek_new_game(3, 5150);
+    ship.energy = 1000;
+    ship.sys[SYS_CONVERTER] = 50;
+    trek_advance(10);
+    broken = ship.energy;
+
+    ok(healthy > broken, "a damaged converter generates less");
+    ok(healthy - 1000 == 400, "at full repair it is 400 per stardate");
+    ok(broken - 1000 == 200, "at half repair it is half that");
+}
+
+static void test_enemy_turn(void) {
+    TrekEvent ev[16];
+    uint8_t n;
+    uint16_t before;
+
+    puts("the enemy turn");
+
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+
+    before = ship.shields;
+    n = trek_enemy_turn(ev, 16);
+    ok(n >= 1, "an enemy in the quadrant fires");
+    ok(ship.shields < before, "shields absorb it");
+    ok(ship.energy == ENERGY_START, "main energy is untouched while shields hold");
+
+    /* MEASURED on the original: a ship at 41 of 355 hit points hit for 16
+       where undamaged companions hit for 27 and 48. */
+    {
+        uint16_t strong, weak;
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+        enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+        trek_enemy_turn(ev, 16);
+        strong = ev[0].amount;
+
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+        enemy_hp[(2 << 3) | 4] = 40;
+        trek_enemy_turn(ev, 16);
+        weak = ev[0].amount;
+
+        ok(weak < strong, "a wounded enemy hits for less");
+    }
+
+    /* Shields gone: the rest lands on the main banks. */
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+    ship.shields = 0;
+    before = ship.energy;
+    trek_enemy_turn(ev, 16);
+    ok(ship.energy < before, "with shields down the hit reaches main energy");
+}
+
+static void test_torpedo(void) {
+    uint8_t r;
+    puts("torpedoes");
+
+    trek_new_game(3, 777);
+    ok(ship.torps == 9, "nine torpedoes at the start");
+
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(1 << 3) | 1] = SEC_BATTLESHIP;
+    enemy_hp[(1 << 3) | 1] = HP_BATTLESHIP;
+    ship.enemies_left = 5;
+
+    r = trek_fire_torpedo(1, 1);
+    ok(r == TORP_KILL,               "one torpedo destroys a battleship");
+    ok(ship.torps == 8,              "and costs a torpedo");
+    ok(sector[(1 << 3) | 1] == SEC_EMPTY, "the sector is cleared");
+    ok(ship.enemies_left == 4,       "the galaxy counter drops");
+    ok(ship.killed == 1,             "counted as a standard Mongol");
+
+    r = trek_fire_torpedo(7, 7);
+    ok(r == TORP_MISS,   "firing at empty space misses");
+    ok(ship.torps == 7,  "and still costs a torpedo");
+
+    ship.torps = 0;
+    ok(trek_fire_torpedo(1, 1) == TORP_NONE_LEFT, "cannot fire without any");
+}
+
+static void test_game_state_and_score(void) {
+    puts("mission state and score");
+
+    trek_new_game(3, 4242);
+    ok(trek_game_state() == GAME_ON, "a fresh game is in progress");
+
+    ship.enemies_left = 0;
+    ok(trek_game_state() == GAME_WON, "no Mongols left is a win");
+
+    trek_new_game(3, 4242);
+    ship.lost = 1;
+    ok(trek_game_state() == GAME_LOST, "a destroyed ship is a loss");
+
+    /* Weights read off the original's own evaluation screen. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 3; ship.killed_cmd = 1; ship.casualties = 18;
+    ok(trek_score() == 3 * 10 + 20 - 18, "itemised score matches the rubric");
+
+    ship.enemies_left = 5;
+    ok(trek_score() == 3 * 10 + 20 - 18 - 300, "quitting early costs 300");
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -496,6 +645,11 @@ int main(void) {
     test_laser_readings();
     test_laser_model();
     test_fire_laser();
+    test_repair();
+    test_converter_scales_with_repair();
+    test_enemy_turn();
+    test_torpedo();
+    test_game_state_and_score();
 
     puts("");
     if (failures) {

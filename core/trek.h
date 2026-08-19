@@ -233,6 +233,26 @@ extern uint8_t gal_known[GAL_CELLS];   /* 0 = never scanned */
 /* The current quadrant only, rebuilt on entry. Indexed [y * QUAD_DIM + x]. */
 extern uint8_t sector[QUAD_CELLS];
 
+/* Ship systems, in the order the original's ENGINEERING REPORT lists them.
+ *
+ * MEASURED: the original keeps these as twelve 16-bit repair percentages at
+ * DS:235A, all 100 on a fresh game. Twelve rather than the ten on its console
+ * because the manual documents a transporter and a shuttlecraft that the
+ * console never shows. See MEASURED.md. */
+#define SYS_CONVERTER    0
+#define SYS_SHIELDS      1
+#define SYS_LIFE         2
+#define SYS_LASERS       3
+#define SYS_TUBES        4
+#define SYS_WARP         5
+#define SYS_IMPULSE      6
+#define SYS_SRSCAN       7
+#define SYS_LRSCAN       8
+#define SYS_COMPUTER     9
+#define SYS_TRANSPORTER 10
+#define SYS_SHUTTLE     11
+#define SYS_COUNT       12
+
 typedef struct {
     uint8_t  quad_y, quad_x;
     uint8_t  sec_y, sec_x;
@@ -248,6 +268,11 @@ typedef struct {
     uint16_t stardate_end;  /* tenths -- mission deadline */
     uint8_t  level;         /* 1..5, the command level / rank */
     uint16_t enemies_left;
+    uint8_t  sys[SYS_COUNT];  /* repair percentage, 0..100 */
+    uint16_t killed;          /* standard Mongols destroyed */
+    uint16_t killed_cmd;      /* command ships, scored separately */
+    uint16_t casualties;
+    uint8_t  lost;            /* ship destroyed */
 } Ship;
 
 extern Ship ship;
@@ -296,6 +321,80 @@ void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
 #define DIVERT_SHORT     2   /* source does not hold that much */
 
 uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
+
+
+/* MEASURED: floor(20 * elapsed_stardates), and it does NOT divide between
+   damaged systems -- two damaged at once each repaired at the full rate. The
+   manual claims the crew divide their time evenly; the original does not. */
+#define REPAIR_PER_STARDATE  20
+
+/* Short range scanner resolution, MEASURED off the original's own code:
+   above 90 everything shows, at or below 50 nothing does, and in between
+   only the ship, stars and novas. */
+#define SRSCAN_FULL          90
+#define SRSCAN_BLIND         50
+
+/* PROVISIONAL. Enemy fire is the one part of combat that resisted
+   measurement -- see MEASURED.md for two withdrawn attempts. What IS known:
+   the printed figure is the real damage, it comes out of shields first, and
+   a ship at 41 of 355 hit points fired far weaker than its undamaged
+   companions. So the shape here is a per-class energy scaled by remaining
+   strength, through the same falloff our lasers use. The falloff is
+   borrowed, not measured, and the per-class numbers are invented. */
+#define ENEMY_FIRE_BATTLESHIP  200
+#define ENEMY_FIRE_COMMAND     300
+#define ENEMY_FIRE_SCOUT       120
+#define ENEMY_FIRE_SUPPLY      100
+
+/* PROVISIONAL: a hit that gets past the shields can wreck a system. The
+   original clearly does this -- a single ambush took out the scanner, life
+   support and the shield generators -- but neither the chance nor the
+   severity has been measured. */
+#define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */
+
+/* What happened during a turn. The core never formats text, so it hands the
+   UI a list of facts and lets each platform word them. */
+#define EV_NONE          0
+#define EV_HIT           1   /* y,x = firing sector; amount = damage */
+#define EV_SHIELD_HOLD   2   /* amount = absorbed entirely by shields */
+#define EV_SYSTEM_HIT    3   /* y = system index; amount = new repair pct */
+#define EV_SHIP_LOST     4
+#define EV_ENEMY_MOVED   5   /* y,x = where it moved to */
+
+typedef struct {
+    uint8_t  kind;
+    uint8_t  y, x;
+    uint16_t amount;
+} TrekEvent;
+
+/* Advance the clock by `tenths` of a stardate: the converter tops up main
+   energy and the crew repair damaged systems. Movement already does this;
+   call it directly only for a turn that passes time without moving. */
+void trek_advance(uint16_t tenths);
+
+/* Every enemy in the quadrant fires. Returns how many events were written.
+   Damage lands on the shields first and on the main banks after those are
+   gone, which is what the original does. */
+uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max);
+
+/* Fire one torpedo at a sector. A torpedo destroys a standard Mongol
+   outright, confirmed against the original. */
+#define TORP_OK          0
+#define TORP_KILL        1
+#define TORP_MISS        2
+#define TORP_NONE_LEFT   3
+#define TORP_BAD_COORDS  4
+uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx);
+
+/* Mission state. */
+#define GAME_ON          0
+#define GAME_WON         1   /* every Mongol destroyed */
+#define GAME_LOST        2   /* ship gone */
+uint8_t trek_game_state(void);
+
+/* The itemised score, using the original's own rubric. MEASURED, every
+   weight read off its evaluation screen. */
+int16_t trek_score(void);
 
 uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);

@@ -190,6 +190,11 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.shields      = SHIELD_START;    /* full, and lowered -- see trek.h */
     ship.torps        = TORPS_START;
     ship.laser_eff    = 100;
+    ship.killed       = 0;
+    ship.killed_cmd   = 0;
+    ship.casualties   = 0;
+    ship.lost         = 0;
+    for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
     ship.warp         = WARP_START;
     ship.shields_up   = 0;
     ship.stardate     = STARDATE_START;
@@ -217,11 +222,31 @@ void trek_new_game(uint8_t level, uint16_t seed) {
    not modelled yet -- there is no damage system. */
 static void advance_time(uint16_t tenths) {
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
+    uint16_t mend = (uint16_t)((REPAIR_PER_STARDATE * tenths) / 10);
+    uint8_t i;
 
     ship.stardate = (uint16_t)(ship.stardate + tenths);
 
+    /* The converter's output scales with its own state of repair (manual
+       l.367-369), so a wrecked converter cannot dig you out of a hole. */
+    gain = (uint16_t)((gain * ship.sys[SYS_CONVERTER]) / 100);
+
     if (ship.energy + gain > ENERGY_MAX) ship.energy = ENERGY_MAX;
     else ship.energy = (uint16_t)(ship.energy + gain);
+
+    /* MEASURED: floor(20 * stardates), applied to every damaged system at
+       the full rate rather than divided between them. */
+    if (mend) {
+        for (i = 0; i < SYS_COUNT; i++) {
+            if (ship.sys[i] >= 100) continue;
+            if (ship.sys[i] + mend >= 100) ship.sys[i] = 100;
+            else ship.sys[i] = (uint8_t)(ship.sys[i] + mend);
+        }
+    }
+}
+
+void trek_advance(uint16_t tenths) {
+    advance_time(tenths);
 }
 
 /* Pool access by the 1/2/3 numbering the original's dialog uses. Returning
@@ -479,4 +504,144 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     if (ship.enemies_left) ship.enemies_left--;
 
     return FIRE_KILL;
+}
+
+/* ------------------------------------------------------------ the enemy */
+
+/* PROVISIONAL, and the weakest thing in this file. See trek.h: the shape is
+   a per-class energy scaled by how much of the ship is left, fired through
+   the same falloff our own lasers use. Only the falloff and the
+   remaining-strength dependence have any evidence behind them. */
+static uint16_t enemy_fire_energy(uint8_t type, uint16_t hp) {
+    uint16_t base, full;
+
+    switch (type) {
+        case SEC_COMMAND: base = ENEMY_FIRE_COMMAND;    full = HP_COMMAND;    break;
+        case SEC_SCOUT:   base = ENEMY_FIRE_SCOUT;      full = HP_SCOUT;      break;
+        case SEC_SUPPLY:  base = ENEMY_FIRE_SUPPLY;     full = HP_SUPPLY;     break;
+        default:          base = ENEMY_FIRE_BATTLESHIP; full = HP_BATTLESHIP; break;
+    }
+    if (full == 0) return 0;
+    if (hp > full) hp = full;
+    /* base * hp / full, staged so the product stays inside 16 bits: base
+       reaches 300 and hp 695, whose product does not fit. */
+    return (uint16_t)(((base / 5) * hp) / (full / 5 ? full / 5 : 1));
+}
+
+/* Damage lands on the shields first and on the main banks once those are
+   gone. MEASURED: with shields up and sufficient, the printed figure comes
+   out of the shield pool entirely and main energy is untouched. */
+static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t through;
+
+    if (amount <= ship.shields) {
+        ship.shields = (uint16_t)(ship.shields - amount);
+        return;
+    }
+
+    through = (uint16_t)(amount - ship.shields);
+    ship.shields = 0;
+
+    if (through >= ship.energy) {
+        ship.energy = 0;
+        ship.lost = 1;
+        if (*n < max) { ev[*n].kind = EV_SHIP_LOST; ev[*n].amount = 0; (*n)++; }
+        return;
+    }
+    ship.energy = (uint16_t)(ship.energy - through);
+
+    /* PROVISIONAL: a hit heavy enough to get through can wreck something.
+       The original does this -- one ambush took out three systems at once --
+       but neither the chance nor the severity is measured. */
+    if (through >= SYSTEM_DAMAGE_THRESHOLD) {
+        uint8_t which = trek_rand_n(SYS_COUNT);
+        uint8_t hurt  = (uint8_t)(20 + trek_rand_n(40));
+        ship.sys[which] = (uint8_t)(ship.sys[which] > hurt ? ship.sys[which] - hurt : 0);
+        ship.casualties = (uint16_t)(ship.casualties + trek_rand_n(10));
+        if (*n < max) {
+            ev[*n].kind = EV_SYSTEM_HIT;
+            ev[*n].y = which;
+            ev[*n].amount = ship.sys[which];
+            (*n)++;
+        }
+    }
+}
+
+uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
+    uint8_t cell, n = 0;
+    uint16_t d, energy, dmg;
+
+    for (cell = 0; cell < QUAD_CELLS && n < max; cell++) {
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+        if (ship.lost) break;
+
+        d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
+                      abs_diff((uint8_t)(cell & 7), ship.sec_x));
+        energy = enemy_fire_energy(sector[cell], enemy_hp[cell]);
+        dmg = trek_laser_damage(energy, 100, d);
+        if (dmg == 0) continue;
+
+        ev[n].kind   = (dmg <= ship.shields) ? EV_SHIELD_HOLD : EV_HIT;
+        ev[n].y      = (uint8_t)(cell >> 3);
+        ev[n].x      = (uint8_t)(cell & 7);
+        ev[n].amount = dmg;
+        n++;
+
+        take_damage(dmg, ev, &n, max);
+    }
+    return n;
+}
+
+/* ---------------------------------------------------------------- torps */
+
+uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx) {
+    uint8_t cell;
+
+    if (sy >= QUAD_DIM || sx >= QUAD_DIM) return TORP_BAD_COORDS;
+    if (ship.torps == 0) return TORP_NONE_LEFT;
+
+    ship.torps--;
+    cell = (uint8_t)((sy << 3) | sx);
+
+    if (!SEC_IS_ENEMY(sector[cell])) return TORP_MISS;
+
+    /* CONFIRMED: one torpedo destroys an undamaged standard Mongol outright.
+       It killed a 355-hit-point battleship at range 3.0 with no damage
+       figure printed, which is why torpedo damage itself is still unknown --
+       nothing has ever survived one to report a number. */
+    if (sector[cell] == SEC_COMMAND) ship.killed_cmd++;
+    else                             ship.killed++;
+
+    sector[cell]   = SEC_EMPTY;
+    enemy_hp[cell] = 0;
+    {
+        uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+        if (gal_enemies[q]) gal_enemies[q]--;
+    }
+    if (ship.enemies_left) ship.enemies_left--;
+    return TORP_KILL;
+}
+
+/* --------------------------------------------------------- mission state */
+
+uint8_t trek_game_state(void) {
+    if (ship.lost) return GAME_LOST;
+    if (ship.enemies_left == 0) return GAME_WON;
+    return GAME_ON;
+}
+
+/* MEASURED: every weight comes off the original's evaluation screen, and the
+   arithmetic on that sheet closed exactly. The kill/day term is deliberately
+   absent -- it printed 0.00 against two kills in 1.2 stardates, so something
+   gates it that we do not understand, and implementing a guess would be
+   worse than leaving it out. */
+int16_t trek_score(void) {
+    int16_t s = 0;
+
+    s = (int16_t)(s + ship.killed * 10);
+    s = (int16_t)(s + ship.killed_cmd * 20);
+    s = (int16_t)(s - (int16_t)ship.casualties);
+    if (ship.lost) s = (int16_t)(s - 200);
+    if (ship.enemies_left) s = (int16_t)(s - 300);
+    return s;
 }
