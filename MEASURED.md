@@ -634,6 +634,43 @@ units at the same range, had its printed result scroll away -- but 184150
 went 355 -> 292 across those dumps, a fall of exactly **63**, which is what
 `energy * eff * (1 - d/12)` predicts. Eighth confirmation of the model.
 
+### Repair rate: 20 points per stardate, and it does NOT divide
+
+Measured by poking a system down and moving, with the elapsed time read out
+of memory rather than inferred.
+
+| elapsed stardates | repair | floor(20 * elapsed) |
+|---|---|---|
+| 0.172 | +3  | 3.44 -> 3 |
+| 2.754 | +55 | 55.08 -> 55 |
+| 2.750 | +55 | 55.00 -> 55 |
+
+    repair = floor(20 * elapsed_stardates)
+
+Three points, no capping, exact on all three. Runs where no time elapsed
+repaired by exactly zero, so repair is a pure function of elapsed time and
+nothing else -- not per turn, not per command.
+
+**It does not divide among damaged systems.** With the scanner and the lasers
+both at 5, a 2.750 stardate trip repaired BOTH by 55, each at the full 20 per
+stardate. The manual says the crew "normally divide their time evenly among
+all damaged systems" (l.451-456). That is not what the code does; every
+damaged system repairs at the same rate in parallel. One clean two-system
+measurement, against two clean one-system measurements.
+
+### The stardate is at DS:1D42, not DS:1D36
+
+Costly correction. DS:1D36, DS:1D42 and DS:1D48 all read 3500.0 at the start
+of a game, so the first was taken as the stardate. It is not. With the
+console showing 3520.8, DS:1D42 and DS:1D48 read 3520.7969 while DS:1D36 read
+3520.625 -- a different quantity that merely tracks nearby.
+
+Several repair readings were nonsense before a screenshot caught it: moves
+that plainly succeeded reported 0.000 elapsed, which produced a spurious
+"repair happens per turn, not per unit time" theory and a search for a master
+copy of the repair array that does not exist. The instrument was wrong, not
+the game. Reading the console and the memory together is what found it.
+
 ### The damage model, found and verified causally (2026-08-19)
 
 Read out of the disassembly first, then confirmed by WRITING to the running
