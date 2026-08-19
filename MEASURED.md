@@ -634,6 +634,56 @@ units at the same range, had its printed result scroll away -- but 184150
 went 355 -> 292 across those dumps, a fall of exactly **63**, which is what
 `energy * eff * (1 - d/12)` predicts. Eighth confirmation of the model.
 
+### The damage model, found and verified causally (2026-08-19)
+
+Read out of the disassembly first, then confirmed by WRITING to the running
+game and watching it obey. That is a step up from every earlier session: the
+oracle stopped being purely observational.
+
+**DS:235A is the system repair array** -- twelve 16-bit words, 1-based, every
+one at 100 on a fresh game. Position 8 is DS:2368, and the console lists
+systems in this order:
+
+    1 EnergyConverter   5 EnTorp Tubes    9 L.R. Scanner
+    2 Shields           6 Warp Engines   10 Computer
+    3 Life Support      7 Impulse Engine
+    4 Lasers            8 S.R. Scanner
+
+Eighth is the short range scanner, which is exactly the entry the scanner
+redraw code reads. TWELVE entries rather than ten is itself corroboration:
+the manual documents two systems that never appear on the console, the
+Transporter and the Shuttlecraft, both of which must be at 100% to use.
+
+**The redraw rule, from the code at 0x01C37C:**
+
+    cmp word [0x2368], 90 ; jg  -> show the real glyph
+    cmp byte [cell], 'E'  ; je  -> show the real glyph
+    cmp byte [cell], '*'  ; je  -> fall through to the 50 test
+    cmp byte [cell], 'N'  ; jne -> show '.'
+    cmp word [0x2368], 50 ; jle -> show '.'
+
+The manual (l.388-391) says scanners are fully functional above 90%, cannot
+detect anything smaller than a star below 90%, and do not work below 50%.
+Same two numbers, and the code pins down what survives: your own ship ('E'),
+stars ('*') and novas ('N').
+
+**Verified by poking the value and forcing a repaint**, in a quadrant with
+three stars and no enemies:
+
+| value written | stars | ship | SYSTEMS STATUS bar |
+|---|---|---|---|
+| 100 | visible | visible | full green |
+| 70  | visible | visible | short yellow |
+| 40  | GONE    | visible | short red |
+
+Both predictions made before looking. The console's own bar tracked the
+written value, which confirms the address independently of the scanner
+behaviour.
+
+Not yet known: the exact colour thresholds for the status bars, and whether
+the other eleven systems use the same 0..100 scale (they all read 100, which
+is consistent but not proof).
+
 ### Hit points scale with command level
 
 A level-1 game read through the same table: three battleships in quadrant 7,6
