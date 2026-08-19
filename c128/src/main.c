@@ -8,11 +8,13 @@
 
 /* 8x8 Trek -- C128 VDC port, milestone 2.
  *
- * Galaxy generation and movement, driven from the shared core. The console
- * frame from milestone 1 now shows live state: the short range scan, the
- * chart of known galaxy, and the status readouts all read core arrays.
+ * Galaxy generation, movement and laser fire, driven from the shared core.
+ * The console frame from milestone 1 shows live state: the short range
+ * scan, the chart of known galaxy, and the status readouts all read core
+ * arrays.
  *
- * No combat, damage, docking or supplies yet.
+ * Enemies do not shoot back yet, and there is no damage, docking, supply
+ * or torpedo handling.
  */
 
 /* Key values come from input.h (KB_*), the same symbols the scan table is
@@ -43,6 +45,141 @@ static uint8_t grab_digits(const char *s, uint8_t *out, uint8_t max) {
         if (u >= KB_DIGIT0 && u <= KB_DIGIT9) out[n++] = (uint8_t)(u - KB_DIGIT0);
     }
     return n;
+}
+
+/* Decimal into buf, returning the length written. cc65 ships sprintf, but
+   pulling it in drags a full formatter into a program that needs at most
+   five digits. Digits are built from KB_DIGIT0 rather than a '0' literal,
+   for the reason input.h spells out. */
+static uint8_t put_u16(char *buf, uint16_t v) {
+    char rev[6];
+    uint8_t n = 0, i = 0;
+
+    if (v == 0) { buf[0] = KB_DIGIT0; return 1; }
+    while (v) { rev[n++] = (char)(KB_DIGIT0 + (v % 10)); v /= 10; }
+    while (n) buf[i++] = rev[--n];
+    return i;
+}
+
+/* String literals ARE translated to PETSCII by cc65, so this copies letters
+   in the 193-218 range while put_u16 writes ASCII digits. Mixing the two in
+   one buffer is fine: everything here goes to ui_message, and the screen
+   code converter in vdc.c accepts both spellings. The translation only
+   bites when a literal is COMPARED against a key value, never when it is
+   displayed. */
+static uint8_t put_str(char *buf, const char *s) {
+    uint8_t n = 0;
+    while (*s) buf[n++] = *s++;
+    return n;
+}
+
+/* Whole number out of a command line, ignoring separators the same way
+   grab_digits does. Saturates rather than wrapping: a captain who types
+   nine digits gets everything the banks hold, not a 16-bit wrap to nearly
+   nothing. */
+static uint16_t grab_num(const char *s) {
+    uint16_t v = 0;
+    unsigned char u;
+    uint8_t d;
+
+    while (*s) {
+        u = (unsigned char)*s++;
+        if (u < KB_DIGIT0 || u > KB_DIGIT9) continue;
+        d = (uint8_t)(u - KB_DIGIT0);
+        /* Both halves matter: 6554 overflows on the multiply, and 6553
+           overflows on the add for any digit above 5. Guarding only the
+           first let "65536" wrap to 0, so a captain asking for everything
+           fired nothing. */
+        if (v > 6553 || (v == 6553 && d > 5)) return 65535U;
+        v = (uint16_t)(v * 10 + d);
+    }
+    return v;
+}
+
+static const char *enemy_name(unsigned char c) {
+    switch (c) {
+        case SEC_COMMAND: return "COMMANDER";
+        case SEC_SCOUT:   return "SCOUT";
+        case SEC_SUPPLY:  return "SUPPLY SHIP";
+        default:          return "MONGOL";
+    }
+}
+
+static char linebuf[32];
+
+/* MEASURED wording, from the original's own strings: it prints " unit hit
+   on " followed by the ship, and reports a kill on its own line. */
+static void report_hit(uint16_t dmg, const char *who, uint8_t killed) {
+    uint8_t n = put_u16(linebuf, dmg);
+
+    n += put_str(linebuf + n, " UNIT HIT ON ");
+    n += put_str(linebuf + n, who);
+    linebuf[n] = 0;
+    ui_message("WEAPONS: ", linebuf);
+
+    if (killed) ui_message("WEAPONS: ", "MONGOL DESTROYED!");
+}
+
+/* The laser officer asks for an amount against each enemy vessel in the
+   quadrant (manual l.563-566) rather than one figure split between them,
+   and 0 skips a target. Energy comes out of the main banks, confirmed on
+   the original by its "insufficient energy" refusal firing when main was
+   below the amount requested. */
+static void do_lasers(void) {
+    uint8_t cell, y, x, found = 0;
+    unsigned char what;
+    uint16_t energy, dealt;
+    char line[8];
+
+    for (cell = 0; cell < QUAD_CELLS; cell++)
+        if (SEC_IS_ENEMY(sector[cell])) found++;
+
+    if (!found) {
+        ui_message("SCIENCE: ", "NO ENEMY SHIPS HERE");
+        return;
+    }
+
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+
+        y = (uint8_t)(cell >> 3);
+        x = (uint8_t)(cell & 7);
+
+        /* Name the target before firing: a kill clears the cell, so reading
+           the class afterwards would report an empty sector. */
+        what = sector[cell];
+
+        {
+            uint8_t n = put_str(linebuf, "FIRE AT ");
+            n += put_u16(linebuf + n, (uint16_t)(y + 1));
+            n += put_str(linebuf + n, ",");
+            n += put_u16(linebuf + n, (uint16_t)(x + 1));
+            n += put_str(linebuf + n, " AMOUNT?");
+            linebuf[n] = 0;
+            ui_message("WEAPONS: ", linebuf);
+        }
+
+        ui_read_command(line, sizeof line);
+        energy = grab_num(line);
+        if (energy == 0) continue;
+
+        switch (trek_fire_laser(y, x, energy, &dealt)) {
+            case FIRE_OK:
+                report_hit(dealt, enemy_name(what), 0);
+                break;
+            case FIRE_KILL:
+                report_hit(dealt, enemy_name(what), 1);
+                break;
+            case FIRE_NO_ENERGY:
+                /* The original refuses the shot outright and charges
+                   nothing for it, so there is no partial volley to carry
+                   on with. */
+                ui_message("ENGINEERING: ", "INSUFFICIENT ENERGY!");
+                return;
+            default:
+                break;
+        }
+    }
 }
 
 static void report_move(uint8_t r) {
@@ -120,8 +257,9 @@ int main(void) {
 
         if (c == KB_M)      do_move(cmd);
         else if (c == KB_W) do_warp(cmd);
+        else if (c == KB_L) do_lasers();
         else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M)OVE W)ARP Q)UIT");
+        else if (c)          ui_message("COMPUTER: ", "M)OVE W)ARP L)ASERS Q)UIT");
 
         ui_draw_scan();
         ui_draw_chart();

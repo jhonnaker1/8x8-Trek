@@ -1,9 +1,14 @@
 # EGA Trek remake — project notes
 
-Status as of 2026-08-15. The C128-VDC port is playable to the extent that a
-galaxy generates and the ship moves through it; there is no combat, damage,
-docking or supply yet. Every game constant is provisional pending the
-debugger session against the original.
+Status as of 2026-08-17. The C128-VDC port generates a galaxy, moves the
+ship through it, and fires lasers. Enemies do not shoot back yet, and there
+is no damage, docking, supply or torpedo handling.
+
+Constants are no longer uniformly provisional: laser damage, enemy hit
+points, the three energy pools, travel costs, torpedo count and the scoring
+rubric are measured against the original, several of them read directly out
+of its memory. See MEASURED.md, which records the wrong turns as well as the
+answers.
 
 ## What this is
 

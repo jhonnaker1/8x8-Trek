@@ -39,7 +39,7 @@ typedef struct {
 static const Key keys[] = {
     { 0, 1, KB_RETURN },
     { 0, 0, KB_DELETE },
-    { 4, 4, KB_M }, { 1, 1, KB_W }, { 7, 6, KB_Q },
+    { 4, 4, KB_M }, { 1, 1, KB_W }, { 7, 6, KB_Q }, { 5, 2, KB_L },
     { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
     { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 },
     { 2, 0, KB_DIGIT0 + 5 }, { 2, 3, KB_DIGIT0 + 6 },
