@@ -22,4 +22,14 @@ void ui_clear_messages(void);
    it goes and handles backspace. */
 void ui_read_command(char *buf, uint8_t max);
 
+/* Modal dialog, the way the original runs weapons and energy transfers: a
+   bordered box drawn over the console, its own running transcript inside,
+   and the console restored when it closes. Putting these exchanges in the
+   COMMUNICATIONS panel instead worked but read nothing like the original,
+   and the four-line log pushed the results off before they could be read. */
+void ui_dialog_open(const char *title);
+void ui_dialog_line(const char *text);
+void ui_dialog_ask(const char *prompt, char *buf, uint8_t max);
+void ui_dialog_close(void);
+
 #endif

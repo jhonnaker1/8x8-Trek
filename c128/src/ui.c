@@ -348,6 +348,103 @@ void ui_read_command(char *buf, uint8_t max) {
 
 /* ----------------------------------------------------------------- all */
 
+/* ------------------------------------------------------------- dialogues */
+
+/* Centred over the viewer and communications panels, which is roughly where
+   the original puts its WEAPONS CONTROL box. Sized to leave the scan, the
+   status readout and the chart visible above it. */
+#define DLG_X   14
+#define DLG_Y    9
+#define DLG_W   52
+#define DLG_H   13
+
+static unsigned char dlg_row;      /* next free line inside the box */
+
+static void dlg_frame(const char *title) {
+    unsigned char x, y;
+
+    for (y = 0; y < DLG_H; y++) {
+        for (x = 0; x < DLG_W; x++) {
+            unsigned char c = SC_SPACE;
+            if (y == 0)             c = (x == 0) ? G_TL : (x == DLG_W - 1) ? G_TR : G_HLINE;
+            else if (y == DLG_H - 1) c = (x == 0) ? G_BL : (x == DLG_W - 1) ? G_BR : G_HLINE;
+            else if (x == 0 || x == DLG_W - 1) c = G_VLINE;
+            scr_put((unsigned char)(DLG_X + x), (unsigned char)(DLG_Y + y), c, COL_LABEL);
+        }
+    }
+    scr_puts((unsigned char)(DLG_X + 2), DLG_Y, title, COL_VALUE);
+    dlg_row = 2;
+}
+
+void ui_dialog_open(const char *title) {
+    dlg_frame(title);
+}
+
+/* Scrolls by redrawing the frame when it fills, rather than moving cells
+   about: the box is small and the VDC write is cheap enough. */
+static void dlg_room(void) {
+    if (dlg_row < DLG_H - 2) return;
+    dlg_frame("");
+}
+
+void ui_dialog_line(const char *text) {
+    dlg_room();
+    scr_puts((unsigned char)(DLG_X + 2), (unsigned char)(DLG_Y + dlg_row),
+             text, COL_MSG);
+    dlg_row++;
+}
+
+void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
+    unsigned char x0, y, n = 0;
+    char c;
+
+    dlg_room();
+    y  = (unsigned char)(DLG_Y + dlg_row);
+    scr_puts((unsigned char)(DLG_X + 2), y, prompt, COL_DEPT);
+    x0 = (unsigned char)(DLG_X + 2 + strlen(prompt) + 1);
+    dlg_row++;
+
+    for (;;) {
+        scr_put((unsigned char)(x0 + n), y, 32 + 128, COL_VALUE);
+        c = kb_waitkey();
+        if (c == KB_RETURN) { scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE); break; }
+        if (c == KB_DELETE) {
+            if (n) {
+                scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE);
+                n--;
+                scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE);
+            }
+            continue;
+        }
+        if (n + 1 >= max || c < 32) continue;
+        buf[n] = c;
+        { char one[2]; one[0] = c; one[1] = '\0';
+          scr_puts((unsigned char)(x0 + n), y, one, COL_VALUE); }
+        n++;
+    }
+    buf[n] = '\0';
+}
+
+void ui_dialog_close(void) {
+    unsigned char x, y;
+
+    dlg_room();
+    scr_puts((unsigned char)(DLG_X + 2), (unsigned char)(DLG_Y + dlg_row),
+             "HIT RETURN TO CONTINUE", COL_DEPT);
+    for (;;) if (kb_waitkey() == KB_RETURN) break;
+
+    /* Blank the box before repainting. ui_draw_all() redraws the frame and
+       the four panels that carry live state, but nothing clears the interior
+       of the panels this port leaves empty -- so dialog text sitting inside
+       LASERS or MAIN VIEWER survived the redraw and stayed on screen. */
+    for (y = 0; y < DLG_H; y++)
+        for (x = 0; x < DLG_W; x++)
+            scr_put((unsigned char)(DLG_X + x), (unsigned char)(DLG_Y + y),
+                    SC_SPACE, COL_LABEL);
+
+    ui_draw_all();
+}
+
 void ui_draw_all(void) {
     draw_console();
     ui_draw_scan();

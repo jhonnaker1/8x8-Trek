@@ -28,7 +28,9 @@ $(OUT): $(SRC) src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h ../core/
 # VDC windows; this port drives only the VDC, so the 40-column window shows
 # whatever BASIC left behind and can be ignored.
 run: verify
-	x128 $(OUT)
+	# -autostart, not a bare filename: VICE otherwise tries the PRG as a
+	# disk image, then a tape, then a cartridge, and logs three failures.
+	x128 -autostart $(OUT)
 
 clean:
 	rm -f build/*.prg build/test_egavdc src/*.o

@@ -107,18 +107,6 @@ static const char *enemy_name(unsigned char c) {
 
 static char linebuf[32];
 
-/* MEASURED wording, from the original's own strings: it prints " unit hit
-   on " followed by the ship, and reports a kill on its own line. */
-static void report_hit(uint16_t dmg, const char *who, uint8_t killed) {
-    uint8_t n = put_u16(linebuf, dmg);
-
-    n += put_str(linebuf + n, " UNIT HIT ON ");
-    n += put_str(linebuf + n, who);
-    linebuf[n] = 0;
-    ui_message("WEAPONS: ", linebuf);
-
-    if (killed) ui_message("WEAPONS: ", "MONGOL DESTROYED!");
-}
 
 /* The laser officer asks for an amount against each enemy vessel in the
    quadrant (manual l.563-566) rather than one figure split between them,
@@ -139,47 +127,50 @@ static void do_lasers(void) {
         return;
     }
 
+    ui_dialog_open("WEAPONS CONTROL");
+
     for (cell = 0; cell < QUAD_CELLS; cell++) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
 
         y = (uint8_t)(cell >> 3);
         x = (uint8_t)(cell & 7);
-
-        /* Name the target before firing: a kill clears the cell, so reading
-           the class afterwards would report an empty sector. */
-        what = sector[cell];
+        what = sector[cell];   /* a kill clears the cell; name it first */
 
         {
-            uint8_t n = put_str(linebuf, "FIRE AT ");
+            uint8_t n = put_str(linebuf, "AMOUNT TO FIRE AT ");
             n += put_u16(linebuf + n, (uint16_t)(y + 1));
             n += put_str(linebuf + n, ",");
             n += put_u16(linebuf + n, (uint16_t)(x + 1));
-            n += put_str(linebuf + n, " AMOUNT?");
+            n += put_str(linebuf + n, ":");
             linebuf[n] = 0;
-            ui_message("WEAPONS: ", linebuf);
         }
+        ui_dialog_ask(linebuf, line, sizeof line);
 
-        ui_read_command(line, sizeof line);
         energy = grab_num(line);
         if (energy == 0) continue;
 
         switch (trek_fire_laser(y, x, energy, &dealt)) {
             case FIRE_OK:
-                report_hit(dealt, enemy_name(what), 0);
+            case FIRE_KILL: {
+                uint8_t killed = (sector[cell] == SEC_EMPTY);
+                uint8_t n = put_u16(linebuf, dealt);
+                n += put_str(linebuf + n, " UNIT HIT ON ");
+                n += put_str(linebuf + n, enemy_name(what));
+                linebuf[n] = 0;
+                ui_dialog_line(linebuf);
+                if (killed) ui_dialog_line("MONGOL DESTROYED!");
                 break;
-            case FIRE_KILL:
-                report_hit(dealt, enemy_name(what), 1);
-                break;
+            }
             case FIRE_NO_ENERGY:
-                /* The original refuses the shot outright and charges
-                   nothing for it, so there is no partial volley to carry
-                   on with. */
-                ui_message("ENGINEERING: ", "INSUFFICIENT ENERGY!");
+                ui_dialog_line("INSUFFICIENT ENERGY, CAPTAIN!");
+                ui_dialog_close();
                 return;
             default:
                 break;
         }
     }
+
+    ui_dialog_close();
 }
 
 static void report_move(uint8_t r) {
@@ -280,19 +271,18 @@ static void enemy_turn(void) {
         k = 0;
         switch (ev[i].kind) {
             case EV_SHIELD_HOLD:
-                k  = put_str(linebuf, "SHIELDS ABSORB ");
-                k += put_u16(linebuf + k, ev[i].amount);
-                k += put_str(linebuf + k, " FROM ");
+                k  = put_u16(linebuf, ev[i].amount);
+                k += put_str(linebuf + k, " ABSORBED FROM ");
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 break;
             case EV_HIT:
                 k  = put_u16(linebuf, ev[i].amount);
-                k += put_str(linebuf + k, " UNIT HIT FROM ");
+                k += put_str(linebuf + k, " HIT FROM ");
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 break;
             case EV_SYSTEM_HIT:
                 k  = put_str(linebuf, sys_name(ev[i].y));
-                k += put_str(linebuf + k, " NOW AT ");
+                k += put_str(linebuf + k, " AT ");
                 k += put_u16(linebuf + k, ev[i].amount);
                 break;
             case EV_SHIP_LOST:
@@ -311,21 +301,33 @@ static void enemy_turn(void) {
 static void do_torpedo(const char *line) {
     uint8_t d[8];
     uint8_t n = grab_digits(line, d, 8);
+    char buf[8];
 
     if (ship.torps == 0) {
         ui_message("WEAPONS: ", "CAPTAIN, WE HAVE NO TORPEDOS!");
         return;
     }
+
+    ui_dialog_open("ENERGY TORPEDO CONTROL");
+
+    /* "t35" fires straight at 3,5; a bare "t" asks, as the original does. */
+    if (n != 2) {
+        ui_dialog_ask("SECTOR TO FIRE AT:", buf, sizeof buf);
+        n = grab_digits(buf, d, 8);
+    }
     if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
-        ui_message("WEAPONS: ", "GIVE A SECTOR, E.G. T35");
+        ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+        ui_dialog_close();
         return;
     }
 
+    ui_dialog_line("TRACKING...");
     switch (trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1))) {
-        case TORP_KILL: ui_message("WEAPONS: ", "MONGOL DESTROYED!"); break;
-        case TORP_MISS: ui_message("WEAPONS: ", "TORPEDO MISSED.");   break;
-        default:        ui_message("WEAPONS: ", "TUBES CANNOT FIRE."); break;
+        case TORP_KILL: ui_dialog_line("MONGOL DESTROYED!");     break;
+        case TORP_MISS: ui_dialog_line("TORPEDO MISSED.");       break;
+        default:        ui_dialog_line("TUBES CANNOT FIRE.");    break;
     }
+    ui_dialog_close();
 }
 
 int main(void) {
