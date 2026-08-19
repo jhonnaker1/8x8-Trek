@@ -634,6 +634,42 @@ units at the same range, had its printed result scroll away -- but 184150
 went 355 -> 292 across those dumps, a fall of exactly **63**, which is what
 `energy * eff * (1 - d/12)` predicts. Eighth confirmation of the model.
 
+### Enemy fire: the printed figure IS the damage (2026-08-19)
+
+Measured by pinning energy to 5000 and shields to 2500 by direct write, then
+taking a turn that deals no damage, then reading both back.
+
+| printed | measured drain |
+|---|---|
+| 619 (plasma bolt) | 619.06 |
+| 248 + 181 = 429 | 428.85 |
+
+Two independent turns. The number the game prints is the real damage, and
+with shields up and sufficient it comes out of the SHIELD pool with main
+energy untouched.
+
+**This weakens the reason given earlier for withdrawing the enemy-fire
+data.** That withdrawal argued the printed figure might be the part that
+penetrated rather than the shot fired, making every reading depend on an
+uncontrolled shield state. It is not a residual. So the rising trend across
+those old volleys -- implied energies of 142/144, then 181/204/221, then
+240/251/260 -- still has no explanation, and the shield-state story should
+not be treated as one. The withdrawal stands; the reasoning behind it does
+not.
+
+**Plasma bolts are a separate weapon.** "WARNING: Mongol at 4-7 fires plasma
+bolt" arrives as its own message before the hit lands, and that hit was 619
+against 179 from an ordinary shot in the same quadrant. Previously known only
+as a string in the binary.
+
+Still unmeasured: how enemy damage varies with distance, class and remaining
+strength. The instrument is now good enough -- energy and shields can be
+pinned, and the enemy table gives every firing ship's exact position and hit
+points -- but the input scripting is not. Blind keystrokes desynchronise
+against the game's modal dialogs, which is what spoiled three of the four
+turns in this session. Any further work here needs the screen read between
+every step rather than a fixed keystroke sequence.
+
 ### Repair rate: 20 points per stardate, and it does NOT divide
 
 Measured by poking a system down and moving, with the elapsed time read out
