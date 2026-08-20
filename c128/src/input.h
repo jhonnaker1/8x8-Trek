@@ -37,4 +37,23 @@
 
 char kb_waitkey(void);   /* blocks until one key is pressed and released */
 
+#ifdef TREK_DEBUG_INPUT
+/* Scripted input, for `make monitor` builds only.
+ *
+ * VICE's own KEYBOARD_FEED cannot drive this port: it fills the KERNAL's
+ * keyboard buffer, and input.c scans the CIA1 matrix directly behind the
+ * KERNAL's back, so fed keys never arrive. Verified, not assumed. This byte
+ * is the way round it -- tools/vice_mon.py writes it through VICE's binary
+ * monitor and kb_waitkey consumes it as though the key had been pressed.
+ *
+ * volatile is load-bearing. Nothing inside the program ever stores a nonzero
+ * value here, so without it the compiler is entitled to decide the test can
+ * never fire and fold it away.
+ *
+ * Never in a release build: `make` does not define TREK_DEBUG_INPUT, so this
+ * whole path compiles out and the shipping binary has no scripted-input
+ * affordance at all. */
+extern volatile unsigned char kb_inject;
+#endif
+
 #endif

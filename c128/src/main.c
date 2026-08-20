@@ -415,6 +415,19 @@ static void do_torpedo(const char *line) {
 int main(void) {
     unsigned char c;
 
+#ifdef TREK_DEBUG_INPUT
+    /* This assignment exists to make kb_inject appear in the link map.
+       cc65 lists a symbol in the map's exports only if another module
+       imports it, and input.c is the only place that otherwise touches this
+       one -- so without a reference here tools/vice_mon.py has no address to
+       poke. Compiled out of release builds along with everything else behind
+       this flag.
+
+       And it goes AFTER the declaration, because cc65 is C89. That is the
+       third time this session; native cc is C99 and will not warn. */
+    kb_inject = 0;
+#endif
+
     vdc_init();
     trek_new_game(GAME_LEVEL, GAME_SEED);
     ui_draw_all();
