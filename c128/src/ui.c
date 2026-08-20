@@ -230,6 +230,94 @@ void ui_draw_status(void) {
     put_num(vx, y, ship.enemies_left, 5, EGA_TO_VDC(EGA_LTRED));
 }
 
+/* ------------------------------------------------------- systems status */
+
+/* Twelve systems, six rows of two columns. The original prints the full name
+   ("EnergyConverter", "Impulse Engine") against a bar, but it does so in a
+   graphics mode with an 8-pixel line pitch inside a 14-pixel character cell,
+   which is how it fits ten names into six rows' worth of height. A character
+   display cannot compress like that, so the names shorten to three letters
+   and the freed width goes into the bar.
+
+   Twelve, not the original console's ten: the Transporter and Shuttlecraft
+   are in the repair array (DS:235A holds twelve words) and in the original's
+   own STATE OF REPAIR dialog, and only the console panel leaves them out.
+   Showing them costs nothing here and the game already tracks them. */
+#define SYS_COLS      2
+#define SYS_ROWS      6
+#define SYS_ENTRY_W  11    /* 3 label + 1 space + 7 bar */
+#define SYS_BAR_W     7
+#define SYS_COL_PITCH 13   /* leaves a two-column gutter between the halves */
+
+/* NOT the solid block. G_BLOCK fills all eight pixel rows of its cell, so six
+   bars stacked on consecutive rows fuse into one green slab and the panel
+   stops showing six systems -- confirmed on screen in VICE before this was
+   changed. Screen code 228 is the reverse of the bottom-line glyph: solid
+   across the top seven rows, clear on the eighth. That leaves a one-pixel
+   separator between rows, which is the same 7-of-8 pitch the original draws
+   its bars at (measured: 7px bars on an 8px pitch, MEASURED.md).
+
+   Read out of VICE's own C128 chargen ROM rather than guessed -- the port has
+   already lost time to invented screen codes, and the charset is right there
+   on disk to check against. */
+#define SYS_BAR_GLYPH 228
+
+/* Order matches core/trek.h's SYS_* indices, which in turn match the order
+   the original's console and repair dialog list them in. */
+static const char *const sys_abbrev[SYS_COUNT] = {
+    "CNV", "SHD", "LIF", "LAS", "TUB", "WRP",
+    "IMP", "SRS", "LRS", "CMP", "TRN", "SHT"
+};
+
+/* FITTED. Poking the repair array in the original showed a full green bar at
+   100, a short yellow one at 70 and a short red one at 40 (MEASURED.md), so
+   the green threshold is somewhere in (70,100] and the yellow one in (40,70].
+   90 and 50 are chosen because they are the two numbers the game already
+   uses for the scanners -- the manual states them and the redraw code at
+   0x01C37C compares against exactly those constants. Consistent with every
+   reading, but not pinned down by one. */
+static unsigned char sys_color(unsigned char pct) {
+    if (pct >= 90) return EGA_TO_VDC(EGA_LTGREEN);
+    if (pct >= 50) return EGA_TO_VDC(EGA_YELLOW);
+    return EGA_TO_VDC(EGA_LTRED);
+}
+
+void ui_draw_systems(void) {
+    const Panel *p = &panels[P_SYSTEMS];
+    unsigned char i, c, r, b, x, y, pct, fill, color;
+
+    clear_panel(P_SYSTEMS);
+
+    for (i = 0; i < SYS_COUNT; i++) {
+        /* Column-major: the left half is systems 1-6 reading down, which is
+           how the original's single column reads. */
+        c = (unsigned char)(i / SYS_ROWS);
+        r = (unsigned char)(i % SYS_ROWS);
+        if (c >= SYS_COLS) break;
+
+        x = (unsigned char)(p->x + 1 + c * SYS_COL_PITCH);
+        y = (unsigned char)(p->y + 1 + r);
+
+        pct = ship.sys[i];
+        if (pct > 100) pct = 100;
+        color = sys_color(pct);
+
+        scr_puts(x, y, sys_abbrev[i], COL_LABEL);
+
+        /* Round to nearest cell, but never round a system that is still
+           partly alive down to an empty bar -- empty has to mean destroyed. */
+        fill = (unsigned char)(((uint16_t)pct * SYS_BAR_W + 50) / 100);
+        if (fill == 0 && pct != 0) fill = 1;
+
+        /* The unlit part of the bar is drawn, not left blank, so the bar's
+           full extent reads and a short bar is visibly short rather than
+           just absent. */
+        for (b = 0; b < SYS_BAR_W; b++)
+            scr_put((unsigned char)(x + 4 + b), y, SYS_BAR_GLYPH,
+                    b < fill ? color : COL_GRID);
+    }
+}
+
 /* ------------------------------------------------------------ messages */
 
 #define MSG_LINES 4
@@ -450,5 +538,6 @@ void ui_draw_all(void) {
     ui_draw_scan();
     ui_draw_chart();
     ui_draw_status();
+    ui_draw_systems();
     msg_redraw();
 }

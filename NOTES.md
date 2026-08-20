@@ -657,3 +657,23 @@ game is the overwhelming bulk. The map is still worth having, because it draws
 a hard line under 26KB of code that never needs reading, and it confirms
 INITIALISE at 0x26920, which is exactly where we located the init routine by
 hand while diagnosing dcc.
+
+## Screen codes are checkable, so stop guessing them (2026-08-19)
+
+`layout.h`'s box-drawing glyphs were derived by hand and shipped marked
+UNVERIFIED. That was avoidable: VICE carries the C128 character ROM on disk
+(`/usr/local/share/vice/C128/chargen-390059-01.bin`, 8 bytes per glyph,
+screen code order), so any screen code can be rendered and read before it is
+written into the source.
+
+This came up filling in SYSTEMS STATUS. The bars were first drawn with
+`G_BLOCK` (160), which fills all eight pixel rows of its cell, so six bars on
+six consecutive rows fused into one solid green slab -- the panel stopped
+showing six systems and started showing a rectangle. The original avoids this
+by drawing 7-pixel bars on an 8-pixel pitch. Dumping the ROM found screen code
+228, the reverse of the bottom-line glyph: solid across seven rows, clear on
+the eighth. Same 7-of-8 pitch, one lookup, no guessing.
+
+`c128/test/test_systems.c` now reads that ROM where it can find one and
+asserts the glyph's actual bitmap, so an invented screen code fails on the
+build machine instead of on screen.

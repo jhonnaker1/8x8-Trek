@@ -928,3 +928,49 @@ nothing in it at all.
 12. ~~Casualty scoring weight~~ — **done.** −1 each.
 13. **The kill/day term.** Printed 0.00 with two kills in 1.2 stardates. See
     the scoring section; do not implement it until the gate is understood.
+
+## The console, captured at full 640x350 (2026-08-19)
+
+`layout.h` had been carrying an open action item since milestone 1: its panel
+table was traced by eye off a 320x175 half-scale JPEG, where one character
+cell is 4x7 pixels and column boundaries cannot be read. dosbox-automation's
+`GET /video/frame` now returns the real 640x350 frame, so the panels can be
+measured instead of guessed. Frame borders, taken as maximal single-colour
+runs, in pixels and then in 80x25 cells:
+
+| panel | pixels | cells |
+|---|---|---|
+| SHORT RANGE SCAN | x3..160, y2..136 | cols 0..20, rows 0..9 |
+| STATUS | x160..326, y2..136 | cols 20..40, rows 0..9 |
+| CHART OF KNOWN GALAXY | x333..636, y2..136 | cols 41..79, rows 0..9 |
+| LASERS | x3..166, y141..197 | cols 0..20, rows 10..14 |
+| COMMAND | x3..166, y202..247 | cols 0..20, rows 14..17 |
+| MAIN VIEWER | x173..316, y141..247 | cols 21..39, rows 10..17 |
+| U.S.S. LEXINGTON | x1..158, y251..348 | cols 0..19, rows 17..24 |
+| SYSTEMS STATUS | x161..318, y251..348 | cols 20..39, rows 17..24 |
+
+COMMUNICATIONS and DAMAGE REPORT are not drawn at all on a fresh game -- the
+lower right is plain background until there is a message -- so their frames
+are still unmeasured.
+
+**The 1:1 cell mapping in layout.h is true of the frames and false of the
+contents.** EGA Trek runs in a 640x350 graphics mode and draws text at
+whatever pitch it likes inside those frames. SYSTEMS STATUS puts ten bars at
+an 8-pixel pitch (measured: bars at y267, 275, 283 ... 339, each 7px tall and
+50px wide, x261..310) inside a panel only six 14-pixel character rows deep.
+The short range scan does the same thing, fitting a header and eight rows into
+eight character rows' worth of height.
+
+So the original's geometry can be adopted for panel *positions* but not for
+line counts: a character display cannot draw ten lines in six rows. The port
+takes the measured rectangle and re-lays out the contents to fit it.
+
+### SYSTEMS STATUS lists twelve systems, not ten
+
+The console panel shows ten. The `REPAIR` command opens a modal STATE OF
+REPAIR dialog which lists twelve -- the console's ten plus Transporter and
+Shuttlecraft -- each with a percentage and Docked/Undocked repair-time
+columns. That matches the twelve words at DS:235A exactly, and settles the
+earlier open question of whether the extra two entries in the repair array
+were really the two systems the manual documents but the console omits. They
+are.

@@ -12,6 +12,9 @@ all: $(OUT)
 test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
+	cc -Wall -Wextra -o build/test_systems test/test_systems.c src/ui.c \
+	   src/layout.c ../core/trek.c
+	./build/test_systems
 
 # Inspects the LINKED binary, which is the only place cc65's character-set
 # translation is visible. Native cc does no such translation, so `make test`
@@ -28,9 +31,12 @@ $(OUT): $(SRC) src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h ../core/
 # VDC windows; this port drives only the VDC, so the 40-column window shows
 # whatever BASIC left behind and can be ignored.
 run: verify
-	# -autostart, not a bare filename: VICE otherwise tries the PRG as a
-	# disk image, then a tape, then a cartridge, and logs three failures.
+	# -autostart, not a bare filename, so VICE loads AND runs the PRG.
+	# It still probes the file as a disk image, a tape and a cartridge on
+	# the way -- the three "Error" lines in the log are that autodetect
+	# and are harmless. An earlier version of this comment claimed the
+	# flag suppressed them. It does not; only the RUN is its doing.
 	x128 -autostart $(OUT)
 
 clean:
-	rm -f build/*.prg build/test_egavdc src/*.o
+	rm -f build/*.prg build/test_egavdc build/test_systems src/*.o

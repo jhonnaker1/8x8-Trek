@@ -4,7 +4,15 @@
 
 /* Column bands: 0..26 | 27..45 | 46..79   (27 + 19 + 34 = 80)
    Row bands:    0..12 | 13..20 | 21..24   (13 +  8 +  4 = 25)
-   The left middle band splits again into LASERS over COMMAND. */
+   The left middle band splits again into LASERS over COMMAND.
+
+   The middle column breaks that row banding on purpose. SYSTEMS STATUS runs
+   rows 17..24, which is where a 640x350 capture of the original puts it
+   (measured 2026-08-19: the panel's grey frame spans x161..318, y251..348,
+   i.e. columns 20..39 and rows 17..24). Ten systems will not fit in the two
+   interior rows the old 21..24 band gave it. MAIN VIEWER gives up the height:
+   the original's viewer is taller than this, but this port draws nothing in
+   it yet, and an empty panel is the right thing to spend. */
 const Panel panels[PANEL_COUNT] = {
     {  0,  0, 27, 13, "SHORT RANGE SCAN" },
     { 27,  0, 19, 13, "STATUS" },
@@ -12,11 +20,11 @@ const Panel panels[PANEL_COUNT] = {
 
     {  0, 13, 20,  4, "LASERS" },
     {  0, 17, 20,  4, "COMMAND" },
-    { 20, 13, 26,  8, "MAIN VIEWER" },
+    { 20, 13, 26,  4, "MAIN VIEWER" },
     { 46, 13, 34,  8, "COMMUNICATIONS" },
 
     {  0, 21, 20,  4, "U.S.S. LEXINGTON" },
-    { 20, 21, 26,  4, "SYSTEMS STATUS" },
+    { 20, 17, 26,  8, "SYSTEMS STATUS" },
     { 46, 21, 34,  4, "DAMAGE REPORT" },
 };
 

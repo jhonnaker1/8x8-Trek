@@ -11,6 +11,7 @@ void ui_draw_all(void);        /* frame plus every live panel */
 void ui_draw_scan(void);
 void ui_draw_chart(void);
 void ui_draw_status(void);
+void ui_draw_systems(void);
 
 /* Four-line message log in the COMMUNICATIONS panel, oldest scrolling off
    the top. `dept` is the originating department, as the original prefixes
