@@ -684,3 +684,50 @@ the eighth. Same 7-of-8 pitch, one lookup, no guessing.
 `c128/test/test_systems.c` now reads that ROM where it can find one and
 asserts the glyph's actual bitmap, so an invented screen code fails on the
 build machine instead of on screen.
+
+## The event queue, and why it is integer to the bone (2026-08-19)
+
+Ported from the ancestor's `events.c`. The design that transfers is a fixed
+slot per event type rather than a real queue -- SST says so itself, "This
+isn't a real event queue a la BSD Trek yet" -- and for a core that must run in
+16 bits on a 6502 that limitation is a feature: no allocation, no list, one
+array of dates and a linear scan of four entries.
+
+What the queue buys is the thing EGA Trek's COMMUNICATIONS panel is full of:
+deadlines. "The StarBase in 6-6 reports that it is under attack. They can last
+until 3517.8" is a scheduled destruction with its date shown to the player.
+
+### expran without floating point
+
+`expran(mean) = -mean * ln(u)`. Three constraints decide the implementation
+and they all point the same way:
+
+- The core forbids `float`, `double` and `long`.
+- `int` is 16 bits under cc65 and 32 on the 68000, so anything that leans on
+  integer promotion computes a **different schedule on the Amiga than on the
+  C128, silently, from the same seed** -- and the seeded PRNG exists precisely
+  so that a seed reproduces a game everywhere.
+- The 6502 has no divide instruction.
+
+So: a 32-entry table of `-ln(u) * 32` sampled at the midpoint of each
+thirty-second, indexed by the **top five bits** of the PRNG (a shift, never a
+division), with the multiply split into high and low halves so no intermediate
+leaves 16 bits. Table mean is 1.00 to two places.
+
+It also saturates, which splitting alone does not give you. The deviate
+reaches 4.16x its mean, so a mean above ~15750 tenths cannot be represented at
+all. A wrapped result there is not a harmless wrong number -- it turns a
+distant event into one firing within a few turns. No caller passes a mean that
+large today; the clamp is there so none ever can.
+
+### A test that nearly went in backwards
+
+The first version of the overflow test asserted that a mean of 60000 never
+produces a draw under 15000. That is wrong, and it failed honestly: for a mean
+of 60000 a draw of 1875 is the correct short tail, `-ln(u) = 1/32`, which comes
+up one time in thirty-two. A small result is not evidence of a wrap.
+
+The property that actually separates them is monotonicity in the mean.
+Reseeding before each draw fixes the table entry, so the only thing varying is
+the mean, and a larger mean must never give a smaller draw. That catches
+wrapping and passes the honest short tail.

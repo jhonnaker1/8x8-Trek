@@ -96,6 +96,14 @@ static uint16_t grab_num(const char *s) {
     return v;
 }
 
+/* A stardate as t.d into a buffer, for messages that carry a deadline. */
+static uint8_t put_tenths_str(char *p, uint16_t tenths) {
+    uint8_t k = put_u16(p, (uint16_t)(tenths / 10));
+    p[k++] = '.';
+    p[k++] = (char)('0' + (tenths % 10));
+    return k;
+}
+
 static const char *enemy_name(unsigned char c) {
     switch (c) {
         case SEC_COMMAND: return "COMMANDER";
@@ -269,7 +277,13 @@ static void enemy_turn(void) {
     TrekEvent ev[12];
     uint8_t n, i, k;
 
-    n = trek_enemy_turn(ev, 12);
+    /* Scheduled events first, then the enemy. A base falling or a tractor
+       beam is something that happened during the time the turn consumed, so
+       it belongs before this turn's shooting. Note the tractor beam can move
+       us to another quadrant, which is exactly why the enemy turn is
+       evaluated after it and not before. */
+    n = trek_run_events(ev, 12);
+    if (n < 12) n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n)));
 
     for (i = 0; i < n; i++) {
         k = 0;
@@ -294,6 +308,36 @@ static void enemy_turn(void) {
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 linebuf[k] = 0;
                 ui_message("SCANNER: ", linebuf);
+                continue;
+            case EV_BASE_ATTACKED:
+                /* The deadline is the point of the message, as it is in the
+                   original: "They can last until 3517.8." */
+                k  = put_str(linebuf, "BASE ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                k += put_str(linebuf + k, " HIT TIL ");
+                k += put_tenths_str(linebuf + k, ev[i].amount);
+                linebuf[k] = 0;
+                ui_message("COMMS: ", linebuf);
+                continue;
+            case EV_BASE_LOST:
+                k  = put_str(linebuf, "BASE ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                k += put_str(linebuf + k, " DESTROYED");
+                linebuf[k] = 0;
+                ui_message("COMMS: ", linebuf);
+                continue;
+            case EV_TRACTORED:
+                k  = put_str(linebuf, "DRAGGED TO QUAD ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                linebuf[k] = 0;
+                ui_message("HELM: ", linebuf);
+                continue;
+            case EV_POD_HIT:
+                k  = put_str(linebuf, "DEATH POD ");
+                k += put_u16(linebuf + k, ev[i].amount);
+                k += put_str(linebuf + k, " ON ALL");
+                linebuf[k] = 0;
+                ui_message("DAMAGE: ", linebuf);
                 continue;
             case EV_SHIP_LOST:
                 ui_message("HELM: ", "WE ARE LOST, CAPTAIN.");

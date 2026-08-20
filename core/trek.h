@@ -439,6 +439,14 @@ uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
 #define EV_SYSTEM_HIT    3   /* y = system index; amount = new repair pct */
 #define EV_SHIP_LOST     4
 #define EV_ENEMY_MOVED   5   /* y,x = where it moved to */
+/* Scheduled events, reported the same way. y,x are the GALAXY cell they
+   concern, not a sector, except EV_POD_HIT which concerns the whole
+   quadrant. `amount` on EV_BASE_ATTACKED is the deadline as a stardate in
+   tenths, so the UI can print "they can last until". */
+#define EV_BASE_ATTACKED 6
+#define EV_BASE_LOST     7
+#define EV_TRACTORED     8   /* y,x = the quadrant we were dragged to */
+#define EV_POD_HIT       9   /* amount = damage, to us and to every enemy */
 
 typedef struct {
     uint8_t  kind;
@@ -446,10 +454,71 @@ typedef struct {
     uint16_t amount;
 } TrekEvent;
 
+/* ------------------------------------------------------- scheduled events
+ *
+ * DERIVED from the ancestor's events.c (reference/sst2k), which is where the
+ * deadline messages in EGA Trek's COMMUNICATIONS panel come from. Two seen in
+ * captures, both carrying a stardate the player can still act before:
+ *
+ *   "The StarBase in 6-6 reports that it is under attack. They can last
+ *    until 3517.8."
+ *   "Planet Gallista-8, quad 8-4, requests evacuation. They can only hold
+ *    out until 3516.5."
+ *
+ * That deadline IS the queue, visible from outside: something is scheduled to
+ * destroy the base, and the game tells you when.
+ *
+ * The ancestor's design, kept: a fixed slot per event type rather than a real
+ * queue, so only one of each can be pending. It says so itself -- "This isn't
+ * a real event queue a la BSD Trek yet". For a core that must run in 16 bits
+ * on a 6502 that limitation is a feature: no allocation, no list, one array
+ * of dates.
+ *
+ * Deliberately NOT included: the ancestor's snapshot-for-time-warp, deep
+ * space probes, and supercommander movement. Those need features this core
+ * does not have, and inventing them would be worse than leaving them out. */
+#define SCHED_BASE_ATTACK    0   /* a base comes under attack */
+#define SCHED_BASE_FALLS     1   /* ... and is destroyed if not relieved */
+#define SCHED_TRACTOR        2   /* a commander drags us across the galaxy */
+#define SCHED_DEATH_POD      3   /* a Vandal death pod arrives */
+#define SCHED_COUNT          4
+
+#define SCHED_NEVER     0xFFFFU  /* the ancestor's FOREVER */
+
+void     trek_schedule(uint8_t kind, uint16_t offset_tenths);
+void     trek_unschedule(uint8_t kind);
+uint8_t  trek_is_scheduled(uint8_t kind);
+uint16_t trek_scheduled(uint8_t kind);   /* absolute stardate, or SCHED_NEVER */
+
+/* Exponential deviate with the given mean, both in tenths of a stardate --
+ * the ancestor's expran(), which is -mean * ln(u).
+ *
+ * Integer by necessity and by choice. The core forbids float and long, and
+ * `int` is 16 bits under cc65 but 32 on the 68000, so anything relying on
+ * promotion would compute different event schedules on the Amiga than on the
+ * C128 -- silently. This is a table of -ln(u) indexed by five bits of the
+ * PRNG, with the multiply staged so no intermediate leaves 16 bits. The whole
+ * schedule is therefore reproducible from a seed on every target, which is
+ * what makes the native test suite an oracle for platforms we cannot run. */
+uint16_t trek_expran(uint16_t mean_tenths);
+
+/* Which base is under attack, as a galaxy cell index; GAL_CELLS if none.
+   The UI needs it to name the base in its message, and the player needs to
+   know where to fly. */
+extern uint8_t base_under_attack;
+
 /* Advance the clock by `tenths` of a stardate: the converter tops up main
-   energy and the crew repair damaged systems. Movement already does this;
-   call it directly only for a turn that passes time without moving. */
-void trek_advance(uint16_t tenths);
+   energy, the crew repair damaged systems, and anything scheduled to happen
+   inside that window happens, in date order. Movement already does this;
+   call it directly only for a turn that passes time without moving.
+ *
+ * `ev` may be NULL when the caller does not want the report -- the events
+ * still fire. Returns how many were written. */
+uint8_t trek_advance(uint16_t tenths, TrekEvent *ev, uint8_t max);
+
+/* Fires anything now due. Movement moves the clock without an event list to
+   fill, so the turn loop calls this once after whatever consumed the turn. */
+uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 
 /* Every enemy in the quadrant fires. Returns how many events were written.
    Damage lands on the shields first and on the main banks after those are

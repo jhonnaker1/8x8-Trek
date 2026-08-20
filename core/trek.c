@@ -138,6 +138,12 @@ void trek_enter_quadrant(void) {
     reveal_around(ship.quad_y, ship.quad_x);
 }
 
+/* Scheduled event dates, one slot per type -- see trek.h for why a slot
+   rather than a queue. Declared here rather than beside the event code
+   because trek_new_game seeds the schedule and comes first. */
+static uint16_t sched[SCHED_COUNT];
+uint8_t  base_under_attack = GAL_CELLS;
+
 void trek_new_game(uint8_t level, uint16_t seed) {
     uint8_t i, q, bases, placed;
     uint16_t total;
@@ -214,6 +220,23 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.sec_x  = trek_rand_n(QUAD_DIM);
 
     trek_enter_quadrant();
+
+    /* Seed the schedule. The ancestor does the same in its setup, with means
+       expressed as fractions of the mission length -- so these are too, which
+       keeps a short mission eventful and a long one paced.
+
+       The tractor beam starts unscheduled at level 1 and 2: being dragged
+       across the galaxy before you have a working ship is the sort of thing
+       that makes a first game unwinnable, and the original's own difficulty
+       curve has to do something equivalent. DERIVED plus judgement, and
+       flagged as such. */
+    for (i = 0; i < SCHED_COUNT; i++) sched[i] = SCHED_NEVER;
+    base_under_attack = GAL_CELLS;
+
+    trek_schedule(SCHED_BASE_ATTACK, trek_expran(MISSION_TENTHS / 3));
+    trek_schedule(SCHED_DEATH_POD,   trek_expran(MISSION_TENTHS / 2));
+    if (level >= 3)
+        trek_schedule(SCHED_TRACTOR, trek_expran(MISSION_TENTHS / 2));
 }
 
 /* -------------------------------------------------------------- movement */
@@ -246,8 +269,211 @@ static void advance_time(uint16_t tenths) {
     }
 }
 
-void trek_advance(uint16_t tenths) {
+/* ------------------------------------------------------ scheduled events */
+
+/* take_damage lives with the combat code further down; events need it for the
+   death pod, which damages the ship exactly as enemy fire does. */
+static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max);
+
+/* A base to put under attack, or GAL_CELLS if the galaxy has none left. Walks
+   from a random start so the choice is uniform without needing a count first. */
+static uint8_t pick_base(void) {
+    uint8_t i, q = trek_rand_n(GAL_CELLS);
+    for (i = 0; i < GAL_CELLS; i++) {
+        if (gal_base[q] != BASE_NONE && q != base_under_attack) return q;
+        q = (uint8_t)((q + 1) & (GAL_CELLS - 1));
+    }
+    return GAL_CELLS;
+}
+
+/* Likewise for a quadrant holding enemies -- where a tractor beam drags you,
+   since it is an enemy doing the dragging. */
+static uint8_t pick_enemy_quadrant(void) {
+    uint8_t i, q = trek_rand_n(GAL_CELLS);
+    for (i = 0; i < GAL_CELLS; i++) {
+        if (gal_enemies[q]) return q;
+        q = (uint8_t)((q + 1) & (GAL_CELLS - 1));
+    }
+    return GAL_CELLS;
+}
+
+void trek_schedule(uint8_t kind, uint16_t offset_tenths) {
+    uint16_t when;
+    if (kind >= SCHED_COUNT) return;
+    /* Saturate rather than wrap. A schedule that wrapped would land in the
+       past and fire immediately, which is the opposite of what was asked. */
+    if (offset_tenths >= (uint16_t)(SCHED_NEVER - ship.stardate)) when = SCHED_NEVER - 1;
+    else when = (uint16_t)(ship.stardate + offset_tenths);
+    sched[kind] = when;
+}
+
+void trek_unschedule(uint8_t kind) {
+    if (kind < SCHED_COUNT) sched[kind] = SCHED_NEVER;
+}
+
+uint8_t trek_is_scheduled(uint8_t kind) {
+    return (uint8_t)(kind < SCHED_COUNT && sched[kind] != SCHED_NEVER);
+}
+
+uint16_t trek_scheduled(uint8_t kind) {
+    return (kind < SCHED_COUNT) ? sched[kind] : SCHED_NEVER;
+}
+
+/* -ln(u) * 32, for u at the midpoint of each thirty-second of (0,1).
+   Indexed by five bits of the PRNG, so the lookup is a shift and never a
+   division -- the 6502 has no divide and this runs whenever an event is
+   rescheduled. Mean of the table is 1.00 to two places, as it must be. */
+static const uint8_t neglog32[32] = {
+    133, 98, 82, 71, 63, 56, 51, 46, 42, 39, 36, 33, 30, 28, 25, 23,
+     21, 19, 18, 16, 14, 13, 11, 10,  9,  7,  6,  5,  4,  3,  2,  1
+};
+
+uint16_t trek_expran(uint16_t mean_tenths) {
+    uint16_t t = neglog32[(uint8_t)(trek_rand() >> 11)];   /* top 5 bits */
+    uint16_t hi, whole, frac;
+
+    /* mean * t / 32, staged AND saturated.
+     *
+     * Staged because `long` is forbidden here and `int` is 16 bits under cc65
+     * but 32 on the 68000 -- a version relying on promotion would compute a
+     * different schedule on the Amiga than on the C128, silently, from the
+     * same seed.
+     *
+     * Saturated because splitting is not by itself enough: the deviate can
+     * reach 4.16x its mean, so any mean above about 15750 tenths genuinely
+     * cannot be represented. Wrapping there would return a small number, and
+     * a small number is not a harmless wrong answer -- it schedules an event
+     * that should have been distant into the next few turns. No caller passes
+     * a mean that large today; this is here so that none ever can. */
+    hi = (uint16_t)(mean_tenths >> 5);
+    if (t && hi > (uint16_t)(65535U / t)) return 65535U;
+
+    whole = (uint16_t)(hi * t);
+    frac  = (uint16_t)(((uint16_t)(mean_tenths & 31) * t) >> 5);
+    if (whole > (uint16_t)(65535U - frac)) return 65535U;
+    return (uint16_t)(whole + frac);
+}
+
+/* Fires everything due between now and `until`, in date order, and returns
+   how many were reported. The ancestor walks its array picking the earliest
+   date under the horizon and repeats; so does this. */
+static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t guard;
+
+    /* Bounded rather than while(1): an event that reschedules itself inside
+       the same window would otherwise spin forever, and on a 6502 that is a
+       hang with no console to break into. */
+    for (guard = 0; guard < 16; guard++) {
+        uint8_t i, next = SCHED_COUNT;
+        uint16_t best = SCHED_NEVER;
+
+        for (i = 0; i < SCHED_COUNT; i++)
+            if (sched[i] <= until && sched[i] < best) { best = sched[i]; next = i; }
+        if (next == SCHED_COUNT) break;
+
+        sched[next] = SCHED_NEVER;
+
+        switch (next) {
+            case SCHED_BASE_ATTACK: {
+                uint8_t q = pick_base();
+                if (q == GAL_CELLS) break;
+                base_under_attack = q;
+                /* The ancestor gives 1 + 3*Rand() stardates before the base
+                   falls. That deadline is the number EGA Trek prints. */
+                trek_schedule(SCHED_BASE_FALLS,
+                              (uint16_t)(10 + trek_rand_n(30)));
+                if (ev && *n < max) {
+                    ev[*n].kind   = EV_BASE_ATTACKED;
+                    ev[*n].y      = (uint8_t)(q >> 3);
+                    ev[*n].x      = (uint8_t)(q & 7);
+                    ev[*n].amount = sched[SCHED_BASE_FALLS];
+                    (*n)++;
+                }
+                break;
+            }
+            case SCHED_BASE_FALLS: {
+                uint8_t q = base_under_attack;
+                if (q >= GAL_CELLS) break;
+                gal_base[q] = BASE_NONE;
+                base_under_attack = GAL_CELLS;
+                if (ev && *n < max) {
+                    ev[*n].kind   = EV_BASE_LOST;
+                    ev[*n].y      = (uint8_t)(q >> 3);
+                    ev[*n].x      = (uint8_t)(q & 7);
+                    ev[*n].amount = 0;
+                    (*n)++;
+                }
+                /* Another base will be attacked in due course. */
+                trek_schedule(SCHED_BASE_ATTACK, trek_expran(300));
+                break;
+            }
+            case SCHED_TRACTOR:
+                /* MEASURED that this exists -- a long range tractor beam
+                   pulled the ship into quadrant 6,5 mid-measurement and
+                   wrecked three systems on arrival (MEASURED.md). What is
+                   NOT measured is what decides the destination, so it is a
+                   random quadrant holding enemies, which is the ancestor's
+                   rule (a commander does the dragging). */
+                {
+                    uint8_t q = pick_enemy_quadrant();
+                    if (q == GAL_CELLS) break;
+                    ship.quad_y = (uint8_t)(q >> 3);
+                    ship.quad_x = (uint8_t)(q & 7);
+                    trek_enter_quadrant();
+                    if (ev && *n < max) {
+                        ev[*n].kind   = EV_TRACTORED;
+                        ev[*n].y      = ship.quad_y;
+                        ev[*n].x      = ship.quad_x;
+                        ev[*n].amount = 0;
+                        (*n)++;
+                    }
+                }
+                trek_schedule(SCHED_TRACTOR, trek_expran(400));
+                break;
+
+            case SCHED_DEATH_POD:
+                /* MEASURED: one figure, applied to the ship AND to every
+                   enemy in the quadrant. 59 units on us and 59 on each of two
+                   Mongols in the same turn. The size is not measured beyond
+                   that single reading, so it is that reading give or take. */
+                {
+                    uint16_t hit = (uint16_t)(40 + trek_rand_n(40));
+                    uint8_t  cell;
+                    for (cell = 0; cell < QUAD_CELLS; cell++) {
+                        if (!SEC_IS_ENEMY(sector[cell])) continue;
+                        if (enemy_hp[cell] > hit) enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - hit);
+                        else { enemy_hp[cell] = 0; sector[cell] = SEC_EMPTY; }
+                    }
+                    if (ev && *n < max) {
+                        ev[*n].kind   = EV_POD_HIT;
+                        ev[*n].y      = ship.sec_y;
+                        ev[*n].x      = ship.sec_x;
+                        ev[*n].amount = hit;
+                        (*n)++;
+                    }
+                    take_damage(hit, ev, n, max);
+                }
+                trek_schedule(SCHED_DEATH_POD, trek_expran(500));
+                break;
+        }
+    }
+    return *n;
+}
+
+/* Movement returns a status code and has no event list to fill, so the queue
+   is drained from here instead of from advance_time(). The turn loop calls
+   this once after whatever consumed the turn -- which also means an event
+   fires after the move that carried the clock past it, not in the middle of
+   it, and the player sees the two in the order they happened. */
+uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
+    uint8_t n = 0;
+    run_events(ship.stardate, ev, &n, max);
+    return n;
+}
+
+uint8_t trek_advance(uint16_t tenths, TrekEvent *ev, uint8_t max) {
     advance_time(tenths);
+    return trek_run_events(ev, max);
 }
 
 /* Pool access by the 1/2/3 numbering the original's dialog uses. Returning

@@ -548,22 +548,22 @@ static void test_repair(void) {
     ok(i == SYS_COUNT, "every system starts intact");
 
     ship.sys[SYS_SRSCAN] = 5;
-    trek_advance(10);                      /* one full stardate */
+    trek_advance(10, 0, 0);                      /* one full stardate */
     ok(ship.sys[SYS_SRSCAN] == 25, "one stardate mends 20 points");
 
     ship.sys[SYS_SRSCAN] = 5;
     ship.sys[SYS_LASERS] = 5;
-    trek_advance(10);
+    trek_advance(10, 0, 0);
     ok(ship.sys[SYS_SRSCAN] == 25 && ship.sys[SYS_LASERS] == 25,
        "two damaged systems each mend the full amount, not half");
 
     ship.sys[SYS_SRSCAN] = 95;
-    trek_advance(10);
+    trek_advance(10, 0, 0);
     ok(ship.sys[SYS_SRSCAN] == 100, "repair stops at 100");
 
     /* MEASURED as floor(): 0.172 stardates gave +3, not +3.44. */
     ship.sys[SYS_SRSCAN] = 0;
-    trek_advance(1);
+    trek_advance(1, 0, 0);
     ok(ship.sys[SYS_SRSCAN] == 2, "a tenth of a stardate mends 2, truncated");
 }
 
@@ -573,13 +573,13 @@ static void test_converter_scales_with_repair(void) {
 
     trek_new_game(3, 5150);
     ship.energy = 1000;
-    trek_advance(10);
+    trek_advance(10, 0, 0);
     healthy = ship.energy;
 
     trek_new_game(3, 5150);
     ship.energy = 1000;
     ship.sys[SYS_CONVERTER] = 50;
-    trek_advance(10);
+    trek_advance(10, 0, 0);
     broken = ship.energy;
 
     ok(healthy > broken, "a damaged converter generates less");
@@ -619,6 +619,166 @@ static void wall_in(uint8_t y, uint8_t x) {
 /* Bearing. The one measured point is the original's own reading: ship at 6,4,
    Commander at 5-5, viewer showing 45.0. The rest of the compass follows from
    the convention that fixes -- east zero, anticlockwise. */
+/* The exponential deviate. What matters is not that it matches libc's
+   -mean*log(u) closely -- it cannot, from 32 table entries -- but that its
+   MEAN is right, that it never leaves 16 bits, and that it is identical on
+   every target. The last is why the multiply is staged; see trek.h. */
+static void test_expran(void) {
+    uint16_t i, v, lo = 0xFFFF, hi = 0;
+    uint32_t total = 0;              /* test-side only; the core forbids this */
+
+    puts("exponential deviate");
+
+    trek_srand(4242);
+    for (i = 0; i < 4096; i++) {
+        v = trek_expran(400);        /* mean 40.0 stardates */
+        total += v;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+    }
+    {
+        uint16_t mean = (uint16_t)(total / 4096);
+        ok(mean >= 380 && mean <= 420, "the mean of 4096 draws is the mean asked for");
+    }
+    ok(lo < 100,  "some draws are much shorter than the mean");
+    ok(hi > 1000, "and some much longer -- the tail is there");
+
+    /* A large mean must not wrap. The deviate reaches 4.16x its mean, so
+       anything above ~15750 tenths cannot be represented at all -- and a
+       wrapped result is not a harmless wrong number, it is a distant event
+       rescheduled into the next few turns. Checked across many draws because
+       only the long tail of the table triggers it. */
+    {
+        /* Monotonicity in the mean is the property wrapping breaks, and a
+           small result is NOT by itself evidence of it -- for a mean of 60000
+           a draw of 1875 is the honest short tail, -ln(u) = 1/32, which comes
+           up one time in thirty-two. Reseeding before each draw fixes the
+           table entry, so the only thing varying is the mean. */
+        static const uint16_t means[] = { 100, 1000, 8000, 15000, 30000, 60000 };
+        uint16_t seed, k, prev, cur, bad = 0;
+        for (seed = 1; seed < 200; seed++) {
+            prev = 0;
+            for (k = 0; k < sizeof means / sizeof means[0]; k++) {
+                trek_srand(seed);
+                cur = trek_expran(means[k]);
+                if (cur < prev) bad++;
+                prev = cur;
+            }
+        }
+        ok(bad == 0, "a bigger mean never yields a smaller draw -- no wrap");
+    }
+
+    /* Just under the limit, the answer is still real rather than saturated. */
+    {
+        uint16_t any_mid = 0;
+        trek_srand(7);
+        for (i = 0; i < 512; i++) {
+            v = trek_expran(15000);
+            if (v > 1000 && v < 60000) any_mid++;
+        }
+        ok(any_mid > 0, "a mean just inside the limit still varies");
+    }
+
+    /* Same seed, same sequence -- the property the whole cross-platform
+       comparison rests on. */
+    {
+        uint16_t a[8], b[8];
+        trek_srand(99);
+        for (i = 0; i < 8; i++) a[i] = trek_expran(250);
+        trek_srand(99);
+        for (i = 0; i < 8; i++) b[i] = trek_expran(250);
+        ok(memcmp(a, b, sizeof a) == 0, "a seed reproduces the sequence exactly");
+    }
+}
+
+/* The queue itself. */
+static void test_event_queue(void) {
+    TrekEvent ev[16];
+    uint8_t n, i, seen;
+
+    puts("scheduled events");
+
+    trek_new_game(3, 4242);
+    ok(trek_is_scheduled(SCHED_BASE_ATTACK), "a new game schedules a base attack");
+    ok(!trek_is_scheduled(SCHED_BASE_FALLS),
+       "but nothing is yet scheduled to destroy one");
+
+    trek_unschedule(SCHED_BASE_ATTACK);
+    ok(!trek_is_scheduled(SCHED_BASE_ATTACK), "an event can be cancelled");
+    ok(trek_scheduled(SCHED_BASE_ATTACK) == SCHED_NEVER, "and reads as never");
+
+    trek_schedule(SCHED_BASE_ATTACK, 100);
+    ok(trek_scheduled(SCHED_BASE_ATTACK) == ship.stardate + 100,
+       "scheduling is relative to now");
+
+    /* Nothing fires early. */
+    n = trek_advance(50, ev, 16);
+    for (i = 0, seen = 0; i < n; i++) if (ev[i].kind == EV_BASE_ATTACKED) seen = 1;
+    ok(!seen, "an event does not fire before its date");
+    ok(trek_is_scheduled(SCHED_BASE_ATTACK), "and is still pending");
+
+    /* And does when the clock passes it. */
+    n = trek_advance(60, ev, 16);
+    for (i = 0, seen = 0; i < n; i++) if (ev[i].kind == EV_BASE_ATTACKED) seen = 1;
+    ok(seen, "it fires once the clock passes its date");
+    ok(!trek_is_scheduled(SCHED_BASE_ATTACK), "and is not left pending");
+    ok(base_under_attack < GAL_CELLS, "a base is named as under attack");
+    ok(trek_is_scheduled(SCHED_BASE_FALLS),
+       "and its destruction is now scheduled -- that is the deadline printed");
+
+    /* The deadline the UI prints must be in the future, or the message is a
+       lie the moment it appears. */
+    for (i = 0; i < n; i++)
+        if (ev[i].kind == EV_BASE_ATTACKED)
+            ok(ev[i].amount > ship.stardate, "the deadline is still ahead");
+
+    /* Letting it run destroys the base. */
+    {
+        uint8_t q = base_under_attack;
+        ok(gal_base[q] != BASE_NONE, "the base is there before the deadline");
+        n = trek_advance(400, ev, 16);
+        for (i = 0, seen = 0; i < n; i++) if (ev[i].kind == EV_BASE_LOST) seen = 1;
+        ok(seen, "the base falls when its deadline passes");
+        ok(gal_base[q] == BASE_NONE, "and is gone from the chart");
+        ok(base_under_attack == GAL_CELLS, "with nothing left under attack");
+    }
+
+    /* Relief: reaching the base cancels the attack, which is the whole point
+       of printing a deadline. */
+    trek_new_game(3, 777);
+    trek_schedule(SCHED_BASE_ATTACK, 10);
+    trek_advance(20, ev, 16);
+    if (base_under_attack < GAL_CELLS) {
+        uint8_t q = base_under_attack;
+        trek_unschedule(SCHED_BASE_FALLS);
+        base_under_attack = GAL_CELLS;
+        trek_advance(500, ev, 16);
+        ok(gal_base[q] != BASE_NONE, "a relieved base survives its deadline");
+    }
+
+    /* Scheduling must never wrap into the past. */
+    trek_new_game(3, 4242);
+    trek_schedule(SCHED_DEATH_POD, 60000);
+    ok(trek_scheduled(SCHED_DEATH_POD) > ship.stardate,
+       "a huge offset saturates rather than wrapping into the past");
+
+    /* Two events due in the same window both fire, oldest first. */
+    trek_new_game(3, 4242);
+    trek_unschedule(SCHED_TRACTOR);
+    trek_schedule(SCHED_BASE_ATTACK, 10);
+    trek_schedule(SCHED_DEATH_POD, 20);
+    n = trek_advance(50, ev, 16);
+    {
+        int8_t first = -1, second = -1;
+        for (i = 0; i < n; i++) {
+            if (ev[i].kind == EV_BASE_ATTACKED && first < 0)  first = (int8_t)i;
+            if (ev[i].kind == EV_POD_HIT       && second < 0) second = (int8_t)i;
+        }
+        ok(first >= 0 && second >= 0, "both events in one window fire");
+        ok(first < second, "and they are reported in date order");
+    }
+}
+
 static void test_bearing(void) {
     puts("bearing");
 
@@ -834,6 +994,8 @@ int main(void) {
     test_enemy_turn();
     test_enemy_movement();
     test_bearing();
+    test_expran();
+    test_event_queue();
     test_torpedo();
     test_game_state_and_score();
 
