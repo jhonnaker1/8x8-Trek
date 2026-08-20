@@ -318,6 +318,88 @@ void ui_draw_systems(void) {
     }
 }
 
+/* -------------------------------------------------------- laser gauges */
+
+/* Two gauges, as the original: efficiency over temperature. The original
+   prints a numbered scale above each bar -- "0  50  100" and
+   "0  1000 1500" -- which needs five lines of a graphics-mode panel and is
+   not going to fit in two character rows. The scale becomes a number printed
+   beside the bar instead, which says more per cell.
+
+   Widths add to the eighteen cells of the panel interior:
+   four label, one space, eight bar, one space, four value. */
+#define LAS_BAR_W    8
+#define LAS_VAL_W    4
+
+/* The efficiency gauge is the one that matters: it is a direct multiplier on
+   damage, and the same colours as SYSTEMS STATUS keep that readable. */
+
+/* PROVISIONAL. Only 1500 has evidence behind it -- see LASER_HEAT_MAX. The
+   original prints a tick at 1000 as well, which suggests it means something,
+   but nothing has been measured there, so the amber band is a guess and is
+   marked as one. Red means the ancestor would be rolling for a burn. */
+static unsigned char heat_color(uint16_t heat) {
+    if (heat > LASER_HEAT_MAX)  return EGA_TO_VDC(EGA_LTRED);
+    if (heat >= 1000)           return EGA_TO_VDC(EGA_YELLOW);
+    return EGA_TO_VDC(EGA_LTGREEN);
+}
+
+/* Rounds to nearest cell, and never lets a nonzero value draw an empty bar:
+   empty has to mean nothing, not merely a little.
+
+   The saturating case is handled by clamping FIRST rather than by widening
+   the arithmetic. Heat saturates at 65535 and 65535 * 8 does not fit in the
+   16 bits cc65 gives an int; after the early return, value < full <= 1500, so
+   value * 8 tops out at 12000 and there is nothing to overflow. */
+static unsigned char gauge_fill(uint16_t value, uint16_t full) {
+    if (value == 0) return 0;
+    if (value >= full) return LAS_BAR_W;
+    {
+        uint16_t n = (uint16_t)((value * LAS_BAR_W + full / 2) / full);
+        return (unsigned char)(n == 0 ? 1 : n);
+    }
+}
+
+/* put_num pads a short number but does NOT truncate a long one -- it writes
+   every digit it has. Heat saturates at 65535, which is five digits in a
+   four-cell field, and the fifth lands on the panel's right border. A real
+   gauge reading off its scale shows that rather than a wrong number, so the
+   field fills with stars. Caught by test_panels.c, not by looking. */
+static void put_gauge_num(unsigned char x, unsigned char y, uint16_t v,
+                          unsigned char color) {
+    unsigned char i;
+    if (v > 9999) {
+        for (i = 0; i < LAS_VAL_W; i++)
+            scr_put((unsigned char)(x + i), y, SC_STAR, color);
+        return;
+    }
+    put_num(x, y, v, LAS_VAL_W, color);
+}
+
+static void gauge_row(unsigned char x, unsigned char y, const char *label,
+                      uint16_t value, uint16_t full, unsigned char color) {
+    unsigned char fill = gauge_fill(value, full);
+    unsigned char b;
+
+    scr_puts(x, y, label, COL_LABEL);
+    for (b = 0; b < LAS_BAR_W; b++)
+        scr_put((unsigned char)(x + 5 + b), y, SYS_BAR_GLYPH,
+                b < fill ? color : COL_GRID);
+    put_gauge_num((unsigned char)(x + 5 + LAS_BAR_W + 1), y, value, color);
+}
+
+void ui_draw_lasers(void) {
+    const Panel *p = &panels[P_LASERS];
+    unsigned char x = (unsigned char)(p->x + 1);
+    unsigned char y = (unsigned char)(p->y + 1);
+
+    clear_panel(P_LASERS);
+    gauge_row(x, y, "EFF", (uint16_t)ship.laser_eff, 100,
+              sys_color(ship.laser_eff));
+    gauge_row(x, (unsigned char)(y + 1), "TEMP", ship.laser_heat,
+              LASER_HEAT_MAX, heat_color(ship.laser_heat));
+}
+
 /* ------------------------------------------------------------ messages */
 
 #define MSG_LINES 4
@@ -539,5 +621,6 @@ void ui_draw_all(void) {
     ui_draw_chart();
     ui_draw_status();
     ui_draw_systems();
+    ui_draw_lasers();
     msg_redraw();
 }

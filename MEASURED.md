@@ -974,3 +974,126 @@ columns. That matches the twelve words at DS:235A exactly, and settles the
 earlier open question of whether the extra two entries in the repair array
 were really the two systems the manual documents but the console omits. They
 are.
+
+## The ancestor found: EGA Trek descends from the FORTRAN line, not the BASIC one (2026-08-19)
+
+Nels Anderson has said in interview that he found Star Trek on a DECsystem-10
+in the mid-1970s, "written in Fortran if I recall right, with source code
+available even", and that for EGA Trek he "tried to stay pretty much true to
+the original gameplay", with the status displays "pretty close to the
+original mainframe versions".
+(https://www.classicdosgames.com/interviews/nelsanderson.html)
+
+That makes `reference/superstartrek.bas` the wrong ancestor. It is the
+Mayfield -> Ahl -> Leedom BASIC line. Anderson's stated source is the FORTRAN
+line, and the two diverged. Anderson's own command list decides it:
+
+| feature | 1978 BASIC | FORTRAN / SST2K line | EGA Trek |
+|---|---|---|---|
+| death ray | absent | present | `RAY` |
+| shuttlecraft | absent | present | in the repair array |
+| planets, landing, crystals | absent | present | `LAND`, `ORBIT`, `USE` |
+| self destruct | absent | present | `SELF` |
+
+Four for four on the FORTRAN branch, none on the BASIC one.
+
+`reference/sst2k/` is now a clone of ESR's super-star-trek
+(https://gitlab.com/esr/super-star-trek). It is **BSD licensed**, which is
+compatible with this repo's MIT, so it may be used with attribution and not
+merely read. The closest thing to Anderson's source is
+`historic/c-version/src/`, described in that repo as ESR's translation of the
+UT FORTRAN version.
+
+**How to use it: as a hypothesis generator, never as an authority.** Anderson
+changed things, and the first thing checked proves it. But a specific
+hypothesis costs one confirming shot; a law discovered from nothing costs
+twenty.
+
+### Laser falloff: the oracle proposes exponential, our data refutes it
+
+SST's phaser damage (`battle.c`, `hittem`):
+
+    dustfac = 0.9 + 0.01*Rand();
+    hit = wham * pow(dustfac, kdist);
+
+Exponential, roughly `0.9^d`. Ours is linear, `1 - d/12`. The two are close
+at short range -- 0.729 against 0.75 at d=3, 0.531 against 0.5 at d=6 --
+so a fit to short-range data alone could not tell them apart, which is
+exactly the kind of thing worth re-checking.
+
+The clean run already settles it. At d=1.414 with 500 units, linear predicts
+441.1 and exponential 430.8; the game printed **441**. At d=5.0 with 250,
+linear predicts 145.8 and exponential 147.6; the game printed **146**.
+Exponential is excluded at both points. The measured linear law stands
+unchanged, and Anderson demonstrably rewrote this formula.
+
+### Laser heat: 1500 is the overheat threshold, and below it nothing happens
+
+    static void overheat(double rpow)
+    {
+        if (rpow > 1500) {
+            double chekbrn = (rpow-1500.)*0.00038;
+            if (Rand() <= chekbrn) { ... phasers damaged ... }
+        }
+    }
+
+`rpow` is the total energy fired in one phaser command. Three things line up:
+
+- EGA Trek's Temp gauge is printed with a scale of `0 ... 1000 1500`. Full
+  scale is the same 1500.
+- Our own reading, "700 of 1500 costs nothing", is exactly what this predicts:
+  at or below 1500 there is no effect at all.
+- The penalty above 1500 is probabilistic, not gradual, which is why no
+  gradual heat cost was ever found.
+
+**Hypothesis, not yet confirmed for EGA Trek:** the Temp gauge reads total
+laser energy fired in one LASERS command against a full scale of 1500, and
+nothing is lost at or below it. One measurement discriminates: fire 750 in a
+single volley and the bar should read half. A first attempt fired 300 and the
+bar drew 20px of 121, where 300/1500 predicts 24px -- close but not exact, so
+either the gauge decays, or it reads something slightly different.
+
+### Enemy fire: proportional to the firer's remaining power, and firing drains it
+
+This is item 7, the one three sessions failed on. SST's `attack()`:
+
+    dustfac = 0.8 + 0.05*Rand();
+    hit = kpower[loop] * pow(dustfac, kavgd[loop]);
+    kpower[loop] *= 0.75;
+
+Two things that would defeat exactly the measurements we attempted:
+
+1. Hit strength is proportional to `kpower`, which is the enemy's **remaining
+   hit points**. An earlier session concluded "output declines with damage
+   taken" and then withdrew it. In the ancestor that conclusion is correct.
+2. **Firing costs the firer a quarter of its power**, independent of damage
+   taken. So a ship's output falls every turn it shoots, whether or not
+   anything hit it. No measurement that ignores this can be stable, and ours
+   did ignore it.
+
+Distance enters as `kavgd`, the *average* distance to the enemy over the turn,
+not the instantaneous one.
+
+### Repair does not divide between systems, in the ancestor either
+
+    repair = xtime;
+    if (docked) repair /= docfac;        /* docfac = 0.25, so 4x docked */
+    for (l = 0; l < NDEVICES; l++)
+        game.damage[l] -= repair;        /* every device, full rate */
+
+Every damaged device gets the whole elapsed time, in parallel. That is what we
+measured in EGA Trek and recorded as contradicting its manual -- and the
+manual's claim that engineers "divide their time evenly among all damaged
+systems" is inherited fiction, wrong about the ancestor too.
+
+**Testable immediately:** docking should repair 4x faster. EGA Trek's STATE OF
+REPAIR dialog prints Docked and Undocked columns side by side, so the ratio
+can be read straight off one screenshot with any system damaged.
+
+### Torpedo damage against our own ship
+
+    *hit = 700.0 + 100.0*Rand() - 1000.0*distance*fabs(sin(bullseye-angle));
+
+700-800 at point blank, falling off with how badly the shot was aimed rather
+than with range alone. Nothing measured for EGA Trek yet; recorded as the
+shape to test.

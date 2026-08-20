@@ -1,4 +1,4 @@
-/* Host-side test for the SYSTEMS STATUS panel in src/ui.c.
+/* Host-side tests for the console panels drawn in src/ui.c.
  *
  * Runs natively (cc, not cl65) against a fake VDC that records every cell
  * written. The point is not the arithmetic -- it is the bounds. The real VDC
@@ -8,8 +8,8 @@
  * this port one bug (message truncation in COMMUNICATIONS), and it cannot be
  * seen in a screenshot of the panel that caused it.
  *
- *     cc -Wall -o build/test_systems test/test_systems.c src/ui.c \
- *        src/layout.c ../core/trek.c && ./build/test_systems
+ *     cc -Wall -o build/test_panels test/test_panels.c src/ui.c \
+ *        src/layout.c ../core/trek.c && ./build/test_panels
  */
 
 #include <stdio.h>
@@ -273,6 +273,97 @@ static void test_independent(void) {
     }
 }
 
+/* ------------------------------------------------------------- lasers */
+
+/* Same bounds argument as SYSTEMS STATUS, and the LASERS panel is the tighter
+   fit: label, bar and a four-digit readout come to exactly the eighteen cells
+   of the interior, with nothing spare to absorb an off-by-one. */
+static void test_lasers_stay_inside(void) {
+    const Panel *p = &panels[P_LASERS];
+    unsigned char x, y;
+    int escaped = 0;
+
+    ship.laser_eff = 100;
+    ship.laser_heat = 65535U;      /* the widest readout there can be */
+    screen_reset();
+    ui_draw_lasers();
+
+    for (y = 0; y < VDC_ROWS; y++)
+        for (x = 0; x < VDC_COLS; x++) {
+            if (cell[y][x] == SENTINEL) continue;
+            if (x > p->x && x < p->x + p->w - 1 &&
+                y > p->y && y < p->y + p->h - 1) continue;
+            escaped++;
+        }
+
+    check(off_screen == 0, "lasers: no write leaves the 80x25 grid");
+    check(escaped == 0,    "lasers: no write leaves the panel interior");
+
+    /* And what it shows instead of a truncated number. */
+    check(cell[p->y + 2][p->x + 15] == 42 &&
+          cell[p->y + 2][p->x + 18] == 42,
+          "a readout wider than its field shows stars, not a wrong number");
+}
+
+static unsigned char las_bar_len(unsigned char row) {
+    const Panel *p = &panels[P_LASERS];
+    unsigned char x = (unsigned char)(p->x + 1 + 5);
+    unsigned char y = (unsigned char)(p->y + 1 + row);
+    unsigned char n = 0, k;
+    for (k = 0; k < 8; k++)
+        if (attr[y][x + k] != EGA_TO_VDC(EGA_DKGRAY)) n++;
+    return n;
+}
+
+static void test_laser_gauges(void) {
+    static const struct { uint16_t eff, heat; unsigned char ec, hc; } t[] = {
+        { 100,     0, 8, 0 },
+        {  50,   750, 4, 4 },
+        {   1,     1, 1, 1 },   /* alive at all must never draw empty */
+        {   0,     0, 0, 0 },
+        {   7,  1500, 1, 8 },
+        { 100, 65535U, 8, 8 },  /* saturated heat pins the bar, not wraps it */
+    };
+    unsigned char i;
+    char msg[72];
+
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        ship.laser_eff  = (unsigned char)t[i].eff;
+        ship.laser_heat = t[i].heat;
+        screen_reset();
+        ui_draw_lasers();
+        sprintf(msg, "eff %u draws %u of 8", t[i].eff, t[i].ec);
+        check(las_bar_len(0) == t[i].ec, msg);
+        sprintf(msg, "heat %u draws %u of 8", t[i].heat, t[i].hc);
+        check(las_bar_len(1) == t[i].hc, msg);
+    }
+}
+
+/* 1500 is the only number here with evidence behind it, so the boundary that
+   matters is the one at 1500: at or below it the ancestor does nothing, above
+   it rolls for a burn. The amber band is a guess and is tested only so that
+   changing it is a deliberate act. */
+static void test_heat_colours(void) {
+    const Panel *p = &panels[P_LASERS];
+    unsigned char x = (unsigned char)(p->x + 1 + 5);
+    unsigned char y = (unsigned char)(p->y + 2);
+    static const struct { uint16_t heat; unsigned char ega; const char *what; } t[] = {
+        {  999, EGA_LTGREEN, "999 is green"       },
+        { 1000, EGA_YELLOW,  "1000 is amber"      },
+        { 1500, EGA_YELLOW,  "1500 is still amber -- the threshold is not yet crossed" },
+        { 1501, EGA_LTRED,   "1501 is red"        },
+    };
+    unsigned char i;
+
+    ship.laser_eff = 100;
+    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
+        ship.laser_heat = t[i].heat;
+        screen_reset();
+        ui_draw_lasers();
+        check(attr[y][x] == EGA_TO_VDC(t[i].ega), t[i].what);
+    }
+}
+
 int main(void) {
     trek_new_game(3, 12345);
 
@@ -285,7 +376,11 @@ int main(void) {
     test_colours();
     test_independent();
 
+    test_lasers_stay_inside();
+    test_laser_gauges();
+    test_heat_colours();
+
     if (failures) { printf("%d failure(s)\n", failures); return 1; }
-    printf("systems status panel: all checks passed\n");
+    printf("console panels: all checks passed\n");
     return 0;
 }

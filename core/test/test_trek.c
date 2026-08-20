@@ -432,6 +432,61 @@ static void test_laser_model(void) {
     }
 }
 
+/* Laser heat: the volley total, cleared where a volley begins. The only
+   number with evidence behind it is the 1500 full scale -- both from firing
+   700 for free in the original and from the FORTRAN ancestor's threshold --
+   so what is tested here is the accounting, not a damage rule. */
+static void test_laser_heat(void) {
+    uint16_t dealt;
+    uint8_t  cell, before;
+
+    puts("laser heat");
+
+    trek_new_game(3, 4242);
+    ok(ship.laser_heat == 0, "a new game starts cold");
+
+    ship.sec_y = 4; ship.sec_x = 4;
+    cell = (uint8_t)((4 << 3) | 5);
+    sector[cell]   = SEC_BATTLESHIP;
+    enemy_hp[cell] = HP_BATTLESHIP;
+
+    trek_laser_begin_volley();
+    trek_fire_laser(4, 5, 300, &dealt);
+    ok(ship.laser_heat == 300, "one shot heats by what it fired");
+
+    sector[cell]   = SEC_BATTLESHIP;
+    enemy_hp[cell] = HP_BATTLESHIP;
+    trek_fire_laser(4, 5, 450, &dealt);
+    ok(ship.laser_heat == 750, "shots in one volley accumulate");
+    ok(ship.laser_heat * 2 == LASER_HEAT_MAX,
+       "750 is half the gauge, which is the shot that would confirm the scale");
+
+    trek_laser_begin_volley();
+    ok(ship.laser_heat == 0, "a new volley starts cold again");
+
+    /* A refused shot must not heat: the original does not spend the energy
+       either, and heat is energy that actually went into the banks. */
+    before = 0;
+    trek_laser_begin_volley();
+    trek_fire_laser(0, 0, 500, &dealt);
+    ok(ship.laser_heat == before, "firing at empty space adds no heat");
+    trek_fire_laser((uint8_t)9, (uint8_t)9, 500, &dealt);
+    ok(ship.laser_heat == before, "off-grid coordinates add no heat");
+    sector[cell]   = SEC_BATTLESHIP;
+    enemy_hp[cell] = HP_BATTLESHIP;
+    trek_fire_laser(4, 5, (uint16_t)(ship.energy + 1), &dealt);
+    ok(ship.laser_heat == before, "a shot refused for energy adds no heat");
+
+    /* Saturation, not wraparound -- a wrapped gauge reads as cold, which is
+       the one failure mode that would be invisible on screen. */
+    ship.laser_heat = 65000U;
+    ship.energy = 60000U;
+    sector[cell]   = SEC_BATTLESHIP;
+    enemy_hp[cell] = HP_BATTLESHIP;
+    trek_fire_laser(4, 5, 1000, &dealt);
+    ok(ship.laser_heat == 65535U, "heat saturates rather than wrapping");
+}
+
 static void test_fire_laser(void) {
     uint16_t dealt, before;
     uint8_t  r, cell, q;
@@ -645,6 +700,7 @@ int main(void) {
     test_laser_readings();
     test_laser_model();
     test_fire_laser();
+    test_laser_heat();
     test_repair();
     test_converter_scales_with_repair();
     test_enemy_turn();

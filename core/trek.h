@@ -151,6 +151,26 @@
  * comparisons against it must shift. */
 #define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */
 
+/* Full scale on the original's laser Temp gauge, whose printed scale reads
+   "0 ... 1000 1500".
+ *
+ * MEASURED, twice over. Firing 700 in a volley cost nothing, and the FORTRAN
+ * ancestor this game is a port of uses the same number as a hard threshold:
+ *
+ *     if (rpow > 1500) { chekbrn = (rpow-1500)*0.00038; ... }
+ *
+ * where rpow is the total energy fired in ONE phaser command. At or below
+ * 1500 there is no penalty at all, which is why no gradual heat cost was ever
+ * found by measurement -- there isn't one. Above it the ancestor rolls a
+ * probabilistic burn against chekbrn.
+ *
+ * The burn is deliberately NOT implemented here. It has not been confirmed
+ * for EGA Trek, and adopting a gameplay rule from the ancestor unverified is
+ * exactly what the laser falloff shows to be unsafe: Anderson rewrote that
+ * one from exponential to linear. The gauge reports; nothing acts on it yet.
+ * See MEASURED.md. */
+#define LASER_HEAT_MAX     1500
+
 /* Enemy hit points.
  *
  * BATTLESHIP and SUPPLY are READ DIRECTLY out of the original's memory. The
@@ -212,6 +232,11 @@ uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist);
    whatever the outcome of the shot, as the original does, and applies the
    damage to whatever is there. `damage` receives the delivered figure; pass
    NULL if the caller does not care. */
+/* Call once at the start of a LASERS command, before the shots. Heat is
+   per-command in the ancestor, so it has to be cleared somewhere the core can
+   see; the UI knows where a volley begins and the core does not. */
+void trek_laser_begin_volley(void);
+
 uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
                         uint16_t *damage);
 
@@ -262,6 +287,11 @@ typedef struct {
     uint8_t  torps;
     uint8_t  laser_eff;     /* percent -- heat and battle damage combined,
                                as the original's single gauge reports it */
+    uint16_t laser_heat;    /* energy fired in the current volley, 0..65535.
+                               Per COMMAND, not cumulative over the game, which
+                               is what the ancestor's rpow means and the only
+                               reading we have is consistent with. Whether it
+                               also decays over time is unmeasured. */
     uint8_t  warp;          /* tenths, 10..80 */
     uint8_t  shields_up;
     uint16_t stardate;      /* tenths */

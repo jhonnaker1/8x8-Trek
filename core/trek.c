@@ -190,6 +190,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.shields      = SHIELD_START;    /* full, and lowered -- see trek.h */
     ship.torps        = TORPS_START;
     ship.laser_eff    = 100;
+    ship.laser_heat   = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.casualties   = 0;
@@ -469,6 +470,10 @@ uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
     return scale_pct(scale_256(energy, f), eff_pct);
 }
 
+void trek_laser_begin_volley(void) {
+    ship.laser_heat = 0;
+}
+
 uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
                         uint16_t *damage) {
     uint8_t cell, q;
@@ -486,6 +491,13 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
        spent when it refuses. */
     if (energy > ship.energy) return FIRE_NO_ENERGY;
     ship.energy = (uint16_t)(ship.energy - energy);
+
+    /* Heat is the energy that went into the volley, whether or not it hit --
+       and this point is past every refusal, so a rejected shot adds none.
+       Saturates rather than wrapping: the gauge is already off its scale long
+       before 65535 and a wrap would read as cold. */
+    if (ship.laser_heat > (uint16_t)(65535U - energy)) ship.laser_heat = 65535U;
+    else ship.laser_heat = (uint16_t)(ship.laser_heat + energy);
 
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
     dealt = trek_laser_damage(energy, ship.laser_eff, d);

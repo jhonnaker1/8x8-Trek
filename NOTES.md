@@ -294,6 +294,13 @@ Everything in [`reference/`](reference):
   half-scale capture of the real 640×350 — so every coordinate in it doubles to
   a true mode 10h pixel position. Usable directly as the layout source.
 - `combat-model.md` — combat math from the 1978 ancestor.
+- `sst2k/` — clone of ESR's super-star-trek (gitlab.com/esr/super-star-trek),
+  **BSD licensed** and so compatible with this repo's MIT. `historic/c-version/`
+  is ESR's translation of the UT FORTRAN version, which is the closest readable
+  thing to what Anderson actually ported. THIS is the ancestor, not the BASIC
+  listing below — see MEASURED.md. Use it to generate hypotheses, then confirm
+  them against the disassembly or the running game; Anderson changed formulas,
+  and the laser falloff proves it.
 - `superstartrek.bas` — the 1978 listing itself (`SUPER STARTREK - MAY 16,1978`).
   Its own header carries the credit chain: original by **Mike Mayfield**;
   modified version published in DEC's *101 BASIC Games* by **Dave Ahl**;

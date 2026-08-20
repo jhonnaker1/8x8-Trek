@@ -12,9 +12,9 @@ all: $(OUT)
 test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
-	cc -Wall -Wextra -o build/test_systems test/test_systems.c src/ui.c \
+	cc -Wall -Wextra -o build/test_panels test/test_panels.c src/ui.c \
 	   src/layout.c ../core/trek.c
-	./build/test_systems
+	./build/test_panels
 
 # Inspects the LINKED binary, which is the only place cc65's character-set
 # translation is visible. Native cc does no such translation, so `make test`
@@ -39,4 +39,4 @@ run: verify
 	x128 -autostart $(OUT)
 
 clean:
-	rm -f build/*.prg build/test_egavdc build/test_systems src/*.o
+	rm -f build/*.prg build/test_egavdc build/test_panels src/*.o

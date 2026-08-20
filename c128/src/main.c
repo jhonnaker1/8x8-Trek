@@ -127,6 +127,10 @@ static void do_lasers(void) {
         return;
     }
 
+    /* Heat is per-command, so it is cleared where the command begins. The
+       core cannot see a volley boundary; only this can. */
+    trek_laser_begin_volley();
+
     ui_dialog_open("WEAPONS CONTROL");
 
     for (cell = 0; cell < QUAD_CELLS; cell++) {
@@ -353,6 +357,8 @@ int main(void) {
         ui_draw_scan();
         ui_draw_chart();
         ui_draw_status();
+        ui_draw_systems();
+        ui_draw_lasers();
 
         if (trek_game_state() != GAME_ON) break;
     }
