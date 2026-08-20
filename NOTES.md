@@ -120,9 +120,11 @@ github.com/geekychris/amiga_mcp -- "Amiga DevBench". Worth having on record
 before the Amiga leg starts, because it answers two questions NOTES.md has
 been carrying unanswered.
 
-**Toolchain.** It cross-compiles with `m68k-amigaos-gcc` in Docker. The port
-order has been decided for a while without ever settling what actually builds
-the 68000 binary; this is a ready answer.
+**Toolchain: already solved, and NOT via their Docker.**
+`~/amiga-toolchain/bin/m68k-amigaos-gcc` is installed (bebbo's GCC 6.5.0b),
+`~/vbcc` too, and `commodore-uno/amiga/Makefile` already builds with it. So
+the Docker requirement -- the heaviest dependency amiga_mcp has -- does not
+apply to us. Use the local toolchain and take only the dev loop.
 
 **Dev loop.** FS-UAE (primary, with an optional patched build carrying an HTTP
 debugger), Amiberry, or real hardware over TCP. Screenshots with
@@ -138,22 +140,27 @@ on-Amiga daemon (`amiga-bridge`) routing messages over AmigaOS MsgPort IPC,
 and a patched FS-UAE. There is real content here; reimplementing it is not the
 obvious move the way it was for VICE.
 
-**The question that decides whether its input injection helps us**, and it is
-a live one after 2026-08-19: this port reads the keyboard directly. On the
-C128, `input.c` scans the CIA1 matrix behind the KERNAL's back, and that is
-exactly why scripted input could not be made to work -- VICE feeds the KERNAL
-buffer and our code never looks there.
+**Input injection should reach us, and there is evidence rather than hope.**
+This mattered because of what happened on the C128 on 2026-08-19: our
+`input.c` scans the CIA1 matrix behind the KERNAL's back, VICE's keyboard feed
+fills the KERNAL buffer, and scripted input therefore could not be made to
+work at all.
 
-If the Amiga leg reads input through AmigaOS input events, amiga_mcp's
-injection should reach it and the Amiga would have the automated loop the C128
-does not. If it reads the hardware directly for the same reasons the C128 does,
-the same wall is waiting. **That is a design decision not yet made, and it now
-has a consequence attached to it.**
+The Amiga leg will not have that problem if it follows the Uno precedent, and
+`commodore-uno/amiga` settles what that precedent is: input goes through
+`con_getkey()` in `amigacon.c`, which reads **console.device** via Intuition.
+Not raw hardware. Better still, its Makefile feeds the same `src/input.c` to
+BOTH the console build and the bitmap-graphics build, so going to a custom
+screen did not push it off the OS input path.
 
-Two practical notes. The install is a `curl | bash` one-liner -- clone and read
-it first. And it needs Docker, Python 3.10+, and a Kickstart ROM, which is a
-licensing matter to sort out separately (Amiga Forever or a dump of one's own
-machine).
+Follow that and the Amiga gets the automated dev loop the C128 does not.
+
+**Practical state, all confirmed on this machine 2026-08-19:** Amiberry is
+installed at `/Applications/Amiberry.app`, FS-UAE is at `~/FS-UAE` and
+`~/FS-UAE-Silicon`, and real Kickstart ROMs (47.115) are already in
+`~/FS-UAE-Silicon/Kickstarts` -- so the licensing question is settled too. The
+only caveat left is that amiga_mcp installs by `curl | bash`; clone and read
+it first.
 
 ### Amiga PAL/NTSC: one binary
 
