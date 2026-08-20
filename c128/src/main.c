@@ -455,6 +455,15 @@ int main(void) {
         k += put_u16(linebuf + k, (uint16_t)sc);
         linebuf[k] = 0;
         ui_message("HQ: ", linebuf);
+
+        /* Bases lost are the one item worth calling out separately: they are
+           the only score line that says whether the deadlines were met. */
+        if (bases_lost) {
+            k  = put_u16(linebuf, (uint16_t)bases_lost);
+            k += put_str(linebuf + k, " BASES LOST TO SIEGE");
+            linebuf[k] = 0;
+            ui_message("HQ: ", linebuf);
+        }
     }
 
     /* Quit has to visibly end the game. Milestone 1 parked here in an

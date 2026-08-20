@@ -1106,14 +1106,76 @@ static void test_game_state_and_score(void) {
     ship.lost = 1;
     ok(trek_game_state() == GAME_LOST, "a destroyed ship is a loss");
 
-    /* Weights read off the original's own evaluation screen. */
+    /* Weights read off the original's own evaluation screen. An unfinished
+       mission, so the rate term is gated off and only the flat items count --
+       which is exactly the sheet MEASURED.md records. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 5;
+    ship.killed = 1; ship.killed_cmd = 1; ship.casualties = 18;
+    ok(trek_score() == 10 + 20 - 18 - 300,
+       "the recorded sheet reproduces exactly: 1 Mongol, 1 Commander, 18 casualties, unfinished");
+    ok(trek_score() == -288, "and its printed total, -288");
+
+    /* Quitting with nothing done is the flat penalty alone. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 5;
+    ok(trek_score() == -300, "nothing done, mission unfinished, is -300");
+
+    /* Bases lost to a siege are scored against us. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 5;
+    bases_lost = 2;
+    ok(trek_score() == -300 + 2 * SCORE_BASE_LOST, "each base lost costs 200");
+
+    /* The rate term. Gated on a finished mission -- the whole point of open
+       item 13, where the original printed 0.00 with kills on the board. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 3;
+    ship.killed = 2;
+    ship.stardate = (uint16_t)(STARDATE_START + 12);   /* 1.2 stardates */
+    ok(trek_score() == 2 * 10 - 300,
+       "unfinished: the rate term contributes nothing, as the original printed");
+
     trek_new_game(3, 4242);
     ship.enemies_left = 0;
-    ship.killed = 3; ship.killed_cmd = 1; ship.casualties = 18;
-    ok(trek_score() == 3 * 10 + 20 - 18, "itemised score matches the rubric");
+    ship.killed = 2;
+    ship.stardate = (uint16_t)(STARDATE_START + 100);  /* 10 stardates */
+    ok(trek_score() == 2 * 10 + 100,
+       "finished: 2 kills in 10 stardates is 0.2/day, worth 100");
 
-    ship.enemies_left = 5;
-    ok(trek_score() == 3 * 10 + 20 - 18 - 300, "quitting early costs 300");
+    /* The five-stardate floor, which stops an instant win paying out
+       absurdly -- and stops the arithmetic leaving 16 bits. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 2;
+    ship.stardate = STARDATE_START;                    /* no time at all */
+    ok(trek_score() == 2 * 10 + 200,
+       "no elapsed time is floored at five stardates, not divided by zero");
+
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 2;
+    ship.stardate = (uint16_t)(STARDATE_START + 10);   /* 1 stardate */
+    ok(trek_score() == 2 * 10 + 200, "and so is anything under five");
+
+    /* A fractional stardate must not be dropped: 4 kills in 7.5 days is
+       0.533/day = 266, where truncating to 7 days would say 285 and
+       truncating the rate to 0 would say nothing at all. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 4;
+    ship.stardate = (uint16_t)(STARDATE_START + 75);
+    {
+        int16_t sc = (int16_t)(trek_score() - 4 * 10);
+        ok(sc >= 265 && sc <= 267, "the fractional part of a stardate counts");
+    }
+
+    /* Nothing overflows at the top end. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 60; ship.killed_cmd = 4;
+    ship.stardate = (uint16_t)(STARDATE_START + 50);
+    ok(trek_score() > 0, "a maximal game still scores positive, not wrapped");
 }
 
 int main(void) {

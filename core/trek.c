@@ -156,6 +156,7 @@ void trek_enter_quadrant(void) {
    because trek_new_game seeds the schedule and comes first. */
 static uint16_t sched[SCHED_COUNT];
 uint8_t  base_under_attack = GAL_CELLS;
+uint8_t  bases_lost = 0;
 
 void trek_new_game(uint8_t level, uint16_t seed) {
     uint8_t i, q, bases, placed;
@@ -246,6 +247,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
        flagged as such. */
     for (i = 0; i < SCHED_COUNT; i++) sched[i] = SCHED_NEVER;
     base_under_attack = GAL_CELLS;
+    bases_lost = 0;
 
     trek_schedule(SCHED_BASE_ATTACK, trek_expran(MISSION_TENTHS / 3));
     trek_schedule(SCHED_DEATH_POD,   trek_expran(MISSION_TENTHS / 2));
@@ -471,6 +473,7 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                 if (q >= GAL_CELLS) break;
                 gal_base[q] = BASE_NONE;
                 base_under_attack = GAL_CELLS;
+                if (bases_lost < 255) bases_lost++;
                 if (ev && *n < max) {
                     ev[*n].kind   = EV_BASE_LOST;
                     ev[*n].y      = (uint8_t)(q >> 3);
@@ -1131,13 +1134,49 @@ uint8_t trek_game_state(void) {
    absent -- it printed 0.00 against two kills in 1.2 stardates, so something
    gates it that we do not understand, and implementing a guess would be
    worse than leaving it out. */
+/* 500 x kills / elapsed_stardates, in integers and without leaving 16 bits.
+ *
+ * Done as (500 * kills) * 10 / tenths rather than 5000 * kills / tenths: the
+ * first product is at most 500 x 64 = 32000 and fits, while 5000 x 64 does
+ * not. The remainder is carried so a fractional stardate is not simply
+ * dropped -- at the five-stardate floor, dropping it would cost up to 18%. */
+static uint16_t kill_rate_points(uint16_t kills, uint16_t tenths) {
+    uint16_t a, q, r;
+
+    if (tenths < SCORE_MIN_TENTHS) tenths = SCORE_MIN_TENTHS;
+    if (kills > 64) kills = 64;          /* keeps `a` inside 16 bits */
+
+    a = (uint16_t)(SCORE_PER_KILL_DAY * kills);
+    q = (uint16_t)(a / tenths);
+    r = (uint16_t)(a - (uint16_t)(q * tenths));
+
+    /* r < tenths, so r * 10 overflows only for a mission longer than 6553
+       stardates -- far beyond anything playable, but the guard costs one
+       comparison and turns an impossible case into an approximate answer
+       rather than a wrong one. */
+    if (tenths > 6553) return (uint16_t)(q * 10);
+    return (uint16_t)((uint16_t)(q * 10) + (uint16_t)((uint16_t)(r * 10) / tenths));
+}
+
 int16_t trek_score(void) {
     int16_t s = 0;
 
-    s = (int16_t)(s + ship.killed * 10);
-    s = (int16_t)(s + ship.killed_cmd * 20);
+    s = (int16_t)(s + ship.killed * SCORE_PER_MONGOL);
+    s = (int16_t)(s + ship.killed_cmd * SCORE_PER_COMMANDER);
     s = (int16_t)(s - (int16_t)ship.casualties);
-    if (ship.lost) s = (int16_t)(s - 200);
-    if (ship.enemies_left) s = (int16_t)(s - 300);
+    s = (int16_t)(s + (int16_t)bases_lost * SCORE_BASE_LOST);
+
+    /* The rate term credits only on a finished mission. See trek.h: FITTED
+       from one reading of the original, on the condition the ancestor uses
+       for this same term. */
+    if (ship.enemies_left) {
+        s = (int16_t)(s + SCORE_INCOMPLETE);
+    } else {
+        uint16_t elapsed = (uint16_t)(ship.stardate - STARDATE_START);
+        uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
+        s = (int16_t)(s + (int16_t)kill_rate_points(kills, elapsed));
+    }
+
+    if (ship.lost) s = (int16_t)(s + SCORE_SHIP_LOST);
     return s;
 }

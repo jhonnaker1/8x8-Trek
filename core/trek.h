@@ -582,9 +582,53 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx);
 #define GAME_LOST        2   /* ship gone */
 uint8_t trek_game_state(void);
 
-/* The itemised score, using the original's own rubric. MEASURED, every
-   weight read off its evaluation screen. */
+/* The itemised score, using the original's own rubric. MEASURED, every weight
+ * read off its evaluation screen -- see MEASURED.md for the sheet, whose
+ * arithmetic closes exactly, so no term is hidden.
+ *
+ * The kill-rate term was open item 13 for three sessions: it printed 0.00
+ * against two kills in 1.2 elapsed stardates, which should have been worth
+ * 833. The ancestor explains the shape and half the answer:
+ *
+ *     perdate = (initial_enemies - remaining) / timused;
+ *     score_itemf("%6.2f Klingons per stardate  %5d", perdate,
+ *                 500 * perdate + 0.5);
+ *
+ * The coefficient is 500 in both games -- EGA Trek's own sheet says "@ 500 per
+ * day" -- so this is the same term. And the ancestor already treats "enemies
+ * remain" as a special case for THIS term and no other, inflating timused to a
+ * floor of five stardates when the mission is unfinished.
+ *
+ * That floor alone gives 2/5 = 0.40, not 0.00, so the ancestor's version is
+ * refuted by our reading. What survives is the condition: EGA Trek gates on
+ * the same thing the ancestor clamps on, and zeroes the term outright rather
+ * than merely inflating the divisor. One reading supports that, so it is
+ * FITTED, not measured -- but it is a far better-founded guess than before,
+ * because the condition is no longer invented.
+ *
+ * Terms this core does not have: rescues (+200), which need planet
+ * evacuations, and stars destroyed (-5), which need a torpedo that can hit
+ * one. Both are in the rubric and neither is reachable yet. */
+#define SCORE_PER_MONGOL        10
+#define SCORE_PER_COMMANDER     20
+#define SCORE_PER_ENEMY_BASE    50
+#define SCORE_PER_KILL_DAY     500
+#define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */
+#define SCORE_INCOMPLETE      (-300)
+#define SCORE_SHIP_LOST       (-200)
+
+/* Minimum elapsed time for the rate term, in tenths -- the ancestor's five
+   stardates. It applies unconditionally here, where the ancestor applies it
+   only when time is zero or enemies remain; with the term gated on a finished
+   mission, its other trigger cannot fire. Without a floor a win at 0.1
+   stardates would compute 500 x kills x 10, which leaves 16 bits. */
+#define SCORE_MIN_TENTHS        50
+
 int16_t trek_score(void);
+
+/* Union bases lost to enemy sieges. Scored, and worth having separately
+   because it is the one number that says whether the deadlines were met. */
+extern uint8_t bases_lost;
 
 uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);

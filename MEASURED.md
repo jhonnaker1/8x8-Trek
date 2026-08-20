@@ -926,8 +926,9 @@ nothing in it at all.
    ranges 1.4 and 3.0, both with shields up. Long range is untested.
 11. **The boarding-party mechanic**, which appears nowhere in the manual.
 12. ~~Casualty scoring weight~~ — **done.** −1 each.
-13. **The kill/day term.** Printed 0.00 with two kills in 1.2 stardates. See
-    the scoring section; do not implement it until the gate is understood.
+13. ~~**The kill/day term.**~~ RESOLVED 2026-08-19, as far as one reading
+    allows -- see "The kill-rate term" below. Implemented, gated on a
+    finished mission, marked FITTED.
 
 ## The console, captured at full 640x350 (2026-08-19)
 
@@ -1205,3 +1206,52 @@ there protects it, so arriving cancels a siege in progress.
 That matters for more than fidelity. Without it the deadline in "they can last
 until 3517.8" would be a countdown the player cannot affect, which is not what
 a message like that is for.
+
+
+## The kill-rate term, open item 13, resolved (2026-08-19)
+
+Three sessions carried this: EGA Trek's evaluation sheet printed
+
+    0.00  Kill/day ratio @ 500 per day.............0
+
+against two kills in 1.2 elapsed stardates, which at 500 per day should have
+been worth 833. Something gated it, and guessing at what was explicitly
+forbidden here.
+
+The ancestor supplies the shape and the condition, though not the whole answer:
+
+    perdate = (initial_enemies - remaining) / timused;
+    score_itemf("%6.2f Klingons per stardate  %5d", perdate,
+                500 * perdate + 0.5);
+
+    if ((timused == 0 || remaining != 0) && timused < 5.0)
+        timused = 5.0;
+
+Two things follow. First, **it is the same term** -- the coefficient is 500 in
+both games, and EGA Trek's own sheet says "@ 500 per day". Second, and this is
+the part that matters, the ancestor already singles out "enemies remain" as a
+special case for THIS term and no other, inflating the divisor to a floor of
+five stardates when the mission is unfinished.
+
+That floor does not reproduce our reading: it gives 2/5 = 0.40, not 0.00. So
+the ancestor's handling is refuted for EGA Trek. What survives is the
+**condition**. Anderson gates on the same thing the ancestor clamps on, and
+zeroes the term outright rather than inflating the divisor.
+
+Still FITTED rather than measured -- one reading cannot distinguish "zero when
+unfinished" from a much larger clamp -- but it is a far better guess than
+before, because the condition is no longer invented. It was the earlier
+session's own suspicion, and the ancestor now supports it.
+
+**What would settle it:** finish a game. Every kill/day sheet we have is from a
+quit, which is exactly the case where the term reads zero. One completed
+mission at any speed shows whether the term fires at all, and its value pins
+the divisor.
+
+### Bases hit are ours, not theirs
+
+The sheet carries "Enemy bases destroyed @ 50 each" as a positive item and
+"Bases hit @ -200 each" as a negative one. They are different things: the
+negative term is Union bases lost, which fits the manual's "You are
+responsible for the protection of all bases in your designated area"
+(l.360-361). Now that sieges can destroy a base, the core counts them.
