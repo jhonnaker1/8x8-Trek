@@ -922,3 +922,51 @@ them, and each is a chunk of core work:
   manual. See MEASURED.md open item 11.
 - **The hall of fame** — `TREK.SCR`, top two scores per command level. The
   setup screen already collects the player's name for it.
+
+## 15. What is left to take from the ancestor, and what is not (added 2026-08-19)
+
+An audit so this does not get re-derived. `reference/sst2k` has been mined for
+combat, movement, repair, events, docking and scoring. Of what remains open:
+
+**Still available, portable nearly whole**
+
+- `planets.c` -- orbit, beam, mine, usecrystals, shuttle, survey, sensor. That
+  is `O)rbit`, `LAND` and `USE` in one subsystem, and it gives the transporter
+  and shuttlecraft repair entries something to mean.
+- `deathray()` -- success probability and a failure-method table, which is
+  what the manual's "there's no telling what may happen" needs.
+- `kaboom()` -- self destruct. `whammo = 25 * energy`; every enemy where
+  `kpower * distance <= whammo` dies.
+- Torpedo damage, and enemy displacement on a non-fatal hit -- see MEASURED.md.
+- `nova()` / `supernova()` -- a torpedo hitting a star, which is the -5
+  scoring term.
+- `doshield()` and `damagereport()` -- energy accounting and report content
+  for SHUP/SHDN/MAX and `R)epair`.
+
+**Available as shape only**
+
+- Enemy hit points as rolled bands rather than constants (MEASURED.md).
+- Enemy counts per skill, for MEASURED open item 1.
+- `mayday()` as a rough model for `HAIL`, though the semantics differ.
+
+**Not there at all -- do not go looking again**
+
+- **Sound.** Checked, hoping otherwise. SST's entire audio is three effects --
+  500 Hz on a kill, a 50 Hz warble on teleport -- and they are ESR's
+  curses-era additions, not the FORTRAN original's. EGA Trek's PC speaker
+  repertoire is Anderson's own and has to be captured from the running game,
+  which the emulator driver has no audio path for yet.
+- **Rescues** (+200 in the rubric) and **boarding parties**. No equivalent.
+  Anderson's own.
+- `MSGS` and `A#` -- SST is a scrolling terminal and keeps no message log.
+- `F)ix` -- SST repairs every damaged system evenly with no priority choice.
+- `INFO`, the title screen, the briefing prose, the hall of fame. SST has
+  `plaque()`, a printed certificate, not a high score table.
+- The custom charset, the VBXE port order, the C128 return-to-BASIC bug.
+  Platform work; the ancestor is a terminal program.
+- The DERIVED numbers still waiting on the game. The source cannot confirm its
+  own guesses -- that is the whole point of the predict-then-verify loop.
+
+The pattern: the source is largely mined for **mechanics**. What remains
+divides into Anderson's own inventions and platform work, and it helps with
+neither.

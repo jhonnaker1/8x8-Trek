@@ -920,11 +920,18 @@ nothing in it at all.
    would answer it.
 8. **The heat threshold.** 700 of 1500 costs nothing. Where it starts to bite
    is unmeasured.
-9. **Torpedo damage.** Needs a target that survives one, so a Commander or a
-   base rather than a standard battleship.
+9. **Torpedo damage.** Shape now known from the ancestor, value still not --
+   see "Torpedo damage, and why nothing survives one" below. The test is
+   named: a Commander at 695 hit points is the one target that can survive a
+   badly aimed shot.
 10. **Torpedo accuracy.** No miss has been observed at all — two for two at
    ranges 1.4 and 3.0, both with shields up. Long range is untested.
 11. **The boarding-party mechanic**, which appears nowhere in the manual.
+    The ancestor has no equivalent either, so this one is EGA Trek's own and
+    must come from the game or the disassembly.
+14. **Are hit points fixed per class, or rolled per ship?** See "Hit points
+    may not be constants" below. Our core assumes fixed; the ancestor rolls.
+    One unexplained reading of 255 is the reason to ask.
 12. ~~Casualty scoring weight~~ — **done.** −1 each.
 13. ~~**The kill/day term.**~~ RESOLVED 2026-08-19, as far as one reading
     allows -- see "The kill-rate term" below. Implemented, gated on a
@@ -1255,3 +1262,56 @@ The sheet carries "Enemy bases destroyed @ 50 each" as a positive item and
 negative term is Union bases lost, which fits the manual's "You are
 responsible for the protection of all bases in your designated area"
 (l.360-361). Now that sieges can destroy a base, the core counts them.
+
+
+## Torpedo damage, and why nothing survives one (2026-08-19)
+
+Open item 9 has been stuck on a circular problem: torpedo damage cannot be
+measured because no target has ever survived a torpedo, so no figure is ever
+printed. The ancestor explains why. From `battle.c`, the damage a torpedo does
+to an enemy -- the same expression it uses against our own ship:
+
+    h1 = 700.0 + 100.0*Rand() - 1000.0 * distance * fabs(sin(bullseye-angle));
+    if (kp < h1) h1 = kp;              /* capped at what the target has left */
+
+700 to 800 on a dead-on hit, falling off with **aiming error** rather than
+range: `bullseye - angle` is how far off the shot was, and a perfectly aimed
+torpedo at any range loses nothing. Against a 355-hit-point battleship that is
+overkill twice over, which is exactly what we have observed -- two for two,
+kills with no figure printed.
+
+**This names the experiment.** A Commander has 695 hit points (measured), so it
+is the one target that can survive a shot, and only a poorly aimed one. Fire at
+a Commander at long range where the aiming error is largest, and either it
+survives and prints a figure, or it dies and puts a floor under the damage.
+Either outcome is worth more than what we have.
+
+DERIVED, not measured, and Anderson's record on rewriting formulas is mixed --
+he kept the 1500 heat threshold and dropped the enemy firing drain outright.
+
+## Hit points may not be constants (2026-08-19)
+
+`core/trek.h` carries one hit-point figure per class: 355 battleship, 695
+commander, 120 supply. The ancestor does not work that way. From `setup.c`:
+
+    game.kpower[i] = Rand()*150.0 + 300.0 +  25.0*game.skill;   /* ordinary */
+    game.kpower[i] = Rand()*400.0 + 450.0 +  50.0*game.skill;   /* commander */
+    game.kpower[i] = Rand()*400.0 + 100.0 +  25.0*game.skill;   /* lesser    */
+
+Every ship is **rolled within a band**, and the band's floor rises with skill.
+
+That would explain the reading nothing else has: a second enemy in today's run
+read **255**, which matches no class we have measured. Under fixed constants it
+has to be a damaged ship or an unmeasured class; under a rolled band it is
+simply an ordinary draw.
+
+It also fits what we already have. Battleships read 355 at level 3 and 325 at
+level 1 -- a difference of 30 across two levels, which is as consistent with
+`base + level * k` as with two fixed constants, and both readings could sit
+inside one band.
+
+**Cheap to test, and it should be done before any more hit-point constants are
+trusted:** enter several quadrants and read the enemy table at DS:25F2 in each.
+If every battleship reads exactly 355 the constants stand. If they scatter, the
+core needs a band per class and `HP_BATTLESHIP` and its neighbours become the
+wrong shape rather than the wrong value.
