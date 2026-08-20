@@ -114,6 +114,47 @@ wanted.
 6. Smooth gauge animation, and a real transition on the alternating main viewer
    instead of a hard cut.
 
+### Amiga tooling: amiga_mcp (noted 2026-08-19, not yet used)
+
+github.com/geekychris/amiga_mcp -- "Amiga DevBench". Worth having on record
+before the Amiga leg starts, because it answers two questions NOTES.md has
+been carrying unanswered.
+
+**Toolchain.** It cross-compiles with `m68k-amigaos-gcc` in Docker. The port
+order has been decided for a while without ever settling what actually builds
+the 68000 binary; this is a ready answer.
+
+**Dev loop.** FS-UAE (primary, with an optional patched build carrying an HTTP
+debugger), Amiberry, or real hardware over TCP. Screenshots with
+planar-to-chunky conversion -- not a trivial step on a bitplanar machine --
+plus memory read/write, registers, source-level breakpoints and stepping,
+Copper list decoding, and file transfer. That is well beyond what the C128 leg
+has.
+
+**How it differs from the VICE MCP server**, which is worth saying because the
+lesson from that one was "check what is underneath, it may be a thin wrapper
+over something the emulator already does". This is not that. It ships an
+on-Amiga daemon (`amiga-bridge`) routing messages over AmigaOS MsgPort IPC,
+and a patched FS-UAE. There is real content here; reimplementing it is not the
+obvious move the way it was for VICE.
+
+**The question that decides whether its input injection helps us**, and it is
+a live one after 2026-08-19: this port reads the keyboard directly. On the
+C128, `input.c` scans the CIA1 matrix behind the KERNAL's back, and that is
+exactly why scripted input could not be made to work -- VICE feeds the KERNAL
+buffer and our code never looks there.
+
+If the Amiga leg reads input through AmigaOS input events, amiga_mcp's
+injection should reach it and the Amiga would have the automated loop the C128
+does not. If it reads the hardware directly for the same reasons the C128 does,
+the same wall is waiting. **That is a design decision not yet made, and it now
+has a consequence attached to it.**
+
+Two practical notes. The install is a `curl | bash` one-liner -- clone and read
+it first. And it needs Docker, Python 3.10+, and a Kickstart ROM, which is a
+licensing matter to sort out separately (Amiga Forever or a dump of one's own
+machine).
+
 ### Amiga PAL/NTSC: one binary
 
 **One binary, not two.** The difference is a layout table, not code, and two
