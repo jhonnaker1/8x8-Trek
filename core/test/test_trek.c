@@ -692,6 +692,147 @@ static void test_expran(void) {
 }
 
 /* The queue itself. */
+/* Docking. The manual is more specific than the ancestor here -- the three
+   base types replenish different things -- so most of this is testing the
+   manual rather than the derivation. */
+static void test_docking(void) {
+    TrekEvent ev[16];
+    uint8_t n, i;
+
+    puts("docking");
+
+    /* Put a base next to the ship by hand rather than hunting the galaxy. */
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+    sector[(4 << 3) | 5] = SEC_BASE;
+    gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+
+    ship.energy = 100; ship.shields = 0; ship.torps = 1; ship.impulse = 7;
+
+    ok(trek_dock() == DOCK_OK,        "a base one sector away can be docked with");
+    ok(ship.energy  == ENERGY_START,  "a StarBase refuels the main banks");
+    ok(ship.shields == SHIELD_MAX,    "and recharges the shields");
+    ok(ship.torps   == TORPS_START,   "and restocks the torpedo tubes");
+    ok(ship.impulse == IMPULSE_START, "and the impulse engines");
+    ok(trek_dock() == DOCK_ALREADY,   "docking twice is refused");
+    ok(trek_docked_safe(),            "a StarBase counts as safe harbour");
+
+    /* Diagonal counts; two sectors away does not. */
+    trek_undock();
+    ship.sec_y = 3; ship.sec_x = 4;                 /* diagonal to 4,5 */
+    ok(trek_dock() == DOCK_OK, "diagonally adjacent is adjacent");
+    trek_undock();
+    ship.sec_y = 4; ship.sec_x = 7;
+    ok(trek_dock() == DOCK_NO_BASE, "two sectors away is too far");
+
+    /* Supply and research bases give less, per manual l.356-359. */
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+    sector[(4 << 3) | 5] = SEC_BASE;
+    gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_SUPPLY;
+    ship.energy = 100; ship.torps = 1;
+    ok(trek_dock() == DOCK_OK,      "a supply base can be docked with");
+    ok(ship.torps == TORPS_START,   "a supply base restocks torpedoes");
+    ok(ship.energy == 100,          "but does not refuel");
+    ok(!trek_docked_safe(),         "and its shields do not cover us");
+
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+    sector[(4 << 3) | 5] = SEC_BASE;
+    gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_RESEARCH;
+    ship.energy = 100; ship.torps = 1;
+    ok(trek_dock() == DOCK_OK,    "a research station can be docked with");
+    ok(ship.torps == 1,           "but restocks nothing this core models");
+    ok(ship.energy == 100,        "including fuel");
+
+    /* Repair runs four times faster docked. DERIVED -- the number to check
+       against the original's own Docked/Undocked columns. */
+    {
+        uint8_t docked_pct, adrift_pct;
+        trek_new_game(3, 4242);
+        ship.sys[SYS_LASERS] = 0;
+        trek_advance(10, ev, 16);
+        adrift_pct = ship.sys[SYS_LASERS];
+
+        trek_new_game(3, 4242);
+        ship.sec_y = 4; ship.sec_x = 4;
+        for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+        sector[(4 << 3) | 5] = SEC_BASE;
+        gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+        trek_dock();
+        ship.sys[SYS_LASERS] = 0;
+        trek_advance(10, ev, 16);
+        docked_pct = ship.sys[SYS_LASERS];
+
+        ok(adrift_pct == REPAIR_PER_STARDATE, "adrift, one stardate mends 20");
+        ok(docked_pct == adrift_pct * DOCK_REPAIR_FACTOR,
+           "docked, it mends four times as much");
+    }
+
+    /* A StarBase's shields absorb enemy fire outright. */
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+    sector[(4 << 3) | 5] = SEC_BASE;
+    gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+    wall_in(1, 1);
+    sector[(1 << 3) | 1] = SEC_BATTLESHIP;
+    enemy_hp[(1 << 3) | 1] = HP_BATTLESHIP;
+    trek_dock();
+    ship.shields = 0;             /* our own shields are flat */
+    ship.energy  = ENERGY_START;
+    n = trek_enemy_turn(ev, 16);
+    ok(ship.energy == ENERGY_START,
+       "docked at a StarBase, enemy fire does not reach the hull");
+    for (i = 0; i < n; i++)
+        if (ev[i].kind == EV_HIT)
+            ok(0, "and nothing is reported as a hull hit");
+
+    /* Movement casts off -- but a refused move does not. */
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    for (i = 0; i < QUAD_CELLS; i++) if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+    sector[(4 << 3) | 5] = SEC_BASE;
+    gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+    trek_dock();
+    trek_move_impulse(9, 9);
+    ok(ship.docked == BASE_STARBASE, "a refused move does not cast off");
+    trek_move_impulse(6, 6);
+    ok(ship.docked == BASE_NONE,     "a real move does");
+}
+
+/* Reaching a besieged base relieves it -- the deadline is actionable. */
+static void test_base_relief(void) {
+    TrekEvent ev[16];
+    uint8_t q;
+
+    puts("relieving a base");
+
+    trek_new_game(3, 4242);
+    trek_unschedule(SCHED_TRACTOR);
+    trek_unschedule(SCHED_DEATH_POD);
+    trek_schedule(SCHED_BASE_ATTACK, 10);
+    trek_advance(20, ev, 16);
+
+    q = base_under_attack;
+    ok(q < GAL_CELLS, "a base is besieged");
+    if (q < GAL_CELLS) {
+        ok(trek_is_scheduled(SCHED_BASE_FALLS), "with its fall scheduled");
+
+        ship.quad_y = (uint8_t)(q >> 3);
+        ship.quad_x = (uint8_t)(q & 7);
+        trek_enter_quadrant();
+
+        ok(base_under_attack == GAL_CELLS, "arriving lifts the siege");
+        ok(!trek_is_scheduled(SCHED_BASE_FALLS), "and cancels the destruction");
+        trek_advance(600, ev, 16);
+        ok(gal_base[q] != BASE_NONE, "so the base outlives its old deadline");
+    }
+}
+
 static void test_event_queue(void) {
     TrekEvent ev[16];
     uint8_t n, i, seen;
@@ -996,6 +1137,8 @@ int main(void) {
     test_bearing();
     test_expran();
     test_event_queue();
+    test_docking();
+    test_base_relief();
     test_torpedo();
     test_game_state_and_score();
 

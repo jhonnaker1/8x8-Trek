@@ -102,6 +102,19 @@ void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
 
+    /* Arriving relieves a base under siege. This is the ancestor's own rule
+       read the other way round: its FBATTAK will not pick a base that is in
+       the player's quadrant at all ("!same(baseq[j], game.quadrant)"), so
+       presence protects. Without this the printed deadline would be a
+       countdown the player cannot affect, which is not what a message saying
+       "they can last until 3517.8" is for. */
+    if (base_under_attack == q) {
+        base_under_attack = GAL_CELLS;
+        trek_unschedule(SCHED_BASE_FALLS);
+    }
+
+    ship.docked = BASE_NONE;
+
     for (i = 0; i < QUAD_CELLS; i++) {
         sector[i]   = SEC_EMPTY;
         enemy_hp[i] = 0;
@@ -197,6 +210,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.torps        = TORPS_START;
     ship.laser_eff    = 100;
     ship.laser_heat   = 0;
+    ship.docked       = BASE_NONE;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.casualties   = 0;
@@ -247,7 +261,17 @@ void trek_new_game(uint8_t level, uint16_t seed) {
 static void advance_time(uint16_t tenths) {
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
     uint16_t mend = (uint16_t)((REPAIR_PER_STARDATE * tenths) / 10);
+
     uint8_t i;
+
+    /* DERIVED: the ancestor divides the repair period by docfac = 0.25 while
+       docked, which is four times the rate. Applied before the clamp below,
+       so a long docked rest still stops at 100.
+
+       Declarations first: cc65 is C89 and rejects a statement before one,
+       while the native build is C99 and does not. `make test` passing is not
+       evidence that the port compiles. */
+    if (ship.docked != BASE_NONE) mend = (uint16_t)(mend * DOCK_REPAIR_FACTOR);
 
     ship.stardate = (uint16_t)(ship.stardate + tenths);
 
@@ -267,6 +291,57 @@ static void advance_time(uint16_t tenths) {
             else ship.sys[i] = (uint8_t)(ship.sys[i] + mend);
         }
     }
+}
+
+/* ---------------------------------------------------------------- docking */
+
+/* The base's own cell, or QUAD_CELLS if the quadrant has none. */
+static uint8_t base_cell(void) {
+    uint8_t c;
+    for (c = 0; c < QUAD_CELLS; c++)
+        if (sector[c] == SEC_BASE) return c;
+    return QUAD_CELLS;
+}
+
+uint8_t trek_dock(void) {
+    uint8_t c, by, bx, dy, dx, type;
+
+    if (ship.docked != BASE_NONE) return DOCK_ALREADY;
+
+    c = base_cell();
+    if (c == QUAD_CELLS) return DOCK_NO_BASE;
+
+    by = (uint8_t)(c >> 3);
+    bx = (uint8_t)(c & 7);
+    dy = abs_diff(by, ship.sec_y);
+    dx = abs_diff(bx, ship.sec_x);
+    if (dy > 1 || dx > 1) return DOCK_NO_BASE;
+
+    type = gal_base[(ship.quad_y << 3) | ship.quad_x];
+    if (type == BASE_NONE) return DOCK_NO_BASE;
+    ship.docked = type;
+
+    /* What each type replenishes, per the manual -- see trek.h. Life support
+       supplies are not a resource in this core, so a Research Station gives
+       nothing here beyond the docked repair rate. */
+    if (type == BASE_STARBASE) {
+        if (ship.energy < ENERGY_START) ship.energy = ENERGY_START;
+        ship.impulse = IMPULSE_START;
+        ship.shields = SHIELD_MAX;
+        ship.torps   = TORPS_START;
+    } else if (type == BASE_SUPPLY) {
+        ship.torps = TORPS_START;
+    }
+
+    return DOCK_OK;
+}
+
+void trek_undock(void) {
+    ship.docked = BASE_NONE;
+}
+
+uint8_t trek_docked_safe(void) {
+    return (uint8_t)(ship.docked == BASE_STARBASE);
 }
 
 /* ------------------------------------------------------ scheduled events */
@@ -538,6 +613,10 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
 
     target = (uint8_t)((sy << 3) | sx);
     if (sector[target] != SEC_EMPTY) return MOVE_BLOCKED;
+
+    /* Any movement breaks the dock. Placed after every rejection above, so a
+       move the game refuses does not silently cast off. */
+    trek_undock();
 
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
 
@@ -955,6 +1034,19 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
         energy = enemy_fire_energy(sector[cell], enemy_hp[cell]);
         dmg = trek_laser_damage(energy, 100, d);
         if (dmg == 0) continue;
+
+        /* "When docked at a StarBase its shields will protect your ship from
+           enemy lasers" (manual l.440-441). Only a StarBase -- research
+           stations and supply bases do not, which is why trek_docked_safe()
+           tests the type rather than merely being docked. */
+        if (trek_docked_safe()) {
+            ev[n].kind   = EV_SHIELD_HOLD;
+            ev[n].y      = (uint8_t)(cell >> 3);
+            ev[n].x      = (uint8_t)(cell & 7);
+            ev[n].amount = dmg;
+            n++;
+            continue;
+        }
 
         ev[n].kind   = (dmg <= ship.shields) ? EV_SHIELD_HOLD : EV_HIT;
         ev[n].y      = (uint8_t)(cell >> 3);

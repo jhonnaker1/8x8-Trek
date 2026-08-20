@@ -1168,3 +1168,40 @@ the bottom left -- bearing in degrees after a slashed-zero glyph, and distance
 in sectors after a triangle. With the Commander at 5-5 and the ship at 6,4 --
 one row up and one column right -- the bearing read 45.0, so east is 0 degrees
 and they increase anticlockwise.
+
+## Docking: the manual outranks the ancestor (2026-08-19)
+
+The ancestor resupplies everything at any base. EGA Trek's manual is more
+specific, and where the two differ the manual wins -- it describes THIS game:
+
+    "A StarBase is the most useful because you can replenish all ships
+     supplies there. Supply stations can provide life support supplies and
+     energy torpedoes. Research stations can provide only life support
+     supplies." (l.356-359)
+
+    "When docked at a StarBase its shields will protect your ship from enemy
+     lasers." (l.440-441)
+
+So the three base types are not interchangeable, and only a StarBase makes a
+quadrant safe. Life support supplies are not a resource in our core -- life
+support is one of the twelve repair percentages -- which leaves a Research
+Station offering nothing but the docked repair rate. Faithful, if thin.
+
+What IS taken from the ancestor: adjacency (any of the eight neighbouring
+sectors, `abs(dx) <= 1 && abs(dy) <= 1`, which the manual's "directly
+adjacent" agrees with), and the repair multiplier.
+
+**Still to confirm: the 4x docked repair rate.** The ancestor divides the
+repair period by `docfac = 0.25`. EGA Trek's own STATE OF REPAIR dialog prints
+Docked and Undocked columns side by side, so one screenshot with any system
+damaged settles it outright. Marked DERIVED until then.
+
+### Presence relieves a besieged base
+
+The ancestor's FBATTAK will not choose a base in the player's own quadrant --
+`!same(game.state.baseq[j], game.quadrant)`. Read the other way round, being
+there protects it, so arriving cancels a siege in progress.
+
+That matters for more than fidelity. Without it the deadline in "they can last
+until 3517.8" would be a countdown the player cannot affect, which is not what
+a message like that is for.

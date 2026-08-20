@@ -121,6 +121,34 @@ static char linebuf[32];
    and 0 skips a target. Energy comes out of the main banks, confirmed on
    the original by its "insufficient energy" refusal firing when main was
    below the amount requested. */
+static void do_dock(void) {
+    switch (trek_dock()) {
+        case DOCK_OK:
+            /* Name what this base actually gave us -- a research station
+               resupplies nothing this core models, and saying "DOCKED" alone
+               would leave the player wondering why the tubes are still
+               empty. */
+            switch (ship.docked) {
+                case BASE_STARBASE:
+                    ui_message("HELM: ", "DOCKED. ALL STORES FULL.");
+                    break;
+                case BASE_SUPPLY:
+                    ui_message("HELM: ", "DOCKED. TORPEDOES ONLY.");
+                    break;
+                default:
+                    ui_message("HELM: ", "DOCKED. NO STORES HERE.");
+                    break;
+            }
+            break;
+        case DOCK_ALREADY:
+            ui_message("HELM: ", "WE ARE ALREADY DOCKED.");
+            break;
+        default:
+            ui_message("HELM: ", "NO BASE ALONGSIDE.");
+            break;
+    }
+}
+
 static void do_lasers(void) {
     uint8_t cell, y, x, found = 0;
     unsigned char what;
@@ -400,9 +428,10 @@ int main(void) {
         if (c == KB_M)      { do_move(cmd);    enemy_turn(); }
         else if (c == KB_L) { do_lasers();     enemy_turn(); }
         else if (c == KB_T) { do_torpedo(cmd); enemy_turn(); }
+        else if (c == KB_D) { do_dock();       enemy_turn(); }
         else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M)OVE W)ARP L)ASERS T)ORP Q)UIT");
+        else if (c)          ui_message("COMPUTER: ", "M W L T D)OCK Q)UIT");
 
         ui_draw_scan();
         ui_draw_chart();

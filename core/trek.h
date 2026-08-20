@@ -323,6 +323,7 @@ typedef struct {
     uint16_t killed_cmd;      /* command ships, scored separately */
     uint16_t casualties;
     uint8_t  lost;            /* ship destroyed */
+    uint8_t  docked;          /* BASE_NONE, or the type docked at */
 } Ship;
 
 extern Ship ship;
@@ -519,6 +520,47 @@ uint8_t trek_advance(uint16_t tenths, TrekEvent *ev, uint8_t max);
 /* Fires anything now due. Movement moves the clock without an event list to
    fill, so the turn loop calls this once after whatever consumed the turn. */
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
+
+/* ---------------------------------------------------------------- docking
+ *
+ * The manual is authoritative here and it is more specific than the ancestor,
+ * which resupplies everything at any base:
+ *
+ *   "When you are in a sector directly adjacent to a StarBase, issue this
+ *    command. You can also dock at Research Stations and Supply Bases, but
+ *    they cannot provide everything that a StarBase can." (l.436-439)
+ *   "A StarBase is the most useful because you can replenish all ships
+ *    supplies there. Supply stations can provide life support supplies and
+ *    energy torpedoes. Research stations can provide only life support
+ *    supplies." (l.356-359)
+ *   "When docked at a StarBase its shields will protect your ship from enemy
+ *    lasers." (l.440-441)
+ *
+ * So the three base types give different things, and only a StarBase makes a
+ * quadrant safe. Life support supplies are not modelled as a resource -- this
+ * core carries life support as one of the twelve repair percentages -- which
+ * leaves a Research Station offering nothing but the docked repair rate. That
+ * is faithful rather than useful, and is what the manual describes.
+ *
+ * Adjacency is the ancestor's rule and the manual's alike: any of the eight
+ * neighbouring sectors, not the base's own cell.
+ *
+ * DERIVED, and the one number here worth checking: the ancestor repairs at
+ * 1/docfac = 4x while docked. EGA Trek's own STATE OF REPAIR dialog prints
+ * Docked and Undocked columns side by side, so a single screenshot with any
+ * system damaged settles it. */
+#define DOCK_REPAIR_FACTOR   4
+
+#define DOCK_OK              0
+#define DOCK_NO_BASE         1   /* no base adjacent */
+#define DOCK_ALREADY         2
+
+uint8_t trek_dock(void);
+void    trek_undock(void);       /* any movement breaks the dock */
+
+/* Docked at a StarBase specifically -- the case where the base's shields
+   cover us. Research stations and supply bases do not. */
+uint8_t trek_docked_safe(void);
 
 /* Every enemy in the quadrant fires. Returns how many events were written.
    Damage lands on the shields first and on the main banks after those are
