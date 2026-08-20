@@ -833,3 +833,92 @@ Design constraint from the start: sound belongs in the platform layer, not the
 core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
+
+## 13. The command set: six of twenty-five (added 2026-08-19)
+
+`reference/EGATREK.REF`, the quick reference card, is the authoritative list
+and it is short enough to reproduce whole. The port implements six of it.
+
+| command | what it does | state |
+|---|---|---|
+| `D)ock` | dock with a StarBase | **done** |
+| `L)asers` | fire lasers | **done** |
+| `M)ove` | move to quad/sector | **done** |
+| `Q)uit` | quit | **done** |
+| `T)orps` | fire torpedoes | **done** |
+| `W)arp` | set warp speed | **done** |
+| `E)nergy` | energy transfer | core `trek_divert()` exists and is tested — **wiring only** |
+| `SHUP` / `SHDN` | shields up / down (arrow keys) | core models `shields_up` and the enemy turn reads it — **wiring only** |
+| `MAX` | divert maximum energy to shields | `trek_divert()` again — **wiring only** |
+| `R)epair` | state of repair report | needs the modal dialog we already have |
+| `MSGS` | review old messages | needs a longer log than the four boxes hold |
+| `C)hart` | chart of known galaxy | the console shows it permanently; may be redundant here |
+| `F)ix` | control which system engineering repairs | needs a repair-priority model the core lacks |
+| `INFO` | info on enemy in current quadrant | needs the MAIN VIEWER, which now exists |
+| `HAIL` | hail a StarBase | no mechanic behind it |
+| `A#` | acknowledge message # | no mechanic behind it |
+| `S)elf` | self destruct | uses the setup screen's password — see item 10 |
+| `RAY` | death ray | unimplemented mechanic |
+| `O)rbit`, `LAND`, `USE` | planets, landing, crystals | unimplemented mechanics |
+| `SAVE` | save game | deferred, see item 10 |
+| `SND` | toggle sound | needs item 12 |
+| `Shift-F1` | boss mode | screen blanker |
+
+Plus the function keys, which are shortcuts rather than new commands:
+F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship, F5 Max Energy, F6 Fix
+Systems, F7 Xfer Energy, F8 Repair Status, F9 Set Speed, F10 Dock.
+
+**Three of these are wiring, not features.** `trek_divert()` is written and
+tested with no way to call it, and `ship.shields_up` is modelled and read by
+the enemy turn with no way to change it — so the port currently cannot raise
+its own shields. That is a bigger hole in how the game plays than anything on
+the front-end list, and it is the cheapest thing here to close.
+
+### What EGA Trek dropped from the ancestor, and why it matters
+
+Comparing the card against SST's `commands[]` is more interesting than the
+missing list, because it shows what the console IS.
+
+Four SST commands do nothing but print state — `SRSCAN`, `STATUS`, `LRSCAN`,
+`REQUEST` — and EGA Trek has none of them. They became panels. That is the
+whole design difference between the two games in one observation, and it is
+why the nine-panel console is not decoration: it replaces a quarter of the
+ancestor's verb set.
+
+Others were merged rather than dropped: `DAMAGES` became `R)epair`,
+`DESTRUCT` became `S)elf`, `DEATHRAY` became `RAY`, `IMPULSE` folded into
+`M)ove` as a sector-only move, `SHIELDS` split into `SHUP`/`SHDN`/`MAX`, and
+`SENSORS`/`TRANSPORT`/`MINE`/`CRYSTALS`/`SHUTTLE`/`PLANETS` collapsed into
+`O)rbit`/`LAND`/`USE`.
+
+A few have no EGA Trek equivalent at all and are worth noting so nobody adds
+them by reflex from the source: `REST` (SST's way of passing time to repair --
+EGA Trek uses `F)ix` instead), `ABANDON`, `PROBE`, `COMPUTER`, `EMEXIT`,
+`SEED`, `SCORE` as a command. `MAYDAY` may be EGA Trek's `HAIL`; SST scores
+"calls for help from starbase" at -45 each and EGA Trek's sheet has no such
+line, so if it is the same thing it is not scored.
+
+## 14. Mechanics with no implementation at all (added 2026-08-19)
+
+Distinct from item 13, which is about commands. These are the systems behind
+them, and each is a chunk of core work:
+
+- **Planets** — `O)rbit`, `LAND`, `USE`. Energium crystals, landing parties,
+  the transporter and shuttlecraft (which are two of the twelve repair
+  entries already modelled and currently mean nothing). The ancestor's
+  `planets.c` is the reference.
+- **The death ray** — `RAY`. "Destroy every enemy ship in the whole
+  quadrant...if it works. If it doesn't work, there's no telling what may
+  happen" (manual l.573-577). The ancestor's `deathray()` has the failure
+  table.
+- **Self destruct** — `S)elf`, gated on the password collected at setup.
+- **Rescues** — worth **+200 each** in the scoring rubric and currently
+  unreachable. The evacuation deadline messages already seen in the original
+  ("Planet Gallista-8, quad 8-4, requests evacuation. They can only hold out
+  until 3516.5") are the trigger, and the event queue can already carry them.
+- **Stars destroyed** — **-5 each** in the rubric. Needs a torpedo that can
+  hit a star rather than only an enemy.
+- **Boarding parties** — in the extracted string catalogue, absent from the
+  manual. See MEASURED.md open item 11.
+- **The hall of fame** — `TREK.SCR`, top two scores per command level. The
+  setup screen already collects the player's name for it.
