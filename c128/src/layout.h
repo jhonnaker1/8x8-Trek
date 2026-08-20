@@ -32,14 +32,38 @@ typedef struct {
     const char *title;
 } Panel;
 
-/* PROVISIONAL. Traced by eye off reference/console_screenshot.jpg, which is a
-   320x175 half-scale capture of the real 640x350 -- so one character cell is
-   4x7 pixels there, too coarse to read exact column boundaries from.
-   Open step in NOTES.md: run EGATREK_unpacked.exe in DOSBox-X, capture at
-   full 640x350, and correct these numbers. Everything downstream reads this
-   table, so that correction is a single-site edit. */
-#define PANEL_COUNT 10
+/* MEASURED off a 640x350 capture of the original (2026-08-19); the full
+   pixel table is in MEASURED.md. Column bands 0..20 | 20..40 | 41..79 and row
+   bands 0..10 | 11..17 | 17..24, with panels sharing border rows and columns
+   the way the original's do.
+
+   One deliberate departure: the top band is ELEVEN rows here, not the ten the
+   original uses. EGA Trek runs in a 640x350 graphics mode and draws text at
+   whatever pitch it likes inside a frame -- the short range scan fits a header
+   and eight rows into eight character rows' worth of height, and the chart
+   fits a header, eight rows and a footer into the same. A character display
+   cannot compress like that, so those panels need one row more than the
+   measurement gives them. MAIN VIEWER pays for it: six interior rows in the
+   original, five here.
+
+   Everything downstream reads this table. */
+#define PANEL_COUNT 8
 extern const Panel panels[PANEL_COUNT];
+
+/* The message region is NOT a panel, and this is the original's design, not a
+   simplification of it. What looked like a COMMUNICATIONS panel above a
+   DAMAGE REPORT panel is one region holding a stack of separately bordered
+   boxes, one per message, interleaved in time order: a damage report can sit
+   between two communications. Measured off a 640x350 capture -- four boxes at
+   x323..636 (columns 40..79), tops at y141/189/237/285, borders yellow for
+   COMMUNICATIONS and orange for DAMAGE REPORT, each completed box carrying a
+   stardate stamp in the right end of its top border.
+
+   Columns 40..79 of rows 11..24, which is where the original puts it. */
+#define MSG_X   40
+#define MSG_Y   11
+#define MSG_W   40
+#define MSG_H   14
 
 /* Indices into panels[]. The UI addresses panels by name so that correcting
    the geometry above stays a single-site edit. */
@@ -49,10 +73,8 @@ extern const Panel panels[PANEL_COUNT];
 #define P_LASERS    3
 #define P_COMMAND   4
 #define P_VIEWER    5
-#define P_COMMS     6
-#define P_BADGE     7
-#define P_SYSTEMS   8
-#define P_DAMAGE    9
+#define P_BADGE     6
+#define P_SYSTEMS   7
 
 void draw_console(void);
 

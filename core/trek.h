@@ -171,6 +171,22 @@
  * See MEASURED.md. */
 #define LASER_HEAT_MAX     1500
 
+/* A note on the provenance tags in this file, now that there is a fifth.
+ *
+ *   CONFIRMED   -- predicted in advance, then seen to happen in the original.
+ *   MEASURED    -- read off the original, by screen or by memory.
+ *   DERIVED     -- taken from the FORTRAN line's source (reference/sst2k),
+ *                  which is what EGA Trek is a port of. Shape only. Anderson
+ *                  rewrote formulas and dropped rules outright, so a DERIVED
+ *                  number is a hypothesis with a good pedigree, not a fact.
+ *   FITTED      -- chosen to match readings, but not uniquely determined.
+ *   PROVISIONAL -- a guess, kept only because something has to be there.
+ *
+ * DERIVED items carry the test that would settle them. Two have already been
+ * settled this way and the results went opposite ways: the 1500 heat
+ * threshold above survived, and the ancestor's rule that firing costs an
+ * enemy a quarter of its power was refuted outright -- see MEASURED.md. */
+
 /* Enemy hit points.
  *
  * BATTLESHIP and SUPPLY are READ DIRECTLY out of the original's memory. The
@@ -209,7 +225,11 @@
  * way is untested -- 120 is a single level-3 reading. */
 #define HP_BATTLESHIP       355  /* read from memory, level 3 */
 #define HP_SUPPLY           120  /* read from memory, level 3 */
-#define HP_COMMAND          500  /* inferred, bracketed 441..501 */
+#define HP_COMMAND          695  /* MEASURED: read from the enemy table at
+                                    level 3, for the ship the console names
+                                    the Mongol Commander. The earlier 500 was
+                                    inferred from damage arithmetic and
+                                    bracketed 441..501; it was wrong. */
 #define HP_SCOUT            100  /* unmeasured */
 
 /* Per-sector enemy strength, parallel to `sector` and rebuilt with it.
@@ -328,6 +348,35 @@ uint8_t  trek_rand_n(uint8_t n);        /* 0 .. n-1 */
    Arguments are absolute differences, each 0..7. */
 uint16_t trek_dist(uint8_t dy, uint8_t dx);
 
+/* Bearing from the ship to a sector, in whole degrees, 0..359.
+ *
+ * MEASURED convention: with the ship at 6,4 and the Mongol Commander at 5,5 --
+ * one row up and one column right -- the original's viewer read 45.0. So east
+ * is zero and degrees increase anticlockwise, which is the ordinary
+ * mathematical convention rather than a compass one.
+ *
+ * Integer throughout: an octant chosen from the signs and the relative
+ * magnitudes of dy and dx, then a 17-entry arctangent table for the ratio
+ * within it. Worst case is half a degree out, which is finer than a display
+ * that prints one decimal can show. Returns 0 for the ship's own cell. */
+uint16_t trek_bearing(uint8_t sy, uint8_t sx);
+
+/* Enemy tactical movement.
+ *
+ * DERIVED from the ancestor's movebaddy() (reference/sst2k, ai.c), and
+ * anchored to observation: in a level-3 game the Mongol Commander walked
+ * 3-8 -> 3-7 -> 4-6 -> 5-5 over four turns, one sector per turn, closing on
+ * the ship and then holding, while a second enemy never moved at all. The
+ * console narrates each step ("The commander has moved. He is now at 5-5").
+ *
+ * The ancestor decides advance / hold / retreat from a "forces" score built
+ * out of the enemy's power, how many enemies are present, and how dangerous
+ * we look -- shields up, energy in the banks, torpedoes left. That shape is
+ * kept; its constants are not measured for EGA Trek and are marked where they
+ * appear in trek.c.
+ *
+ * Reported through EV_ENEMY_MOVED, which was already defined below and until
+ * now never emitted by anything. */
 void trek_new_game(uint8_t level, uint16_t seed);
 void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
 

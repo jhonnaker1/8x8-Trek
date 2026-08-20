@@ -587,6 +587,125 @@ static void test_converter_scales_with_repair(void) {
     ok(broken - 1000 == 200, "at half repair it is half that");
 }
 
+/* The first shot in an event list. Enemies move before they fire, so the
+   fire event is no longer necessarily first. */
+static uint16_t fire_amount(const TrekEvent *ev, uint8_t n) {
+    uint8_t i;
+    for (i = 0; i < n; i++)
+        if (ev[i].kind == EV_HIT || ev[i].kind == EV_SHIELD_HOLD)
+            return ev[i].amount;
+    return 0;
+}
+
+/* Fills the eight cells around one sector with stars, so whatever is in the
+   middle has nowhere to step. */
+static void wall_in(uint8_t y, uint8_t x) {
+    int8_t dy, dx, ny, nx;
+    for (dy = -1; dy <= 1; dy++)
+        for (dx = -1; dx <= 1; dx++) {
+            if (!dy && !dx) continue;
+            ny = (int8_t)(y + dy); nx = (int8_t)(x + dx);
+            if (ny < 0 || ny >= (int8_t)QUAD_DIM) continue;
+            if (nx < 0 || nx >= (int8_t)QUAD_DIM) continue;
+            sector[(ny << 3) | nx] = SEC_STAR;
+        }
+}
+
+/* Enemy movement. DERIVED from the ancestor and anchored to one observed run:
+   at level 3 a Commander advanced one sector per turn and then held, while a
+   second enemy never moved. What is tested here is the behaviour that
+   observation pins down -- that a strong enemy closes, that nothing walks
+   through an occupied cell, and that no ship gets two turns in one round. */
+/* Bearing. The one measured point is the original's own reading: ship at 6,4,
+   Commander at 5-5, viewer showing 45.0. The rest of the compass follows from
+   the convention that fixes -- east zero, anticlockwise. */
+static void test_bearing(void) {
+    puts("bearing");
+
+    trek_new_game(3, 31337);
+    ship.sec_y = 5; ship.sec_x = 3;   /* 6,4 in the original's 1-based display */
+
+    ok(trek_bearing(4, 4) == 45,  "one up and one right reads 45, as the original does");
+    ok(trek_bearing(5, 4) == 0,   "due right is 0");
+    ok(trek_bearing(4, 3) == 90,  "straight up is 90");
+    ok(trek_bearing(5, 2) == 180, "due left is 180");
+    ok(trek_bearing(6, 3) == 270, "straight down is 270");
+    ok(trek_bearing(4, 2) == 135, "up and left is 135");
+    ok(trek_bearing(6, 4) == 315, "down and right is 315");
+    ok(trek_bearing(6, 2) == 225, "down and left is 225");
+
+    /* Off the diagonals, within the half degree the table can promise. */
+    {
+        uint16_t b = trek_bearing(3, 4);   /* two up, one right -> 63.43 */
+        ok(b >= 63 && b <= 64, "two up and one right is about 63");
+        b = trek_bearing(4, 5);            /* one up, two right -> 26.57 */
+        ok(b >= 26 && b <= 27, "one up and two right is about 27");
+    }
+
+    ok(trek_bearing(5, 3) == 0, "the ship's own cell has no bearing");
+}
+
+static void test_enemy_movement(void) {
+    TrekEvent ev[16];
+    uint8_t n, i, moved, cell;
+
+    puts("enemy movement");
+
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    ship.shields_up = 0;              /* shields down makes them bold */
+    sector[(0 << 3) | 0] = SEC_COMMAND;
+    enemy_hp[(0 << 3) | 0] = HP_COMMAND;
+
+    n = trek_enemy_turn(ev, 16);
+    ok(sector[(0 << 3) | 0] != SEC_COMMAND, "a strong enemy leaves its cell");
+
+    for (cell = 0, moved = 0; cell < QUAD_CELLS; cell++)
+        if (sector[cell] == SEC_COMMAND) moved = cell;
+    {
+        /* abs_diff is private to trek.c, so spell it out here. */
+        uint8_t my = (uint8_t)(moved >> 3), mx = (uint8_t)(moved & 7);
+        uint8_t dy = (uint8_t)(my > ship.sec_y ? my - ship.sec_y : ship.sec_y - my);
+        uint8_t dx = (uint8_t)(mx > ship.sec_x ? mx - ship.sec_x : ship.sec_x - mx);
+        ok(trek_dist(dy, dx) < trek_dist(4, 4), "and it is closer than it was");
+    }
+
+    for (i = 0, cell = 0; i < n; i++)
+        if (ev[i].kind == EV_ENEMY_MOVED) cell++;
+    ok(cell == 1, "the move is reported exactly once");
+
+    /* Boxed in on every side, it stays put and still shoots. */
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    wall_in(1, 1);
+    sector[(1 << 3) | 1] = SEC_COMMAND;
+    enemy_hp[(1 << 3) | 1] = HP_COMMAND;
+    n = trek_enemy_turn(ev, 16);
+    ok(sector[(1 << 3) | 1] == SEC_COMMAND, "a boxed-in enemy holds position");
+    ok(fire_amount(ev, n) > 0,              "and fires anyway");
+
+    /* Nothing may land on the ship's own cell. */
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(4 << 3) | 4] = SEC_SHIP;
+    sector[(4 << 3) | 5] = SEC_COMMAND;
+    enemy_hp[(4 << 3) | 5] = HP_COMMAND;
+    trek_enemy_turn(ev, 16);
+    ok(sector[(4 << 3) | 4] == SEC_SHIP, "an enemy never steps onto the ship");
+    ok(sector[(4 << 3) | 5] == SEC_COMMAND, "and so stays where it was");
+
+    /* REFUTED against the original, and worth a test so it cannot creep back
+       in: firing costs an enemy nothing. */
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    wall_in(2, 4);
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+    for (i = 0; i < 5; i++) trek_enemy_turn(ev, 16);
+    ok(enemy_hp[(2 << 3) | 4] == HP_BATTLESHIP,
+       "five turns of firing cost the enemy no hit points");
+}
+
 static void test_enemy_turn(void) {
     TrekEvent ev[16];
     uint8_t n;
@@ -606,22 +725,31 @@ static void test_enemy_turn(void) {
     ok(ship.energy == ENERGY_START, "main energy is untouched while shields hold");
 
     /* MEASURED on the original: a ship at 41 of 355 hit points hit for 16
-       where undamaged companions hit for 27 and 48. */
+       where undamaged companions hit for 27 and 48.
+
+       The enemy is walled in for this one. Enemies move before they fire now,
+       and how far they move depends on their power -- so without the wall a
+       wounded ship and a healthy one shoot from different distances and this
+       compares two things at once. */
     {
         uint16_t strong, weak;
         trek_new_game(3, 31337);
         ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
         sector[(2 << 3) | 4] = SEC_BATTLESHIP;
         enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
         trek_enemy_turn(ev, 16);
-        strong = ev[0].amount;
+        strong = fire_amount(ev, 16);
+        ok(sector[(2 << 3) | 4] == SEC_BATTLESHIP,
+           "a walled-in enemy cannot move");
 
         trek_new_game(3, 31337);
         ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
         sector[(2 << 3) | 4] = SEC_BATTLESHIP;
         enemy_hp[(2 << 3) | 4] = 40;
         trek_enemy_turn(ev, 16);
-        weak = ev[0].amount;
+        weak = fire_amount(ev, 16);
 
         ok(weak < strong, "a wounded enemy hits for less");
     }
@@ -704,6 +832,8 @@ int main(void) {
     test_repair();
     test_converter_scales_with_repair();
     test_enemy_turn();
+    test_enemy_movement();
+    test_bearing();
     test_torpedo();
     test_game_state_and_score();
 

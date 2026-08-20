@@ -2,30 +2,28 @@
 #include "layout.h"
 #include "egavdc.h"
 
-/* Column bands: 0..26 | 27..45 | 46..79   (27 + 19 + 34 = 80)
-   Row bands:    0..12 | 13..20 | 21..24   (13 +  8 +  4 = 25)
-   The left middle band splits again into LASERS over COMMAND.
-
-   The middle column breaks that row banding on purpose. SYSTEMS STATUS runs
-   rows 17..24, which is where a 640x350 capture of the original puts it
-   (measured 2026-08-19: the panel's grey frame spans x161..318, y251..348,
-   i.e. columns 20..39 and rows 17..24). Ten systems will not fit in the two
-   interior rows the old 21..24 band gave it. MAIN VIEWER gives up the height:
-   the original's viewer is taller than this, but this port draws nothing in
-   it yet, and an empty panel is the right thing to spend. */
+/* See layout.h for where these numbers come from and what the one deliberate
+   departure from the original is. */
 const Panel panels[PANEL_COUNT] = {
-    {  0,  0, 27, 13, "SHORT RANGE SCAN" },
-    { 27,  0, 19, 13, "STATUS" },
-    { 46,  0, 34, 13, "CHART OF KNOWN GALAXY" },
+    /* Top band, rows 0..10. The scan panel carries no title because the
+       original's does not -- its column headers are the top line. */
+    {  0,  0, 21, 11, "SHORT RANGE SCAN" },
+    { 20,  0, 21, 11, "STATUS" },
+    { 41,  0, 39, 11, "CHART OF KNOWN GALAXY" },
 
-    {  0, 13, 20,  4, "LASERS" },
-    {  0, 17, 20,  4, "COMMAND" },
-    { 20, 13, 26,  4, "MAIN VIEWER" },
-    { 46, 13, 34,  8, "COMMUNICATIONS" },
+    /* Middle band, rows 11..17. LASERS and COMMAND share row 14. */
+    {  0, 11, 21,  4, "LASERS" },
+    {  0, 14, 21,  4, "COMMAND" },
+    { 21, 11, 19,  7, "MAIN VIEWER" },
 
-    {  0, 21, 20,  4, "U.S.S. LEXINGTON" },
-    { 20, 17, 26,  8, "SYSTEMS STATUS" },
-    { 46, 21, 34,  4, "DAMAGE REPORT" },
+    /* Bottom band, rows 17..24. The badge has no title in its border: the
+       ship name is the first line inside it. */
+    {  0, 17, 20,  8, "" },
+    { 20, 17, 20,  8, "SYSTEMS STATUS" },
+
+    /* Columns 40..79 of rows 11..24 are deliberately absent from this table.
+       That is the message region, and it has no frame of its own -- see
+       MSG_X and friends in layout.h. */
 };
 
 #define BORDER_COL  EGA_TO_VDC(EGA_LTCYAN)

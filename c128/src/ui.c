@@ -94,14 +94,14 @@ void ui_draw_scan(void) {
     const Panel *p = &panels[P_SCAN];
     unsigned char row, col, glyph, color;
     unsigned char x0 = (unsigned char)(p->x + 4);
-    unsigned char y0 = (unsigned char)(p->y + 3);
+    unsigned char y0 = (unsigned char)(p->y + 2);
 
     clear_panel(P_SCAN);
 
     /* Column headers and row labels are 1-based, as the original presents
        them; the core is 0-based throughout. */
     for (col = 0; col < QUAD_DIM; col++)
-        scr_put((unsigned char)(x0 + col * 2), (unsigned char)(p->y + 2),
+        scr_put((unsigned char)(x0 + col * 2), (unsigned char)(p->y + 1),
                 (unsigned char)(SC_DIGIT0 + col + 1), COL_LABEL);
 
     for (row = 0; row < QUAD_DIM; row++) {
@@ -127,12 +127,12 @@ void ui_draw_chart(void) {
     unsigned char row, col, q, color;
     unsigned char x, y;
     unsigned char x0 = (unsigned char)(p->x + 2);
-    unsigned char y0 = (unsigned char)(p->y + 3);
+    unsigned char y0 = (unsigned char)(p->y + 2);
 
     clear_panel(P_CHART);
 
     for (col = 0; col < GAL_DIM; col++)
-        scr_put((unsigned char)(x0 + col * 4 + 1), (unsigned char)(p->y + 2),
+        scr_put((unsigned char)(x0 + col * 4 + 1), (unsigned char)(p->y + 1),
                 (unsigned char)(SC_DIGIT0 + col + 1), COL_LABEL);
 
     for (row = 0; row < GAL_DIM; row++) {
@@ -163,15 +163,21 @@ void ui_draw_chart(void) {
         }
     }
 
-    /* Mark where we are, in the row of the panel below the grid. */
-    scr_puts((unsigned char)(p->x + 2), (unsigned char)(p->y + p->h - 2),
-             "LEXINGTON IN QUAD", COL_LABEL);
-    put_num((unsigned char)(p->x + 20), (unsigned char)(p->y + p->h - 2),
-            (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
-    scr_put((unsigned char)(p->x + 21), (unsigned char)(p->y + p->h - 2),
-            44 /* ',' */, COL_VALUE);
-    put_num((unsigned char)(p->x + 22), (unsigned char)(p->y + p->h - 2),
-            (uint16_t)(ship.quad_x + 1), 1, COL_VALUE);
+    /* "LEXINGTON IN QUAD y,x" goes in the BOTTOM BORDER, the way a title goes
+       in the top one. The panel's nine interior rows are all spoken for -- one
+       header and eight galaxy rows -- and the original prints this line right
+       against its own bottom edge too. */
+    {
+        unsigned char by = (unsigned char)(p->y + p->h - 1);
+        unsigned char bx = (unsigned char)(p->x + 2);
+        /* Trailing space matters: this line is written INTO the bottom
+           border, so a gap left between words shows the border rule through
+           it and reads as a stray dash. */
+        scr_puts(bx, by, "LEXINGTON IN QUAD ", COL_LABEL);
+        put_num((unsigned char)(bx + 18), by, (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
+        scr_put((unsigned char)(bx + 19), by, 44 /* ',' */, COL_VALUE);
+        put_num((unsigned char)(bx + 20), by, (uint16_t)(ship.quad_x + 1), 1, COL_VALUE);
+    }
 }
 
 /* -------------------------------------------------------------- status */
@@ -184,28 +190,15 @@ void ui_draw_status(void) {
 
     clear_panel(P_STATUS);
 
-    /* Nine rows, no blank spacers. The previous layout used spacers and ran
-       ENEMIES onto the panel's bottom border -- visible in the first VICE
-       capture, where the border line ran straight through the word. The
-       mission-deadline row is gone with them: the original's panel shows no
-       such figure, and ours was invented.
+    /* Seven rows. QUADRANT and SECTOR used to be here and are now on the
+       COMMAND panel, which is where the original puts them -- it prints
+       "Quad 8,5  Sec 2,5" under the command prompt. That was not a saving
+       made up to fit: it is what the capture shows.
 
        Energy is three separate pools, as the original's ENGINEERING REPORT
        shows -- main banks, impulse engines, and shield charge. */
     scr_puts(lx, y, "STARDATE", COL_LABEL);
     put_tenths(vx, y, ship.stardate, COL_VALUE);
-    y++;
-
-    scr_puts(lx, y, "QUADRANT", COL_LABEL);
-    put_num(vx, y, (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
-    scr_put((unsigned char)(vx + 1), y, 44, COL_VALUE);
-    put_num((unsigned char)(vx + 2), y, (uint16_t)(ship.quad_x + 1), 1, COL_VALUE);
-    y++;
-
-    scr_puts(lx, y, "SECTOR", COL_LABEL);
-    put_num(vx, y, (uint16_t)(ship.sec_y + 1), 1, COL_VALUE);
-    scr_put((unsigned char)(vx + 1), y, 44, COL_VALUE);
-    put_num((unsigned char)(vx + 2), y, (uint16_t)(ship.sec_x + 1), 1, COL_VALUE);
     y++;
 
     scr_puts(lx, y, "ENERGY", COL_LABEL);
@@ -230,6 +223,57 @@ void ui_draw_status(void) {
     put_num(vx, y, ship.enemies_left, 5, EGA_TO_VDC(EGA_LTRED));
 }
 
+/* ---------------------------------------------------------------- badge */
+
+/* The Department of Space crest. The original draws a blue ellipse outlined
+   in cyan with one large white star and three small ones, under the ship name
+   and hull number, over "Dept. of Space" -- six lines, which is exactly what
+   the measured panel gives.
+
+   The disc is built from half-block glyphs read out of the C128 chargen ROM:
+   228 is a full block less its bottom pixel row, 98 fills the bottom half of a
+   cell and 226 the top half. Rounding the disc that way costs nothing and is
+   the difference between a crest and a rectangle. */
+#define BADGE_DISC_TOP     98    /* lower half filled -- rounds the top edge */
+#define BADGE_DISC_BOTTOM 226    /* upper half filled -- rounds the bottom   */
+#define BADGE_DISC_BODY   160    /* solid                                    */
+
+void ui_draw_badge(void) {
+    const Panel *p = &panels[P_BADGE];
+    unsigned char y = (unsigned char)(p->y + 1);
+    unsigned char cx = (unsigned char)(p->x + p->w / 2);
+    unsigned char disc = EGA_TO_VDC(EGA_BLUE);
+    unsigned char i;
+
+    clear_panel(P_BADGE);
+
+    scr_puts((unsigned char)(p->x + 2), y, "U.S.S. LEXINGTON", COL_VALUE);
+    y++;
+    scr_puts((unsigned char)(cx - 3), y, "RCB-92", COL_VALUE);
+    y++;
+
+    /* All one colour. Outlining the rounded rows in cyan the way the original
+       outlines its ellipse turned the crest into a cyan sandwich on screen:
+       at this size the rim is the whole of the top and bottom rows, so it
+       stops reading as an edge and starts reading as a stripe. */
+    for (i = 0; i < 5; i++)
+        scr_put((unsigned char)(cx - 2 + i), y, BADGE_DISC_TOP, disc);
+    y++;
+    for (i = 0; i < 7; i++)
+        scr_put((unsigned char)(cx - 3 + i), y, BADGE_DISC_BODY, disc);
+    /* The large star. A character cell has no background of its own on the
+       VDC, so this reads as a white star in the disc rather than on it --
+       which is as close as a text display gets. */
+    scr_put((unsigned char)(cx + 1), y, SC_STAR, COL_VALUE);
+    scr_put((unsigned char)(cx - 2), y, SC_DOT, COL_VALUE);
+    y++;
+    for (i = 0; i < 5; i++)
+        scr_put((unsigned char)(cx - 2 + i), y, BADGE_DISC_BOTTOM, disc);
+    y++;
+
+    scr_puts((unsigned char)(p->x + 3), y, "DEPT. OF SPACE", COL_LABEL);
+}
+
 /* ------------------------------------------------------- systems status */
 
 /* Twelve systems, six rows of two columns. The original prints the full name
@@ -245,9 +289,9 @@ void ui_draw_status(void) {
    Showing them costs nothing here and the game already tracks them. */
 #define SYS_COLS      2
 #define SYS_ROWS      6
-#define SYS_ENTRY_W  11    /* 3 label + 1 space + 7 bar */
-#define SYS_BAR_W     7
-#define SYS_COL_PITCH 13   /* leaves a two-column gutter between the halves */
+#define SYS_ENTRY_W   9    /* 3 label + 1 space + 5 bar */
+#define SYS_BAR_W     5
+#define SYS_COL_PITCH 9    /* two columns fill the 18-cell interior exactly */
 
 /* NOT the solid block. G_BLOCK fills all eight pixel rows of its cell, so six
    bars stacked on consecutive rows fuse into one green slab and the panel
@@ -400,59 +444,202 @@ void ui_draw_lasers(void) {
               LASER_HEAT_MAX, heat_color(ship.laser_heat));
 }
 
+/* ---------------------------------------------------------- main viewer */
+
+/* What the original puts here, read off a capture: against a starfield, the
+   enemy's class as a caption in the top left, a line drawing of the ship, and
+   two readouts in the bottom left -- bearing in degrees after a slashed zero,
+   distance in sectors after a triangle.
+
+   Five character rows cannot hold a line drawing, so the ship becomes a small
+   PETSCII silhouette and the caption, bearing and distance carry the rest.
+   The nearest enemy is the subject, which is what the original tracks: its
+   scanner reports follow whichever ship is closing. */
+#define VIEW_EMPTY_MSG "NO CONTACT"
+
+static const char *enemy_class(unsigned char c) {
+    switch (c) {
+        case SEC_COMMAND:    return "MONGOL COMMANDER";
+        case SEC_SCOUT:      return "MONGOL SCOUT";
+        case SEC_SUPPLY:     return "SUPPLY STATION";
+        default:             return "MONGOL BATTLESHIP";
+    }
+}
+
+/* Nearest enemy, or QUAD_CELLS if the quadrant is clear. */
+static unsigned char nearest_enemy(uint16_t *dist) {
+    unsigned char cell, best = QUAD_CELLS;
+    uint16_t d, bd = 0xFFFF;
+
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        unsigned char y, x, dy, dx;
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+        y = (unsigned char)(cell >> 3);
+        x = (unsigned char)(cell & 7);
+        dy = (unsigned char)(y > ship.sec_y ? y - ship.sec_y : ship.sec_y - y);
+        dx = (unsigned char)(x > ship.sec_x ? x - ship.sec_x : ship.sec_x - x);
+        d = trek_dist(dy, dx);
+        if (d < bd) { bd = d; best = cell; }
+    }
+    if (dist) *dist = (best == QUAD_CELLS) ? 0 : bd;
+    return best;
+}
+
+void ui_draw_viewer(void) {
+    const Panel *p = &panels[P_VIEWER];
+    unsigned char x = (unsigned char)(p->x + 1);
+    unsigned char y = (unsigned char)(p->y + 1);
+    unsigned char cell, color;
+    uint16_t d;
+
+    clear_panel(P_VIEWER);
+
+    cell = nearest_enemy(&d);
+    if (cell == QUAD_CELLS) {
+        scr_puts((unsigned char)(x + 3), (unsigned char)(y + 2),
+                 VIEW_EMPTY_MSG, COL_GRID);
+        return;
+    }
+
+    /* The class colours are game rules, not decoration -- the original makes
+       enemy type readable by hue and core/ega.h carries the mapping. */
+    (void)cell_glyph(sector[cell], &color);
+    scr_puts(x, y, enemy_class(sector[cell]), color);
+
+    /* A silhouette, not a drawing: saucer, hull, nacelle. */
+    scr_put((unsigned char)(x + 6), (unsigned char)(y + 2), 81 /* filled disc */, color);
+    scr_hline((unsigned char)(x + 7), (unsigned char)(y + 2), 4, G_HLINE, color);
+    scr_put((unsigned char)(x + 11), (unsigned char)(y + 2), 160, color);
+
+    /* Bearing and range, in the corner the original uses. The slashed zero
+       and triangle it prints have no PETSCII equivalent, so these are
+       labelled rather than glyphed. */
+    scr_puts(x, (unsigned char)(y + 3), "BRG", COL_LABEL);
+    put_num((unsigned char)(x + 4), (unsigned char)(y + 3),
+            trek_bearing((unsigned char)(cell >> 3), (unsigned char)(cell & 7)),
+            3, COL_VALUE);
+
+    scr_puts(x, (unsigned char)(y + 4), "RNG", COL_LABEL);
+    /* trek_dist is 8.8 fixed point; print it as w.t by scaling the fraction
+       to tenths. Staged: the fraction is at most 255, so 255*10 is safe. */
+    put_num((unsigned char)(x + 4), (unsigned char)(y + 4),
+            (uint16_t)(d >> 8), 2, COL_VALUE);
+    scr_put((unsigned char)(x + 6), (unsigned char)(y + 4), SC_DOT, COL_VALUE);
+    put_num((unsigned char)(x + 7), (unsigned char)(y + 4),
+            (uint16_t)(((d & 0xFF) * 10) >> 8), 1, COL_VALUE);
+}
+
 /* ------------------------------------------------------------ messages */
 
-#define MSG_LINES 4
-#define MSG_WIDTH 30
+/* One box per message, stacked oldest at the top, exactly as the original
+   does it. There is no COMMUNICATIONS panel and no DAMAGE REPORT panel: a
+   640x350 capture shows four separately bordered boxes sharing one region,
+   with damage reports and communications interleaved in time order and each
+   completed box stamped with its stardate in the right end of its top border.
+   The department names that looked like panel titles are message prefixes.
 
-/* 16, not 12: "NAVIGATION: " is twelve characters and was losing its
-   trailing space, so messages ran straight into the department name. */
-static char msg_dept[MSG_LINES][16];
-static char msg_text[MSG_LINES][MSG_WIDTH + 1];
+   Three rows per box -- border, text, border -- except the last, which takes
+   the slack. That is the original's shape too: its first three boxes are 43
+   pixels tall and the bottom one 62, because the bottom box is the turn in
+   progress and grows as the turn reports itself. The original also wraps each
+   message to three lines; ours holds one, which is what fourteen rows and a
+   38-cell interior will take. */
+#define MSG_SLOTS   4
+#define MSG_BOX_H   3
+#define MSG_WIDTH  36
+
+static unsigned char msg_top(unsigned char slot) {
+    return (unsigned char)(MSG_Y + slot * MSG_BOX_H);
+}
+
+static unsigned char msg_height(unsigned char slot) {
+    if (slot + 1 < MSG_SLOTS) return MSG_BOX_H;
+    return (unsigned char)(MSG_H - (MSG_SLOTS - 1) * MSG_BOX_H);
+}
+
+static char     msg_dept[MSG_SLOTS][16];
+static char     msg_text[MSG_SLOTS][MSG_WIDTH + 1];
+static uint16_t msg_date[MSG_SLOTS];
 static unsigned char msg_count = 0;
+
+/* Department colours. Yellow and orange are measured -- they are the border
+   and text colours of the COMMUNICATIONS and DAMAGE REPORT boxes in the
+   capture. Everything else is UNMEASURED: no capture has been taken with a
+   HELM or SCIENCE message on screen, so those keep the green this port has
+   been using rather than a guess dressed up as a finding. */
+static unsigned char dept_color(const char *dept) {
+    if (dept[0] == 'D')                    /* DAMAGE */
+        return EGA_TO_VDC(EGA_BROWN);
+    if (dept[0] == 'C' && dept[1] == 'O' && dept[2] == 'M' && dept[3] == 'M')
+        return EGA_TO_VDC(EGA_YELLOW);     /* COMMUNICATIONS, not COMPUTER */
+    return COL_MSG;
+}
+
+static void msg_clear_region(void) {
+    scr_fill_rect(MSG_X, MSG_Y, MSG_W, MSG_H, SC_SPACE, COL_LABEL);
+}
 
 void ui_clear_messages(void) {
     msg_count = 0;
-    clear_panel(P_COMMS);
+    msg_clear_region();
 }
 
-/* Department and text together must fit the panel's interior. The VDC
-   auto-increments its update address, so a line that runs past column 79
-   does not clip -- it wraps onto the next row and overwrites whatever panel
-   is there. Clamp rather than trusting callers to keep messages short. */
-static void msg_redraw(void) {
-    const Panel *p = &panels[P_COMMS];
-    const unsigned char avail = (unsigned char)(p->w - 4);
+/* Draws one box. The stardate goes into the top border rather than costing a
+   text row, which is where the original puts it too. */
+static void msg_box(unsigned char slot) {
+    unsigned char y = msg_top(slot);
+    unsigned char right = (unsigned char)(MSG_X + MSG_W - 1);
+    unsigned char bottom = (unsigned char)(y + msg_height(slot) - 1);
+    unsigned char color = dept_color(msg_dept[slot]);
+    unsigned char dlen, rem;
     char tbuf[MSG_WIDTH + 1];
-    unsigned char i, y, dlen, rem;
 
-    clear_panel(P_COMMS);
+    scr_hline((unsigned char)(MSG_X + 1), y, (unsigned char)(MSG_W - 2),
+              G_HLINE, color);
+    scr_hline((unsigned char)(MSG_X + 1), bottom, (unsigned char)(MSG_W - 2),
+              G_HLINE, color);
+    scr_put(MSG_X, y, G_TL, color);
+    scr_put(right, y, G_TR, color);
+    scr_put(MSG_X, bottom, G_BL, color);
+    scr_put(right, bottom, G_BR, color);
+    scr_vline(MSG_X, (unsigned char)(y + 1),
+              (unsigned char)(msg_height(slot) - 2), G_VLINE, color);
+    scr_vline(right, (unsigned char)(y + 1),
+              (unsigned char)(msg_height(slot) - 2), G_VLINE, color);
 
-    for (i = 0; i < msg_count; i++) {
-        y = (unsigned char)(p->y + 2 + i);
+    put_tenths((unsigned char)(right - 7), y, msg_date[slot], color);
 
-        dlen = (unsigned char)strlen(msg_dept[i]);
-        if (dlen > avail) dlen = avail;
-        rem = (unsigned char)(avail - dlen);
-        if (rem > MSG_WIDTH) rem = MSG_WIDTH;
+    /* The VDC auto-increments its update address, so a line running past the
+       right edge does not clip -- it wraps onto the next row and lands in
+       whatever is there. Clamp here rather than trusting callers. */
+    dlen = (unsigned char)strlen(msg_dept[slot]);
+    if (dlen > MSG_W - 2) dlen = (unsigned char)(MSG_W - 2);
+    rem = (unsigned char)(MSG_W - 2 - dlen);
+    if (rem > MSG_WIDTH) rem = MSG_WIDTH;
 
-        scr_puts((unsigned char)(p->x + 2), y, msg_dept[i], COL_DEPT);
+    scr_puts((unsigned char)(MSG_X + 1), (unsigned char)(y + 1),
+             msg_dept[slot], COL_DEPT);
+    strncpy(tbuf, msg_text[slot], rem);
+    tbuf[rem] = '\0';
+    scr_puts((unsigned char)(MSG_X + 1 + dlen), (unsigned char)(y + 1),
+             tbuf, color);
+}
 
-        strncpy(tbuf, msg_text[i], rem);
-        tbuf[rem] = '\0';
-        scr_puts((unsigned char)(p->x + 2 + dlen), y, tbuf, COL_MSG);
-    }
+static void msg_redraw(void) {
+    unsigned char i;
+    msg_clear_region();
+    for (i = 0; i < msg_count; i++) msg_box(i);
 }
 
 void ui_message(const char *dept, const char *text) {
     unsigned char i;
 
-    if (msg_count == MSG_LINES) {
-        /* Oldest scrolls off the top, as the original's four-line console
-           does (manual l.312-314). */
-        for (i = 1; i < MSG_LINES; i++) {
+    if (msg_count == MSG_SLOTS) {
+        /* Oldest scrolls off the top, as the original's stack does. */
+        for (i = 1; i < MSG_SLOTS; i++) {
             strcpy(msg_dept[i - 1], msg_dept[i]);
             strcpy(msg_text[i - 1], msg_text[i]);
+            msg_date[i - 1] = msg_date[i];
         }
         msg_count--;
     }
@@ -461,6 +648,7 @@ void ui_message(const char *dept, const char *text) {
     msg_dept[msg_count][15] = '\0';
     strncpy(msg_text[msg_count], text, MSG_WIDTH);
     msg_text[msg_count][MSG_WIDTH] = '\0';
+    msg_date[msg_count] = ship.stardate;
     msg_count++;
 
     msg_redraw();
@@ -468,14 +656,37 @@ void ui_message(const char *dept, const char *text) {
 
 /* ------------------------------------------------------------- command */
 
+/* "Quad 8,5  Sec 2,5" under the prompt, which is where the original keeps
+   it -- these two were on the STATUS panel here until a capture showed
+   otherwise. Drawn separately from ui_read_command so that reading a command
+   does not wipe it. */
+void ui_draw_position(void) {
+    const Panel *p = &panels[P_COMMAND];
+    unsigned char x = (unsigned char)(p->x + 2);
+    unsigned char y = (unsigned char)(p->y + 2);
+
+    scr_hline(x, y, (unsigned char)(p->w - 3), SC_SPACE, COL_LABEL);
+
+    scr_puts(x, y, "QUAD", COL_LABEL);
+    put_num((unsigned char)(x + 5), y, (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
+    scr_put((unsigned char)(x + 6), y, 44, COL_VALUE);
+    put_num((unsigned char)(x + 7), y, (uint16_t)(ship.quad_x + 1), 1, COL_VALUE);
+
+    scr_puts((unsigned char)(x + 10), y, "SEC", COL_LABEL);
+    put_num((unsigned char)(x + 14), y, (uint16_t)(ship.sec_y + 1), 1, COL_VALUE);
+    scr_put((unsigned char)(x + 15), y, 44, COL_VALUE);
+    put_num((unsigned char)(x + 16), y, (uint16_t)(ship.sec_x + 1), 1, COL_VALUE);
+}
+
 void ui_read_command(char *buf, uint8_t max) {
     const Panel *p = &panels[P_COMMAND];
     unsigned char x0 = (unsigned char)(p->x + 2);
-    unsigned char y  = (unsigned char)(p->y + 2);
+    unsigned char y  = (unsigned char)(p->y + 1);
     unsigned char n = 0;
     char c;
 
-    clear_panel(P_COMMAND);
+    /* Clears its own row only. The row below carries the position readout. */
+    scr_hline(x0, y, (unsigned char)(p->w - 3), SC_SPACE, COL_LABEL);
     scr_puts(x0, y, "CMD:", COL_LABEL);
 
     for (;;) {
@@ -622,5 +833,8 @@ void ui_draw_all(void) {
     ui_draw_status();
     ui_draw_systems();
     ui_draw_lasers();
+    ui_draw_badge();
+    ui_draw_viewer();
+    ui_draw_position();
     msg_redraw();
 }

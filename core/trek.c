@@ -579,9 +579,146 @@ static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max)
     }
 }
 
+/* How keen an enemy is to close, DERIVED from the ancestor's movebaddy().
+ *
+ * The ancestor builds a "forces" score out of the enemy's own power, how many
+ * of them are present, and how dangerous we look, then turns it into a signed
+ * number of sectors: positive advance, negative retreat, zero hold. Its
+ * constants are reproduced here in integer form. NONE of them is measured for
+ * EGA Trek; what is measured is the resulting behaviour at level 3, where a
+ * Commander advanced one sector per turn and then held (MEASURED.md).
+ *
+ * Deliberately not reproduced: the ancestor's supercommander bolt-hole, its
+ * docked-at-base back-off, and its expert-skill enemy weighting. Those depend
+ * on features this core does not have yet, and inventing them would be worse
+ * than leaving them out. */
+static int16_t enemy_motion(uint16_t hp, uint16_t dist_whole) {
+    uint16_t forces;
+    int16_t  motion;
+
+    /* forces = own power + 100 per enemy present, +1000 if our shields are
+       down, less a term for the energy and torpedoes we could bring. Staged
+       to stay inside 16 bits: hp reaches 695 and the additions are bounded. */
+    forces = hp;
+    if (ship.enemies_left < 40) forces = (uint16_t)(forces + 100 * ship.enemies_left);
+    if (!ship.shields_up)       forces = (uint16_t)(forces + 1000);
+
+    if (ship.energy > 2500) {
+        uint16_t bold = (uint16_t)((ship.energy - 2500) / 5);   /* 0.2 * excess */
+        forces = (forces > bold) ? (uint16_t)(forces - bold) : 0;
+    }
+    {
+        uint16_t torp = (uint16_t)(50 * ship.torps);
+        forces = (forces > torp) ? (uint16_t)(forces - torp) : 0;
+    }
+
+    if (forces > 1000) {
+        /* Very strong: move in for the kill, but never past us. */
+        motion = (int16_t)(dist_whole + 1);
+    } else {
+        /* The ancestor's forces/150 - 5, which is negative below 750 and
+           positive above -- so a weak ship backs off and a strong one closes. */
+        motion = (int16_t)(forces / 150) - 5;
+    }
+
+    /* Limited by command level, as the ancestor limits by skill. */
+    if (motion >  (int16_t)ship.level) motion =  (int16_t)ship.level;
+    if (motion < -(int16_t)ship.level) motion = -(int16_t)ship.level;
+    return motion;
+}
+
+/* One step of pursuit or flight: the sign of the row and column difference,
+   which is the ancestor's krawl. Returns NO_STEP if the destination is not
+   free -- enemies do not push through stars, bases or each other.
+ *
+ * Returns the destination rather than filling in a `uint8_t *dest`, and that
+ * is not a style preference. The out-parameter version crashed cc65 outright
+ * at -O ("Subprocess 'cc65' aborted by signal 11") while compiling fine
+ * without it; the return-value form compiles at every level. Bisected to this
+ * function, and then to the parameter itself -- rewriting the branches and
+ * removing all signed-char arithmetic changed nothing. Native `make test`
+ * cannot see this: it only shows up in the cross compiler. */
+#define NO_STEP 0xFF
+
+static uint8_t enemy_step(uint8_t cell, uint8_t away) {
+    uint8_t y = (uint8_t)(cell >> 3), x = (uint8_t)(cell & 7);
+    uint8_t ny = y, nx = x, dest;
+
+    if (!away) {
+        if (ship.sec_y > y)      ny = (uint8_t)(y + 1);
+        else if (ship.sec_y < y) ny = (uint8_t)(y - 1);
+        if (ship.sec_x > x)      nx = (uint8_t)(x + 1);
+        else if (ship.sec_x < x) nx = (uint8_t)(x - 1);
+    } else {
+        if (ship.sec_y > y)      { if (y == 0) return NO_STEP; ny = (uint8_t)(y - 1); }
+        else if (ship.sec_y < y) { if (y >= QUAD_DIM - 1) return NO_STEP; ny = (uint8_t)(y + 1); }
+        if (ship.sec_x > x)      { if (x == 0) return NO_STEP; nx = (uint8_t)(x - 1); }
+        else if (ship.sec_x < x) { if (x >= QUAD_DIM - 1) return NO_STEP; nx = (uint8_t)(x + 1); }
+    }
+
+    dest = (uint8_t)((ny << 3) | nx);
+    if (dest == cell) return NO_STEP;
+    if (sector[dest] != SEC_EMPTY) return NO_STEP;
+    return dest;
+}
+
+/* Moves every enemy in the quadrant, then leaves firing to the caller. Done as
+   a separate pass so that an enemy fires from where it ended up, which is what
+   the original's scanner report implies -- it announces the move first and the
+   damage afterwards. */
+static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t cell, dest, steps, away;
+    int16_t motion;
+    uint16_t d;
+    /* Which cells have already had their turn, so a ship that steps into a
+       not-yet-visited cell does not get a second one. */
+    uint8_t moved[QUAD_CELLS];
+    uint8_t i;
+
+    for (i = 0; i < QUAD_CELLS; i++) moved[i] = 0;
+
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        if (!SEC_IS_ENEMY(sector[cell]) || moved[cell]) continue;
+
+        d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
+                      abs_diff((uint8_t)(cell & 7), ship.sec_x));
+        motion = enemy_motion(enemy_hp[cell], (uint16_t)(d >> 8));
+        if (motion == 0) { moved[cell] = 1; continue; }
+
+        away  = (uint8_t)(motion < 0);
+        steps = (uint8_t)(away ? -motion : motion);
+
+        while (steps--) {
+            dest = enemy_step(cell, away);
+            if (dest == NO_STEP) break;
+            sector[dest]   = sector[cell];
+            enemy_hp[dest] = enemy_hp[cell];
+            sector[cell]   = SEC_EMPTY;
+            enemy_hp[cell] = 0;
+            cell = dest;
+        }
+        moved[cell] = 1;
+
+        if (*n < max) {
+            ev[*n].kind   = EV_ENEMY_MOVED;
+            ev[*n].y      = (uint8_t)(cell >> 3);
+            ev[*n].x      = (uint8_t)(cell & 7);
+            ev[*n].amount = 0;
+            (*n)++;
+        }
+    }
+}
+
 uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
+
+    enemies_move(ev, &n, max);
+
+    /* NOT here, deliberately: the ancestor drains a quarter of an enemy's
+       power every time it fires. Tested directly against the original -- five
+       zero-energy turns while two Mongols shot at us, and neither lost a
+       single point. Anderson dropped that rule. See MEASURED.md. */
 
     for (cell = 0; cell < QUAD_CELLS && n < max; cell++) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
@@ -602,6 +739,35 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
         take_damage(dmg, ev, &n, max);
     }
     return n;
+}
+
+/* arctan(i/16) in whole degrees, i = 0..16. The table is the whole of the
+   trigonometry in this file; everything else is octant bookkeeping. */
+static const uint8_t atan_deg[17] = {
+    0, 4, 7, 11, 14, 17, 21, 24, 27, 29, 32, 35, 37, 39, 41, 43, 45
+};
+
+uint16_t trek_bearing(uint8_t sy, uint8_t sx) {
+    uint8_t up, right;      /* screen rows grow downwards; bearings do not */
+    uint16_t dy, dx, a;
+
+    if (sy == ship.sec_y && sx == ship.sec_x) return 0;
+
+    up    = (uint8_t)(sy < ship.sec_y);
+    right = (uint8_t)(sx > ship.sec_x);
+    dy = abs_diff(sy, ship.sec_y);
+    dx = abs_diff(sx, ship.sec_x);
+
+    /* Reduce to the first octant, where the smaller leg is over the larger,
+       and index the table by that ratio in sixteenths. */
+    if (dx >= dy) a = atan_deg[(dy * 16) / dx];
+    else          a = (uint16_t)(90 - atan_deg[(dx * 16) / dy]);
+
+    /* The modulo matters only in one place, and it is the place a compass is
+       most often asked about: due east is a == 0 in the lower-right octant,
+       where 360 - 0 would report 360 rather than 0. */
+    if (right)  return up ? a : (uint16_t)((360 - a) % 360);
+    return up ? (uint16_t)(180 - a) : (uint16_t)(180 + a);
 }
 
 /* ---------------------------------------------------------------- torps */

@@ -1097,3 +1097,74 @@ can be read straight off one screenshot with any system damaged.
 700-800 at point blank, falling off with how badly the shot was aimed rather
 than with range alone. Nothing measured for EGA Trek yet; recorded as the
 shape to test.
+
+## Confirming the ancestor against the game (2026-08-19)
+
+The oracle's job is to propose; the game still decides. Four results, all from
+one run of a level-3 game under dosbox-automation with the enemy table at
+DS:25F2 read directly -- no pixel reading, which is what made this cheap.
+
+### Enemies do NOT lose power by firing -- the ancestor's rule is REFUTED
+
+SST's `attack()` ends every enemy phaser shot with `game.kpower[loop] *= 0.75`,
+so a ship weakens itself by a quarter each time it fires. That was the headline
+candidate for the confound that made three sessions of enemy-fire measurement
+unstable.
+
+Tested by firing lasers at **zero energy** -- a turn that costs time, moves
+nothing and damages nothing -- five times in a row, reading the table each
+turn:
+
+| turn | Commander | second ship |
+|---|---|---|
+| 0 | 636 | 196 |
+| 1 | 636 | 196 |
+| 2 | 636 | 196 |
+| 3 | 636 | 196 |
+| 4 | 636 | 196 |
+| 5 | 636 | 196 |
+
+Not one point lost, while both were shooting at us throughout. **Anderson
+dropped the drain.** So enemy output does not decay with shots fired, and
+whatever destabilised the earlier measurements, it was not this.
+
+Worth stating plainly: this is the oracle working as intended, not failing. A
+specific hypothesis was cheap to kill. Discovering the same fact by measuring
+blind is what cost three sessions.
+
+### Enemies move, and our core does not model that at all
+
+Across those same turns the Commander walked 3-8 → 3-7 → 4-6 → 5-5, one sector
+per turn, closing on us, and then held. The second ship never moved. The
+console narrates it: "SCANNER REPORT: The commander has moved. He is now at
+5-5."
+
+`trek_enemy_turn()` only fires. Stationary enemies are a large missing
+behaviour, not a wrong constant.
+
+### The Commander has 695 hit points at level 3, not 441..501
+
+The table read 695 for the ship the console calls the Mongol Commander. The
+earlier bracket of 441..501 was inferred from damage arithmetic and is wrong;
+this is a direct read of the same table that gave 355 for a battleship.
+
+A second ship read 255, which matches no class we have measured -- 355
+battleship, 120 supply. Either it had already been damaged before we arrived,
+or scouts are 255. Unresolved.
+
+### Vandal Death Pods are an area effect
+
+"Vandal Death Pod enters quadrant: 59 unit hit on Lexington." In the same turn
+both Mongols dropped by exactly 59 as well: 695 → 636 and 255 → 196. One
+figure, applied to every ship in the quadrant including the enemy's own. This
+first looked like evidence of the firing drain, which is a good example of why
+the zero-energy turn was needed to isolate it.
+
+### What the MAIN VIEWER shows
+
+Enough to build ours. Against a starfield: the enemy class as a caption in the
+top left ("MONGOL COMMANDER"), a line drawing of the ship, and two readouts in
+the bottom left -- bearing in degrees after a slashed-zero glyph, and distance
+in sectors after a triangle. With the Commander at 5-5 and the ship at 6,4 --
+one row up and one column right -- the bearing read 45.0, so east is 0 degrees
+and they increase anticlockwise.

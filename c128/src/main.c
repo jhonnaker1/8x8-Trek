@@ -289,6 +289,12 @@ static void enemy_turn(void) {
                 k += put_str(linebuf + k, " AT ");
                 k += put_u16(linebuf + k, ev[i].amount);
                 break;
+            case EV_ENEMY_MOVED:
+                k  = put_str(linebuf, "MONGOL NOW AT ");
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                linebuf[k] = 0;
+                ui_message("SCANNER: ", linebuf);
+                continue;
             case EV_SHIP_LOST:
                 ui_message("HELM: ", "WE ARE LOST, CAPTAIN.");
                 continue;
@@ -359,6 +365,8 @@ int main(void) {
         ui_draw_status();
         ui_draw_systems();
         ui_draw_lasers();
+        ui_draw_viewer();
+        ui_draw_position();
 
         if (trek_game_state() != GAME_ON) break;
     }

@@ -68,6 +68,13 @@ char kb_waitkey(void) { return 13; }
 
 /* ------------------------------------------------------------- harness */
 
+/* Derived from the panel rather than restated, so that moving the panel moves
+   the test with it. Two columns of (3 label + 1 space + bar) fill the
+   interior; a hard-coded 7 here is what broke when SYSTEMS STATUS shrank from
+   24 interior columns to the measured 18. */
+#define SYS_PITCH  ((panels[P_SYSTEMS].w - 2) / 2)
+#define SYS_BAR    (SYS_PITCH - 4)
+
 static int failures;
 
 static void check(int cond, const char *what) {
@@ -83,6 +90,14 @@ static void test_panels_disjoint(void) {
     int clash = 0;
 
     memset(owner, 0xFF, sizeof owner);
+
+    /* The message region is not in panels[], so claim it first. Without this
+       a panel could grow into it and nothing here would notice -- the region
+       stopped being a panel when COMMUNICATIONS and DAMAGE REPORT turned out
+       to be one stack of boxes rather than two frames. */
+    for (y = MSG_Y; y < MSG_Y + MSG_H; y++)
+        for (x = MSG_X; x < MSG_X + MSG_W; x++) owner[y][x] = 0xF0;
+
     for (i = 0; i < PANEL_COUNT; i++) {
         const Panel *p = &panels[i];
         check(p->x + p->w <= VDC_COLS, "panel fits horizontally");
@@ -93,7 +108,7 @@ static void test_panels_disjoint(void) {
                 owner[y][x] = i;
             }
     }
-    check(clash == 0, "no two panel interiors overlap");
+    check(clash == 0, "no panel overlaps another, or the message region");
 }
 
 /* The panel has to be tall enough for what it draws. Six interior rows and
@@ -102,7 +117,8 @@ static void test_panels_disjoint(void) {
 static void test_panel_holds_twelve(void) {
     const Panel *p = &panels[P_SYSTEMS];
     check(p->h - 2 >= 6, "SYSTEMS STATUS has six interior rows");
-    check(p->w - 2 >= 24, "SYSTEMS STATUS has room for two 11-wide columns");
+    check(p->w - 2 >= 14, "SYSTEMS STATUS has room for two labelled bars");
+    check((p->w - 2) % 2 == 0, "its interior splits evenly into two columns");
 }
 
 static void set_all(unsigned char pct) {
@@ -149,7 +165,7 @@ static void test_placement(void) {
     ui_draw_systems();
 
     for (i = 0; i < SYS_COUNT; i++) {
-        x = (unsigned char)(p->x + 1 + (i / 6) * 13);
+        x = (unsigned char)(p->x + 1 + (i / 6) * SYS_PITCH);
         y = (unsigned char)(p->y + 1 + (i % 6));
         for (k = 0; k < 3; k++) buf[k] = (char)cell[y][x + k];
         buf[3] = '\0';
@@ -211,30 +227,37 @@ static void test_bar_glyph(void) {
    at all keeps at least one cell -- an empty bar has to mean destroyed. */
 static unsigned char bar_len(unsigned char sys) {
     const Panel *p = &panels[P_SYSTEMS];
-    unsigned char x = (unsigned char)(p->x + 1 + (sys / 6) * 13 + 4);
+    unsigned char x = (unsigned char)(p->x + 1 + (sys / 6) * SYS_PITCH + 4);
     unsigned char y = (unsigned char)(p->y + 1 + (sys % 6));
     unsigned char n = 0, k;
-    for (k = 0; k < 7; k++)
+    for (k = 0; k < SYS_BAR; k++)
         if (attr[y][x + k] != EGA_TO_VDC(EGA_DKGRAY)) n++;
     return n;
 }
 
 static void test_bar_length(void) {
-    static const struct { unsigned char pct, cells; } t[] = {
-        {   0, 0 }, {   1, 1 }, {   7, 1 }, {   8, 1 },
-        {  14, 1 }, {  40, 3 }, {  50, 4 }, {  70, 5 },
-        {  90, 6 }, {  93, 7 }, { 100, 7 },
-    };
-    unsigned char i;
-    char msg[64];
+    static const unsigned char pct[] = { 0, 1, 7, 8, 14, 40, 50, 70, 90, 93, 100 };
+    unsigned char i, want;
+    char msg[72];
 
-    for (i = 0; i < sizeof t / sizeof t[0]; i++) {
-        set_all(t[i].pct);
+    for (i = 0; i < sizeof pct / sizeof pct[0]; i++) {
+        want = (unsigned char)((pct[i] * SYS_BAR + 50) / 100);
+        if (want == 0 && pct[i] != 0) want = 1;   /* alive is never empty */
+        if (want > SYS_BAR) want = SYS_BAR;
+        set_all(pct[i]);
         screen_reset();
         ui_draw_systems();
-        sprintf(msg, "%u%% draws %u of 7 cells", t[i].pct, t[i].cells);
-        check(bar_len(0) == t[i].cells, msg);
+        sprintf(msg, "%u%% draws %u of %u cells", pct[i], want, SYS_BAR);
+        check(bar_len(0) == want, msg);
     }
+
+    /* The rounding is to nearest, so the midpoint of a cell must land on the
+       higher count -- checked explicitly because "close enough" would pass
+       every case above by accident. */
+    set_all((unsigned char)(100 / SYS_BAR / 2 + 1));
+    screen_reset();
+    ui_draw_systems();
+    check(bar_len(0) == 1, "half a cell rounds up to one, not down to none");
 }
 
 /* The three colours that were read off the original by poking its repair
@@ -265,7 +288,7 @@ static void test_independent(void) {
 
     for (i = 0; i < SYS_COUNT; i++) {
         unsigned char pct = (unsigned char)(i * 9);
-        unsigned char want = (unsigned char)((pct * 7 + 50) / 100);
+        unsigned char want = (unsigned char)((pct * SYS_BAR + 50) / 100);
         char msg[64];
         if (want == 0 && pct != 0) want = 1;
         sprintf(msg, "system %u at %u%% draws %u cells", i, pct, want);
@@ -364,6 +387,140 @@ static void test_heat_colours(void) {
     }
 }
 
+/* ------------------------------------------------------------ messages */
+
+/* Four boxes of three rows fill the region exactly, so an off-by-one in the
+   stacking writes onto the row below the console. */
+static void test_messages_stay_inside(void) {
+    unsigned char x, y;
+    int escaped = 0;
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("COMMUNICATIONS: ", "STARBASE 6-6 UNDER ATTACK");
+    ui_message("DAMAGE: ", "ENERGYCONVERTER AT 47%");
+    ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
+    ui_message("DAMAGE: ", "87 UNIT HIT FROM 4,6");
+
+    for (y = 0; y < VDC_ROWS; y++)
+        for (x = 0; x < VDC_COLS; x++) {
+            if (cell[y][x] == SENTINEL) continue;
+            if (x >= MSG_X && x < MSG_X + MSG_W &&
+                y >= MSG_Y && y < MSG_Y + MSG_H) continue;
+            escaped++;
+        }
+
+    check(off_screen == 0, "messages: no write leaves the 80x25 grid");
+    check(escaped == 0,    "messages: no write leaves the message region");
+}
+
+/* Departments are interleaved in one stack, which is the whole point of the
+   correction: a damage report sits between two other messages rather than
+   being routed to a panel of its own. */
+static void test_message_stack(void) {
+    unsigned char i;
+    char msg[64];
+    static const unsigned char want[4] = { 0, 1, 2, 1 };  /* index into cols[] */
+    unsigned char cols[3];
+
+    cols[0] = EGA_TO_VDC(EGA_YELLOW);   /* COMMUNICATIONS */
+    cols[1] = EGA_TO_VDC(EGA_BROWN);    /* DAMAGE         */
+    cols[2] = EGA_TO_VDC(EGA_LTGREEN);  /* everything else, unmeasured    */
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("COMMUNICATIONS: ", "ONE");
+    ui_message("DAMAGE: ", "TWO");
+    ui_message("HELM: ", "THREE");
+    ui_message("DAMAGE: ", "FOUR");
+
+    for (i = 0; i < 4; i++) {
+        unsigned char y = (unsigned char)(MSG_Y + i * 3);
+        sprintf(msg, "box %u has its department's border colour", i);
+        check(attr[y][MSG_X] == cols[want[i]], msg);
+    }
+
+    /* COMPUTER must not be mistaken for COMMUNICATIONS -- both start with C,
+       and matching on one letter would colour every computer message yellow. */
+    screen_reset();
+    ui_clear_messages();
+    ui_message("COMPUTER: ", "M)OVE W)ARP");
+    check(attr[MSG_Y][MSG_X] == cols[2],
+          "COMPUTER is not mistaken for COMMUNICATIONS");
+}
+
+/* The stardate stamp sits in the top border, and it is the date the message
+   was made, not the date it is drawn -- so an older box keeps its own. */
+static void test_message_stamps(void) {
+    unsigned char x = (unsigned char)(MSG_X + MSG_W - 8);
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("HELM: ", "FIRST");
+    ship.stardate = 35162;
+    ui_message("HELM: ", "SECOND");
+
+    check(cell[MSG_Y][x] == '3' - '0' + 48, "stamp starts with the stardate");
+    /* 3514.9 then 3516.2 -- compare the digit that differs. */
+    check(cell[MSG_Y][x + 3] == 52 && cell[MSG_Y][x + 5] == 57,
+          "the first box keeps 3514.9");
+    check(cell[MSG_Y + 3][x + 3] == 54 && cell[MSG_Y + 3][x + 5] == 50,
+          "the second box carries 3516.2, not the first box's date");
+}
+
+/* A fifth message scrolls the oldest off the top rather than growing past the
+   region, and the surviving boxes keep their own dates. */
+static void test_message_scroll(void) {
+    unsigned char x = (unsigned char)(MSG_X + MSG_W - 8);
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("HELM: ", "ONE");
+    ship.stardate = 35150;
+    ui_message("HELM: ", "TWO");
+    ship.stardate = 35151;
+    ui_message("HELM: ", "THREE");
+    ship.stardate = 35152;
+    ui_message("HELM: ", "FOUR");
+    ship.stardate = 35153;
+    ui_message("HELM: ", "FIVE");
+
+    /* Top box should now be the one stamped 3515.0, not 3514.9. */
+    check(cell[MSG_Y][x + 3] == 53 && cell[MSG_Y][x + 5] == 48,
+          "the oldest box scrolls off and 3515.0 is now on top");
+    check(cell[MSG_Y + 9][x + 5] == 51,
+          "the newest box is at the bottom, stamped 3515.3");
+}
+
+/* The badge fills its panel and nothing more. It is the one panel whose
+   contents are drawn by position rather than by a loop, so an edit to the
+   layout is exactly what would push the crest through a border. */
+static void test_badge_stays_inside(void) {
+    const Panel *p = &panels[P_BADGE];
+    unsigned char x, y;
+    int escaped = 0, painted = 0;
+
+    screen_reset();
+    ui_draw_badge();
+
+    for (y = 0; y < VDC_ROWS; y++)
+        for (x = 0; x < VDC_COLS; x++) {
+            if (cell[y][x] == SENTINEL) continue;
+            painted++;
+            if (x > p->x && x < p->x + p->w - 1 &&
+                y > p->y && y < p->y + p->h - 1) continue;
+            escaped++;
+        }
+
+    check(off_screen == 0, "badge: no write leaves the 80x25 grid");
+    check(escaped == 0,    "badge: no write leaves the panel interior");
+    check(painted > 0,     "badge: something is actually drawn");
+}
+
 int main(void) {
     trek_new_game(3, 12345);
 
@@ -376,9 +533,15 @@ int main(void) {
     test_colours();
     test_independent();
 
+    test_badge_stays_inside();
     test_lasers_stay_inside();
     test_laser_gauges();
     test_heat_colours();
+
+    test_messages_stay_inside();
+    test_message_stack();
+    test_message_stamps();
+    test_message_scroll();
 
     if (failures) { printf("%d failure(s)\n", failures); return 1; }
     printf("console panels: all checks passed\n");
