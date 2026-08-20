@@ -1018,3 +1018,52 @@ combat, movement, repair, events, docking and scoring. Of what remains open:
 The pattern: the source is largely mined for **mechanics**. What remains
 divides into Anderson's own inventions and platform work, and it helps with
 neither.
+
+## 16. Isolate why the KERNAL keyboard is dead in this port (added 2026-08-19)
+
+`c128/src/input.c` scans the CIA1 matrix directly because `cgetc()` blocks
+forever here -- observed, and real. But the *cause* was never isolated. The
+comment reaches for `commodore-uno`'s C128 port, which hit the same wall and
+settled on the same answer.
+
+**Uno's cause cannot be ours.** Its `test_kbd.c` and `test_kbd2.c` are a
+controlled pair: identical programs, the only difference being a switch to VIC
+bank 2 (`CIA2_PRA` bank select plus `VIC_MEMCTL`). That is what killed
+`kbhit()`/`cgetc()` there. This port never touches the VIC at all -- it drives
+the VDC, and `vdc_init()` does three things: write VDC registers, set 2MHz,
+clear the screen. It does not disable interrupts and it does not switch banks.
+
+So we adopted a fix by analogy and never found our own reason.
+
+### Why it is worth an hour
+
+If the KERNAL keyboard can be made to work in this configuration, **VICE's own
+KEYBOARD_FEED works**, and the whole `kb_inject` apparatus goes away -- the
+`#ifdef`, the separate debug binary, the `#pragma optimize`, and the failure
+nobody has explained (see the header of `tools/vice_mon.py`). The C128 leg
+would get the same automated loop Atari and Amiga are going to have, without
+a debug affordance in the source at all.
+
+And if the answer turns out to be "2MHz mode breaks it", that is worth knowing
+on its own account. It would be a constraint on the whole port, not just on
+testing.
+
+### The experiment
+
+Uno's two files are the right template: a minimal program, one variable
+changed. Build three tiny PRGs, each a `for(;;) if (kbhit()) show(cgetc());`
+loop drawing to the VDC or the 40-column screen, and find the step that kills
+it:
+
+1. Bare `cgetc()` loop, nothing else. Establishes the baseline works.
+2. Add `C128_CLKRATE |= 0x01` (2MHz). Prime suspect -- though note the
+   KERNAL's IRQ is CIA1-timer-driven and the CIA runs at 1MHz regardless, so
+   the obvious theory is not obviously right.
+3. Add the `vdc_init()` register writes.
+
+Then whatever remains: cc65's C128 startup, which nobody has looked at.
+
+**This is now cheap and needs no human.** `tools/vice_mon.py` screenshots the
+VDC and reads memory, so it is three builds and three screenshots. That is the
+difference from when the wall was first hit -- back then it needed someone to
+watch the emulator and report back.
