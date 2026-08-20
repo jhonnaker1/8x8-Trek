@@ -413,7 +413,9 @@ checklist of *which situations need a message*, not as text to copy.
 
 ## Open questions / next steps
 
-1. **Close the encoding-mismatch class with `make verify`.** Three separate bugs
+1. ~~**Close the encoding-mismatch class with `make verify`.**~~ DONE --
+   `c128/Makefile` has a `verify` target and `tools/verify_prg.py` checks the
+   key table is ASCII in the linked PRG. Three separate bugs
    this session were the same defect wearing different hats: blank panel titles,
    a PETSCII key table, and the dispatch constants that made `q` a no-op.
    **Neither test suite can see any of them**, because native `cc` does not
@@ -441,8 +443,11 @@ checklist of *which situations need a message*, not as text to copy.
 3. **Seed the RNG from something varying.** `GAME_SEED` is fixed, deliberately —
    it makes a side-by-side against DOSBox-X repeatable — but it means every run
    is the same galaxy. Wire it to timing once there is a title screen.
-4. **Capture the original at full 640×350** in DOSBox-X and correct the
-   provisional panel table in `c128/src/layout.c`. The only layout source so far
+4. ~~**Capture the original at full 640×350**~~ DONE 2026-08-19 via
+   dosbox-automation; the measured table is in `layout.c` and MEASURED.md.
+   Original text follows.
+
+   Correct the provisional panel table in `c128/src/layout.c`. The only layout source so far
    is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for
    exact column boundaries. Everything reads that one table, so it's a
    single-site edit. The same capture settles which glyphs the original uses.
@@ -458,7 +463,9 @@ checklist of *which situations need a message*, not as text to copy.
    EGA Trek's panels want CP437-style glyphs. `commodore-uno/c128/src/vdc.c` has
    the upload path, including the VDC's 16-byte-per-glyph slot padding, and
    `tools/gen_charset.py` the generator precedent.
-7. **Game core, next pieces.** Galaxy state, the distance table and the message
+7. ~~**Game core, next pieces.**~~ Largely DONE: systems and repair, lasers,
+   torpedoes, enemy fire and movement, docking, scoring, and a scheduled
+   event queue all exist. Original text follows. Galaxy state, the distance table and the message
    log now exist. Still missing, roughly in dependency order: the 12 ship systems
    with percentage repair, combat (lasers and torpedoes), enemy AI and return
    fire, docking and resupply, then win/lose and scoring. `combat-model.md` has
@@ -731,3 +738,98 @@ The property that actually separates them is monotonicity in the mean.
 Reseeding before each draw fixes the table entry, so the only thing varying is
 the mean, and a larger mean must never give a smaller draw. That catches
 wrapping and passes the honest short tail.
+
+## Front end and sound — not started (added 2026-08-19)
+
+Everything so far is the console. The original wraps it in a front end the
+port has none of, and makes noise the port does not. Captured from the running
+original so these are a specification rather than a reminder; re-capture with
+`tools/drive_original.py shot:name` at each step.
+
+### 9. Title screen
+
+`Revision 3.0` small, top left. "EGA Trek" in a large outlined serif, "The
+Mongol Invasion" beneath it. A line-drawn starship across the middle left. Two
+panels along the bottom, both bordered in the console's style:
+
+- **left** — the U.S.S. Lexington crest, *identical to the badge panel on the
+  console*: ship name, RCB-92, the blue starred disc, "Dept. of Space". Ours
+  already draws this, so the title screen reuses `ui_draw_badge()` rather than
+  duplicating it.
+- **right** — the shareware notice: registration fee, Nels Anderson's address
+  and BBS number, "Copyright © 1992 by Nels Anderson".
+
+The attribution panel is not optional decoration. This project's README credits
+Anderson; the title screen is where a player sees it, and it should say the
+same thing the original's does.
+
+Any key advances.
+
+### 10. Setup screen
+
+One screen, heading "U.S.S. Lexington / RCB-92" in a script face, with prompts
+appearing in sequence down the left and earlier answers staying visible:
+
+    Welcome aboard Captain!
+
+    Will you require a briefing <Y/N>?          -> item 11
+    Restore a saved game <Y/N>?                 -> OUT OF SCOPE, see below
+    Please enter your name: KIRK
+    For verification, enter your command level (1-5): 3
+    Captain, please enter self-destruct password: ****
+
+Notes worth having before building it:
+
+- The **command level** already drives `trek_new_game(level, seed)` and the
+  enemy-count band, so this prompt is wiring, not new mechanics.
+- The **self-destruct password** is the SELF command's confirmation. There is
+  no self-destruct in the core yet, so the prompt can be collected and stored
+  before the command exists.
+- The **name** is for the hall of fame in `TREK.SCR`, which is also not built.
+- This is the natural home for **seeding the RNG from something varying**,
+  which is open item 3 and currently blocked on there being a title screen at
+  all: time the player's keystrokes through these prompts.
+
+**Save and restore are deliberately out of scope for now.** The "Restore a
+saved game" prompt still needs to appear and take N, because the sequence
+reads wrong without it, but nothing behind it.
+
+### 11. Briefing pages
+
+Shown only if the player answers Y. Paged, with "(Hit "Enter" for next page or
+"Q" to quit briefing)" and Q returning to the setup sequence at the restore
+prompt. At least eleven pages; the section headings observed, in order:
+
+    (intro -- "Good morning, Captain...")
+    INTELLIGENCE REPORT
+    RESEARCH/BATTLE CRUISER
+    NAVIGATION SECTION
+    ENGINEERING SECTION
+    WEAPONS SECTION
+    DEFENSE
+    SCANNERS
+    SCANNER EXAMPLES
+    COMMUNICATIONS
+    ... (capture ran out at ten; there are more)
+
+Two things this costs. The text is **long** -- eleven-odd pages of three or
+four paragraphs each -- which on a 6502 is a real chunk of the binary and
+probably wants compressing or paging off disk. And it is **Anderson's prose**,
+which is copyrightable: the same rule already recorded for the message
+catalogue applies, so these are a specification of *what each page covers*,
+not text to copy.
+
+### 12. Sound
+
+The original uses the PC speaker. The C128 has a SID, the Amiga four channels
+of sampled audio, and the Atari POKEY, so this is the one area where every
+port can beat the original outright rather than approximate it.
+
+Nothing is captured yet -- the emulator driver has no audio path, so working
+out what the original plays and when is its own task. Likely: firing, hits,
+red alert, docking, destruction, and the death-pod arrival.
+
+Design constraint from the start: sound belongs in the platform layer, not the
+core. `core/` must not gain an audio call. The event list the core already
+returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
+seam -- each platform decides what noise an event makes.
