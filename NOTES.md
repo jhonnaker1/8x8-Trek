@@ -1184,3 +1184,21 @@ Three different things were seen in it: the enemy silhouette with class name
 100%, and a power-distribution readout (PMAX/PAVL/PPCT, "POWER DISTRIB 509").
 It is a multi-page display, which is more than the single enemy panel we
 built.
+
+### The laser heat gauge, and a lesson about instruments
+
+The LASERS panel's Temp bar, photographed immediately after a single volley
+of exactly 400 units, filled 26 pixels of a 121-pixel track -- about 21% of a
+scale labelled 0 / 1000 / 1500. Efficiency stayed at exactly 100%, proved not
+by the gauge but by the shot itself: the damage matched `energy * (1 - d/12)`
+to the unit, which it only does at full efficiency.
+
+So a 400-unit volley does not degrade the lasers, which is consistent with
+1500 being the overheat threshold and nothing happening below it.
+
+The gauge scale itself did NOT come out of this, and the reason is worth
+recording: the tick labels are character cells, so their positions quantise
+to 8 pixels and three different alignment assumptions give scale maxima from
+1500 to 2000. Measuring a number by photographing the bar that displays it is
+the wrong instrument when the number is sitting in memory. Next session,
+find laser heat in the ship record and read it.

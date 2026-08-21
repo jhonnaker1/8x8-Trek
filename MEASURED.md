@@ -1517,3 +1517,103 @@ the ship had been destroyed on the first of them and the game had restarted
 into its setup screen, so every reading after that was stale memory at
 addresses the new process had not yet touched. Nothing in the numbers looked
 wrong.
+
+## Open item 7, the enemy fire law: shape found, our constants refuted (2026-08-20)
+
+The motion session recorded damage messages it was not looking for, and they
+turn out to be the best enemy-fire data we have. Item 7 previously said "no
+enemy-fire constant should be taken from this data" because the firer's class
+was not recorded. This time the enemy table gives the firer's **exact
+remaining hit points**, which is better than its class, and our own sector is
+a memory read, so range is exact too.
+
+Nine hits, from a Commander at 3-8 and a Battleship at 4-7:
+
+| shields | our sector | firer hp | range | damage |
+|---|---|---|---|---|
+| up   | 8,4 | 695 | 6.403 | 272 |
+| up   | 8,4 | 355 | 5.000 | 143 |
+| up   | 8,5 | 623 | 5.831 | 266 |
+| up   | 8,5 | 283 | 4.472 | 117 |
+| down | 8,6 | 623 | 5.385 | 313 |
+| down | 8,6 | 283 | 4.123 | 182 |
+| down | 7,6 | 540 | 4.472 | 334 |
+| down | 7,6 | 200 | 3.162 | 154 |
+| down | 7,6 | 200 | 3.162 | 147 |
+
+The first four pairings are arithmetically certain, not inferred from message
+order: `2500 - 272 - 143` and `2500 - 266 - 117` reproduce the shield readings
+2085.074 and 2117 exactly. So the printed figure is the whole amount that
+leaves the shield pool.
+
+### The shape
+
+Damage is proportional to the firer's **remaining** hit points -- not to its
+class -- and falls off linearly with range. Fitting `dmg = k * hp * (1 - d/L)`
+over all nine points, the spread of k is minimised near **L = 10** (cv 0.13);
+dropping the range term entirely doubles the spread to 0.26, so the falloff
+is real. Exponential falloff fits no better than linear (cv 0.13 at a scale
+length of 6), which the nine points cannot separate.
+
+The five shields-down readings alone are startlingly tight:
+
+    dmg = 1.108 * hp * (1 - d/9.86)
+
+reproduces all five to about 1%. Rounding that to `hp * (1 - d/10)` with a
+coefficient near 1.1 predicts the very first observation -- 695 hit points at
+range 6.403 -- as 275 against the 272 printed.
+
+### What it says about our core
+
+`enemy_fire_energy()` is wrong in two ways.
+
+**It fires far too weakly.** Our Commander at full strength fires 300, which
+at range 6.403 lands `300 * (1 - 6.403/12) = 140`. The original delivered
+**272** in that exact situation. Our enemies hit at roughly half strength,
+which is a large part of why the port's combat feels harmless.
+
+**The per-class table is unnecessary.** Our model scales a per-class base by
+`hp/full`, and those bases imply a different coefficient for every class
+(Commander 0.43, Battleship 0.56, Supply 0.83). The data wants one coefficient
+for everybody, applied to current hit points -- which already carry the class
+difference, since that is what hit points are. `ENEMY_FIRE_BATTLESHIP`,
+`_COMMAND`, `_SCOUT` and `_SUPPLY` would all go.
+
+### Not yet changed, and why
+
+Nine observations with two variables moving together: every shields-down
+reading is also at closer range than every shields-up one, so "shields down"
+and "close" cannot be separated here, and the shields-up group's coefficient
+(0.92) sits below the shields-down group's (1.10). That gap may be a real
+effect, or it may be the range confound.
+
+What settles it is a controlled run, which this rig can now do: hold our
+sector fixed, do not fire (so enemy hit points stay put), and take many turns
+at one range with shields up, then the same range with shields down. An
+afternoon's worth of turns would give the coefficient, the falloff length,
+and the size of the random component separately.
+
+## Two smaller items the same session moved
+
+### Open item 15, hit points per class: effectively settled
+
+A second galaxy, generated from a cold start days after the first, produced a
+Commander at **695** and a Battleship at **355** -- the same figures to the
+unit. Across two independent games that is 695 twice and 355 four times, with
+no variation. Hit points are fixed per class, not rolled per ship.
+
+The unexplained 255 reading from the earlier session is still unexplained, but
+"already damaged before we arrived" is now much the likelier reading of it,
+since nothing else has ever varied.
+
+### Open item 1, the enemy count spread: base confirmed, range widened
+
+Two fresh level-3 games gave **34** and **38** Mongols. Every previous
+level-3 reading was 40, 42, 42, 42 -- all crowded at the top of the fitted
+0..12 offset, which was mildly suspicious. Offsets of 4 and 8 fill in the
+middle and are the first evidence the spread is genuinely wide rather than
+the base being 40.
+
+Level 3 now spans 34..42 across six games, all inside the `level*10 +
+rand(0..12)` we fitted. The base of ten per level survives a test it could
+have failed; the upper limit of the spread is still only bounded from below.
