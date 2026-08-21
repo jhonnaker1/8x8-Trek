@@ -379,8 +379,11 @@ void trek_schedule(uint8_t kind, uint16_t offset_tenths) {
     if (kind >= SCHED_COUNT) return;
     /* Saturate rather than wrap. A schedule that wrapped would land in the
        past and fire immediately, which is the opposite of what was asked. */
-    if (offset_tenths >= (uint16_t)(SCHED_NEVER - ship.stardate)) when = SCHED_NEVER - 1;
-    else when = (uint16_t)(ship.stardate + offset_tenths);
+    {
+        uint16_t headroom = (uint16_t)(SCHED_NEVER - ship.stardate);
+        if (offset_tenths >= headroom) when = (uint16_t)(SCHED_NEVER - 1);
+        else when = (uint16_t)(ship.stardate + offset_tenths);
+    }
     sched[kind] = when;
 }
 
@@ -427,7 +430,10 @@ uint16_t trek_expran(uint16_t mean_tenths) {
 
     whole = (uint16_t)(hi * t);
     frac  = (uint16_t)(((uint16_t)(mean_tenths & 31) * t) >> 5);
-    if (whole > (uint16_t)(65535U - frac)) return 65535U;
+    {
+        uint16_t room = (uint16_t)(65535U - frac);
+        if (whole > room) return 65535U;
+    }
     return (uint16_t)(whole + frac);
 }
 
@@ -804,8 +810,11 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
        and this point is past every refusal, so a rejected shot adds none.
        Saturates rather than wrapping: the gauge is already off its scale long
        before 65535 and a wrap would read as cold. */
-    if (ship.laser_heat > (uint16_t)(65535U - energy)) ship.laser_heat = 65535U;
-    else ship.laser_heat = (uint16_t)(ship.laser_heat + energy);
+    {
+        uint16_t room = (uint16_t)(65535U - energy);
+        if (ship.laser_heat > room) ship.laser_heat = 65535U;
+        else ship.laser_heat = (uint16_t)(ship.laser_heat + energy);
+    }
 
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
     dealt = trek_laser_damage(energy, ship.laser_eff, d);

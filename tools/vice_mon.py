@@ -18,6 +18,7 @@ or just `make monitor` in c128/. Then:
     python3 tools/vice_mon.py mem:1c01,16
     python3 tools/vice_mon.py key:M shot:after
     python3 tools/vice_mon.py sym:_ship
+    python3 tools/vice_mon.py live          # is the machine actually running?
 
 THE ONE TRAP, AND IT COST A WHOLE SESSION
 
@@ -86,9 +87,21 @@ PALETTES = (
 
 
 class Mon(object):
-    def __init__(self, host=HOST, port=PORT, timeout=15):
+    def __init__(self, host=HOST, port=PORT, timeout=15, check=True):
         self.s = socket.create_connection((host, port), timeout=timeout)
         self.rid = 0
+        # Checked on connect, deliberately. Saying "remember to check" in a
+        # comment is not carrying the lesson forward; every wrong conclusion
+        # of 2026-08-19 would have been caught by this in the first minute.
+        if check and not self.is_live():
+            sys.stderr.write(
+                "vice_mon: WARNING -- the emulated machine is NOT running.\n"
+                "  The jiffy clock at $A0 did not advance between two reads.\n"
+                "  Everything read while stopped is a frozen snapshot, and\n"
+                "  injected input is never processed. Usually this means a\n"
+                "  monitor command left it stopped: call Mon.resume().\n"
+                "  (A paused emulator, or a program that has taken over the\n"
+                "  KERNAL IRQ, will also trip this -- see is_live().)\n")
 
     def _recv(self, n):
         buf = b""
@@ -102,10 +115,11 @@ class Mon(object):
     def cmd(self, ctype, body=b""):
         """Send one command and return (response_type, error, payload).
 
-        VICE also pushes unsolicited frames -- notably STOPPED and RESUMED
-        around anything that pauses the CPU -- and they arrive interleaved
-        with replies. Matching on the request id and discarding the rest is
-        what keeps this from desynchronising.
+        Raw: does NOT resume the machine afterwards. Prefer mem_get, mem_set
+        and screenshot, which do. VICE also pushes unsolicited frames --
+        notably STOPPED and RESUMED -- interleaved with replies, so matching
+        on the request id and discarding the rest is what keeps this from
+        desynchronising.
         """
         self.rid += 1
         want = self.rid
@@ -119,6 +133,29 @@ class Mon(object):
             payload = self._recv(blen) if blen else b""
             if rid == want:
                 return rtype, err, payload
+
+    def is_live(self, gap=0.2, addr=0xA0):
+        """True if the emulated CPU is able to execute.
+
+        Reads the KERNAL jiffy clock at $A0 -- incremented 60 times a second
+        by the IRQ -- twice, and reports whether it moved.
+
+        NOTE WHAT THIS DOES AND DOES NOT CATCH. mem_get resumes the machine,
+        so this cannot detect "a previous command left it stopped": it would
+        restart it and then report healthy. That case is designed out
+        instead -- every operation in this class resumes -- so it cannot
+        arise through this API. What it DOES catch is a machine that cannot
+        run at all: paused in the UI, wedged, or a raw self.cmd() call in
+        someone else's script that bypassed resume() and then hung.
+
+        Caveat: it measures "the KERNAL IRQ is running", not strictly "the
+        CPU is running". A program that took over the IRQ vector would read
+        as not-live; nothing in this project does. Pass `addr` to watch a
+        location such a program changes itself instead.
+        """
+        a = self.mem_get(addr, 3)
+        time.sleep(gap)
+        return self.mem_get(addr, 3) != a
 
     def resume(self):
         """Let the emulator run again.
@@ -293,6 +330,9 @@ def main():
         elif arg.startswith("sym:"):
             addr, path = symbol(arg[4:])
             print("%s = $%04X  (%s)" % (arg[4:], addr, path))
+        elif arg == "live":
+            print("live:", "yes -- machine is running"
+                           if mon.is_live() else "NO -- machine is stopped")
         elif arg == "ping":
             print("ping:", "ok" if mon.ping() else "FAILED")
         else:
