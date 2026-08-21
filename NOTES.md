@@ -1019,7 +1019,7 @@ The pattern: the source is largely mined for **mechanics**. What remains
 divides into Anderson's own inventions and platform work, and it helps with
 neither.
 
-## 16. Isolate why the KERNAL keyboard is dead in this port (added 2026-08-19)
+## 16. ~~Isolate why the KERNAL keyboard is dead in this port~~ RUN 2026-08-19
 
 `c128/src/input.c` scans the CIA1 matrix directly because `cgetc()` blocks
 forever here -- observed, and real. But the *cause* was never isolated. The
@@ -1067,3 +1067,53 @@ Then whatever remains: cc65's C128 startup, which nobody has looked at.
 VDC and reads memory, so it is three builds and three screenshots. That is the
 difference from when the wall was first hit -- back then it needed someone to
 watch the emulator and report back.
+
+
+### Result of item 16: the hypothesis was wrong, and so was the instrument
+
+**The bisect found nothing.** Three test programs -- a bare `kbhit()`/`cgetc()`
+loop, the same plus 2MHz, the same plus 2MHz and `vdc_init()`'s VDC register
+writes -- and the KERNAL keyboard works in **all three**. Neither suspect is
+guilty. Whatever kills `cgetc()` in the real port is somewhere else, and is
+still unexplained.
+
+The tests store the key in a global and are read out through the binary
+monitor rather than printing anything, which is what makes them work at 2MHz
+where the VIC picture is blanked. They are in the session scratchpad, not the
+repo; the pattern is three files sharing a `RUN_LOOP` macro and a second
+module holding the globals -- separate module because cc65 lists a symbol in
+the link map only if another module imports it.
+
+**But the experiment found something much bigger by accident.** The baseline
+test reported the keyboard dead while a leftover `$41` in `last_key` proved a
+key HAD arrived. Chasing that contradiction found the real fault:
+
+**VICE's binary monitor stops the machine on its first command and leaves it
+stopped.** Reads keep succeeding and return a frozen snapshot; the CPU never
+advances; anything injected is never processed. `CMD_EXIT` resumes it.
+
+That single fact invalidates a run of conclusions reached earlier the same
+day, all of them recorded here and in commit messages as if established:
+
+- "VICE's KEYBOARD_FEED does not reach this port" -- it does, once resumed.
+- "the machine is hung, PC pinned at one address" -- it was stopped, by me.
+- "kb_inject is never consumed" -- it is, in **0.02 seconds**.
+
+`tools/vice_mon.py` now resumes after every operation, and the C128 leg has a
+full automated loop: type a command, screenshot the result, read memory.
+Verified end to end by typing `W30` and seeing "ENGINEERING: WARP SPEED SET"
+appear in the message stack.
+
+**The lesson is the one this project keeps relearning.** A silent instrument
+that returns plausible values is worse than one that fails, and every wrong
+conclusion above was stated with more confidence than the evidence carried.
+The jiffy clock at $A0 is the check: if it does not advance between reads, the
+machine is stopped and nothing else read that session means anything.
+
+### What this leaves open
+
+`cgetc()` blocking in the real port is still unexplained, but it now matters
+much less -- `kb_inject` works, so the automated loop does not depend on
+fixing it. If it is revisited, the remaining candidates are the port's own
+size and memory layout, or cc65's C128 startup, neither of which the bisect
+touched.

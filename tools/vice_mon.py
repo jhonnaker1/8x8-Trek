@@ -19,44 +19,35 @@ or just `make monitor` in c128/. Then:
     python3 tools/vice_mon.py key:M shot:after
     python3 tools/vice_mon.py sym:_ship
 
-WHAT WORKS AND WHAT DOES NOT
+THE ONE TRAP, AND IT COST A WHOLE SESSION
 
-  * Screenshots of the VDC's 80-column screen. This is the whole point: the
-    C128 port can now be checked without asking a human to look at it.
-  * Memory read and write, so a game state can be set up directly. For this
-    port that is more useful than typing commands anyway -- damage a specific
-    system and screenshot the SYSTEMS STATUS panel, rather than playing to
-    that state.
-  * Scripted keypresses, via `key:` -- NOT WORKING YET. See below.
-    VICE's own KEYBOARD_FEED does not reach this port -- it fills the KERNAL's
-    keyboard buffer while c128/src/input.c scans the CIA1 matrix directly, so
-    fed keys never arrive (verified: an "M" fed that way leaves the command
-    line empty). The way round it should be kb_inject, a byte the port tests
-    while it waits, compiled in only under -DTREK_DEBUG_INPUT.
+The binary monitor STOPS the emulated machine on its first command and leaves
+it stopped. Nothing tells you: reads keep succeeding, they just all return the
+same frozen snapshot, the CPU never advances, and anything you inject is never
+processed. It looks exactly like a program ignoring you, and it produced a
+string of wrong conclusions on 2026-08-19 -- "input injection does not reach
+this port", "the machine is hung", "the port never consumes the byte" -- all
+of them artefacts of a stopped machine.
 
-    It does not work, and this is an honest account of how far it got rather
-    than a promise. What is established:
+Mon.resume() sends the EXIT command that lets it run again, and mem_get,
+mem_set and screenshot all call it. The proof it is real: the KERNAL jiffy
+clock at $A0, which the IRQ bumps 60 times a second, does not move between
+plain reads and advances 25 ticks per 0.4s once resume() is called between
+them.
 
-      - The check is compiled in and at the right address. The live machine's
-        bytes at _kb_waitkey read `20 e3 74 ad 21 80 d0 03 ...` -- JSR to the
-        prologue, then LDA $8021, which is kb_inject -- and they match the PRG
-        image byte for byte, so the monitor's memory view is the CPU's.
-      - Writes land and persist. A round trip at $0400 works, and a byte
-        poked into kb_inject reads back unchanged.
-      - The port never consumes it. Exactly once, early on, two injected "W"s
-        did appear on the command line; that has never been reproduced.
+WHAT WORKS
 
-    Ruled out: wrong address, memory banking, the optimiser folding the test
-    away (turning -O off for the function changed nothing), and the check
-    being placed after the release-wait loop (moving it to the top of the
-    function changed nothing).
+  * Screenshots of the VDC's 80-column display. The C128 port can be checked
+    without asking a human to look at it.
+  * Memory read and write, so a game state can be set up directly -- damage a
+    system and screenshot SYSTEMS STATUS rather than playing to that state.
+  * Scripted keypresses, via `key:`, against a `make monitor` build.
 
-    NOT ruled out, and where to look next: whether kb_waitkey is entered at
-    all while the port sits at the command prompt. A checkpoint on its entry
-    address would answer that in one run. Do NOT try to infer it from
-    REGISTERS_GET -- the PC it reports while the machine is running is not
-    live, and reading it as though it were led to a wrong conclusion here
-    (a release build that plays perfectly reports the same frozen PC).
+    VICE's own KEYBOARD_FEED fills the KERNAL's keyboard buffer, and
+    c128/src/input.c scans the CIA1 matrix directly, so fed keys do not reach
+    the port. kb_inject is the way round it: a byte the port tests while it
+    waits, compiled in only under -DTREK_DEBUG_INPUT so the release binary has
+    no such affordance. Measured at 0.02s from poke to consumption.
 
 There is an MCP server (github.com/axewater/mcp-vice-emu) wrapping this same
 protocol. It needs Node and a session restart; this needs neither.
@@ -129,6 +120,21 @@ class Mon(object):
             if rid == want:
                 return rtype, err, payload
 
+    def resume(self):
+        """Let the emulator run again.
+
+        THE trap of this protocol, and it cost a whole session before it was
+        found. The binary monitor STOPS the machine on its first command and
+        stays stopped. Nothing says so: reads keep succeeding, they just all
+        return the same frozen snapshot, and the CPU never advances. The
+        symptom looks exactly like a program that is ignoring you.
+
+        Proof it is real: the KERNAL jiffy clock at $A0, which the IRQ bumps
+        60 times a second, does not move between plain reads and advances 25
+        ticks per 0.4s once this is called between them.
+        """
+        self.cmd(CMD_EXIT)
+
     def ping(self):
         return self.cmd(CMD_PING)[1] == 0
 
@@ -137,6 +143,7 @@ class Mon(object):
         body = (bytes([0]) + struct.pack("<HH", start, end)
                 + bytes([0]) + struct.pack("<H", bank))
         rtype, err, p = self.cmd(CMD_MEM_GET, body)
+        self.resume()
         if err:
             raise IOError("mem_get error %d" % err)
         n = struct.unpack("<H", p[0:2])[0]
@@ -147,6 +154,7 @@ class Mon(object):
         body = (bytes([0]) + struct.pack("<HH", start, end)
                 + bytes([0]) + struct.pack("<H", bank) + bytes(data))
         rtype, err, p = self.cmd(CMD_MEM_SET, body)
+        self.resume()
         if err:
             raise IOError("mem_set error %d" % err)
 
@@ -204,6 +212,7 @@ def screenshot(mon, path, use_vicii=0, scale=1):
     from PIL import Image
 
     rtype, err, p = mon.cmd(CMD_DISPLAY_GET, bytes([use_vicii, 0x00]))
+    mon.resume()
     if err:
         raise IOError("display_get error %d" % err)
 
@@ -266,8 +275,6 @@ def main():
             print("poked %s" % addr)
         elif arg.startswith("key:"):
             text = arg[4:]
-            sys.stderr.write("warning: key injection is not working -- see the "
-                             "docstring at the top of this file\n")
             addr, path = symbol("kb_inject")
             if "debug" not in path:
                 sys.exit("kb_inject came from %s, which is a release map. "

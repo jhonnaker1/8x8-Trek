@@ -46,9 +46,10 @@ char kb_waitkey(void);   /* blocks until one key is pressed and released */
  * is the way round it -- tools/vice_mon.py writes it through VICE's binary
  * monitor and kb_waitkey consumes it as though the key had been pressed.
  *
- * volatile is load-bearing. Nothing inside the program ever stores a nonzero
- * value here, so without it the compiler is entitled to decide the test can
- * never fire and fold it away.
+ * volatile because nothing inside the program ever stores a nonzero value
+ * here. (It was once suspected of being insufficient against cc65's -O; that
+ * suspicion was wrong, and the pragma added to work around it has been
+ * removed -- see input.c.)
  *
  * Never in a release build: `make` does not define TREK_DEBUG_INPUT, so this
  * whole path compiles out and the shipping binary has no scripted-input

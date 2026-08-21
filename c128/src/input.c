@@ -86,49 +86,28 @@ static void settle(void) {
 volatile unsigned char kb_inject = 0;
 #endif
 
-#ifdef TREK_DEBUG_INPUT
-/* cc65's -O will happily keep a global in a register across a loop, volatile
-   or not, and that is exactly what went wrong here: kb_inject was read once
-   on entry to kb_waitkey and never re-read, so a key poked in while the port
-   was already blocked was never seen. The compiled LDA was present and the
-   address was right, which is what made it confusing.
-   Turning the optimiser off for this one function is the smallest fix that
-   makes the load happen every time round. Debug builds only. */
-#pragma optimize (push, off)
-#endif
 char kb_waitkey(void) {
     unsigned char i;
-
-#ifdef TREK_DEBUG_INPUT
-    /* BEFORE the release-wait below, not inside the poll loop after it.
-       A scripted key has no physical key to lift, and the wait loop turns
-       out to be where this function actually sits: with the check placed
-       after it, injected keys were never seen on a freshly autostarted
-       emulator. The compiled code was there -- LDA $7FA3 at $4DA9 -- so the
-       port simply never got that far. */
-    if (kb_inject) {
-        char c = (char)kb_inject;
-        kb_inject = 0;
-        return c;
-    }
-#endif
 
     /* Wait out whatever is still held, so one physical press yields exactly
        one character rather than repeating for as long as a finger rests on
        the key. */
-    while (scan() != 0xFF) {
-#ifdef TREK_DEBUG_INPUT
-        if (kb_inject) {
-            char c = (char)kb_inject;
-            kb_inject = 0;
-            return c;
-        }
-#endif
-    }
+    while (scan() != 0xFF) { }
     settle();
 
     for (;;) {
 #ifdef TREK_DEBUG_INPUT
+        /* Scripted input, debug builds only -- see input.h. One check, here
+           in the poll loop, is all that is needed: this is where the port
+           blocks, and a key poked between calls simply waits in the byte
+           until the next entry.
+           An earlier version had three copies of this and a
+           `#pragma optimize (push, off)` around the function, added to defeat
+           a supposed cc65 optimisation that was keeping the global in a
+           register. That diagnosis was wrong. The real fault was outside the
+           port entirely: VICE's binary monitor had stopped the machine, so
+           nothing was executing at all. Removed rather than left in place --
+           code kept for a refuted reason is worse than no comment. */
         if (kb_inject) {
             char c = (char)kb_inject;
             kb_inject = 0;
@@ -142,6 +121,3 @@ char kb_waitkey(void) {
         }
     }
 }
-#ifdef TREK_DEBUG_INPUT
-#pragma optimize (pop)
-#endif
