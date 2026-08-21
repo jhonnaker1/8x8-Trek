@@ -1579,6 +1579,20 @@ for everybody, applied to current hit points -- which already carry the class
 difference, since that is what hit points are. `ENEMY_FIRE_BATTLESHIP`,
 `_COMMAND`, `_SCOUT` and `_SUPPLY` would all go.
 
+### CORRECTED 2026-08-21: the shields split was an artefact
+
+The controlled run below tested exactly the worry stated in this section, and
+the worry was justified. Holding range, hit points, ship and sector fixed and
+toggling only the shields gives **358.4 with shields up and 367.5 with them
+down** -- a 2.5% difference on five firing turns each, which is nothing. The
+0.76 / 0.98 split above is the range confound it was flagged as, plus Vandal
+Death Pods counted as enemy fire. The falloff length of ~10 fitted here is
+also wrong; see the controlled figures.
+
+What survives from this section is the part that mattered: damage is
+proportional to the firer's REMAINING HIT POINTS and not to its class, and
+our enemies fire far too weakly. Both are now confirmed directly.
+
 ### Not yet changed, and why
 
 Nine observations with two variables moving together: every shields-down
@@ -1617,3 +1631,115 @@ the base being 40.
 Level 3 now spans 34..42 across six games, all inside the `level*10 +
 rand(0..12)` we fitted. The base of ten per level survives a test it could
 have failed; the upper limit of the spread is still only bounded from below.
+
+## The controlled fire run (2026-08-21)
+
+The rig: one enemy in the quadrant, its hit points **written back every turn**
+so the firer's power is a controlled variable, our sector fixed, and the turn
+taken by firing a nil volley so nothing about our own state changes. Damage is
+read as the fall in the shield and energy pools, both pinned before each turn,
+and corrected for Vandal Death Pods by the fall in the *enemy's* pinned hit
+points -- a pod hits every ship in the quadrant for one figure, so the enemy
+measures the pod for us.
+
+### Damage is proportional to hit points, not to class -- DECISIVE
+
+The cleanest result of the project so far, and it needed no statistics.
+
+A **supply ship** with its own 120 hit points sat at range 2.83 and was
+effectively silent: eight turns produced one ambiguous reading and otherwise
+nothing. Writing **695** into that same ship's hit points -- same ship, same
+class, same sector, same range, nothing else touched -- it immediately began
+firing for 495.7, 514.7, 498.9, 527.0.
+
+So the per-class fire table in our core has nothing to model. `hp` already
+carries the class difference, because that is what hit points are.
+`ENEMY_FIRE_BATTLESHIP`, `_COMMAND`, `_SCOUT` and `_SUPPLY` should all go, and
+`enemy_fire_energy()` reduces to a coefficient on current hit points.
+
+It also explains the supply ship's silence without any special case: at 120
+hit points its volley is about 85, which is smaller than a death pod, and it
+was being lost in them.
+
+### Shields up or down makes no difference -- REFUTES the earlier reading
+
+Same enemy, same 695 hit points, same sector, same range 5.657, toggling only
+the shields:
+
+| shields | turns fired | mean damage | damage/hp |
+|---|---|---|---|
+| up | 5 of 10 | 358.4 | 0.516 |
+| down | 5 of 10 | 367.5 | 0.529 |
+
+2.5% apart. There is no shields term in the damage the game reports. The
+0.76-vs-0.98 split derived from the earlier uncontrolled data was the range
+confound plus uncorrected pods, and is withdrawn.
+
+### Enemies fire on about half of turns
+
+Across every block: 5/10, 5/10, 7/10, 4/8. This is not lost turns -- a lost
+turn shows up as a zero followed by a doubled reading, which is exactly what
+the instrument did before it was fixed, and the surviving figures are tight
+(±5%) with no doubles. Enemies genuinely hold fire roughly half the time.
+
+Our `trek_enemy_turn()` fires every enemy every turn.
+
+### Range matters, but not as a straight line to zero
+
+Same ship, same 695 hit points, pod-corrected, shields up:
+
+| range | n | damage/hp |
+|---|---|---|
+| 2.828 | 4 | 0.733 |
+| 4.243 | 7 | 0.511 |
+| 5.657 | 10 | 0.522 |
+
+The two long ranges are **indistinguishable**. That rules out the linear
+falloff to zero at 12 that our laser law uses and that the earlier fit
+proposed -- under any such law 5.657 should deliver a third less than 4.243,
+and it delivers slightly more. The shape looks like a falloff that flattens
+into a floor somewhere around half the firer's hit points, but three ranges
+cannot settle that, and all three sampled here are diagonal offsets (2,2),
+(3,3) and (4,4), which is a poor design: it leaves the possibility that the
+game keys on something other than Euclidean distance untested.
+
+**Next run should vary the offset shape, not just its length** -- (0,4),
+(1,4), (3,3) and (4,0) all at similar Euclidean distance -- and add ranges
+below 2.8, where the only reading is from a different game and disagrees with
+the trend by 21%.
+
+### What the port should change now
+
+Confirmed enough to act on: drop the per-class fire table for a coefficient on
+current hit points, and make enemies hold fire on roughly half of turns. The
+exact coefficient and the range curve are not settled and should wait.
+
+### Method, dearly bought
+
+Four instrument faults, each of which produced confident wrong numbers:
+
+1. **The enemy table is not zero-terminated.** Killing a ship zeroes its
+   record in place; a quadrant that started with four and lost three reads as
+   `[live, 0, 0, 0, live]`. Stopping at the first zero hid an enemy that had
+   wandered in from another quadrant, and its fire was being attributed to the
+   ship being studied.
+2. **A pool drop is not enemy fire.** Death pods hit us and every enemy for
+   one figure. Against a 120-hit-point ship the pods were most of the signal.
+3. **The pools settle after the volley animation.** Reading early gives a
+   zero and lands that damage on the next reading, doubling it -- the 0 / 2x
+   pattern that first looked like the enemy firing on alternate turns.
+4. **The weapons dialog asks once per live enemy, and a nil volley still
+   raises "Hit enter to continue."** Missing either swallows the next command
+   and drops a turn.
+
+The earlier session's nine readings came from the damage-report TEXT, which
+names the firer. That method was immune to faults 1 and 2 and was, in
+hindsight, the better instrument.
+
+### One motion observation, against the grain
+
+The Commander moved (1,5) -> (2,6), closing on us, on a turn when we FIRED
+rather than moved. Twenty-six consecutive move-turns last session produced no
+motion at all. That is one observation, but it points at the trigger being
+something other than the passage of a turn, and it is worth designing for
+directly: the same null-volley rig, watching position rather than damage.

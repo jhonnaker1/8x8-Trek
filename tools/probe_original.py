@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
-"""Drive the original EGA Trek and record enemy motion against ship state.
+"""Drive the original EGA Trek and measure it through its own memory.
+
+Four traps, each of which produced confident wrong numbers before it was
+found. Read them before designing a run:
+
+  1. The enemy table is NOT zero-terminated -- see enemies() below.
+  2. Damage read as a fall in the shield/energy pools is NOT enemy fire.
+     A Vandal Death Pod hits every ship in the quadrant, ours included, and
+     against a weak enemy the pods are most of what the pools record. The
+     pod hits the enemy for the same figure, so pinning the enemy's hit
+     points and reading them back after the turn measures the pod exactly;
+     subtract it. The damage-report TEXT names the firer and needs no such
+     correction, which makes it the better instrument when it is legible.
+  3. The pools settle after the volley animation, not when the command
+     returns. Read too early and the turn reads zero, then the late damage
+     lands on the next reading and doubles it. Poll until two reads agree.
+  4. Firing zero at a target still opens a "Hit enter to continue" prompt,
+     and the weapons dialog asks once PER LIVE ENEMY. Miss either and the
+     next command is swallowed answering the stale prompt, which shows up as
+     alternating live/dead turns.
 
 Reads the enemy table (6-byte records: y, x, hit points) and the ship record
 directly out of memory. Both move between runs -- the ship record shifted 16
@@ -76,16 +95,25 @@ def find_ship_record(mem):
     return None
 
 
-def enemies(table):
-    """Read the current quadrant's enemy table until the zero terminator."""
-    b = read(table, 6 * 12)
+def enemies(table, slots=12):
+    """Read the live enemies out of the current quadrant's table.
+
+    The table is NOT zero-terminated, which cost an experiment to find out.
+    Killing a ship zeroes its record in place and leaves it there, so a
+    quadrant that started with four and lost three reads as
+    [live, 0, 0, 0, live] -- stopping at the first zero silently hides every
+    enemy past the hole, including ones that wander in later. Scan all the
+    slots and filter.
+
+    The word the game keeps beside this (`nenhere` in our notes) counts slots
+    in use, not ships alive, so it is not a terminator either."""
+    b = read(table, 6 * slots)
     out = []
-    for k in range(12):
+    for k in range(slots):
         y, x, hp = (int.from_bytes(b[k*6+j*2:k*6+j*2+2], "little")
                     for j in range(3))
-        if y == 0 and x == 0 and hp == 0:
-            break
-        out.append((y, x, hp))
+        if hp and 1 <= y <= 8 and 1 <= x <= 8:
+            out.append((y, x, hp))
     return out
 
 
