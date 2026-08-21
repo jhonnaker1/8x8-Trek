@@ -640,7 +640,12 @@ uint8_t trek_game_state(void);
 #define SCORE_PER_KILL_DAY     500
 #define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */
 #define SCORE_INCOMPLETE      (-300)
-#define SCORE_SHIP_LOST       (-200)
+
+/* There is no ship-loss line on the original's sheet. MEASURED 2026-08-20 by
+   losing the ship and reading the Detailed Evaluation: the whole penalty is
+   the crew, at a point each, and -300 + -430 came to exactly the -730 printed.
+   An earlier SCORE_SHIP_LOST (-200) here was invented and double-counted. */
+#define CREW_COMPLEMENT        430
 
 /* Minimum elapsed time for the rate term, in tenths -- the ancestor's five
    stardates. It applies unconditionally here, where the ancestor applies it

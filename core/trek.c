@@ -892,6 +892,10 @@ static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max)
     if (through >= ship.energy) {
         ship.energy = 0;
         ship.lost = 1;
+        /* All hands. The original scores losing the ship purely as casualties
+           -- see MEASURED.md -- so the complement has to land here, not as a
+           flat penalty in trek_score(). */
+        ship.casualties = CREW_COMPLEMENT;
         if (*n < max) { ev[*n].kind = EV_SHIP_LOST; ev[*n].amount = 0; (*n)++; }
         return;
     }
@@ -1218,6 +1222,5 @@ int16_t trek_score(void) {
         s = (int16_t)(s + (int16_t)kill_rate_points(kills, elapsed));
     }
 
-    if (ship.lost) s = (int16_t)(s + SCORE_SHIP_LOST);
     return s;
 }

@@ -1358,3 +1358,162 @@ Sit in a quadrant with one enemy, record its movement each turn while varying
 shields up/down and energy high/low. That is a `make monitor` script now
 rather than a human watching, so it is cheap -- and it is the same instrument
 that would settle the four other DERIVED numbers still outstanding.
+
+## Enemy motion: the ancestor's per-turn model is REFUTED (2026-08-20)
+
+Open item 14 asked for "a handful of observations at known ship states" to
+calibrate `enemy_motion`'s three constants. The observations say there is
+nothing to calibrate: EGA Trek does not run `movebaddy` per turn at all.
+
+### Method
+
+Level 3, quadrant 8-2, two enemies read straight out of the table:
+a **Commander at 3-8 with 695 hit points** and a **Battleship at 4-7 with
+355**. Both figures match the classes the console names, which is the third
+independent confirmation that hit points are fixed per class.
+
+Every input to `forces` was pinned by writing memory between turns -- energy
+to 5000, the twelve system percentages to 100, and in the first block the
+shields to 2500 -- so the only thing varying across turns was the game's own
+randomness. Each turn was a one-sector impulse move between two adjacent
+sectors, so our own position stayed effectively constant.
+
+| block | turns | shields | result |
+|---|---|---|---|
+| A | 8 | up | no enemy moved |
+| B | 8 | down | no enemy moved |
+| C | 10 | down, clock forced across the 3502.0 event | no enemy moved |
+
+Twenty-six turns, zero movement by either ship.
+
+### What each model predicted
+
+**Our port**, shields up: `forces = 695 + 200 - 500 - 450 = -55`, saturating
+to 0, so `motion = -5` clamped to -3 -- retreat at full speed, every turn.
+Not observed.
+
+**The ancestor**, shields down: `forces = 623 + 200 + 1000 - 500 - 450 = 873`,
+so `motion = (873 + 200*Rand())/150 - 5` lies in 0.82..2.15 and truncates to
+1 or 2 whenever `Rand() >= 0.135` -- an advance on about 86% of turns. Zero
+advances in eight turns puts this at p ~ 1.5e-7. Refuted.
+
+The shields-up case is the weaker of the two, because the Commander sits at
+x=8 against the east wall and "retreat" has nowhere to go; holding is
+consistent with the ancestor there. The shields-down block is the one that
+kills it, and it kills it flatly.
+
+### Two things the ancestor does say, and they are structural
+
+Reading `moveklings()` rather than `movebaddy()` was the mistake all along.
+The caller gates who moves at all:
+
+    if (game.comhere)  ... movebaddy(..., IHC);   /* commander */
+    if (game.ishere)   ... movebaddy(..., IHS);   /* super commander */
+    if (game.skill >= SKILL_EXPERT && (game.options & OPTION_MVBADDY))
+        ... movebaddy(...)                        /* everyone else */
+
+**Ordinary ships do not move below expert skill.** Our port moves every enemy
+every turn, which is a larger error than any constant in it, and the
+Battleship holding still for 26 turns at level 3 is exactly right.
+
+The one historical observation of movement -- a Commander walking
+3-8 -> 3-7 -> 4-6 -> 5-5 -- was announced as "SCANNER REPORT: The commander
+has moved." A scanner report is how the ancestor narrates *scheduled*
+commander movement (`FSCMOVE`, `schedule(FSCMOVE, 0.2777)`), not per-turn
+tactics, which narrate as "retreats to" / "advances to". Combined with 26
+turns of nothing under conditions where per-turn tactics predict near-certain
+motion, commander movement in EGA Trek is an **event on the queue**, not a
+per-turn decision.
+
+### Consequence
+
+`enemy_motion()` should not be refitted; it should be replaced. The refit
+that item 14 asked for would have fitted a model that does not apply. What
+the port needs instead is:
+
+1. Movement gated to commanders only (at these command levels).
+2. Commander movement driven from the event queue, which the core already has.
+
+The period of that event is the one number still unmeasured, and it is the
+only thing item 14 still wants. The ancestor's 0.2777 stardates is the
+starting guess.
+
+### Incidental, from the same session
+
+* **Laser damage confirmed again, exactly.** 400 units at range 4.472 dealt
+  251: `400 * (1 - 4.472/12) = 250.9`. Same figure the earlier session read,
+  reproduced from a cold start.
+* **Enemies still do not lose power by firing.** Hit points held at 695/355
+  across every firing turn. The ancestor's `kpower` drain stays refuted.
+* **Vandal Death Pods, twice more.** "Vandal Death Pod enters quadrant: 72
+  unit hit on Lexington" while both enemies dropped by exactly 72
+  (695->623, 355->283); a second pod took 83 off all three. One figure
+  applied to every ship in the quadrant, our own included.
+* **Impulse moves cost ~0.042 stardates per sector** and roughly 110 energy;
+  a multi-sector move cost 495.
+
+## The scoring sheet, read live (2026-08-20)
+
+Flying into a black hole on the first game turned out to be the cheapest
+measurement of the session: losing the ship prints the Detailed Evaluation,
+which is the whole scoring rubric with its coefficients.
+
+| item | rate | this game |
+|---|---|---|
+| Rescues | 200 each | 0 |
+| Penalty for incomplete mission | -300 | -300 |
+| Mongols killed | 10 each | 0 |
+| Commanders killed | 20 each | 0 |
+| Enemy bases destroyed | 50 each | 0 |
+| Kill/day ratio | 500 per day | 0.00 |
+| **Casualties on board Lexington** | **-1 each** | **-430** |
+| Stars destroyed | -5 each | 0 |
+| Bases hit | -200 each | 0 |
+| TOTAL | | **-730** |
+
+Every coefficient we had is confirmed. Two corrections fall out of it:
+
+**There is no ship-loss line.** `-300 + -430 = -730` exactly, with nothing
+left over. Losing the ship is scored as the death of the crew -- all 430 of
+them, at a point each -- and `SCORE_SHIP_LOST (-200)` in trek.h is a line
+item the original does not have. Our score for this same game would have been
+-930.
+
+**430 is the crew complement**, and losing the ship kills all of them. The
+core tracks `ship.casualties` and adds to it from combat, but never sets it to
+the full complement on death, so it would have under-counted as well as
+double-counted.
+
+`SCORE_PER_ENEMY_BASE` is also defined in trek.h but never summed in
+`trek_score()`.
+
+## Reading the original's memory: what shifts and what does not (2026-08-20)
+
+The addresses in this file are per-run and must be re-located every launch.
+Between two launches of the same binary on the same machine the ship record
+moved **+16 bytes** (energy 181940 -> 181956) and the enemy table moved with
+it (184146 -> 184162, a fixed +2206 from energy). The twelve system
+percentages did **not** move: they stayed at 183498 both times.
+
+So they are separate allocations and no single base fixes them all. Anchor
+each structure independently:
+
+* **ship record** -- scan for the Turbo Pascal reals 5000.0 and 2500.0. The
+  pairs six bytes apart are (current, display latch), NOT (current, maximum):
+  both halves fall together when shields take a hit.
+* **enemy table** -- energy + 2206. Six-byte records of `y, x, hit points` as
+  three 16-bit integers, zero-terminated.
+* **systems** -- a run of twelve 16-bit percentages; find it by the run, not
+  by an offset. Index 9 is the computer.
+* **live stardate** -- 181938 this run. 181926 is the *start* stardate and
+  never changes, which is a trap: it reads a plausible 3500.0 forever.
+
+The two unidentified reals just past the ship record are the **event queue**,
+holding absolute stardates (3502.0 and 3507.31 on a fresh game).
+
+**Check for game-over before trusting any read.** A five-turn firing loop
+late in the session returned five identical, entirely plausible snapshots;
+the ship had been destroyed on the first of them and the game had restarted
+into its setup screen, so every reading after that was stale memory at
+addresses the new process had not yet touched. Nothing in the numbers looked
+wrong.

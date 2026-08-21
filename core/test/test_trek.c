@@ -1190,6 +1190,17 @@ static void test_game_state_and_score(void) {
        "the recorded sheet reproduces exactly: 1 Mongol, 1 Commander, 18 casualties, unfinished");
     ok(trek_score() == -288, "and its printed total, -288");
 
+    /* The second sheet MEASURED.md records, from the game that ended in a
+       black hole: nothing achieved, mission unfinished, ship lost with all
+       hands. The original printed -730 and had no ship-loss line -- the whole
+       penalty beyond the -300 is the 430 crew at a point each. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 34;
+    ship.casualties = CREW_COMPLEMENT;
+    ship.lost = 1;
+    ok(trek_score() == -300 - 430, "losing the ship is scored as its crew");
+    ok(trek_score() == -730, "and its printed total, -730");
+
     /* Quitting with nothing done is the flat penalty alone. */
     trek_new_game(3, 4242);
     ship.enemies_left = 5;

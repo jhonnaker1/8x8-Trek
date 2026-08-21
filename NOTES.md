@@ -1117,3 +1117,70 @@ much less -- `kb_inject` works, so the automated loop does not depend on
 fixing it. If it is revisited, the remaining candidates are the port's own
 size and memory layout, or cc65's C128 startup, neither of which the bisect
 touched.
+
+## Front end and mechanics, observed directly (2026-08-20)
+
+Captured while measuring enemy motion. Several of these close questions that
+items 9-14 were carrying as guesses.
+
+### The setup screen, item 10, in full
+
+Five prompts, in this order, all on one page under the "U.S.S. Lexington /
+RCB-92" heading, with "Welcome aboard Captain!" above them:
+
+    Will you require a briefing (Y/N)?
+    Restore a saved game (Y/N)?
+    Please enter your name:
+    For verification, enter your command level (1-5):
+    Captain, please enter self-destruct password:
+
+The name prompt is one we did not have on the list at all. "For
+verification" is the original's phrasing for the level, and the password is
+free text.
+
+### The title screen animates, item 9
+
+The Lexington fires a red laser at a Mongol ship on the left of the frame,
+so the title is not a static image. "Revision 3.0" sits in a bar top-left,
+the shareware notice in a green panel bottom-right, and the Dept. of Space
+badge bottom-left -- the same badge the console carries.
+
+### Hall of fame, item 14
+
+Five slots, one per command level, named by rank rather than numbered:
+Lt. Commander, Commander, Captain, Commodore, Admiral. Each row is name,
+rank, score. So it is one high score per difficulty, not a top-five table.
+
+### Black holes exist, and nothing in item 14 mentions them
+
+A warp 5 move to an adjacent quadrant ended the first game outright: "U.S.S.
+Lexington pulled into black hole & destroyed this stardate, with loss of all
+aboard." The same route at warp 1 had stopped politely -- "Blocked by object
+at 1-6" -- so **low warp stops at obstacles and high warp does not**. That is
+a mechanic we model no part of: no black holes in the galaxy, no speed-
+dependent collision behaviour.
+
+### Damaged computer changes how M works
+
+With the navigation computer damaged the M command stops accepting
+coordinates and prompts `DeltaX:` / `DeltaY:` with "Computer Damaged; Manual
+Only" -- the relative-movement mode the manual documents at l.515-529, which
+we had read as an option the player may prefer. It is also a *consequence of
+damage*, and the only way to move while the computer is out.
+
+Related: "ENGINEERING: Move aborted; impulse engines are too damaged to use"
+is a hard refusal, not a slower move.
+
+### Torpedoes are drawn as icons
+
+The STATUS panel shows a 3x3 grid of red torpedo pictograms, not a number --
+nine of them on a fresh game, confirming TORPS_START. Our C128 panel prints a
+figure where the original draws the rack.
+
+### The MAIN VIEWER cycles
+
+Three different things were seen in it: the enemy silhouette with class name
+("MONGOL BATTLESHIP", "ARRAY MONITOR 504"), a twelve-row systems list at
+100%, and a power-distribution readout (PMAX/PAVL/PPCT, "POWER DISTRIB 509").
+It is a multi-page display, which is more than the single enemy panel we
+built.
