@@ -1756,3 +1756,71 @@ rather than moved. Twenty-six consecutive move-turns last session produced no
 motion at all. That is one observation, but it points at the trigger being
 something other than the passage of a turn, and it is worth designing for
 directly: the same null-volley rig, watching position rather than damage.
+
+## Four open items the fire run moved on the way past (2026-08-21)
+
+### Open item 15, the odd hit points, is explained -- by pods
+
+Two readings have never matched a class: 255 from the first session and 320
+from this one. Both were ships we had never shot at, which made "already
+damaged" look like special pleading.
+
+This session watched the mechanism happen. Four enemies in quadrant 7-6 read
+626, 286, 286 and 286 -- **each exactly 69 below** the class values 695 and
+355 -- because a Vandal Death Pod had been through before we arrived. Pods hit
+every ship in a quadrant for one figure, and they roam. So any enemy we meet
+may already carry damage from a pod we never saw, and 255 and 320 need no
+explanation beyond that.
+
+Hit points are fixed per class. Nothing observed contradicts it, and the one
+thing that appeared to has a mechanism.
+
+(`HP_SCOUT` is still 100 and still unmeasured; neither 255 nor 320 should be
+read as evidence for it.)
+
+### Open item 8, the heat threshold: nothing happens below 1240, not 400
+
+A single command fired 450, 460 and 330 -- **1240 units in one volley** -- at
+three battleships holding 286 hit points each, from sector 3-7. All three
+died, which puts a floor under the laser efficiency at the moment each shot
+landed:
+
+| target | energy | range | damage at full efficiency | implies |
+|---|---|---|---|---|
+| 7-7 | 450 | 4.000 | 300.0 | eff >= 95.3% |
+| 7-6 | 460 | 4.123 | 301.9 | eff >= 94.7% |
+| 3-8 | 330 | 1.000 | 302.5 | eff >= 94.5% |
+
+So firing 1240 in one command leaves the lasers at 95% or better, and the
+last target in the volley is as unaffected as the first -- heat does not
+accumulate *within* a volley either. The previous bound was 400. DERIVED 1500
+survives, with the untested band now 1240..1500 rather than 400..1500.
+
+### Open item 1, the enemy count: eight level-3 games now, and a specific doubt
+
+Two more level-3 games, both **37**. The full set is now
+40, 42, 42, 42, 34, 38, 37, 37 -- offsets from `level*10` of
+10, 12, 12, 12, 4, 8, 7, 7.
+
+Our `rand_n(13)` gives a uniform 0..12 with a mean of 6. The eight samples
+average **9.0**, and not one has landed in 0..3 -- which a uniform model makes
+a 5% event. The base is probably higher than ten per level, or the spread
+narrower, or both.
+
+Not refitting on this. But it is now a stated, testable doubt rather than a
+gap, and six more level-3 games would settle it: if the low end really is 34,
+values of 30..33 will keep not appearing.
+
+### Open item 14, enemy motion: the trigger looks like the player's action
+
+The Commander moved (1,5) -> (2,6), closing, on a turn when we **fired a nil
+volley** rather than moved. Twenty-six consecutive move-turns the day before
+produced no motion at all from two enemies.
+
+That is one observation and it is not a law, but it is the first thing that
+has ever correlated with motion, and it is cheap to test properly: the same
+null-volley rig, alternating fire-turns and move-turns at a fixed position,
+watching position instead of damage.
+
+SST's forces formula still does not explain it either way -- with our shields
+up it computes a retreat for this Commander, and the ship advanced.

@@ -1202,3 +1202,38 @@ to 8 pixels and three different alignment assumptions give scale maxima from
 1500 to 2000. Measuring a number by photographing the bar that displays it is
 the wrong instrument when the number is sitting in memory. Next session,
 find laser heat in the ship record and read it.
+
+### Enemies migrate between quadrants (2026-08-21)
+
+Watched directly. After clearing quadrant 7-6 of three battleships the counter
+read "Mongols: 34", and the quadrant held one Commander. Several turns later a
+**second enemy was firing at us from 3-5**, holding 320 hit points, and the
+Mongol counter still read 34 -- so it moved in from another quadrant rather
+than being spawned. Killing it took the counter to 33.
+
+We model nothing of this. `gal_enemies[]` is fixed at galaxy generation and
+only ever decreases. The ancestor moves commanders between quadrants on a
+scheduled event (`FSCMOVE`), which is the obvious shape to steal, and it is
+probably the same mechanism behind item 14's "the commander has moved"
+scanner report.
+
+It also means a quadrant the chart calls empty need not stay empty, which
+matters for how the chart is presented.
+
+### Two smaller observations from the same session
+
+**Supply ships may not count as enemies on the chart.** The chart showed
+quadrant 8-3 as `002` -- no enemies, no base, two stars -- while the enemy
+table for that quadrant held a supply ship with 120 hit points. Either supply
+ships are excluded from the count or the chart had not refreshed; worth one
+deliberate check, because our chart counts every hostile.
+
+**Something other than energy can end the game.** A shields-down block ended
+with the ship destroyed and the program back at its setup screen, on a turn
+when energy had been pinned to 5000 immediately beforehand and the incoming
+hits were about 545. Energy cannot have reached zero. Our core only ever
+destroys the ship when a hit exceeds remaining energy, so whatever happened
+has no equivalent in the model. Life support reaching zero is the obvious
+candidate and was NOT ruled out -- the systems were pinned at the start of the
+turn, not during it. Unexplained, and worth isolating before anyone trusts
+the port's death condition.
