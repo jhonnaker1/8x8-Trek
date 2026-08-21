@@ -1708,11 +1708,24 @@ game keys on something other than Euclidean distance untested.
 below 2.8, where the only reading is from a different game and disagrees with
 the trend by 21%.
 
-### What the port should change now
+### What the port should change now -- DONE in 1f9808b
 
 Confirmed enough to act on: drop the per-class fire table for a coefficient on
 current hit points, and make enemies hold fire on roughly half of turns. The
 exact coefficient and the range curve are not settled and should wait.
+
+Both landed the same day. `ENEMY_FIRE_BATTLESHIP`, `_COMMAND`, `_SCOUT` and
+`_SUPPLY` are gone; `enemy_fire_energy()` takes hit points and nothing else,
+at `ENEMY_FIRE_PCT` 90; and `trek_enemy_turn()` skips a firer one turn in
+`ENEMY_FIRE_ONE_IN`. The falloff is deliberately left as our laser law, which
+these measurements say is the wrong shape, because three diagonal ranges are
+not enough to replace it with.
+
+Worth knowing before judging the difficulty: the two changes very nearly
+cancel. A fresh Commander fired 300 every turn before and now fires 625 on
+half of them, so its average output moves about 4%. What changes is the
+variance -- combat becomes occasional heavy hits rather than a steady drip,
+which is what the original feels like.
 
 ### Method, dearly bought
 
