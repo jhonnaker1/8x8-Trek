@@ -1247,3 +1247,36 @@ has no equivalent in the model. Life support reaching zero is the obvious
 candidate and was NOT ruled out -- the systems were pinned at the start of the
 turn, not during it. Unexplained, and worth isolating before anyone trusts
 the port's death condition.
+
+### Enemy movement is triggered by firing, not by the turn (2026-08-21)
+
+Watched directly, and it settles the shape of open item 14 even if not its
+constants. Across the torpedo runs the enemies moved **after every volley** --
+consistently, ship after ship, to the point where aiming at a sector became
+useless because the occupant had left by the next shot.
+
+Set against the previous session: twenty-six consecutive turns in which our
+only action was a one-sector impulse move produced **no motion at all** from
+two enemies, with shields up and down and the clock forced across a scheduled
+event.
+
+So the trigger is the player attacking, not a turn elapsing. That is a
+different mechanism from the ancestor's, where `moveklings()` runs from the
+turn resolution regardless of what the player did, and it means our
+`enemies_move()` is called in the wrong place as well as computing the wrong
+thing.
+
+The cheap confirming experiment is now obvious: alternate fire-turns and
+move-turns from a fixed sector against one enemy and watch position only.
+
+### The planet list exists, and planets have classes
+
+The MAIN VIEWER cycles to a "PLANET LIST" page:
+
+    5-4N Gallisto-5      6-4N Cygnus-6      6-4M Gallisto-6
+    7-1N Andromeda-7     7-6O Sigma-7
+
+Quadrant, a class letter, and a name. The letters seen are N, M and O, which
+is the Star Trek planet-class convention -- M being the habitable one. So the
+planets in item 14 are not just a mechanic to port from `planets.c`; they are
+already named and classified per galaxy, and the console has a page for them.

@@ -1824,3 +1824,111 @@ watching position instead of damage.
 
 SST's forces formula still does not explain it either way -- with our shields
 up it computes a retreat for this Commander, and the ship advanced.
+
+## Open item 9, torpedo damage: capped at 355, falling with range (2026-08-21)
+
+The item had been stuck because no target ever survived a torpedo, so no
+figure was ever printed. The way past it is to make the target survive:
+**write a large hit-point value into its record before the shot**. It then
+takes the hit and the table reports the damage the game never prints.
+
+Method: follow a ship by its **table slot** rather than its sector, pin that
+slot's hit points, aim at whatever sector the slot currently occupies, and
+diff the WHOLE table across the shot. See "How this went wrong" below.
+
+| range | shots | hits | damage |
+|---|---|---|---|
+| 1.414 - 2.236 | 6 | 6 | 355, 355, 355, 355, 355, 355 |
+| 5.000 | 6 | 6 | 210, 355, 355, 247, 209, 296 |
+| 7.616 | 7 | 4 | 176, 209, 229, 247 |
+
+**355 is a cap, not the damage.** At short range it binds every time, with
+zero variance across six shots -- which is why one torpedo has always killed a
+355-hit-point battleship exactly, and why nothing had ever survived to print a
+number. By range 5 the cap only binds sometimes (twice in six), and by 7.6 it
+never does.
+
+Means: 355 at short range, 279 at 5.0, 215 at 7.6. So there IS a range term,
+and there IS a random component -- it is simply invisible at close range
+because the cap swallows it.
+
+The cap is **355 regardless of the pin**: the target here was pinned to 700
+and 1500 at different times and never took more than 355. 355 is a
+battleship's class hit points, and this target was a battleship. Whether the
+cap is the class figure or the ship's true current hit points is NOT
+distinguished by this data -- both were 355.
+
+An earlier reading has a Commander taking 355 as well, which is the tactically
+important one: **a Commander survives a torpedo**, at 695 - 355 = 340, and
+needs two. Our `trek_fire_torpedo()` zeroes whatever it hits, so the port
+cannot express that.
+
+The ancestor's `700 + 100*Rand()` falling off with aiming error is no longer
+refuted, as an earlier draft of this section wrongly concluded from the
+short-range data alone. Fit is loose: the spread at 5.0 is at least 146 and at
+7.6 about 71, which one uniform 0..100 term does not obviously produce. Not
+enough to pin a formula.
+
+## Open item 10, torpedo accuracy: real, and it falls with range
+
+Torpedoes are aimed at a **sector**, not an angle. Misses are genuine and the
+game announces them -- *"Clean miss, sir!"* -- observed on screen, which is
+also the message text the port should use.
+
+| range | hit rate |
+|---|---|
+| 1.414 - 2.236 | 6 / 6 |
+| 5.000 | 6 / 6 |
+| 7.616 | 4 / 7 |
+
+Perfect accuracy out to range 5, degrading beyond it. There are two further
+ways to miss that are geometry rather than a roll, and both must be excluded
+before reading the table above as a pure accuracy curve:
+
+1. **The target moves.** Enemies move after every volley, so a torpedo aimed
+   where a ship was arrives at an empty cell. Five consecutive shots read as
+   misses while the enemy sat unmoved in a stale table record; following the
+   live table fixed it. The figures above all aim at the slot's current
+   sector, so they are clean of this.
+2. **Something is in the way.** The ray is walked cell by cell and detonates
+   on the first occupant, which need not be the target -- see the supernova
+   below.
+
+## Torpedoes detonate stars, and a supernova is enormous
+
+Firing from 5-3 at an enemy in 2-7, the ray passed through a star at 4-4:
+
+    Star at 4-4 goes supernova!
+    Lexington blown to quad 8-4.
+    2 Mongols destroyed.
+    46 unit hit absorbed by shields.
+
+Every enemy in the quadrant died, our ship was **thrown into another
+quadrant**, and we took damage. The chart then marks the burnt quadrant
+`999`. NOTES item 14 lists "stars destroyed, -5 each" as a scoring line that
+needs a torpedo able to hit a star; it is much more than a scoring line.
+
+## How this went wrong, four times
+
+Worth recording because three of the four produced plausible numbers.
+
+1. **Pinning the target's hit points makes it fire proportionally harder.**
+   A target pinned to 20000 fires roughly `20000 * 0.9 * falloff` -- about
+   14000 -- and destroyed us in one shot. The very finding that makes this
+   experiment possible (damage is proportional to hit points) is what makes a
+   large pin lethal. 700-1500 is the usable window: above any torpedo, below
+   anything that one-shots a pinned 2500 shield.
+2. **The stardate guard could not see a quit or a death**, because a score
+   screen does not move the stardate backwards -- only a *new game* does. The
+   check that works is a **video** check: the COMMAND panel's magenta is
+   present on every console frame, dialog open or not, and absent on every
+   end screen.
+3. **Aiming by sector re-targets whoever wandered in.** Ships move after
+   every volley, so the ship at a sector is not the ship that was there.
+   Follow the slot.
+4. **Enemies migrate into the quadrant mid-fight.** A quadrant the chart
+   called `104` -- one enemy -- held four a few turns later.
+
+Pinning systems before a turn does not protect them during it either. The
+real protection is keeping the shield pool above the incoming volley so
+nothing penetrates.
