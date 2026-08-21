@@ -295,6 +295,24 @@ static void advance_time(uint16_t tenths) {
     }
 }
 
+/* --------------------------------------------------------------- shields */
+
+uint8_t trek_shields_up(void) {
+    if (ship.shields_up) return SHIELD_ALREADY;
+    if (ship.energy < SHIELD_RAISE_COST) return SHIELD_NO_ENERGY;
+
+    ship.energy = (uint16_t)(ship.energy - SHIELD_RAISE_COST);
+    ship.shields_up = 1;
+    return SHIELD_OK;
+}
+
+uint8_t trek_shields_down(void) {
+    if (!ship.shields_up) return SHIELD_ALREADY;
+    /* No refund and no charge: "Lowering shields causes no energy change."  */
+    ship.shields_up = 0;
+    return SHIELD_OK;
+}
+
 /* ---------------------------------------------------------------- docking */
 
 /* The base's own cell, or QUAD_CELLS if the quadrant has none. */
@@ -909,6 +927,14 @@ static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max)
  * docked-at-base back-off, and its expert-skill enemy weighting. Those depend
  * on features this core does not have yet, and inventing them would be worse
  * than leaving them out. */
+/* How many enemies share the quadrant with us. */
+static uint8_t enemies_here(void) {
+    uint8_t c, n = 0;
+    for (c = 0; c < QUAD_CELLS; c++)
+        if (SEC_IS_ENEMY(sector[c])) n++;
+    return n;
+}
+
 static int16_t enemy_motion(uint16_t hp, uint16_t dist_whole) {
     uint16_t forces;
     int16_t  motion;
@@ -917,7 +943,13 @@ static int16_t enemy_motion(uint16_t hp, uint16_t dist_whole) {
        down, less a term for the energy and torpedoes we could bring. Staged
        to stay inside 16 bits: hp reaches 695 and the additions are bounded. */
     forces = hp;
-    if (ship.enemies_left < 40) forces = (uint16_t)(forces + 100 * ship.enemies_left);
+    /* 100 per enemy IN THIS QUADRANT, which is the ancestor's `game.nenhere`.
+       This first read ship.enemies_left, the galaxy-wide total -- so on a
+       fresh level-3 game it added 3000-odd and every enemy charged regardless
+       of anything else, shields included. Caught by a shields test that
+       expected a weak ship to hold off raised shields and found it charging
+       either way. */
+    forces = (uint16_t)(forces + 100 * enemies_here());
     if (!ship.shields_up)       forces = (uint16_t)(forces + 1000);
 
     if (ship.energy > 2500) {

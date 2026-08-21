@@ -929,7 +929,10 @@ nothing in it at all.
 11. **The boarding-party mechanic**, which appears nowhere in the manual.
     The ancestor has no equivalent either, so this one is EGA Trek's own and
     must come from the game or the disassembly.
-14. **Are hit points fixed per class, or rolled per ship?** See "Hit points
+14. **Enemy motion thresholds do not transfer.** See "The ancestor's motion
+    constants are on its own power scale" below. The direction of every term
+    is sound; the numbers are not ours.
+15. **Are hit points fixed per class, or rolled per ship?** See "Hit points
     may not be constants" below. Our core assumes fixed; the ancestor rolls.
     One unexplained reading of 255 is the reason to ask.
 12. ~~Casualty scoring weight~~ — **done.** −1 each.
@@ -1315,3 +1318,43 @@ trusted:** enter several quadrants and read the enemy table at DS:25F2 in each.
 If every battleship reads exactly 355 the constants stand. If they scatter, the
 core needs a band per class and `HP_BATTLESHIP` and its neighbours become the
 wrong shape rather than the wrong value.
+
+
+## The ancestor's motion constants are on its own power scale (2026-08-19)
+
+`enemy_motion()` is DERIVED from `movebaddy()`, and its shape is right --
+advance, hold or retreat from a score built out of the enemy's own power, how
+many are present, and how dangerous we look. Two things came out of testing it
+properly.
+
+**A real bug, found by a shields test.** The "100 per enemy present" term was
+reading `ship.enemies_left`, the GALAXY-wide count, where the ancestor uses
+`game.nenhere`, enemies in the current quadrant. On a fresh level-3 game that
+added three thousand-odd to every score, so `forces > 1000` was always true and
+every enemy charged regardless of anything else -- shields, our energy, its own
+damage. Fixed to count the quadrant. Worth noting the bug was invisible while
+it existed: enemies charging looks like enemies working.
+
+**And then the constants showed themselves.** With the inflation gone, almost
+nothing advances. The reason is scale. SST's commander rolls
+`950 + 400*Rand() + 50*skill`, so 950-1500; ours is 695, and its ordinary
+Klingon is `Rand()*150 + 300 + 25*skill`, which is about where our BATTLESHIP
+sits at 355. EGA Trek's whole power scale is roughly SST's ordinary-ship scale.
+The thresholds `forces/150 - 5` and `forces > 1000` are calibrated to the
+former and simply do not mean the same thing against the latter.
+
+A lone healthy Commander with our shields down scores 845 under them, which
+lands in the hold band. The one observation we have says it should advance:
+3-8 -> 3-7 -> 4-6 -> 5-5, one sector per turn.
+
+**Not refitted, deliberately.** Three free parameters and one observation is
+not a fit, it is a curve drawn through a point. What the tests assert instead
+is the RELATIVE behaviour, which is certain because it follows from the terms
+themselves: lowering our shields makes an enemy no less aggressive, and a
+crippled ship (shields down, banks empty, no torpedoes) invites attack.
+
+**What would settle it:** a handful of observations at known ship states.
+Sit in a quadrant with one enemy, record its movement each turn while varying
+shields up/down and energy high/low. That is a `make monitor` script now
+rather than a human watching, so it is cheap -- and it is the same instrument
+that would settle the four other DERIVED numbers still outstanding.

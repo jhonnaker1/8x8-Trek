@@ -121,6 +121,102 @@ static char linebuf[32];
    and 0 skips a target. Energy comes out of the main banks, confirmed on
    the original by its "insufficient energy" refusal firing when main was
    below the amount requested. */
+/* SHUP and SHDN on one key. The original gives them separate commands and
+   binds them to the arrow keys as well; this port has neither the arrow keys
+   (the C128's dedicated cursor keys sit outside the 8x8 matrix input.c scans
+   -- see the note there) nor spare letters, so S toggles. The message says
+   which way it went, so the state is never ambiguous. */
+static void do_shields(void) {
+    if (ship.shields_up) {
+        trek_shields_down();
+        ui_message("ENGINEERING: ", "SHIELDS DOWN.");
+        return;
+    }
+    switch (trek_shields_up()) {
+        case SHIELD_OK:
+            ui_message("ENGINEERING: ", "SHIELDS UP.");
+            break;
+        default:
+            ui_message("ENGINEERING: ", "TOO LITTLE ENERGY.");
+            break;
+    }
+}
+
+/* Names for the three pools, in the 1/2/3 order trek_divert uses. */
+static const char *pool_name(unsigned char p) {
+    switch (p) {
+        case POOL_MAIN:    return "MAIN";
+        case POOL_IMPULSE: return "IMPULSE";
+        default:           return "SHIELDS";
+    }
+}
+
+static void report_divert(uint8_t r, uint16_t lost) {
+    switch (r) {
+        case DIVERT_OK:
+            if (lost) {
+                /* CONFIRMED on the original: transferring into a full pool
+                   destroys the surplus. Saying so matters -- the player
+                   otherwise sees energy vanish with no explanation. */
+                uint8_t k = put_str(linebuf, "DONE. ");
+                k += put_u16(linebuf + k, lost);
+                k += put_str(linebuf + k, " UNITS LOST");
+                linebuf[k] = 0;
+                ui_message("ENGINEERING: ", linebuf);
+            } else {
+                ui_message("ENGINEERING: ", "TRANSFER COMPLETE.");
+            }
+            break;
+        case DIVERT_SHORT:
+            ui_message("ENGINEERING: ", "WE HAVE NOT GOT IT.");
+            break;
+        default:
+            ui_message("ENGINEERING: ", "ILLOGICAL, CAPTAIN.");
+            break;
+    }
+}
+
+static void do_energy(void) {
+    char line[8];
+    uint16_t from, to, amount, lost = 0;
+
+    ui_dialog_open("ENERGY TRANSFER");
+    ui_dialog_line("1 MAIN  2 IMPULSE  3 SHIELDS");
+
+    ui_dialog_ask("FROM (1-3):", line, sizeof line);
+    from = grab_num(line);
+    ui_dialog_ask("TO (1-3):", line, sizeof line);
+    to = grab_num(line);
+    ui_dialog_ask("AMOUNT:", line, sizeof line);
+    amount = grab_num(line);
+
+    {
+        uint8_t k = put_str(linebuf, pool_name((unsigned char)from));
+        k += put_str(linebuf + k, " TO ");
+        k += put_str(linebuf + k, pool_name((unsigned char)to));
+        linebuf[k] = 0;
+        ui_dialog_line(linebuf);
+    }
+    ui_dialog_close();
+
+    report_divert(trek_divert((uint8_t)from, (uint8_t)to, amount, &lost), lost);
+}
+
+/* MAX -- everything the main banks hold, into the shields. The original lists
+   it separately from ENERGY because it is the thing you want in a hurry. */
+static void do_max_energy(void) {
+    uint16_t lost = 0;
+    uint16_t room = (uint16_t)(SHIELD_MAX > ship.shields
+                               ? SHIELD_MAX - ship.shields : 0);
+    uint16_t amount = ship.energy < room ? ship.energy : room;
+
+    if (amount == 0) {
+        ui_message("ENGINEERING: ", "SHIELDS ALREADY FULL.");
+        return;
+    }
+    report_divert(trek_divert(POOL_MAIN, POOL_SHIELDS, amount, &lost), lost);
+}
+
 static void do_dock(void) {
     switch (trek_dock()) {
         case DOCK_OK:
@@ -442,9 +538,12 @@ int main(void) {
         else if (c == KB_L) { do_lasers();     enemy_turn(); }
         else if (c == KB_T) { do_torpedo(cmd); enemy_turn(); }
         else if (c == KB_D) { do_dock();       enemy_turn(); }
+        else if (c == KB_S) { do_shields();    enemy_turn(); }
+        else if (c == KB_E) { do_energy();     enemy_turn(); }
+        else if (c == KB_X) { do_max_energy(); enemy_turn(); }
         else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M W L T D)OCK Q)UIT");
+        else if (c)          ui_message("COMPUTER: ", "M W L T D S)HLD E X)MAX Q");
 
         ui_draw_scan();
         ui_draw_chart();

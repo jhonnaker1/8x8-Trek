@@ -695,6 +695,73 @@ static void test_expran(void) {
 /* Docking. The manual is more specific than the ancestor here -- the three
    base types replenish different things -- so most of this is testing the
    manual rather than the derivation. */
+/* SHUP and SHDN. The asymmetry is the point: raising costs, lowering is free.
+   Manual l.339-342. */
+static void test_shields(void) {
+    uint16_t before;
+
+    puts("shields up and down");
+
+    trek_new_game(3, 4242);
+    ok(!ship.shields_up, "a new game starts with shields lowered");
+
+    before = ship.energy;
+    ok(trek_shields_up() == SHIELD_OK, "they can be raised");
+    ok(ship.shields_up,               "and read as raised");
+    ok(ship.energy == before - SHIELD_RAISE_COST,
+       "raising costs the main banks, not the shield charge");
+    ok(trek_shields_up() == SHIELD_ALREADY, "raising twice is refused");
+
+    before = ship.energy;
+    ok(trek_shields_down() == SHIELD_OK, "they can be lowered");
+    ok(!ship.shields_up,                 "and read as lowered");
+    ok(ship.energy == before, "lowering costs nothing and refunds nothing");
+    ok(trek_shields_down() == SHIELD_ALREADY, "lowering twice is refused");
+
+    /* Flat shields can still be raised. Raised and charged are independent --
+       the original distinguishes them and so must we. */
+    trek_new_game(3, 4242);
+    ship.shields = 0;
+    ok(trek_shields_up() == SHIELD_OK, "flat shields can still be raised");
+    ok(ship.shields == 0,              "which charges nothing");
+
+    /* And they cannot be raised on an empty tank. */
+    trek_new_game(3, 4242);
+    ship.energy = SHIELD_RAISE_COST - 1;
+    ok(trek_shields_up() == SHIELD_NO_ENERGY,
+       "too little energy to raise is refused");
+    ok(!ship.shields_up,  "and they stay down");
+    ok(ship.energy == SHIELD_RAISE_COST - 1, "a refused raise costs nothing");
+
+    /* Raised shields matter to the enemy: enemy_motion adds 1000 to its
+       forces score when ours are down, so lowering them must make an enemy
+       no less aggressive. Asserted as a RELATIVE effect on purpose -- the
+       absolute thresholds are the ancestor's, calibrated to its power scale,
+       and do not transfer to ours (see MEASURED.md). The direction does. */
+    {
+        TrekEvent ev[16];
+        uint8_t mid = (uint8_t)((2 << 3) | 2);
+        uint8_t moved_up, moved_down;
+
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        ship.shields_up = 1;
+        sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+        trek_enemy_turn(ev, 16);
+        moved_up = (uint8_t)(sector[mid] != SEC_COMMAND);
+
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        ship.shields_up = 0;
+        sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+        trek_enemy_turn(ev, 16);
+        moved_down = (uint8_t)(sector[mid] != SEC_COMMAND);
+
+        ok(moved_up && !moved_down,
+           "shields up drives a Commander off; lowering them makes it hold");
+    }
+}
+
 static void test_docking(void) {
     TrekEvent ev[16];
     uint8_t n, i;
@@ -952,9 +1019,15 @@ static void test_enemy_movement(void) {
 
     puts("enemy movement");
 
+    /* A crippled ship invites attack: shields down, banks empty, no
+       torpedoes. Those are the three terms enemy_motion subtracts for, so
+       this is the unambiguous "advance" case rather than one that depends on
+       where the ancestor's thresholds happen to fall. */
     trek_new_game(3, 31337);
     ship.sec_y = 4; ship.sec_x = 4;
-    ship.shields_up = 0;              /* shields down makes them bold */
+    ship.shields_up = 0;
+    ship.energy = 0;
+    ship.torps  = 0;
     sector[(0 << 3) | 0] = SEC_COMMAND;
     enemy_hp[(0 << 3) | 0] = HP_COMMAND;
 
@@ -988,6 +1061,7 @@ static void test_enemy_movement(void) {
     /* Nothing may land on the ship's own cell. */
     trek_new_game(3, 31337);
     ship.sec_y = 4; ship.sec_x = 4;
+    ship.shields_up = 0; ship.energy = 0; ship.torps = 0;
     sector[(4 << 3) | 4] = SEC_SHIP;
     sector[(4 << 3) | 5] = SEC_COMMAND;
     enemy_hp[(4 << 3) | 5] = HP_COMMAND;
@@ -1199,6 +1273,7 @@ int main(void) {
     test_bearing();
     test_expran();
     test_event_queue();
+    test_shields();
     test_docking();
     test_base_relief();
     test_torpedo();

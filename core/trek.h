@@ -402,6 +402,31 @@ void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
 
 uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
 
+/* Shields up and down -- SHUP and SHDN.
+ *
+ * From the manual (l.339-342): "Raising the shields draws a small amount of
+ * energy from the main energy banks so you do not want to raise the shields
+ * needlessly. Lowering shields causes no energy change." So the cost is
+ * asymmetric on purpose, and SHIELD_RAISE_COST above is that small amount.
+ *
+ * Note `shields_up` and `shields` are independent: the first is whether they
+ * are raised, the second how much charge they hold. Raising flat shields is
+ * allowed and useless, exactly as it is in the original -- the manual makes
+ * the same distinction when it says enemy fire drains the shields while they
+ * hold and reaches main energy once they do not.
+ *
+ * Also from the manual (l.578-583): raising them turns the ship's own glyph
+ * on the short range scanner yellow, and lowering returns it to white. That
+ * is a UI consequence, but it is a game rule -- it is how the player reads
+ * the state at a glance -- so it is recorded here rather than left to the
+ * presentation layer to invent. */
+#define SHIELD_OK          0
+#define SHIELD_ALREADY     1
+#define SHIELD_NO_ENERGY   2   /* main banks cannot pay the raising cost */
+
+uint8_t trek_shields_up(void);
+uint8_t trek_shields_down(void);
+
 
 /* MEASURED: floor(20 * elapsed_stardates), and it does NOT divide between
    damaged systems -- two damaged at once each repaired at the full rate. The

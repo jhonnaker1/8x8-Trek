@@ -69,7 +69,15 @@ static void clear_panel(unsigned char p) {
    enemy type readable by hue. */
 static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
     switch (c) {
-        case SEC_SHIP:       *color = COL_SHIP;
+        case SEC_SHIP:
+                             /* Yellow with the shields raised, white with
+                                them down. Not decoration -- the manual makes
+                                it the way the player reads shield state at a
+                                glance: "the image of your ship on the short
+                                range scanner will change to yellow" (l.580),
+                                and SHDN "will return to white" (l.586). */
+                             *color = ship.shields_up
+                                      ? EGA_TO_VDC(EGA_YELLOW) : COL_SHIP;
                              return SC_LETTER('E');
         case SEC_STAR:       *color = COL_STAR;
                              return SC_STAR;
