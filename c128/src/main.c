@@ -397,7 +397,7 @@ static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
 /* Every command that costs a turn ends here: the enemy shoots back and the
    console reports it. Without this there is no game, only a shooting
    gallery. */
-static void enemy_turn(void) {
+static void enemy_turn(uint8_t player_fired) {
     TrekEvent ev[12];
     uint8_t n, i, k;
 
@@ -407,7 +407,9 @@ static void enemy_turn(void) {
        us to another quadrant, which is exactly why the enemy turn is
        evaluated after it and not before. */
     n = trek_run_events(ev, 12);
-    if (n < 12) n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n)));
+    if (n < 12)
+        n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n),
+                                          player_fired));
 
     for (i = 0; i < n; i++) {
         k = 0;
@@ -500,10 +502,33 @@ static void do_torpedo(const char *line) {
     }
 
     ui_dialog_line("TRACKING...");
-    switch (trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1))) {
-        case TORP_KILL: ui_dialog_line("MONGOL DESTROYED!");     break;
-        case TORP_MISS: ui_dialog_line("TORPEDO MISSED.");       break;
-        default:        ui_dialog_line("TUBES CANNOT FIRE.");    break;
+    {
+        uint16_t dmg = 0;
+        uint8_t  r = trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
+                                       &dmg);
+        switch (r) {
+            case TORP_KILL:
+                ui_dialog_line("MONGOL DESTROYED!");
+                break;
+            case TORP_OK: {
+                /* New: a Commander survives one. MEASURED -- torpedo damage
+                   caps at 355 and a Commander has 695, so this branch was
+                   unreachable before today. */
+                uint8_t k = put_str(linebuf, "MONGOL DAMAGED -- ");
+                k += put_u16(linebuf + k, dmg);
+                k += put_str(linebuf + k, " UNIT HIT");
+                linebuf[k] = 0;
+                ui_dialog_line(linebuf);
+                break;
+            }
+            case TORP_MISS:
+                /* The original's own wording, read off its screen. */
+                ui_dialog_line("CLEAN MISS, SIR!");
+                break;
+            default:
+                ui_dialog_line("TUBES CANNOT FIRE.");
+                break;
+        }
     }
     ui_dialog_close();
 }
@@ -534,13 +559,15 @@ int main(void) {
 
         c = (unsigned char)cmd[0];
 
-        if (c == KB_M)      { do_move(cmd);    enemy_turn(); }
-        else if (c == KB_L) { do_lasers();     enemy_turn(); }
-        else if (c == KB_T) { do_torpedo(cmd); enemy_turn(); }
-        else if (c == KB_D) { do_dock();       enemy_turn(); }
-        else if (c == KB_S) { do_shields();    enemy_turn(); }
-        else if (c == KB_E) { do_energy();     enemy_turn(); }
-        else if (c == KB_X) { do_max_energy(); enemy_turn(); }
+        /* Only L and T pass 1: enemies manoeuvre when we shoot at them, not
+           merely when a turn passes. MEASURED -- see trek.h. */
+        if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
+        else if (c == KB_L) { do_lasers();     enemy_turn(1); }
+        else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
+        else if (c == KB_D) { do_dock();       enemy_turn(0); }
+        else if (c == KB_S) { do_shields();    enemy_turn(0); }
+        else if (c == KB_E) { do_energy();     enemy_turn(0); }
+        else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
         else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
         else if (c)          ui_message("COMPUTER: ", "M W L T D S)HLD E X)MAX Q");

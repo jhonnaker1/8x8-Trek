@@ -609,16 +609,59 @@ uint8_t trek_docked_safe(void);
 /* Every enemy in the quadrant fires. Returns how many events were written.
    Damage lands on the shields first and on the main banks after those are
    gone, which is what the original does. */
-uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max);
+/* `player_fired` non-zero if the command that ended the turn was an attack.
+   MEASURED 2026-08-21: enemies move when the player FIRES, not merely when a
+   turn passes. They moved after every volley across a torpedo session, while
+   twenty-six consecutive impulse-move turns the day before produced no motion
+   at all from two enemies -- shields up and down, and with the clock forced
+   across a scheduled event. */
+uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 
 /* Fire one torpedo at a sector. A torpedo destroys a standard Mongol
    outright, confirmed against the original. */
-#define TORP_OK          0
+#define TORP_OK          0   /* hit, target survived */
 #define TORP_KILL        1
 #define TORP_MISS        2
 #define TORP_NONE_LEFT   3
 #define TORP_BAD_COORDS  4
-uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx);
+
+/* Torpedo damage. MEASURED 2026-08-21 against the original, by writing a large
+ * hit-point value into the target so it SURVIVES the shot and then reading the
+ * damage out of the enemy table -- the game never prints it, which is what had
+ * kept this unmeasurable. Nineteen shots at three ranges:
+ *
+ *     range 1.41-2.24   6 shots   355 every time, no variance
+ *     range 5.00        6 shots   210, 355, 355, 247, 209, 296
+ *     range 7.62        7 shots   176, 209, 229, 247, and three misses
+ *
+ * CONFIRMED: 355 is a CAP, not the damage. It binds every time up close --
+ * which is exactly why one torpedo has always killed a 355-hit-point
+ * battleship and nothing ever survived to report a figure -- binds twice in
+ * six at range 5, and never at 7.6. A Commander takes 355 as well, so the cap
+ * is a constant and not the target's own strength.
+ *
+ * The tactical consequence: a Commander SURVIVES a torpedo at 695-355=340 and
+ * needs two.
+ *
+ * FITTED: the base and the spread. 500 through the same falloff our lasers use
+ * plus a 0..100 roll reproduces all three ranges -- always capped inside 2.5,
+ * capped 37% of the time at range 5 against 33% observed, and 183..283 at 7.6
+ * against 176..247 observed. Nineteen shots is not many for three constants,
+ * and the ancestor's own 700+100*Rand() is a different base entirely. */
+#define TORP_MAX_DAMAGE      355   /* MEASURED, the cap */
+#define TORP_BASE            500   /* FITTED, before falloff */
+#define TORP_SPREAD          101   /* FITTED, a 0..100 roll on top */
+
+/* Accuracy, MEASURED the same day: 6/6 inside range 2.24, 6/6 at range 5.00,
+ * 4/7 at 7.62. Certain out to five and degrading past it. The original
+ * announces a miss as "Clean miss, sir!".
+ *
+ * FITTED from one long-range block, so the slope is soft: 16% per unit past
+ * the sure range gives 68% at range 7 where 4/7 was seen. */
+#define TORP_SURE_DIST         5   /* whole sectors; inside this it cannot miss */
+#define TORP_MISS_PCT_PER_UNIT 16
+/* `damage` receives the figure delivered; pass NULL if not wanted. */
+uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage);
 
 /* Mission state. */
 #define GAME_ON          0

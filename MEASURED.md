@@ -1894,6 +1894,20 @@ before reading the table above as a pure accuracy curve:
    on the first occupant, which need not be the target -- see the supernova
    below.
 
+### Landed in the port
+
+`trek_fire_torpedo()` now takes a `uint16_t *damage` out-parameter, deals
+`min(355, 500 * (1 - d/12) + rand(0..100))`, and returns `TORP_OK` when the
+target lives -- a branch that was unreachable before, because the old code
+zeroed whatever it hit. Accuracy is certain inside five sectors and degrades
+at 16% per sector past it. The C128 reports a survivor as "MONGOL DAMAGED --
+n UNIT HIT" and a miss in the original's own words, "CLEAN MISS, SIR!".
+
+Still NOT implemented, deliberately: the ray-march, and therefore the
+supernova below. One observation, and several unknowns behind it -- whether
+every enemy always dies, where the ship is thrown, how the damage scales. It
+needs its own session.
+
 ## Torpedoes detonate stars, and a supernova is enormous
 
 Firing from 5-3 at an enemy in 2-7, the ray passed through a star at 4-4:

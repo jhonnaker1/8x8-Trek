@@ -1059,11 +1059,14 @@ static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
-uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
+uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
 
-    enemies_move(ev, &n, max);
+    /* Only on an attack -- see trek.h. This is a different trigger from the
+       ancestor's, where moveklings() runs from the turn resolution whatever
+       the player did. */
+    if (player_fired) enemies_move(ev, &n, max);
 
     /* NOT here, deliberately: the ancestor drains a quarter of an enemy's
        power every time it fires. Tested directly against the original -- five
@@ -1141,9 +1144,11 @@ uint16_t trek_bearing(uint8_t sy, uint8_t sx) {
 
 /* ---------------------------------------------------------------- torps */
 
-uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx) {
-    uint8_t cell;
+uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
+    uint8_t  cell, whole;
+    uint16_t d, dmg;
 
+    if (damage) *damage = 0;
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return TORP_BAD_COORDS;
     if (ship.torps == 0) return TORP_NONE_LEFT;
 
@@ -1152,10 +1157,31 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx) {
 
     if (!SEC_IS_ENEMY(sector[cell])) return TORP_MISS;
 
-    /* CONFIRMED: one torpedo destroys an undamaged standard Mongol outright.
-       It killed a 355-hit-point battleship at range 3.0 with no damage
-       figure printed, which is why torpedo damage itself is still unknown --
-       nothing has ever survived one to report a number. */
+    d     = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
+    whole = (uint8_t)(d >> 8);
+
+    /* Certain inside the sure range, then degrading. MEASURED: 6/6, 6/6, 4/7
+       at ranges 2.24, 5.00 and 7.62. */
+    if (whole > TORP_SURE_DIST) {
+        uint8_t miss = (uint8_t)((whole - TORP_SURE_DIST) * TORP_MISS_PCT_PER_UNIT);
+        if (miss > 90) miss = 90;
+        if (trek_rand_n(100) < miss) return TORP_MISS;
+    }
+
+    /* Same falloff the lasers use, at full efficiency -- torpedoes carry their
+       own charge, so the ship's laser heat and battle damage do not enter. */
+    dmg = trek_laser_damage(TORP_BASE, 100, d);
+    dmg = (uint16_t)(dmg + trek_rand_n(TORP_SPREAD));
+    if (dmg > TORP_MAX_DAMAGE) dmg = TORP_MAX_DAMAGE;
+    if (damage) *damage = dmg;
+
+    /* It no longer always kills. A Commander at 695 walks away from one with
+       340 left, which is MEASURED and is the whole point of the change. */
+    if (dmg < enemy_hp[cell]) {
+        enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dmg);
+        return TORP_OK;
+    }
+
     if (sector[cell] == SEC_COMMAND) ship.killed_cmd++;
     else                             ship.killed++;
 

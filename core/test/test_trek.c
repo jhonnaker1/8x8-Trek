@@ -603,7 +603,7 @@ static uint16_t fire_amount(const TrekEvent *ev, uint8_t n) {
 static uint8_t fire_turn(TrekEvent *ev, uint8_t max) {
     uint8_t tries, n;
     for (tries = 0; tries < 40; tries++) {
-        n = trek_enemy_turn(ev, max);
+        n = trek_enemy_turn(ev, max, 1);
         if (fire_amount(ev, n) > 0) return n;
         if (ship.lost) break;
     }
@@ -760,14 +760,14 @@ static void test_shields(void) {
         ship.sec_y = 4; ship.sec_x = 4;
         ship.shields_up = 1;
         sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
-        trek_enemy_turn(ev, 16);
+        trek_enemy_turn(ev, 16, 1);
         moved_up = (uint8_t)(sector[mid] != SEC_COMMAND);
 
         trek_new_game(3, 31337);
         ship.sec_y = 4; ship.sec_x = 4;
         ship.shields_up = 0;
         sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
-        trek_enemy_turn(ev, 16);
+        trek_enemy_turn(ev, 16, 1);
         moved_down = (uint8_t)(sector[mid] != SEC_COMMAND);
 
         ok(moved_up && !moved_down,
@@ -864,7 +864,7 @@ static void test_docking(void) {
     trek_dock();
     ship.shields = 0;             /* our own shields are flat */
     ship.energy  = ENERGY_START;
-    n = trek_enemy_turn(ev, 16);
+    n = trek_enemy_turn(ev, 16, 1);
     ok(ship.energy == ENERGY_START,
        "docked at a StarBase, enemy fire does not reach the hull");
     for (i = 0; i < n; i++)
@@ -1044,7 +1044,7 @@ static void test_enemy_movement(void) {
     sector[(0 << 3) | 0] = SEC_COMMAND;
     enemy_hp[(0 << 3) | 0] = HP_COMMAND;
 
-    n = trek_enemy_turn(ev, 16);
+    n = trek_enemy_turn(ev, 16, 1);
     ok(sector[(0 << 3) | 0] != SEC_COMMAND, "a strong enemy leaves its cell");
 
     for (cell = 0, moved = 0; cell < QUAD_CELLS; cell++)
@@ -1078,7 +1078,7 @@ static void test_enemy_movement(void) {
     sector[(4 << 3) | 4] = SEC_SHIP;
     sector[(4 << 3) | 5] = SEC_COMMAND;
     enemy_hp[(4 << 3) | 5] = HP_COMMAND;
-    trek_enemy_turn(ev, 16);
+    trek_enemy_turn(ev, 16, 1);
     ok(sector[(4 << 3) | 4] == SEC_SHIP, "an enemy never steps onto the ship");
     ok(sector[(4 << 3) | 5] == SEC_COMMAND, "and so stays where it was");
 
@@ -1089,7 +1089,7 @@ static void test_enemy_movement(void) {
     wall_in(2, 4);
     sector[(2 << 3) | 4] = SEC_BATTLESHIP;
     enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
-    for (i = 0; i < 5; i++) trek_enemy_turn(ev, 16);
+    for (i = 0; i < 5; i++) trek_enemy_turn(ev, 16, 1);
     ok(enemy_hp[(2 << 3) | 4] == HP_BATTLESHIP,
        "five turns of firing cost the enemy no hit points");
 }
@@ -1181,7 +1181,7 @@ static void test_enemy_turn(void) {
         for (i = 0; i < 200; i++) {
             uint8_t n2;
             ship.shields = 30000;      /* keep the ship alive for the count */
-            n2 = trek_enemy_turn(ev, 16);
+            n2 = trek_enemy_turn(ev, 16, 1);
             /* Scan only this turn's events. Passing the array size instead
                would re-read last turn's shot out of the untouched tail. */
             if (fire_amount(ev, n2) > 0) fired++;
@@ -1189,6 +1189,36 @@ static void test_enemy_turn(void) {
         if (fired <= 70 || fired >= 130) printf("    (fired %d of 200)\n", fired);
         ok(fired > 70 && fired < 130,
            "enemies fire on roughly half their turns, not every one");
+    }
+
+    /* Movement is triggered by the player attacking, not by the turn.
+       MEASURED: enemies moved after every volley in a torpedo session, while
+       twenty-six consecutive impulse-move turns produced none at all. */
+    {
+        int i;
+        uint8_t start;
+        trek_new_game(3, 31337);
+        ship.sec_y = 8; ship.sec_x = 8;
+        sector[(1 << 3) | 1] = SEC_COMMAND;
+        enemy_hp[(1 << 3) | 1] = HP_COMMAND;
+        /* Crippled, so enemy_motion definitely wants to close. Otherwise this
+           tests the motion thresholds -- which are known wrong, MEASURED --
+           instead of the trigger it is about. */
+        ship.energy = 0; ship.torps = 0; ship.shields_up = 0;
+        start = sector[(1 << 3) | 1];
+        for (i = 0; i < 30; i++) {
+            ship.shields = 30000; ship.energy = 0; ship.torps = 0;
+            trek_enemy_turn(ev, 16, 0);          /* a turn we did not fire on */
+        }
+        ok(sector[(1 << 3) | 1] == start,
+           "an enemy holds position on a turn the player did not fire");
+
+        for (i = 0; i < 30; i++) {
+            ship.shields = 30000; ship.energy = 0; ship.torps = 0;
+            trek_enemy_turn(ev, 16, 1);          /* a turn we did */
+        }
+        ok(sector[(1 << 3) | 1] != start,
+           "and manoeuvres once we shoot at it");
     }
 
     /* Shields gone: the rest lands on the main banks. */
@@ -1204,29 +1234,73 @@ static void test_enemy_turn(void) {
 
 static void test_torpedo(void) {
     uint8_t r;
+    uint16_t dmg;
     puts("torpedoes");
 
     trek_new_game(3, 777);
     ok(ship.torps == 9, "nine torpedoes at the start");
 
+    /* Close in, where the measured cap binds every time, so the outcome is
+       deterministic and the test has no coin to flip. */
     ship.sec_y = 4; ship.sec_x = 4;
-    sector[(1 << 3) | 1] = SEC_BATTLESHIP;
-    enemy_hp[(1 << 3) | 1] = HP_BATTLESHIP;
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
     ship.enemies_left = 5;
 
-    r = trek_fire_torpedo(1, 1);
-    ok(r == TORP_KILL,               "one torpedo destroys a battleship");
+    r = trek_fire_torpedo(2, 4, &dmg);
+    ok(r == TORP_KILL,               "one torpedo destroys a battleship up close");
+    ok(dmg == TORP_MAX_DAMAGE,       "for exactly the measured 355");
     ok(ship.torps == 8,              "and costs a torpedo");
-    ok(sector[(1 << 3) | 1] == SEC_EMPTY, "the sector is cleared");
+    ok(sector[(2 << 3) | 4] == SEC_EMPTY, "the sector is cleared");
     ok(ship.enemies_left == 4,       "the galaxy counter drops");
     ok(ship.killed == 1,             "counted as a standard Mongol");
 
-    r = trek_fire_torpedo(7, 7);
+    /* The change this measurement bought: a Commander walks away from one.
+       MEASURED on the original -- the cap is a constant, not the target's own
+       strength, so 695 - 355 = 340. */
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_COMMAND;
+    enemy_hp[(2 << 3) | 4] = HP_COMMAND;
+    r = trek_fire_torpedo(2, 4, &dmg);
+    ok(r == TORP_OK,                 "a Commander SURVIVES a torpedo");
+    ok(dmg == TORP_MAX_DAMAGE,       "taking the same capped 355");
+    ok(enemy_hp[(2 << 3) | 4] == HP_COMMAND - TORP_MAX_DAMAGE,
+       "and is left with 340");
+    ok(sector[(2 << 3) | 4] == SEC_COMMAND, "still there, still a Commander");
+    ok(ship.killed_cmd == 0,         "and is not counted as a kill");
+
+    /* Accuracy: certain inside the sure range, fallible past it. */
+    {
+        int i, hits = 0, far_hits = 0;
+        trek_new_game(3, 777);
+        ship.sec_y = 1; ship.sec_x = 1;
+        for (i = 0; i < 60; i++) {
+            sector[(4 << 3) | 4] = SEC_COMMAND;      /* distance 4.24 */
+            enemy_hp[(4 << 3) | 4] = 60000;
+            ship.torps = 9;
+            if (trek_fire_torpedo(4, 4, &dmg) != TORP_MISS) hits++;
+
+            /* (7,7) not (8,8): sector indices are 0..7, and 8 returns
+               TORP_BAD_COORDS, which this loop first miscounted as a hit. */
+            sector[(7 << 3) | 7] = SEC_COMMAND;      /* distance 8.49 */
+            enemy_hp[(7 << 3) | 7] = 60000;
+            ship.torps = 9;
+            if (trek_fire_torpedo(7, 7, &dmg) != TORP_MISS) far_hits++;
+        }
+        ok(hits == 60,      "inside the sure range a torpedo cannot miss");
+        ok(far_hits < 50,   "at long range it can");
+        ok(far_hits > 10,   "but not always");
+    }
+
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    r = trek_fire_torpedo(7, 7, &dmg);
     ok(r == TORP_MISS,   "firing at empty space misses");
-    ok(ship.torps == 7,  "and still costs a torpedo");
+    ok(dmg == 0,         "and reports no damage");
 
     ship.torps = 0;
-    ok(trek_fire_torpedo(1, 1) == TORP_NONE_LEFT, "cannot fire without any");
+    ok(trek_fire_torpedo(1, 1, &dmg) == TORP_NONE_LEFT, "cannot fire without any");
 }
 
 static void test_game_state_and_score(void) {
