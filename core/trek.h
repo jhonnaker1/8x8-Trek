@@ -439,17 +439,36 @@ uint8_t trek_shields_down(void);
 #define SRSCAN_FULL          90
 #define SRSCAN_BLIND         50
 
-/* PROVISIONAL. Enemy fire is the one part of combat that resisted
-   measurement -- see MEASURED.md for two withdrawn attempts. What IS known:
-   the printed figure is the real damage, it comes out of shields first, and
-   a ship at 41 of 355 hit points fired far weaker than its undamaged
-   companions. So the shape here is a per-class energy scaled by remaining
-   strength, through the same falloff our lasers use. The falloff is
-   borrowed, not measured, and the per-class numbers are invented. */
-#define ENEMY_FIRE_BATTLESHIP  200
-#define ENEMY_FIRE_COMMAND     300
-#define ENEMY_FIRE_SCOUT       120
-#define ENEMY_FIRE_SUPPLY      100
+/* Enemy fire. MEASURED 2026-08-21 by a controlled run against the original --
+   one enemy, its hit points written back every turn, our sector fixed, damage
+   read out of the pinned pools and corrected for death pods. See MEASURED.md.
+ *
+ * CONFIRMED: the amount depends on the firer's REMAINING HIT POINTS and not
+ * on its class. A supply ship at its own 120 hit points was effectively
+ * silent; writing 695 into that same ship -- same class, same sector, same
+ * range -- it fired 496, 515, 499, 527 immediately. So there is no per-class
+ * table to keep: hit points already carry the class difference. The four
+ * invented ENEMY_FIRE_* constants that used to live here are gone.
+ *
+ * CONFIRMED: raising shields does not reduce the figure. 358 against 367 at
+ * one range with five firing turns each.
+ *
+ * FITTED: the coefficient. Damage over hit points read 0.733 at range 2.828,
+ * 0.511 at 4.243 and 0.522 at 5.657, and 90% through our own laser falloff is
+ * the best single number across those three.
+ *
+ * NOT MEASURED, and known to be wrong: the falloff SHAPE. Those last two
+ * ranges are indistinguishable, which no falloff reaching zero at 12 allows.
+ * The real curve flattens into a floor somewhere near half the firer's hit
+ * points. It is left alone here rather than fitted to three points, all of
+ * which were diagonal offsets. */
+#define ENEMY_FIRE_PCT          90   /* percent of hit points, before falloff */
+
+/* MEASURED: enemies hold fire on about half of their turns -- 5/10, 5/10,
+   7/10 and 4/8 across four blocks. Not an artefact of dropped turns: a
+   dropped turn shows up as a zero followed by a doubled reading, and the
+   surviving figures were tight with no doubles. */
+#define ENEMY_FIRE_ONE_IN        2
 
 /* PROVISIONAL: a hit that gets past the shields can wreck a system. The
    original clearly does this -- a single ambush took out the scanner, life

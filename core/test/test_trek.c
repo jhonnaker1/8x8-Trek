@@ -191,7 +191,7 @@ static void test_reveal(void) {
 static void test_impulse(void) {
     uint16_t e0;
     uint16_t t0;
-    uint8_t r, oy, ox, ty, tx, found = 0;
+    uint8_t r, oy, ox, ty = 0, tx = 0, found = 0;
     int i;
 
     puts("impulse movement");
@@ -594,6 +594,19 @@ static uint16_t fire_amount(const TrekEvent *ev, uint8_t n) {
     for (i = 0; i < n; i++)
         if (ev[i].kind == EV_HIT || ev[i].kind == EV_SHIELD_HOLD)
             return ev[i].amount;
+    return 0;
+}
+
+/* Enemies hold fire on about half their turns, so a test that needs to see a
+   shot has to be willing to wait for one. Returns the event count of the turn
+   that fired, or 0 if none did in a generous number of tries. */
+static uint8_t fire_turn(TrekEvent *ev, uint8_t max) {
+    uint8_t tries, n;
+    for (tries = 0; tries < 40; tries++) {
+        n = trek_enemy_turn(ev, max);
+        if (fire_amount(ev, n) > 0) return n;
+        if (ship.lost) break;
+    }
     return 0;
 }
 
@@ -1054,7 +1067,7 @@ static void test_enemy_movement(void) {
     wall_in(1, 1);
     sector[(1 << 3) | 1] = SEC_COMMAND;
     enemy_hp[(1 << 3) | 1] = HP_COMMAND;
-    n = trek_enemy_turn(ev, 16);
+    n = fire_turn(ev, 16);
     ok(sector[(1 << 3) | 1] == SEC_COMMAND, "a boxed-in enemy holds position");
     ok(fire_amount(ev, n) > 0,              "and fires anyway");
 
@@ -1094,7 +1107,7 @@ static void test_enemy_turn(void) {
     enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
 
     before = ship.shields;
-    n = trek_enemy_turn(ev, 16);
+    n = fire_turn(ev, 16);
     ok(n >= 1, "an enemy in the quadrant fires");
     ok(ship.shields < before, "shields absorb it");
     ok(ship.energy == ENERGY_START, "main energy is untouched while shields hold");
@@ -1108,13 +1121,14 @@ static void test_enemy_turn(void) {
        compares two things at once. */
     {
         uint16_t strong, weak;
+        uint8_t nf;
         trek_new_game(3, 31337);
         ship.sec_y = 4; ship.sec_x = 4;
         wall_in(2, 4);
         sector[(2 << 3) | 4] = SEC_BATTLESHIP;
         enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
-        trek_enemy_turn(ev, 16);
-        strong = fire_amount(ev, 16);
+        nf = fire_turn(ev, 16);
+        strong = fire_amount(ev, nf);
         ok(sector[(2 << 3) | 4] == SEC_BATTLESHIP,
            "a walled-in enemy cannot move");
 
@@ -1123,10 +1137,58 @@ static void test_enemy_turn(void) {
         wall_in(2, 4);
         sector[(2 << 3) | 4] = SEC_BATTLESHIP;
         enemy_hp[(2 << 3) | 4] = 40;
-        trek_enemy_turn(ev, 16);
-        weak = fire_amount(ev, 16);
+        nf = fire_turn(ev, 16);
+        weak = fire_amount(ev, nf);
 
         ok(weak < strong, "a wounded enemy hits for less");
+    }
+
+    /* The experiment that settled it, run against our own core: the same hit
+       points in two different classes must hit for the same amount. On the
+       original, forcing a supply ship's hit points to a Commander's made it
+       fire like a Commander. */
+    {
+        uint16_t as_supply, as_command;
+        uint8_t nf;
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
+        sector[(2 << 3) | 4]   = SEC_SUPPLY;
+        enemy_hp[(2 << 3) | 4] = 400;
+        nf = fire_turn(ev, 16);
+        as_supply = fire_amount(ev, nf);
+
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
+        sector[(2 << 3) | 4]   = SEC_COMMAND;
+        enemy_hp[(2 << 3) | 4] = 400;
+        nf = fire_turn(ev, 16);
+        as_command = fire_amount(ev, nf);
+
+        ok(as_supply > 0 && as_supply == as_command,
+           "class does not change the damage -- only hit points do");
+    }
+
+    /* And they hold fire about half the time. */
+    {
+        int i, fired = 0;
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
+        sector[(2 << 3) | 4]   = SEC_BATTLESHIP;
+        enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+        for (i = 0; i < 200; i++) {
+            uint8_t n2;
+            ship.shields = 30000;      /* keep the ship alive for the count */
+            n2 = trek_enemy_turn(ev, 16);
+            /* Scan only this turn's events. Passing the array size instead
+               would re-read last turn's shot out of the untouched tail. */
+            if (fire_amount(ev, n2) > 0) fired++;
+        }
+        if (fired <= 70 || fired >= 130) printf("    (fired %d of 200)\n", fired);
+        ok(fired > 70 && fired < 130,
+           "enemies fire on roughly half their turns, not every one");
     }
 
     /* Shields gone: the rest lands on the main banks. */
@@ -1136,7 +1198,7 @@ static void test_enemy_turn(void) {
     enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
     ship.shields = 0;
     before = ship.energy;
-    trek_enemy_turn(ev, 16);
+    fire_turn(ev, 16);
     ok(ship.energy < before, "with shields down the hit reaches main energy");
 }
 

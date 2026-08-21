@@ -855,24 +855,21 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
 
 /* ------------------------------------------------------------ the enemy */
 
-/* PROVISIONAL, and the weakest thing in this file. See trek.h: the shape is
-   a per-class energy scaled by how much of the ship is left, fired through
-   the same falloff our own lasers use. Only the falloff and the
-   remaining-strength dependence have any evidence behind them. */
-static uint16_t enemy_fire_energy(uint8_t type, uint16_t hp) {
-    uint16_t base, full;
+/* An enemy fires its remaining hit points, less a tenth. The ship's CLASS
+   does not enter into it -- see trek.h: forcing a supply ship's hit points to
+   a Commander's made it fire like a Commander, which is what removed the
+   per-class table this function used to carry.
 
-    switch (type) {
-        case SEC_COMMAND: base = ENEMY_FIRE_COMMAND;    full = HP_COMMAND;    break;
-        case SEC_SCOUT:   base = ENEMY_FIRE_SCOUT;      full = HP_SCOUT;      break;
-        case SEC_SUPPLY:  base = ENEMY_FIRE_SUPPLY;     full = HP_SUPPLY;     break;
-        default:          base = ENEMY_FIRE_BATTLESHIP; full = HP_BATTLESHIP; break;
-    }
-    if (full == 0) return 0;
-    if (hp > full) hp = full;
-    /* base * hp / full, staged so the product stays inside 16 bits: base
-       reaches 300 and hp 695, whose product does not fit. */
-    return (uint16_t)(((base / 5) * hp) / (full / 5 ? full / 5 : 1));
+   Staged so the product stays inside 16 bits -- hp * 90 would reach 62550 for
+   a Commander and overflow outright for anything wounded off a larger ship.
+   Splitting at the hundreds keeps both halves small and the result exact for
+   any percentage, which a shortcut like hp - hp/10 would not: that only
+   happens to be right because 90 divides evenly, and would quietly compute
+   83% if this constant were ever retuned to 85. */
+static uint16_t enemy_fire_energy(uint16_t hp) {
+    uint16_t whole = (uint16_t)((hp / 100) * ENEMY_FIRE_PCT);
+    uint16_t frac  = (uint16_t)(((hp % 100) * ENEMY_FIRE_PCT) / 100);
+    return (uint16_t)(whole + frac);
 }
 
 /* Damage lands on the shields first and on the main banks once those are
@@ -1077,9 +1074,15 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
         if (ship.lost) break;
 
+        /* Enemies hold fire on about half their turns. MEASURED; see trek.h.
+           This is per enemy and per turn, so a quadrant full of them still
+           delivers something most turns -- it is the single duel that goes
+           quiet, which is where it was measured. */
+        if (trek_rand_n(ENEMY_FIRE_ONE_IN)) continue;
+
         d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
                       abs_diff((uint8_t)(cell & 7), ship.sec_x));
-        energy = enemy_fire_energy(sector[cell], enemy_hp[cell]);
+        energy = enemy_fire_energy(enemy_hp[cell]);
         dmg = trek_laser_damage(energy, 100, d);
         if (dmg == 0) continue;
 
