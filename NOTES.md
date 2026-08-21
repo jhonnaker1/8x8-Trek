@@ -529,11 +529,18 @@ checklist of *which situations need a message*, not as text to copy.
    automatable verification loop.** AltirraSDL plus AltirraBridge
    (`~/AltirraBridge-nightly-macos-arm64`) can drive an Atari headlessly —
    screenshots, frame-stepping, memory and CPU reads, breakpoints, injected
-   input. VICE offers nothing equivalent here: its remote monitor halts
-   emulation on connect and `screencapture` has no display access, so the C128
-   leg can only be checked by eye. Item 1 above is unresolved for exactly that
-   reason. A port whose output can be asserted on in a test is a materially
-   different proposition from one that cannot.
+   input. ~~VICE offers nothing equivalent here~~ -- that stopped being
+   true on 2026-08-19. `tools/vice_mon.py` drives VICE's binary monitor:
+   screenshots, memory reads and writes, symbol lookup from the linked map,
+   and key injection, all verified end to end. The monitor DOES halt the
+   machine on its first command, which is what the original claim was really
+   about, but `CMD_EXIT` resumes it and the tool does that automatically.
+
+   So this argument for VBXE is withdrawn: both legs are automatable now, and
+   the port order should be decided on the merits of the targets rather than
+   on which one can be tested. A port whose output can be asserted on in a
+   test is still a materially different proposition from one that cannot --
+   that part stands, it just no longer distinguishes these two.
 
 ## Platform suitability (from the Uno lineup)
 
@@ -895,9 +902,9 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `Q)uit` | quit | **done** |
 | `T)orps` | fire torpedoes | **done** |
 | `W)arp` | set warp speed | **done** |
-| `E)nergy` | energy transfer | core `trek_divert()` exists and is tested — **wiring only** |
-| `SHUP` / `SHDN` | shields up / down (arrow keys) | core models `shields_up` and the enemy turn reads it — **wiring only** |
-| `MAX` | divert maximum energy to shields | `trek_divert()` again — **wiring only** |
+| `E)nergy` | energy transfer | **done** (4de6758) |
+| `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
+| `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | needs the modal dialog we already have |
 | `MSGS` | review old messages | needs a longer log than the four boxes hold |
 | `C)hart` | chart of known galaxy | the console shows it permanently; may be redundant here |
@@ -993,7 +1000,10 @@ combat, movement, repair, events, docking and scoring. Of what remains open:
 
 **Available as shape only**
 
-- Enemy hit points as rolled bands rather than constants (MEASURED.md).
+- ~~Enemy hit points as rolled bands rather than constants.~~ SETTLED
+  2026-08-21: they are fixed per class. Do not port SST's bands. The
+  readings that looked like variation were ships a death pod had already
+  been through.
 - Enemy counts per skill, for MEASURED open item 1.
 - `mayday()` as a rough model for `HAIL`, though the semantics differ.
 
