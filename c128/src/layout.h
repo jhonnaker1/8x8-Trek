@@ -78,4 +78,14 @@ extern const Panel panels[PANEL_COUNT];
 
 void draw_console(void);
 
+
+/* The STATE OF REPAIR report draws its own box rather than using the modal
+   dialog: twelve systems plus three header lines do not fit the dialog's
+   thirteen, and the original gives the report a panel of its own. Here rather
+   than in ui.c so the tests can address it. */
+#define REP_X    18
+#define REP_Y     3
+#define REP_W    44
+#define REP_H    19
+
 #endif

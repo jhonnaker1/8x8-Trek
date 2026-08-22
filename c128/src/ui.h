@@ -37,4 +37,10 @@ void ui_dialog_line(const char *text);
 void ui_dialog_ask(const char *prompt, char *buf, uint8_t max);
 void ui_dialog_close(void);
 
+/* The STATE OF REPAIR report: every system's condition, and how long it would
+   take to mend docked and adrift. Its own screen rather than a dialog line
+   because twelve systems plus headers do not fit the modal box, and because
+   the original gives it a full-width panel of its own. */
+void ui_repair_report(void);
+
 #endif

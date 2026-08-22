@@ -270,8 +270,14 @@ static void test_colours(void) {
     set_all(100); screen_reset(); ui_draw_systems();
     check(attr[y][x] == EGA_TO_VDC(EGA_LTGREEN), "100% is green");
 
+    set_all(95); screen_reset(); ui_draw_systems();
+    check(attr[y][x] == EGA_TO_VDC(EGA_YELLOW), "95% is yellow, not green");
+
     set_all(70); screen_reset(); ui_draw_systems();
     check(attr[y][x] == EGA_TO_VDC(EGA_YELLOW), "70% is yellow");
+
+    set_all(55); screen_reset(); ui_draw_systems();
+    check(attr[y][x] == EGA_TO_VDC(EGA_YELLOW), "55% is yellow");
 
     set_all(40); screen_reset(); ui_draw_systems();
     check(attr[y][x] == EGA_TO_VDC(EGA_LTRED), "40% is red");
@@ -293,6 +299,59 @@ static void test_independent(void) {
         if (want == 0 && pct != 0) want = 1;
         sprintf(msg, "system %u at %u%% draws %u cells", i, pct, want);
         check(bar_len(i) == want, msg);
+    }
+}
+
+
+/* ------------------------------------------------ state of repair report */
+
+/* Reads a run of cells back as text, so a test can assert what the report
+   actually printed rather than that it printed something. */
+static void row_text(unsigned char y, unsigned char x, unsigned char n, char *out) {
+    unsigned char i;
+    for (i = 0; i < n; i++) out[i] = (char)cell[y][x + i];
+    out[n] = 0;
+}
+
+static void test_repair_report(void) {
+    char buf[32];
+    unsigned char i;
+
+    set_all(100);
+    ship.sys[SYS_CONVERTER] = 40;    /* 60 points to mend */
+    ship.sys[SYS_LASERS]    = 65;
+    screen_reset();
+    ui_repair_report();
+
+    /* MEASURED off the original at these very percentages: 40% took 1.3
+       docked and 3.0 adrift. Ours is computed from REPAIR_PER_STARDATE and
+       its docked twin, so this asserts the two agree. */
+    row_text((unsigned char)(REP_Y + 4), (unsigned char)(REP_X + 25), 3, buf);
+    check(strcmp(buf, "1.3") == 0, "40% mends in 1.3 stardates docked");
+    row_text((unsigned char)(REP_Y + 4), (unsigned char)(REP_X + 34), 3, buf);
+    check(strcmp(buf, "3.0") == 0, "and 3.0 adrift, as the original printed");
+
+    /* An undamaged system prints no time at all -- twelve rows of 0.0 would
+       be noise, and the original leaves them blank. */
+    row_text((unsigned char)(REP_Y + 4 + SYS_SHIELDS), (unsigned char)(REP_X + 25), 3, buf);
+    check(strcmp(buf, "   ") == 0, "an undamaged system shows no repair time");
+
+    /* Colour follows the same measured rule as the bars. */
+    check(attr[REP_Y + 4][REP_X + 2] == EGA_TO_VDC(EGA_LTRED),
+          "40% names the system in red");
+    check(attr[REP_Y + 4 + SYS_LASERS][REP_X + 2] == EGA_TO_VDC(EGA_YELLOW),
+          "65% in yellow");
+    check(attr[REP_Y + 4 + SYS_SHIELDS][REP_X + 2] == EGA_TO_VDC(EGA_LTGREEN),
+          "100% in green");
+
+    /* Every row inside the box, every system named. */
+    for (i = 0; i < SYS_COUNT; i++) {
+        char msg[64];
+        unsigned char yy = (unsigned char)(REP_Y + 4 + i);
+        sprintf(msg, "row %u sits inside the report box", i);
+        check(yy < (unsigned char)(REP_Y + REP_H - 2), msg);
+        sprintf(msg, "row %u names a system", i);
+        check(cell[yy][REP_X + 2] != 32, msg);
     }
 }
 
@@ -531,6 +590,7 @@ int main(void) {
     test_bar_glyph();
     test_bar_length();
     test_colours();
+    test_repair_report();
     test_independent();
 
     test_badge_stays_inside();

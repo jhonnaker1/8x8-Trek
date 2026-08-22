@@ -321,16 +321,14 @@ static const char *const sys_abbrev[SYS_COUNT] = {
     "IMP", "SRS", "LRS", "CMP", "TRN", "SHT"
 };
 
-/* FITTED. Poking the repair array in the original showed a full green bar at
-   100, a short yellow one at 70 and a short red one at 40 (MEASURED.md), so
-   the green threshold is somewhere in (70,100] and the yellow one in (40,70].
-   90 and 50 are chosen because they are the two numbers the game already
-   uses for the scanners -- the manual states them and the redraw code at
-   0x01C37C compares against exactly those constants. Consistent with every
-   reading, but not pinned down by one. */
+/* MEASURED 2026-08-21 off the original's STATE OF REPAIR screen, which colours
+   each system by the same rule the bars use: 100% green; 95, 65 and 55 all
+   yellow; 40, 10 and 0 all red. So green means undamaged and nothing else, and
+   the red boundary sits between 40 and 55. An earlier version guessed 90 and
+   50 from three readings; the 95 seen yellow is what moved the green line. */
 static unsigned char sys_color(unsigned char pct) {
-    if (pct >= 90) return EGA_TO_VDC(EGA_LTGREEN);
-    if (pct >= 50) return EGA_TO_VDC(EGA_YELLOW);
+    if (pct >= 100) return EGA_TO_VDC(EGA_LTGREEN);
+    if (pct >= 50)  return EGA_TO_VDC(EGA_YELLOW);
     return EGA_TO_VDC(EGA_LTRED);
 }
 
@@ -845,4 +843,78 @@ void ui_draw_all(void) {
     ui_draw_viewer();
     ui_draw_position();
     msg_redraw();
+}
+
+/* ------------------------------------------------ state of repair report */
+
+#define SC_PCT   37            /* screen codes 32..63 are ASCII, so '%' is 37 */
+
+/* Full names, as the original's report spells them. The SYSTEMS STATUS panel
+   uses three-letter abbreviations because it has four columns to fit; this has
+   the width for the real thing. Same order as SYS_*. */
+static const char *const sys_name[SYS_COUNT] = {
+    "ENERGYCONVERTER", "SHIELDS",       "LIFE SUPPORT",   "LASERS",
+    "ENTORP TUBES",    "WARP ENGINES",  "IMPULSE ENGINE", "S.R. SCANNER",
+    "L.R. SCANNER",    "COMPUTER",      "TRANSPORTER",    "SHUTTLECRAFT"
+};
+
+/* Stardates, in tenths, to mend `pts` points at `rate` points per stardate,
+   rounded to the nearest tenth. Both rates are MEASURED -- see trek.h -- and
+   these figures are computed from OUR constants rather than transcribed off
+   the original's screen, so what the report promises is what the repair code
+   will actually do. */
+static uint16_t repair_tenths(unsigned char pts, unsigned char rate) {
+    return (uint16_t)(((uint16_t)pts * 10u + rate / 2u) / rate);
+}
+
+/* n.n in three cells. The other put_tenths() pads to six for stardates. */
+static void put_time(unsigned char x, unsigned char y, uint16_t tenths,
+                     unsigned char color) {
+    if (tenths > 99) { scr_puts(x, y, "***", color); return; }
+    scr_put(x,                      y, (unsigned char)(SC_DIGIT0 + tenths / 10), color);
+    scr_put((unsigned char)(x + 1), y, SC_DOT, color);
+    scr_put((unsigned char)(x + 2), y, (unsigned char)(SC_DIGIT0 + tenths % 10), color);
+}
+
+void ui_repair_report(void) {
+    unsigned char x, y, i, pct, color;
+
+    for (y = 0; y < REP_H; y++) {
+        for (x = 0; x < REP_W; x++) {
+            unsigned char c = SC_SPACE;
+            if (y == 0)              c = (x == 0) ? G_TL : (x == REP_W - 1) ? G_TR : G_HLINE;
+            else if (y == REP_H - 1) c = (x == 0) ? G_BL : (x == REP_W - 1) ? G_BR : G_HLINE;
+            else if (x == 0 || x == REP_W - 1) c = G_VLINE;
+            scr_put((unsigned char)(REP_X + x), (unsigned char)(REP_Y + y), c, COL_LABEL);
+        }
+    }
+    scr_puts((unsigned char)(REP_X + 14), REP_Y, "STATE OF REPAIR", COL_VALUE);
+
+    scr_puts((unsigned char)(REP_X + 2),  (unsigned char)(REP_Y + 1), "SYSTEM", COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 26), (unsigned char)(REP_Y + 1), "REPAIR TIME", COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 24), (unsigned char)(REP_Y + 2), "DOCKED UNDOCKED", COL_LABEL);
+
+    for (i = 0; i < SYS_COUNT; i++) {
+        y   = (unsigned char)(REP_Y + 4 + i);
+        pct = ship.sys[i];
+        if (pct > 100) pct = 100;
+        color = sys_color(pct);
+
+        scr_puts((unsigned char)(REP_X + 2), y, sys_name[i], color);
+        put_num((unsigned char)(REP_X + 18), y, pct, 3, color);
+        scr_put((unsigned char)(REP_X + 21), y, SC_PCT, color);
+
+        /* Left blank against an undamaged system, as the original leaves it:
+           a column of 0.0 down twelve rows reads as noise. */
+        if (pct >= 100) continue;
+        put_time((unsigned char)(REP_X + 25), y,
+                 repair_tenths((unsigned char)(100 - pct),
+                               REPAIR_PER_STARDATE_DOCKED), color);
+        put_time((unsigned char)(REP_X + 34), y,
+                 repair_tenths((unsigned char)(100 - pct),
+                               REPAIR_PER_STARDATE), color);
+    }
+
+    scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
+             "HIT RETURN TO CONTINUE", COL_DEPT);
 }

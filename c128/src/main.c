@@ -397,6 +397,15 @@ static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
 /* Every command that costs a turn ends here: the enemy shoots back and the
    console reports it. Without this there is no game, only a shooting
    gallery. */
+/* R)epair. A report, so it costs no time and draws no fire -- the same as the
+   permanently visible panels, and the command card calls it a "state of Repair
+   report". Blocks on Return, then repaints the console it drew over. */
+static void do_repair(void) {
+    ui_repair_report();
+    while (kb_waitkey() != KB_RETURN) { }
+    ui_draw_all();
+}
+
 static void enemy_turn(uint8_t player_fired) {
     TrekEvent ev[12];
     uint8_t n, i, k;
@@ -568,6 +577,7 @@ int main(void) {
         else if (c == KB_S) { do_shields();    enemy_turn(0); }
         else if (c == KB_E) { do_energy();     enemy_turn(0); }
         else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
+        else if (c == KB_R) do_repair();   /* a report, not a turn */
         else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
         else if (c)          ui_message("COMPUTER: ", "M W L T D S)HLD E X)MAX Q");
