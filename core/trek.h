@@ -366,22 +366,23 @@ uint16_t trek_dist(uint8_t dy, uint8_t dx);
  * that prints one decimal can show. Returns 0 for the ship's own cell. */
 uint16_t trek_bearing(uint8_t sy, uint8_t sx);
 
-/* Enemy tactical movement.
+/* Enemy movement. MEASURED 2026-08-21 over thirty-six turns against one
+ * Commander, our position moved five times:
  *
- * DERIVED from the ancestor's movebaddy() (reference/sst2k, ai.c), and
- * anchored to observation: in a level-3 game the Mongol Commander walked
- * 3-8 -> 3-7 -> 4-6 -> 5-5 over four turns, one sector per turn, closing on
- * the ship and then holding, while a second enemy never moved at all. The
- * console narrates each step ("The commander has moved. He is now at 5-5").
+ *   a Commander closes ONE SECTOR toward the ship on every turn the player
+ *   fires, until it is adjacent, and then holds.
  *
- * The ancestor decides advance / hold / retreat from a "forces" score built
- * out of the enemy's power, how many enemies are present, and how dangerous
- * we look -- shields up, energy in the banks, torpedoes left. That shape is
- * kept; its constants are not measured for EGA Trek and are marked where they
- * appear in trek.c.
+ * Fourteen of fourteen non-adjacent turns moved; none of the adjacent ones
+ * did. No randomness, no retreat at any range, never more than one sector,
+ * and nothing about our shields, energy or torpedoes enters into it.
  *
- * Reported through EV_ENEMY_MOVED, which was already defined below and until
- * now never emitted by anything. */
+ * Only commanders move at all -- watched across a full session, and it is the
+ * ancestor's own gate: moveklings() runs movebaddy() for the commander and the
+ * super commander unconditionally, and for ordinary ships only at expert skill.
+ *
+ * The ancestor's forces score -- power, numbers, our shields and torpedoes,
+ * deciding advance / hold / retreat and how far -- was ported here and is now
+ * DELETED. None of it survived contact with the original. */
 void trek_new_game(uint8_t level, uint16_t seed);
 void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
 

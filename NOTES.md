@@ -901,7 +901,7 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: six of twenty-five (added 2026-08-19)
+## 13. The command set: ten of twenty-five (added 2026-08-19, count updated 2026-08-21)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
 and it is short enough to reproduce whole. The port implements six of it.
