@@ -554,6 +554,7 @@ int main(void) {
 #endif
 
     vdc_init();
+    ui_title();
     {
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two

@@ -86,6 +86,15 @@ static void check(int cond, const char *what) {
     if (!cond) { printf("FAIL: %s\n", what); failures++; }
 }
 
+/* Reads a run of cells back as text, so a test can assert what a screen
+   actually printed rather than that it printed something. */
+static void row_text(unsigned char y, unsigned char x, unsigned char n, char *out) {
+    unsigned char i;
+    for (i = 0; i < n; i++) out[i] = (char)cell[y][x + i];
+    out[n] = 0;
+}
+
+
 /* Every panel's interior must be disjoint from every other panel's, or one
    redraw silently erases part of another. This is what caught the old
    SYSTEMS/VIEWER overlap when the panel was moved up to row 17. */
@@ -333,15 +342,33 @@ static void test_setup_seed(void) {
     check(a != b, "same timing at a different level gives a different galaxy");
 }
 
-/* ------------------------------------------------ state of repair report */
+/* The title screen, rendered into the fake VDC. kb_waitkey() is stubbed to
+   return RETURN, so the blocking wait falls straight through. */
+static void test_title_screen(void) {
+    screen_reset();
+    ui_title();
 
-/* Reads a run of cells back as text, so a test can assert what the report
-   actually printed rather than that it printed something. */
-static void row_text(unsigned char y, unsigned char x, unsigned char n, char *out) {
-    unsigned char i;
-    for (i = 0; i < n; i++) out[i] = (char)cell[y][x + i];
-    out[n] = 0;
+    /* Both plates must be complete boxes. The bottom edge is the one that went
+       missing on screen and is invisible in a screenshot at this size. */
+    check(cell[16][4]  == G_TL, "title: left plate top left");
+    check(cell[16][27] == G_TR, "title: left plate top right");
+    check(cell[22][4]  == G_BL, "title: left plate bottom left");
+    check(cell[22][27] == G_BR, "title: left plate bottom right");
+    check(cell[22][10] == G_HLINE, "title: left plate bottom edge");
+    check(cell[22][55] == G_HLINE, "title: credit plate bottom edge");
+
+    check(off_screen == 0, "title: nothing drawn off screen");
+
+    /* And the credit is on it, because that is the point of the screen. */
+    {
+        char buf[40];
+        row_text(17, 34, 37, buf);
+        check(strstr(buf, "NELS ANDERSON") != NULL,
+              "title: Nels Anderson is credited");
+    }
 }
+
+/* ------------------------------------------------ state of repair report */
 
 static void test_repair_report(void) {
     char buf[32];
@@ -373,6 +400,16 @@ static void test_repair_report(void) {
           "65% in yellow");
     check(attr[REP_Y + 4 + SYS_SHIELDS][REP_X + 2] == EGA_TO_VDC(EGA_LTGREEN),
           "100% in green");
+
+    /* The box itself: all four corners and a mid-span of each edge. Drawn by
+       the shared box() helper, so this covers the title screen's boxes too. */
+    check(cell[REP_Y][REP_X]                 == G_TL, "box: top left corner");
+    check(cell[REP_Y][REP_X + REP_W - 1]     == G_TR, "box: top right corner");
+    check(cell[REP_Y + REP_H - 1][REP_X]     == G_BL, "box: bottom left corner");
+    check(cell[REP_Y + REP_H - 1][REP_X + REP_W - 1] == G_BR, "box: bottom right corner");
+    check(cell[REP_Y][REP_X + 5]             == G_HLINE, "box: top edge");
+    check(cell[REP_Y + REP_H - 1][REP_X + 5] == G_HLINE, "box: bottom edge");
+    check(cell[REP_Y + 3][REP_X]             == G_VLINE, "box: left edge");
 
     /* Every row inside the box, every system named. */
     for (i = 0; i < SYS_COUNT; i++) {
@@ -622,6 +659,7 @@ int main(void) {
     test_colours();
     test_repair_report();
     test_setup_seed();
+    test_title_screen();
     test_independent();
 
     test_badge_stays_inside();

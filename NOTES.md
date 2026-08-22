@@ -803,7 +803,7 @@ port has none of, and makes noise the port does not. Captured from the running
 original so these are a specification rather than a reminder; re-capture with
 `tools/drive_original.py shot:name` at each step.
 
-### 9. Title screen  (the OTHER two end screens are BUILT 2026-08-21 -- see below)
+### 9. Title screen -- BUILT 2026-08-21
 
 `Revision 3.0` small, top left. "EGA Trek" in a large outlined serif, "The
 Mongol Invasion" beneath it. A line-drawn starship across the middle left. Two
@@ -1328,3 +1328,34 @@ Combined with the trigger found the same day, the rule the core now implements
 is: **commanders only, and only on turns when the player fires**. The console
 narrates each one -- "The commander has moved. He is now at 1-3" -- which is
 why the message is commander-specific.
+
+### A third way the native tests can pass while the C128 build is wrong
+
+The title screen's two plates and the repair report all lost their bottom
+border on the VDC while `c128/make test` passed every assertion, including
+ones that read the bottom-left corner cell back and found `G_BL` exactly where
+it should be.
+
+The drawing helper used a nested loop with a conditional per cell:
+
+    if (y == 0)          c = corner or hline;
+    else if (y == h - 1) c = corner or hline;
+    else if (x == 0 ...) c = vline;
+
+Native `cc` renders that correctly. The `cl65 -O` build dropped the `h - 1`
+row. Rewriting it with `scr_hline`/`scr_vline` -- the shape `draw_panel()` in
+layout.c has always used, and which has always been right on hardware -- fixed
+it immediately.
+
+The cause was not isolated further; `-O` versus codegen generally was not
+separated, and it is recorded here as a shape to prefer rather than a compiler
+bug proven. What matters is the pattern, which this port has now hit three
+times: **a test that runs under `cc` is not evidence about the program `cl65`
+produces.** The other two were the PETSCII key table (which is why
+`make verify` exists) and the `enemy_step` out-parameter that crashed cc65
+outright.
+
+Jamie spotted this one by asking whether the same borders were missing from
+the main play screen. They were not -- `draw_panel()` was always fine -- but
+the question is what sent me to compare the two code paths instead of trusting
+a passing test.

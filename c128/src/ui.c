@@ -882,18 +882,39 @@ static void put_time(unsigned char x, unsigned char y, uint16_t tenths,
     scr_put((unsigned char)(x + 2), y, (unsigned char)(SC_DIGIT0 + tenths % 10), color);
 }
 
-void ui_repair_report(void) {
-    unsigned char x, y, i, pct, color;
+/* A bordered, cleared box. The dialog draws its own because it also tracks a
+   cursor row; the report and the title screen share this one.
+ *
+ * Drawn with scr_hline/scr_vline rather than a nested loop with a conditional
+ * per cell, and that is not a style choice. The loop form WORKED NATIVELY and
+ * passed its unit test while the cl65 build silently dropped the bottom edge
+ * on screen -- both boxes lost their bottom border and nothing complained.
+ * draw_panel() in layout.c has always used this shape and has always rendered
+ * correctly on hardware, so the fix was to match it. The exact cause was not
+ * isolated to -O versus codegen generally; what matters is that the native
+ * test cannot be trusted alone here, which is the same lesson the PETSCII key
+ * table taught and the reason `make verify` exists. */
+static void box(unsigned char bx, unsigned char by, unsigned char w,
+                unsigned char h, unsigned char color) {
+    unsigned char right  = (unsigned char)(bx + w - 1);
+    unsigned char bottom = (unsigned char)(by + h - 1);
 
-    for (y = 0; y < REP_H; y++) {
-        for (x = 0; x < REP_W; x++) {
-            unsigned char c = SC_SPACE;
-            if (y == 0)              c = (x == 0) ? G_TL : (x == REP_W - 1) ? G_TR : G_HLINE;
-            else if (y == REP_H - 1) c = (x == 0) ? G_BL : (x == REP_W - 1) ? G_BR : G_HLINE;
-            else if (x == 0 || x == REP_W - 1) c = G_VLINE;
-            scr_put((unsigned char)(REP_X + x), (unsigned char)(REP_Y + y), c, COL_LABEL);
-        }
-    }
+    scr_fill_rect((unsigned char)(bx + 1), (unsigned char)(by + 1),
+                  (unsigned char)(w - 2), (unsigned char)(h - 2), SC_SPACE, color);
+    scr_hline((unsigned char)(bx + 1), by,     (unsigned char)(w - 2), G_HLINE, color);
+    scr_hline((unsigned char)(bx + 1), bottom, (unsigned char)(w - 2), G_HLINE, color);
+    scr_vline(bx,    (unsigned char)(by + 1), (unsigned char)(h - 2), G_VLINE, color);
+    scr_vline(right, (unsigned char)(by + 1), (unsigned char)(h - 2), G_VLINE, color);
+    scr_put(bx,    by,     G_TL, color);
+    scr_put(right, by,     G_TR, color);
+    scr_put(bx,    bottom, G_BL, color);
+    scr_put(right, bottom, G_BR, color);
+}
+
+void ui_repair_report(void) {
+    unsigned char y, i, pct, color;
+
+    box(REP_X, REP_Y, REP_W, REP_H, COL_LABEL);
     scr_puts((unsigned char)(REP_X + 14), REP_Y, "STATE OF REPAIR", COL_VALUE);
 
     scr_puts((unsigned char)(REP_X + 2),  (unsigned char)(REP_Y + 1), "SYSTEM", COL_LABEL);
@@ -1118,5 +1139,102 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     }
 
     scr_puts(29, 22, "HIT RETURN TO CONTINUE", COL_DEPT);
+    while (kb_waitkey() != KB_RETURN) { }
+}
+
+/* ---------------------------------------------------------- title screen */
+
+/* The original's logo is a drawn bitmap in EGA mode 10h. On a text VDC the
+   nearest honest thing is a block-letter banner, so this carries a 5x5 font
+   for exactly the six letters "EGA TREK" needs. Rows are bit patterns, high
+   bit leftmost of five. */
+static const unsigned char banner_font[6][5] = {
+    { 0x1F, 0x10, 0x1E, 0x10, 0x1F },   /* E */
+    { 0x0F, 0x10, 0x17, 0x11, 0x0E },   /* G */
+    { 0x0E, 0x11, 0x1F, 0x11, 0x11 },   /* A */
+    { 0x1F, 0x04, 0x04, 0x04, 0x04 },   /* T */
+    { 0x1E, 0x11, 0x1E, 0x12, 0x11 },   /* R */
+    { 0x11, 0x12, 0x1C, 0x12, 0x11 }    /* K */
+};
+static const char banner_text[] = "EGATREK";       /* index into the font */
+static const unsigned char banner_gap = 3;         /* blank cols between EGA and TREK */
+
+static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
+                          unsigned char color) {
+    unsigned char r, c;
+    for (r = 0; r < 5; r++) {
+        for (c = 0; c < 5; c++) {
+            if (banner_font[idx][r] & (unsigned char)(0x10 >> c))
+                scr_put((unsigned char)(bx + c), (unsigned char)(by + r), G_BLOCK, color);
+        }
+    }
+}
+
+void ui_title(void) {
+    unsigned char i, x;
+
+    scr_clear();
+
+    /* Version bar, where the original puts its "Revision 3.0". Ours names the
+       port, because claiming the original's revision number would be a lie
+       about what this program is. */
+    scr_puts(1, 0, " C128-VDC PORT ", EGA_TO_VDC(EGA_LTCYAN));
+
+    /* "EGA" then a gap then "TREK": 3*6 + gap + 4*6 - 1 columns wide. */
+    x = 15;
+    for (i = 0; i < 7; i++) {
+        unsigned char idx = 0;
+        switch (banner_text[i]) {
+            case 'E': idx = 0; break;
+            case 'G': idx = 1; break;
+            case 'A': idx = 2; break;
+            case 'T': idx = 3; break;
+            case 'R': idx = 4; break;
+            default:  idx = 5; break;          /* K */
+        }
+        if (i == 3) x = (unsigned char)(x + banner_gap);   /* the space */
+        banner_letter(x, 3, idx, COL_VALUE);
+        x = (unsigned char)(x + 6);
+    }
+
+    scr_puts(30, 9, "THE MONGOL INVASION", EGA_TO_VDC(EGA_LTCYAN));
+
+    /* The Lexington, drawn in solid cells rather than punctuation. An earlier
+       version used "/", "\\" and "_" and lost half of them: cc65 translates
+       string literals to PETSCII, where those glyphs are not where ASCII put
+       them. Blocks sidestep the character set entirely, and match the
+       original's filled artwork better than line-drawing would. */
+    {
+        static const char *const ship_art[5] = {
+            "....######....",
+            "...########...",
+            "....######....",
+            "......##......",
+            "..###########."
+        };
+        unsigned char r, c;
+        for (r = 0; r < 5; r++)
+            for (c = 0; ship_art[r][c]; c++)
+                if (ship_art[r][c] == '#')
+                    scr_put((unsigned char)(8 + c), (unsigned char)(11 + r),
+                            G_BLOCK, EGA_TO_VDC(EGA_LTGRAY));
+    }
+
+    /* Ship plate, bottom left, matching the console's own badge panel. */
+    box(4, 16, 24, 7, COL_LABEL);
+    scr_puts(9,  17, "U.S.S. LEXINGTON", COL_VALUE);
+    scr_puts(13, 18, "RCB-92",           COL_VALUE);
+    scr_puts(9,  20, "DEPT. OF SPACE",   EGA_TO_VDC(EGA_LTCYAN));
+
+    /* And the credit. The original earns this panel -- EGA Trek was shareware
+       and Nels Anderson wrote it; this port exists because of his game, so his
+       name goes on the front of it and not in a comment somewhere. */
+    box(32, 16, 44, 7, COL_LABEL);
+    scr_puts(34, 17, "EGA TREK WAS WRITTEN BY NELS ANDERSON",   COL_MSG);
+    scr_puts(34, 18, "AND RELEASED AS SHAREWARE IN 1992.",      COL_MSG);
+    scr_puts(34, 20, "THIS IS AN INDEPENDENT PORT OF HIS GAME", EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(34, 21, "TO THE COMMODORE 128.",                   EGA_TO_VDC(EGA_LTCYAN));
+
+    scr_puts(28, 24, "PRESS RETURN TO BEGIN", COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
