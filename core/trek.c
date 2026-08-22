@@ -932,63 +932,20 @@ static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max)
  * docked-at-base back-off, and its expert-skill enemy weighting. Those depend
  * on features this core does not have yet, and inventing them would be worse
  * than leaving them out. */
-/* How many enemies share the quadrant with us. */
-static uint8_t enemies_here(void) {
-    uint8_t c, n = 0;
-    for (c = 0; c < QUAD_CELLS; c++)
-        if (SEC_IS_ENEMY(sector[c])) n++;
-    return n;
-}
 
-static int16_t enemy_motion(uint16_t hp, uint16_t dist_whole) {
-    uint16_t forces;
-    int16_t  motion;
+/* Enemy movement was a port of the ancestor's movebaddy() -- a "forces" score
+   built from the enemy's power, how many are present, our shields, energy and
+   torpedoes, deciding advance / hold / retreat and how far. All of it is gone,
+   because MEASURED 2026-08-21 says the original does something far simpler.
 
-    /* forces = own power + 100 per enemy present, +1000 if our shields are
-       down, less a term for the energy and torpedoes we could bring. Staged
-       to stay inside 16 bits: hp reaches 695 and the additions are bounded. */
-    forces = hp;
-    /* 100 per enemy IN THIS QUADRANT, which is the ancestor's `game.nenhere`.
-       This first read ship.enemies_left, the galaxy-wide total -- so on a
-       fresh level-3 game it added 3000-odd and every enemy charged regardless
-       of anything else, shields included. Caught by a shields test that
-       expected a weak ship to hold off raised shields and found it charging
-       either way. */
-    forces = (uint16_t)(forces + 100 * enemies_here());
-    if (!ship.shields_up)       forces = (uint16_t)(forces + 1000);
+   Thirty-six turns against one Commander, our position changed five times:
+   every one of the fourteen turns where it was NOT adjacent produced a move,
+   one sector toward the ship. Every turn where it WAS adjacent produced none.
+   Fourteen out of fourteen and twenty-two out of twenty-two -- no randomness,
+   no retreat at any range, and never more than one sector.
 
-    if (ship.energy > 2500) {
-        uint16_t bold = (uint16_t)((ship.energy - 2500) / 5);   /* 0.2 * excess */
-        forces = (forces > bold) ? (uint16_t)(forces - bold) : 0;
-    }
-    {
-        uint16_t torp = (uint16_t)(50 * ship.torps);
-        forces = (forces > torp) ? (uint16_t)(forces - torp) : 0;
-    }
-
-    if (forces > 1000) {
-        /* Very strong: move in for the kill, but never past us. */
-        motion = (int16_t)(dist_whole + 1);
-    } else {
-        /* The ancestor's (forces + 200*Rand())/150 - 5, which is negative below
-           750 and positive above -- so a weak ship backs off and a strong one
-           closes.
-
-           The jitter was dropped when this was first ported, and restoring it
-           is what makes the observed behaviour possible. Commanders advance one
-           sector at a time and INTERMITTENTLY: three turns running in one
-           sighting, once in four or five in another. A deterministic score
-           cannot do that. This term lands typical forces either side of the
-           1-sector boundary, so the same state sometimes steps and sometimes
-           holds, which is what the original does. */
-        motion = (int16_t)((forces + trek_rand_n(200)) / 150) - 5;
-    }
-
-    /* Limited by command level, as the ancestor limits by skill. */
-    if (motion >  (int16_t)ship.level) motion =  (int16_t)ship.level;
-    if (motion < -(int16_t)ship.level) motion = -(int16_t)ship.level;
-    return motion;
-}
+   Holding when adjacent needs no code: the only cell closer is the ship's own,
+   and enemy_step() refuses an occupied destination. */
 
 /* One step of pursuit or flight: the sign of the row and column difference,
    which is the ancestor's krawl. Returns NO_STEP if the destination is not
@@ -1030,9 +987,7 @@ static uint8_t enemy_step(uint8_t cell, uint8_t away) {
    the original's scanner report implies -- it announces the move first and the
    damage afterwards. */
 static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
-    uint8_t cell, dest, steps, away;
-    int16_t motion;
-    uint16_t d;
+    uint8_t cell, dest;
     /* Which cells have already had their turn, so a ship that steps into a
        not-yet-visited cell does not get a second one. */
     uint8_t moved[QUAD_CELLS];
@@ -1051,17 +1006,10 @@ static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
            skill. Our port moved everything. */
         if (sector[cell] != SEC_COMMAND) continue;
 
-        d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
-                      abs_diff((uint8_t)(cell & 7), ship.sec_x));
-        motion = enemy_motion(enemy_hp[cell], (uint16_t)(d >> 8));
-        if (motion == 0) { moved[cell] = 1; continue; }
-
-        away  = (uint8_t)(motion < 0);
-        steps = (uint8_t)(away ? -motion : motion);
-
-        while (steps--) {
-            dest = enemy_step(cell, away);
-            if (dest == NO_STEP) break;
+        /* One sector toward the ship, every time. See the note above. */
+        {
+            dest = enemy_step(cell, 0);
+            if (dest == NO_STEP) { moved[cell] = 1; continue; }
             sector[dest]   = sector[cell];
             enemy_hp[dest] = enemy_hp[cell];
             sector[cell]   = SEC_EMPTY;

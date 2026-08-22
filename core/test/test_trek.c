@@ -610,6 +610,9 @@ static uint8_t fire_turn(TrekEvent *ev, uint8_t max) {
     return 0;
 }
 
+/* abs difference, for tests that need trek_dist directly. */
+static uint8_t abs_diff8(uint8_t a, uint8_t b) { return (uint8_t)(a > b ? a - b : b - a); }
+
 /* Did the one enemy of this type end up nearer the ship than it started at
    (sy,sx)? Returns 1 if so. Used to test motion DIRECTION rather than the mere
    fact of a move. */
@@ -766,39 +769,43 @@ static void test_shields(void) {
     ok(!ship.shields_up,  "and they stay down");
     ok(ship.energy == SHIELD_RAISE_COST - 1, "a refused raise costs nothing");
 
-    /* Raised shields matter to the enemy: enemy_motion adds 1000 to its
-       forces score when ours are down, so lowering them must make an enemy no
-       less aggressive. Asserted as a RELATIVE effect on purpose -- the
-       absolute thresholds are the ancestor's, calibrated to its power scale,
-       and do not transfer to ours (see MEASURED.md). The direction does.
-
-       Counted over many trials rather than asserted on one, because motion
-       carries the ancestor's 200*Rand() jitter: a single turn is a coin toss,
-       and the earlier one-turn version of this test was asserting the toss. */
+    /* Movement, MEASURED 2026-08-21 over thirty-six turns: a Commander closes
+       one sector every firing turn until it is adjacent, then holds. Fourteen
+       of fourteen non-adjacent turns moved and none of the adjacent ones did.
+       There is no forces score, no randomness and no retreat, so nothing about
+       OUR state -- shields, energy, torpedoes -- changes it. */
     {
         TrekEvent ev[16];
-        uint8_t mid = (uint8_t)((2 << 3) | 2);
-        int i, closer_up = 0, closer_down = 0;
+        uint8_t mid = (uint8_t)((1 << 3) | 1);
+        int steps;
+        uint16_t last, now;
 
-        for (i = 0; i < 60; i++) {
-            trek_new_game(3, (uint16_t)(1000 + i));
-            ship.sec_y = 4; ship.sec_x = 4;
-            ship.shields_up = 1;
-            sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+        trek_new_game(3, 31337);
+        ship.sec_y = 6; ship.sec_x = 6;
+        ship.shields_up = 1;
+        sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+        last = 0xFFFF;
+        for (steps = 0; steps < 12; steps++) {
+            uint8_t k;
             trek_enemy_turn(ev, 16, 1);
-            closer_up += enemy_closed(SEC_COMMAND, 2, 2);
-
-            trek_new_game(3, (uint16_t)(1000 + i));
-            ship.sec_y = 4; ship.sec_x = 4;
-            ship.shields_up = 0;
-            sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
-            trek_enemy_turn(ev, 16, 1);
-            closer_down += enemy_closed(SEC_COMMAND, 2, 2);
+            for (k = 0; k < QUAD_CELLS; k++) if (sector[k] == SEC_COMMAND) break;
+            now = trek_dist(abs_diff8((uint8_t)(k >> 3), ship.sec_y),
+                            abs_diff8((uint8_t)(k & 7), ship.sec_x));
+            if (now >= last) break;
+            last = now;
         }
-        /* Direction, not merely movement: retreating and advancing both count
-           as "moved", so counting moves says nothing about aggression. */
-        ok(closer_down >= closer_up,
-           "dropping our shields makes a Commander no less willing to close");
+        ok(steps >= 4, "a Commander closes turn after turn, not now and then");
+        ok(last <= 362, "until it is adjacent");
+
+        /* And then it stops, however long we leave it. */
+        {
+            uint8_t before, k;
+            for (k = 0; k < QUAD_CELLS; k++) if (sector[k] == SEC_COMMAND) break;
+            before = k;
+            for (steps = 0; steps < 10; steps++) trek_enemy_turn(ev, 16, 1);
+            for (k = 0; k < QUAD_CELLS; k++) if (sector[k] == SEC_COMMAND) break;
+            ok(k == before, "and holds there rather than circling");
+        }
     }
 
 }

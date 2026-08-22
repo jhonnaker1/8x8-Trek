@@ -2115,3 +2115,67 @@ observed non-zero.
 
 Open item 7's falloff shape, open item 8's 1240..1500 band, open item 11
 (boarding parties), the kill/day gate, and planets. The combat rig did not run.
+
+## The combat rig: enemy motion and the fire law, both settled (2026-08-21)
+
+Thirty-six turns against a single Commander in a cleared quadrant, its hit
+points pinned to 600 so its output was a controlled variable, our own position
+moved five times to sweep the geometry. Every turn a nil volley, which draws
+the enemy's answer and provokes its movement; damage read from the pinned
+pools and corrected for pods.
+
+A first attempt used **shields toggling** as the null turn, on the theory that
+it takes a turn without provoking movement. It does not take a turn at all:
+every reading came back as exactly 50.0, which is `SHIELD_RAISE_COST`, not
+enemy fire. SHUP/SHDN costs energy and passes no time.
+
+### Enemy motion is deterministic, and the forces model is gone
+
+| turns | moved |
+|---|---|
+| enemy NOT adjacent | **14 of 14** |
+| enemy adjacent | 0 of 18 |
+
+(Four further turns log as "adjacent and moved": those are the final approach
+step, which lands on adjacency.)
+
+**A Commander closes one sector toward the ship on every firing turn until it
+is adjacent, and then holds.** No randomness. No retreat at any range. Never
+more than one sector. Nothing about our state -- shields, energy, torpedoes --
+enters into it.
+
+That deletes `enemy_motion()` entirely: the forces score, the 150 divisor, the
+-5 offset, the 1000 threshold, the skill clamp, and the `200*Rand()` jitter
+restored earlier the same day on the strength of an apparent intermittency
+that turned out to be the enemy simply being adjacent already. `enemies_here()`
+went with it, and the 68000 port-check found that for me.
+
+Holding when adjacent needs no code at all: the only closer cell is the ship's
+own and `enemy_step()` refuses an occupied destination.
+
+### The fire law: Euclidean, linear, zero at 12
+
+    damage = hit_points * 0.78 * (1 - distance / 12)
+
+k measured **0.782 with sd 0.038 over all thirty-six turns** across eleven
+distinct ranges -- about 5% residual scatter, which is the random component and
+is small.
+
+The metric is Euclidean and provably not the alternatives:
+
+| test | result |
+|---|---|
+| (4,2) vs (2,4), same Euclid | 314.7 vs 314.2 -- symmetric in dy/dx |
+| (3,2) vs (2,3), same Euclid | 308.4 vs 311.2 -- same |
+| same **Chebyshev** 4, Euclid 4.12..5.66 | 0.52, 0.52, 0.52, 0.41 -- varies, ruled out |
+| same **Manhattan** 6, Euclid 4.24..5.10 | 0.54, 0.52, 0.52, 0.48 -- varies, ruled out |
+
+Zero at 12 is exactly the constant our own lasers use, which is a satisfying
+place to land: one falloff law for both sides.
+
+**This supersedes the earlier four-point estimate** that put the coefficient
+near 0.95 and claimed the curve "flattens into a floor". It does not flatten.
+That reading was four shots at a single range, and this file said at the time
+that three ranges could not settle the shape. Eleven can.
+
+`ENEMY_FIRE_PCT` moves from 90 to 78.

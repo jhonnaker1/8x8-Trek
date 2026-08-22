@@ -457,16 +457,24 @@ uint8_t trek_shields_down(void);
  * CONFIRMED: raising shields does not reduce the figure. 358 against 367 at
  * one range with five firing turns each.
  *
- * FITTED: the coefficient. Damage over hit points read 0.733 at range 2.828,
- * 0.511 at 4.243 and 0.522 at 5.657, and 90% through our own laser falloff is
- * the best single number across those three.
+ * MEASURED 2026-08-21, thirty-six turns against one Commander across eleven
+ * distinct ranges: the falloff is LINEAR IN EUCLIDEAN DISTANCE and reaches
+ * zero at 12, exactly the law our own lasers use.
  *
- * NOT MEASURED, and known to be wrong: the falloff SHAPE. Those last two
- * ranges are indistinguishable, which no falloff reaching zero at 12 allows.
- * The real curve flattens into a floor somewhere near half the firer's hit
- * points. It is left alone here rather than fitted to three points, all of
- * which were diagonal offsets. */
-#define ENEMY_FIRE_PCT          90   /* percent of hit points, before falloff */
+ *   dmg = hit_points * 0.78 * (1 - distance / 12)
+ *
+ * k came out at 0.782 with a standard deviation of 0.038 over all thirty-six,
+ * so the residual scatter is about 5% -- the random component, and small.
+ *
+ * The metric is Euclidean and nothing else. Offsets of (4,2) and (2,4) dealt
+ * 314.7 and 314.2, so it is symmetric in dy and dx; the same Chebyshev
+ * distance spanned 0.41 to 0.52 of hit points and the same Manhattan distance
+ * 0.48 to 0.54, which rules both out.
+ *
+ * This supersedes an earlier four-point estimate at a single range that put
+ * the coefficient nearer 0.95 and suggested the curve flattened into a floor.
+ * It does not flatten; that reading was one range with n=4. */
+#define ENEMY_FIRE_PCT          78   /* percent of hit points, before falloff */
 
 /* MEASURED: enemies hold fire on about half of their turns -- 5/10, 5/10,
    7/10 and 4/8 across four blocks. Not an artefact of dropped turns: a
