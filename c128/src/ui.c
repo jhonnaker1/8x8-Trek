@@ -988,3 +988,135 @@ void ui_setup(Setup *s) {
        share. */
     s->seed = setup_seed(kb_entropy, s->level);
 }
+
+/* ------------------------------------------------------- end of game */
+
+/* Right-aligned signed number, for the score column. put_num() is unsigned and
+   pads on the left, which is what the counts want but not the points. */
+static void put_signed(unsigned char x, unsigned char y, int16_t v,
+                       unsigned char w, unsigned char color) {
+    unsigned char buf[7], n = 0;
+    uint16_t m = (uint16_t)(v < 0 ? -v : v);
+
+    do { buf[n++] = (unsigned char)(SC_DIGIT0 + (m % 10)); m /= 10; } while (m && n < 6);
+    if (v < 0) buf[n++] = 45;                      /* '-', numerically: PETSCII */
+    while (w > n) { scr_put(x++, y, SC_SPACE, color); w--; }
+    while (n) scr_put(x++, y, buf[--n], color);
+}
+
+/* One row: the count on the left, the item with dot leaders, the points on the
+   right. The original's leaders run to a fixed column, which is what makes the
+   sheet read as a column of figures rather than ragged text. */
+#define EV_X       12
+#define EV_ITEM    (EV_X + 6)
+#define EV_DOTS_TO (EV_X + 46)
+
+static void ev_row(unsigned char y, const char *count, const char *item,
+                   int16_t pts, unsigned char color) {
+    unsigned char i, x;
+
+    if (count) scr_puts(EV_X, y, count, color);
+    scr_puts(EV_ITEM, y, item, color);
+    x = (unsigned char)(EV_ITEM + strlen(item));
+    for (i = x; i < EV_DOTS_TO; i++) scr_put(i, y, SC_DOT, COL_GRID);
+    put_signed(EV_DOTS_TO, y, pts, 5, color);
+}
+
+/* A count as text, so a row can print "0.00" for the rate and plain integers
+   everywhere else through the same path. */
+static void ev_count(char *buf, uint16_t v) {
+    uint8_t n = 0, i;
+    char tmp[6];
+    do { tmp[n++] = (char)('0' + (v % 10)); v /= 10; } while (v && n < 5);
+    for (i = 0; i < n; i++) buf[i] = tmp[n - 1 - i];
+    buf[n] = '\0';
+}
+
+void ui_evaluation(void) {
+    ScoreSheet sh;
+    char c[8];
+    unsigned char y = 7;
+
+    trek_score_sheet(&sh);
+    scr_clear();
+    scr_puts(32, 1, "DEPT. OF SPACE",      COL_VALUE);
+    scr_puts(31, 2, "EARTH HEADQUARTERS",  COL_LABEL);
+    scr_puts(31, 3, "DETAILED EVALUATION", COL_VALUE);
+    scr_puts(EV_ITEM,    5, "ITEM",  COL_LABEL);
+    scr_puts(EV_DOTS_TO, 5, "SCORE", COL_LABEL);
+
+    ev_count(c, sh.rescues);
+    ev_row(y++, c, "RESCUES @ 200 EACH", sh.rescue_pts, COL_MSG);
+    ev_row(y++, NULL, "PENALTY FOR INCOMPLETE MISSION", sh.incomplete_pts, COL_MSG);
+    ev_count(c, sh.mongols);
+    ev_row(y++, c, "MONGOLS KILLED @ 10 EACH", sh.mongol_pts, COL_MSG);
+    ev_count(c, sh.commanders);
+    ev_row(y++, c, "COMMANDERS KILLED @ 20 EACH", sh.commander_pts, COL_MSG);
+    ev_count(c, sh.enemy_bases);
+    ev_row(y++, c, "ENEMY BASES DESTROYED @ 50 EACH", sh.enemy_base_pts, COL_MSG);
+
+    /* The rate prints with two decimals, as the original does -- 0.00 on an
+       unfinished mission, which is the commonest sight on this screen. */
+    {
+        char r[8];
+        uint8_t k = 0;
+        ev_count(r, (uint16_t)(sh.rate_hundredths / 100));
+        k = (uint8_t)strlen(r);
+        r[k++] = '.';
+        r[k++] = (char)('0' + (sh.rate_hundredths / 10) % 10);
+        r[k++] = (char)('0' + sh.rate_hundredths % 10);
+        r[k]   = '\0';
+        ev_row(y++, r, "KILL/DAY RATIO @ 500 PER DAY", sh.rate_pts, COL_MSG);
+    }
+
+    ev_count(c, sh.casualties);
+    ev_row(y++, c, "CASUALTIES ON BOARD LEXINGTON", sh.casualty_pts, COL_MSG);
+    ev_count(c, sh.stars);
+    ev_row(y++, c, "STARS DESTROYED @ -5 EACH", sh.star_pts, COL_MSG);
+    ev_count(c, sh.bases_hit);
+    ev_row(y++, c, "BASES HIT @ -200 EACH", sh.bases_hit_pts, COL_MSG);
+
+    y++;
+    ev_row(y, NULL, "TOTAL", sh.total, COL_VALUE);
+
+    scr_puts(29, 22, "HIT RETURN TO CONTINUE", COL_DEPT);
+    while (kb_waitkey() != KB_RETURN) { }
+}
+
+/* One slot per command level, named by rank -- MEASURED off the original's own
+   screen, and TREK.SCR holds ten records, two per level. Only the current
+   game's entry is shown: writing the file needs disk I/O, which is deliberately
+   absent along with save and restore. */
+static const char *const rank_name[5] = {
+    "LT. COMMANDER", "COMMANDER", "CAPTAIN", "COMMODORE", "ADMIRAL"
+};
+
+void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
+    unsigned char i, y;
+
+    scr_clear();
+    scr_puts(33, 1, "DEPT. OF SPACE", COL_VALUE);
+    scr_puts(34, 2, "HALL OF FAME",   COL_VALUE);
+    scr_puts(14, 4, "FOR OUTSTANDING PERFORMANCE, THE FOLLOWING DEPT. OF SPACE", COL_MSG);
+    scr_puts(19, 5, "OFFICERS HAVE BEEN INDUCTED INTO THE HALL OF FAME:", COL_MSG);
+
+    scr_puts(16, 8, "NAME", COL_LABEL);
+    scr_puts(46, 8, "RANK", COL_LABEL);
+    scr_puts(62, 8, "SCORE", COL_LABEL);
+
+    for (i = 0; i < 5; i++) {
+        unsigned char j;
+        y = (unsigned char)(10 + i * 2);
+        scr_puts(46, y, rank_name[i], COL_VALUE);
+        if (level == (uint8_t)(i + 1) && name[0]) {
+            scr_puts(16, y, name, COL_MSG);
+            put_signed(62, y, score, 6, COL_MSG);
+        } else {
+            for (j = 0; j < 20; j++) scr_put((unsigned char)(16 + j), y, SC_DOT, COL_GRID);
+            put_signed(62, y, 0, 6, COL_GRID);
+        }
+    }
+
+    scr_puts(29, 22, "HIT RETURN TO CONTINUE", COL_DEPT);
+    while (kb_waitkey() != KB_RETURN) { }
+}

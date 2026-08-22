@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "vdc.h"
+#include "egavdc.h"
 #include "layout.h"
 #include "ui.h"
 #include "input.h"
@@ -537,6 +538,7 @@ static void do_torpedo(const char *line) {
 
 int main(void) {
     unsigned char c;
+    Setup setup;          /* kept for the end screens: the name and rank */
 
 #ifdef TREK_DEBUG_INPUT
     /* This assignment exists to make kb_inject appear in the link map.
@@ -553,7 +555,6 @@ int main(void) {
 
     vdc_init();
     {
-        Setup setup;
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two
            sittings get the same galaxy. Before this, GAME_SEED was a constant
@@ -594,37 +595,24 @@ int main(void) {
         if (trek_game_state() != GAME_ON) break;
     }
 
+    /* The original ends with two full screens, not a line in the log: the
+       Detailed Evaluation and then the Hall of Fame. Both layouts are MEASURED
+       -- see MEASURED.md -- and the evaluation is filled straight from the
+       core's own score sheet, so what it prints is what was scored. */
     if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
     else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
-    {
-        int16_t sc = trek_score();
-        uint8_t k = put_str(linebuf, "SCORE ");
-        /* 45 is '-', written numerically for the reason input.h gives: a
-           character literal here would be translated to PETSCII. */
-        if (sc < 0) { linebuf[k++] = 45; sc = (int16_t)(-sc); }
-        k += put_u16(linebuf + k, (uint16_t)sc);
-        linebuf[k] = 0;
-        ui_message("HQ: ", linebuf);
 
-        /* Bases lost are the one item worth calling out separately: they are
-           the only score line that says whether the deadlines were met. */
-        if (bases_lost) {
-            k  = put_u16(linebuf, (uint16_t)bases_lost);
-            k += put_str(linebuf + k, " BASES LOST TO SIEGE");
-            linebuf[k] = 0;
-            ui_message("HQ: ", linebuf);
-        }
-    }
+    ui_evaluation();
+    ui_hall_of_fame(setup.name, setup.level, trek_score());
 
     /* Quit has to visibly end the game. Milestone 1 parked here in an
        endless wait_vsync() so the console would stay on screen, which made
        Q indistinguishable from a hang once there was a command loop to quit
        out of. Acknowledge, wait for the captain, then hand the machine back
        in the state we found it. */
-    ui_clear_messages();
-    ui_message("HELM: ", "MISSION ENDED, CAPTAIN.");
-    ui_message("COMPUTER: ", "RUN/STOP+RESTORE FOR");
-    ui_message("COMPUTER: ", "BASIC.");
+    scr_clear();
+    scr_puts(28, 10, "MISSION ENDED, CAPTAIN.", EGA_TO_VDC(EGA_LTGREEN));
+    scr_puts(24, 12, "RUN/STOP + RESTORE FOR BASIC.", EGA_TO_VDC(EGA_LTCYAN));
 
     /* Drop back to 1MHz first, so the VIC-IIe screen is live again and the
        machine does not look dead on the other window. */
@@ -635,9 +623,11 @@ int main(void) {
      * `return 0` here hands control to cc65's exit path, and the machine
      * stops responding on both screens. Not diagnosed: this program runs at
      * 2MHz, drives the VDC directly, and scans CIA1 behind the KERNAL's
-     * back, so there are several candidates and no way to observe the
-     * machine from a session on this host (see NOTES.md on why VICE cannot
-     * be screenshotted or single-stepped from here).
+     * back, so there are several candidates. It is no longer unobservable,
+     * though -- tools/vice_mon.py drives VICE's binary monitor and can
+     * screenshot, read memory and inject keys, which is how the setup screen
+     * and the repair report were verified. The bisect recipe below is now
+     * something a script can run rather than a plan.
      *
      * Parking is the honest behaviour rather than a pretend one: the final
      * console stays readable, and because interrupts are left enabled the

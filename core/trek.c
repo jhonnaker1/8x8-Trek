@@ -1201,24 +1201,48 @@ static uint16_t kill_rate_points(uint16_t kills, uint16_t tenths) {
     return (uint16_t)((uint16_t)(q * 10) + (uint16_t)((uint16_t)(r * 10) / tenths));
 }
 
-int16_t trek_score(void) {
-    int16_t s = 0;
+void trek_score_sheet(ScoreSheet *s) {
+    uint16_t elapsed = (uint16_t)(ship.stardate - STARDATE_START);
+    uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
 
-    s = (int16_t)(s + ship.killed * SCORE_PER_MONGOL);
-    s = (int16_t)(s + ship.killed_cmd * SCORE_PER_COMMANDER);
-    s = (int16_t)(s - (int16_t)ship.casualties);
-    s = (int16_t)(s + (int16_t)bases_lost * SCORE_BASE_LOST);
+    /* Mechanisms that do not exist yet. Written out rather than left to a
+       memset so it is obvious they are zero by absence, not by outcome. */
+    s->rescues     = 0; s->rescue_pts    = 0;
+    s->enemy_bases = 0; s->enemy_base_pts = 0;
+    s->stars       = 0; s->star_pts      = 0;
 
-    /* The rate term credits only on a finished mission. See trek.h: FITTED
-       from one reading of the original, on the condition the ancestor uses
-       for this same term. */
+    s->mongols       = ship.killed;
+    s->mongol_pts    = (int16_t)(ship.killed * SCORE_PER_MONGOL);
+    s->commanders    = ship.killed_cmd;
+    s->commander_pts = (int16_t)(ship.killed_cmd * SCORE_PER_COMMANDER);
+    s->casualties    = ship.casualties;
+    s->casualty_pts  = (int16_t)(0 - (int16_t)ship.casualties);
+    s->bases_hit     = bases_lost;
+    s->bases_hit_pts = (int16_t)(bases_lost * SCORE_BASE_LOST);
+
+    /* The rate term credits only on a finished mission, and the penalty only
+       on an unfinished one -- they are the two halves of one condition. */
     if (ship.enemies_left) {
-        s = (int16_t)(s + SCORE_INCOMPLETE);
+        s->incomplete_pts  = SCORE_INCOMPLETE;
+        s->rate_hundredths = 0;
+        s->rate_pts        = 0;
     } else {
-        uint16_t elapsed = (uint16_t)(ship.stardate - STARDATE_START);
-        uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
-        s = (int16_t)(s + (int16_t)kill_rate_points(kills, elapsed));
+        uint16_t t = elapsed < SCORE_MIN_TENTHS ? SCORE_MIN_TENTHS : elapsed;
+        s->incomplete_pts  = 0;
+        /* kills per stardate, x100, staged to stay inside 16 bits. */
+        s->rate_hundredths = (uint16_t)((uint16_t)((kills > 64 ? 64 : kills) * 1000u) / t);
+        s->rate_pts        = (int16_t)kill_rate_points(kills, elapsed);
     }
 
-    return s;
+    s->total = (int16_t)(s->rescue_pts + s->incomplete_pts + s->mongol_pts
+                       + s->commander_pts + s->enemy_base_pts + s->rate_pts
+                       + s->casualty_pts + s->star_pts + s->bases_hit_pts);
+}
+
+/* Derived from the sheet rather than computed separately, so the total the
+   player is shown and the total recorded are the same arithmetic. */
+int16_t trek_score(void) {
+    ScoreSheet s;
+    trek_score_sheet(&s);
+    return s.total;
 }

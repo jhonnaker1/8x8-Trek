@@ -803,7 +803,7 @@ port has none of, and makes noise the port does not. Captured from the running
 original so these are a specification rather than a reminder; re-capture with
 `tools/drive_original.py shot:name` at each step.
 
-### 9. Title screen
+### 9. Title screen  (the OTHER two end screens are BUILT 2026-08-21 -- see below)
 
 `Revision 3.0` small, top left. "EGA Trek" in a large outlined serif, "The
 Mongol Invasion" beneath it. A line-drawn starship across the middle left. Two
@@ -989,8 +989,11 @@ them, and each is a chunk of core work:
   hit a star rather than only an enemy.
 - **Boarding parties** — in the extracted string catalogue, absent from the
   manual. See MEASURED.md open item 11.
-- **The hall of fame** — `TREK.SCR`, top two scores per command level. The
-  setup screen already collects the player's name for it.
+- **The hall of fame** — ~~`TREK.SCR`, top two scores per command level.~~
+  The SCREEN is built (2026-08-21) and shows the current game's entry in its
+  rank row; the file is not written, because that needs disk I/O and is
+  deliberately absent along with save and restore. `TREK.SCR`'s format is
+  known: ten records of a 25-character name, CRLF, a score, CRLF.
 
 ## 15. What is left to take from the ancestor, and what is not (added 2026-08-19)
 

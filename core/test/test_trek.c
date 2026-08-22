@@ -1389,6 +1389,28 @@ static void test_game_state_and_score(void) {
     ok(trek_score() == -300 - 430, "losing the ship is scored as its crew");
     ok(trek_score() == -730, "and its printed total, -730");
 
+    /* The sheet, line by line, against the same measured game. Every row the
+       original printed is checked, including the three that are zero because
+       we have no mechanism for them yet -- if one ever becomes non-zero by
+       accident this catches it. */
+    {
+        ScoreSheet sh;
+        trek_score_sheet(&sh);
+        ok(sh.casualties == CREW_COMPLEMENT,  "sheet: 430 casualties");
+        ok(sh.casualty_pts == -430,           "sheet: costing 430");
+        ok(sh.incomplete_pts == -300,         "sheet: the incomplete penalty");
+        ok(sh.rate_pts == 0,                  "sheet: no rate credit unfinished");
+        ok(sh.mongol_pts == 0 && sh.commander_pts == 0, "sheet: nothing killed");
+        ok(sh.rescues == 0 && sh.enemy_bases == 0 && sh.stars == 0,
+           "sheet: the three unimplemented items are zero");
+        ok(sh.total == -730,                  "sheet: total matches the original");
+        ok(sh.total == sh.rescue_pts + sh.incomplete_pts + sh.mongol_pts
+                     + sh.commander_pts + sh.enemy_base_pts + sh.rate_pts
+                     + sh.casualty_pts + sh.star_pts + sh.bases_hit_pts,
+           "sheet: the printed lines add up to the printed total");
+        ok(sh.total == trek_score(), "sheet: and to what the score records");
+    }
+
     /* Quitting with nothing done is the flat penalty alone. */
     trek_new_game(3, 4242);
     ship.enemies_left = 5;

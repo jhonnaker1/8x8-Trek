@@ -62,4 +62,10 @@ void ui_setup(Setup *s);
    there. */
 uint16_t setup_seed(uint16_t entropy, uint8_t level);
 
+/* End of game. The evaluation is the original's Detailed Evaluation, nine
+   line items and a total; the hall of fame is its five rank rows. Both block
+   on Return. */
+void ui_evaluation(void);
+void ui_hall_of_fame(const char *name, uint8_t level, int16_t score);
+
 #endif

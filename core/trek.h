@@ -749,6 +749,30 @@ uint8_t trek_game_state(void);
 
 int16_t trek_score(void);
 
+/* The Detailed Evaluation, line by line, exactly as the original prints it --
+   MEASURED 2026-08-21 from a real end screen (see MEASURED.md). The core fills
+   this and derives trek_score() from its total, so the sheet the player reads
+   and the number recorded can never disagree.
+ *
+ * Three items have no mechanism behind them yet and are always zero: rescues,
+ * enemy bases destroyed, and stars destroyed. They are kept as fields rather
+ * than omitted because the original prints all nine rows whatever happened,
+ * and because their absence is a to-do rather than a design choice. */
+typedef struct {
+    uint16_t rescues;        int16_t rescue_pts;
+                             int16_t incomplete_pts;
+    uint16_t mongols;        int16_t mongol_pts;
+    uint16_t commanders;     int16_t commander_pts;
+    uint16_t enemy_bases;    int16_t enemy_base_pts;
+    uint16_t rate_hundredths; int16_t rate_pts;   /* kills per stardate x100 */
+    uint16_t casualties;     int16_t casualty_pts;
+    uint16_t stars;          int16_t star_pts;
+    uint16_t bases_hit;      int16_t bases_hit_pts;
+    int16_t  total;
+} ScoreSheet;
+
+void trek_score_sheet(ScoreSheet *s);
+
 /* Union bases lost to enemy sieges. Scored, and worth having separately
    because it is the one number that says whether the deadlines were met. */
 extern uint8_t bases_lost;
