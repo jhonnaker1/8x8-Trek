@@ -20,6 +20,8 @@
  * This bit the project three times -- panel titles, then the input path,
  * then the dispatch -- which is why the values now live in one place that
  * both sides include rather than being spelled out twice. */
+#include <stdint.h>
+
 #define KB_NONE   0
 #define KB_RETURN 13
 #define KB_DELETE 20
@@ -40,6 +42,13 @@
 #define KB_W      87
 
 char kb_waitkey(void);   /* blocks until one key is pressed and released */
+
+/* Free-running counter, bumped once per pass of the key poll loop. Sampling it
+   when the player presses a key is the port's only source of entropy: the C128
+   has no clock the game reads, and how long a human takes to answer a prompt
+   is unpredictable at this resolution. Used to seed the galaxy -- before this
+   every game was the same one, because GAME_SEED was a constant. */
+extern uint16_t kb_entropy;
 
 #ifdef TREK_DEBUG_INPUT
 /* Scripted input, for `make monitor` builds only.

@@ -41,6 +41,11 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
     attr[y][x] = color;
 }
 
+/* Stubs for the parts of the port the panel tests do not exercise. ui.c now
+   references both because the setup screen lives there. */
+uint16_t kb_entropy = 0;
+void scr_clear(void) { screen_reset(); }
+
 void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char color) {
     while (*s) scr_put(x++, y, (unsigned char)*s++, color);
 }
@@ -302,6 +307,31 @@ static void test_independent(void) {
     }
 }
 
+
+
+/* The setup screen's only real invariant: the core's xorshift is dead at zero,
+   so a seed of zero would hand every such sitting the same galaxy -- which is
+   the exact bug the screen exists to fix. */
+static void test_setup_seed(void) {
+    unsigned char lv;
+    uint16_t a, b;
+
+    for (lv = 1; lv <= 5; lv++) {
+        char msg[64];
+        sprintf(msg, "level %u never seeds zero", lv);
+        /* The entropy that would cancel this level's mix, if any. */
+        check(setup_seed((uint16_t)(lv * 2749u), lv) != 0, msg);
+    }
+    check(setup_seed(0, 3) != 0, "zero entropy still seeds non-zero");
+
+    a = setup_seed(1234, 3);
+    b = setup_seed(1235, 3);
+    check(a != b, "one more poll pass gives a different galaxy");
+
+    a = setup_seed(1234, 2);
+    b = setup_seed(1234, 4);
+    check(a != b, "same timing at a different level gives a different galaxy");
+}
 
 /* ------------------------------------------------ state of repair report */
 
@@ -591,6 +621,7 @@ int main(void) {
     test_bar_length();
     test_colours();
     test_repair_report();
+    test_setup_seed();
     test_independent();
 
     test_badge_stays_inside();

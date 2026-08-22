@@ -43,4 +43,23 @@ void ui_dialog_close(void);
    the original gives it a full-width panel of its own. */
 void ui_repair_report(void);
 
+/* What the setup screen collects, in the original's own order. Saving is not
+   implemented, so answering yes to the restore prompt reports no saved game
+   and carries on -- which is what the original does with no file on disk. */
+typedef struct {
+    char     name[13];
+    char     password[9];
+    uint8_t  level;      /* 1..5 */
+    uint8_t  briefing;   /* non-zero if the player asked for one */
+    uint16_t seed;       /* sampled from how long the answers took */
+} Setup;
+
+void ui_setup(Setup *s);
+
+/* The seed derivation, exposed so it can be tested without a keyboard. Mixing
+   in the level keeps two identically-timed sittings at different difficulties
+   apart, and the result is never zero because the core's xorshift is dead
+   there. */
+uint16_t setup_seed(uint16_t entropy, uint8_t level);
+
 #endif

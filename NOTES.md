@@ -488,7 +488,9 @@ checklist of *which situations need a message*, not as text to copy.
    with no `vdc_init()`, confirm a clean exit, then add back the 2MHz switch,
    the VDC writes, and the CIA scanning in turn.
 
-3. **Seed the RNG from something varying.** `GAME_SEED` is fixed, deliberately —
+3. ~~**Seed the RNG from something varying.**~~ DONE 2026-08-21 -- the setup screen counts keyboard poll passes while it waits for the player's answers and mixes that with the chosen level. Two runs verified in VICE gave different galaxies (quad 8-3 with 34 enemies, quad 8-7 with 31). Original text follows.
+
+   **Seed the RNG from something varying.** `GAME_SEED` is fixed, deliberately —
    it makes a side-by-side against DOSBox-X repeatable — but it means every run
    is the same galaxy. Wire it to timing once there is a title screen.
 4. ~~**Capture the original at full 640×350**~~ DONE 2026-08-19 via
@@ -820,7 +822,7 @@ same thing the original's does.
 
 Any key advances.
 
-### 10. Setup screen
+### 10. Setup screen -- BUILT 2026-08-21
 
 One screen, heading "U.S.S. Lexington / RCB-92" in a script face, with prompts
 appearing in sequence down the left and earlier answers staying visible:

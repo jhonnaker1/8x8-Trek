@@ -87,6 +87,8 @@ static void settle(void) {
 volatile unsigned char kb_inject = 0;
 #endif
 
+uint16_t kb_entropy = 0;
+
 char kb_waitkey(void) {
     unsigned char i;
 
@@ -115,6 +117,7 @@ char kb_waitkey(void) {
             return c;
         }
 #endif
+        kb_entropy++;
         i = scan();
         if (i != 0xFF) {
             settle();                /* debounce the contact bounce */

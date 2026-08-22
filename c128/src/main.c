@@ -23,13 +23,6 @@
    written with character literals, cc65 translated them to PETSCII, and the
    two spellings drifted silently. One definition, included by both. */
 
-/* PROVISIONAL: a fixed seed, so the same galaxy comes up every run. That is
-   deliberate for now -- it makes a side-by-side against the original in
-   DOSBox-X repeatable, and the core test asserts a seed reproduces a galaxy
-   exactly. Wire this to something varying once there is a title screen to
-   take the timing from. */
-#define GAME_SEED  12345
-#define GAME_LEVEL 3
 
 static char cmd[16];
 
@@ -559,7 +552,15 @@ int main(void) {
 #endif
 
     vdc_init();
-    trek_new_game(GAME_LEVEL, GAME_SEED);
+    {
+        Setup setup;
+        ui_setup(&setup);
+        /* The seed comes out of how long the player took to answer, so no two
+           sittings get the same galaxy. Before this, GAME_SEED was a constant
+           and every game was identical -- NOTES item 3, blocked on this screen
+           since the start. */
+        trek_new_game(setup.level, setup.seed);
+    }
     ui_draw_all();
     ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
 

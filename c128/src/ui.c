@@ -781,18 +781,14 @@ void ui_dialog_line(const char *text) {
     dlg_row++;
 }
 
-void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
-    unsigned char x0, y, n = 0;
+/* Reads a line at (x0,y), echoing as it goes and handling backspace. Shared by
+   the modal dialog and the setup screen so both behave identically. */
+static void read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max) {
+    unsigned char n = 0;
     char c;
 
-    dlg_room();
-    y  = (unsigned char)(DLG_Y + dlg_row);
-    scr_puts((unsigned char)(DLG_X + 2), y, prompt, COL_DEPT);
-    x0 = (unsigned char)(DLG_X + 2 + strlen(prompt) + 1);
-    dlg_row++;
-
     for (;;) {
-        scr_put((unsigned char)(x0 + n), y, 32 + 128, COL_VALUE);
+        scr_put((unsigned char)(x0 + n), y, 32 + 128, COL_VALUE);   /* cursor */
         c = kb_waitkey();
         if (c == KB_RETURN) { scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE); break; }
         if (c == KB_DELETE) {
@@ -810,6 +806,16 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
         n++;
     }
     buf[n] = '\0';
+}
+
+void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
+    unsigned char y;
+
+    dlg_room();
+    y = (unsigned char)(DLG_Y + dlg_row);
+    scr_puts((unsigned char)(DLG_X + 2), y, prompt, COL_DEPT);
+    dlg_row++;
+    read_field((unsigned char)(DLG_X + 2 + strlen(prompt) + 1), y, buf, max);
 }
 
 void ui_dialog_close(void) {
@@ -917,4 +923,68 @@ void ui_repair_report(void) {
 
     scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
              "HIT RETURN TO CONTINUE", COL_DEPT);
+}
+
+/* ---------------------------------------------------------- setup screen */
+
+/* The prompts, in the original's order and its own words -- captured from a
+   live run on 2026-08-21 and archived to reference/shots. The name is what the
+   hall of fame records; the password is what S)elf will be gated on. */
+
+static uint8_t ask_yes(unsigned char y, const char *prompt) {
+    char buf[4];
+    scr_puts(2, y, prompt, COL_LABEL);
+    read_field((unsigned char)(2 + strlen(prompt) + 1), y, buf, sizeof buf);
+    return (uint8_t)(buf[0] == 'Y' || buf[0] == 'y');
+}
+
+uint16_t setup_seed(uint16_t entropy, uint8_t level) {
+    uint16_t v = (uint16_t)(entropy ^ (uint16_t)(level * 2749u));
+    return v ? v : 1u;
+}
+
+void ui_setup(Setup *s) {
+    char buf[8];
+    unsigned char y;
+
+    scr_clear();
+    scr_puts(31, 1, "U.S.S. LEXINGTON", COL_VALUE);
+    scr_puts(36, 2, "RCB-92",           COL_VALUE);
+    scr_puts(2,  5, "WELCOME ABOARD CAPTAIN!", COL_MSG);
+
+    s->briefing = ask_yes(7, "WILL YOU REQUIRE A BRIEFING (Y/N)?");
+
+    if (ask_yes(9, "RESTORE A SAVED GAME (Y/N)?")) {
+        /* Saving is deliberately not built yet. This is what the original
+           does when the disk holds no game, so the prompt can stay honest
+           rather than being left out of the sequence. */
+        scr_puts(4, 10, "NO SAVED GAME FOUND.", EGA_TO_VDC(EGA_LTRED));
+        y = 11;
+    } else {
+        y = 10;
+    }
+
+    scr_puts(2, y, "PLEASE ENTER YOUR NAME:", COL_LABEL);
+    read_field(26, y, s->name, sizeof s->name);
+    y++;
+
+    /* Looped rather than clamped: the original asks again, and silently
+       turning a typo into a different difficulty is worse than re-asking. */
+    for (;;) {
+        scr_puts(2, y, "FOR VERIFICATION, ENTER YOUR COMMAND LEVEL (1-5):", COL_LABEL);
+        buf[0] = '\0';
+        read_field(51, y, buf, 3);
+        if (buf[0] >= '1' && buf[0] <= '5' && buf[1] == '\0') break;
+        scr_puts(51, y, "  ", COL_VALUE);
+    }
+    s->level = (uint8_t)(buf[0] - '0');
+    y++;
+
+    scr_puts(2, y, "CAPTAIN, PLEASE ENTER SELF-DESTRUCT PASSWORD:", COL_LABEL);
+    read_field(47, y, s->password, sizeof s->password);
+
+    /* The whole point of the screen, mechanically: kb_entropy has been counting
+       poll passes throughout, so it now holds something no two sittings will
+       share. */
+    s->seed = setup_seed(kb_entropy, s->level);
 }
