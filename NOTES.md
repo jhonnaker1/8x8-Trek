@@ -1295,3 +1295,19 @@ file with no formatting logic in between.
 
 That closes the hall-of-fame half of item 14 without a measurement session --
 it was sitting in `reference/` the whole time.
+
+### Only commanders move (2026-08-21)
+
+Jamie watched a full session and the pattern is clean: **only Commanders ever
+change sector**. Battleships, scouts and supply ships sit still however hard
+they are provoked.
+
+That is exactly the ancestor's own gate, which had been read out of
+`moveklings()` and then not acted on: it runs `movebaddy()` for the commander
+and the super commander unconditionally, and for ordinary ships only at expert
+skill. Our port moved every enemy.
+
+Combined with the trigger found the same day, the rule the core now implements
+is: **commanders only, and only on turns when the player fires**. The console
+narrates each one -- "The commander has moved. He is now at 1-3" -- which is
+why the message is commander-specific.

@@ -848,8 +848,11 @@ static void test_docking(void) {
         docked_pct = ship.sys[SYS_LASERS];
 
         ok(adrift_pct == REPAIR_PER_STARDATE, "adrift, one stardate mends 20");
-        ok(docked_pct == adrift_pct * DOCK_REPAIR_FACTOR,
-           "docked, it mends four times as much");
+        /* MEASURED off the original's own STATE OF REPAIR dialog, which prints
+           both columns: 47 a stardate docked against 20 adrift, about 2.35x.
+           The ancestor's 4x was DERIVED and is refuted. */
+        ok(docked_pct == REPAIR_PER_STARDATE_DOCKED,
+           "docked, it mends 47 -- about 2.35x, not the ancestor's four");
     }
 
     /* A StarBase's shields absorb enemy fire outright. */
@@ -1219,6 +1222,20 @@ static void test_enemy_turn(void) {
         }
         ok(sector[(1 << 3) | 1] != start,
            "and manoeuvres once we shoot at it");
+
+        /* And only commanders do. MEASURED: across a long session no other
+           class ever changed sector, which is also the ancestor's own gate --
+           moveklings() moves ordinary ships only at expert skill. */
+        trek_new_game(3, 31337);
+        ship.sec_y = 8; ship.sec_x = 8;
+        sector[(1 << 3) | 1] = SEC_BATTLESHIP;
+        enemy_hp[(1 << 3) | 1] = HP_BATTLESHIP;
+        for (i = 0; i < 30; i++) {
+            ship.shields = 30000; ship.energy = 0; ship.torps = 0;
+            trek_enemy_turn(ev, 16, 1);
+        }
+        ok(sector[(1 << 3) | 1] == SEC_BATTLESHIP,
+           "a battleship never moves, however hard we provoke it");
     }
 
     /* Shields gone: the rest lands on the main banks. */

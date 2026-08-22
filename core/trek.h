@@ -230,7 +230,11 @@
                                     the Mongol Commander. The earlier 500 was
                                     inferred from damage arithmetic and
                                     bracketed 441..501; it was wrong. */
-#define HP_SCOUT            100  /* unmeasured */
+#define HP_SCOUT            255  /* MEASURED 2026-08-21: the INFO panel names
+                                    the 255-hit-point ship "Mongol Scout" at
+                                    Shields 100%. This also closes the reading
+                                    that had been unexplained since the first
+                                    session -- 255 was never damage. */
 
 /* Per-sector enemy strength, parallel to `sector` and rebuilt with it.
    Non-zero only where sector[] holds an enemy. */
@@ -593,7 +597,25 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * 1/docfac = 4x while docked. EGA Trek's own STATE OF REPAIR dialog prints
  * Docked and Undocked columns side by side, so a single screenshot with any
  * system damaged settles it. */
-#define DOCK_REPAIR_FACTOR   4
+/* MEASURED 2026-08-21 off the STATE OF REPAIR dialog, which prints Docked and
+ * Undocked times side by side, so one screenshot with a system damaged reads
+ * both rates at once. Six readings at 0%, 10%, 40%, 55%, 65% and 95%:
+ *
+ *     points to repair   docked   undocked
+ *     100                2.1      5.1
+ *      90                1.9      4.6
+ *      60                1.3      3.0
+ *      45                1.0      2.3
+ *      35                0.8      1.8
+ *
+ * Solving across all of them: undocked ~19.75 points per stardate, docked
+ * ~46.6. So the docked advantage is about **2.35x**, and the ancestor's 4x --
+ * DERIVED, and flagged here as the one number worth checking -- is REFUTED.
+ *
+ * The undocked figure confirms REPAIR_PER_STARDATE 20 to within the display's
+ * rounding, and the rate was identical with one system damaged and with three,
+ * which independently confirms that repair does not divide between them. */
+#define REPAIR_PER_STARDATE_DOCKED  47
 
 #define DOCK_OK              0
 #define DOCK_NO_BASE         1   /* no base adjacent */

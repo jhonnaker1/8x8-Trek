@@ -273,7 +273,11 @@ static void advance_time(uint16_t tenths) {
        Declarations first: cc65 is C89 and rejects a statement before one,
        while the native build is C99 and does not. `make test` passing is not
        evidence that the port compiles. */
-    if (ship.docked != BASE_NONE) mend = (uint16_t)(mend * DOCK_REPAIR_FACTOR);
+    /* MEASURED: the docked rate is 47 points a stardate against 20, not the
+       ancestor's 4x. See trek.h. */
+    if (ship.docked != BASE_NONE)
+        mend = (uint16_t)((mend * REPAIR_PER_STARDATE_DOCKED)
+                          / REPAIR_PER_STARDATE);
 
     ship.stardate = (uint16_t)(ship.stardate + tenths);
 
@@ -1029,6 +1033,14 @@ static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
 
     for (cell = 0; cell < QUAD_CELLS; cell++) {
         if (!SEC_IS_ENEMY(sector[cell]) || moved[cell]) continue;
+        /* Commanders and nothing else. MEASURED 2026-08-21: across a long
+           session only the Commander ever changed sector, and the console
+           narrates it specifically -- "The commander has moved. He is now at
+           1-3". It is also exactly what the ancestor's caller does:
+           moveklings() runs movebaddy() for the commander and the super
+           commander unconditionally, and for ordinary ships only at expert
+           skill. Our port moved everything. */
+        if (sector[cell] != SEC_COMMAND) continue;
 
         d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
                       abs_diff((uint8_t)(cell & 7), ship.sec_x));

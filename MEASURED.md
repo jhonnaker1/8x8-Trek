@@ -1946,3 +1946,97 @@ Worth recording because three of the four produced plausible numbers.
 Pinning systems before a turn does not protect them during it either. The
 real protection is keeping the shield pool above the incoming volley so
 nothing penetrates.
+
+## The damaged-ship block (2026-08-21)
+
+Run by writing damage straight into the twelve system percentages rather than
+getting shot at, which makes the whole block safe and repeatable.
+
+### Open item: the docked repair rate. 2.35x, not 4x -- DERIVED value REFUTED
+
+`R)epair` prints Docked and Undocked times side by side, so one screenshot with
+a system damaged reads both rates at once. Six readings:
+
+| points to repair | docked | undocked |
+|---|---|---|
+| 100 | 2.1 | 5.1 |
+|  90 | 1.9 | 4.6 |
+|  60 | 1.3 | 3.0 |
+|  45 | 1.0 | 2.3 |
+|  35 | 0.8 | 1.8 |
+
+Solving across all of them, allowing for one-decimal rounding: **undocked
+~19.75 points per stardate, docked ~46.6**. The advantage is about **2.35x**.
+The ancestor's `1/docfac = 4x` was DERIVED and is refuted -- it was flagged in
+trek.h as the one number there worth checking, and checking it was worth it.
+
+Two things come free with it. The undocked figure confirms
+`REPAIR_PER_STARDATE 20` to within the display's rounding. And the rate was
+identical with one system damaged and with three, which independently confirms
+that repair does not divide between systems -- previously measured by watching
+repair happen, now confirmed from the game's own predicted times.
+
+The core now carries `REPAIR_PER_STARDATE_DOCKED 47` rather than a factor.
+
+### HP_SCOUT is 255, and the long-unexplained reading was never damage
+
+The `INFO` panel names the 255-hit-point ship **"Mongol Scout"** at
+**Shields: 100%**. `HP_SCOUT` had been 100 and marked unmeasured.
+
+That also closes the 255 that has been sitting unexplained since the first
+session, and the guess recorded for it -- "already damaged before we arrived"
+-- was wrong. It was a scout at full strength all along.
+
+`INFO` shows a silhouette, class name, Sector, Range, Bearing and Shields as a
+percentage, with up/down to step through the enemies present and ESC to exit.
+So the game calls an enemy's hit points its **shields**, and shows them as a
+percentage of the class maximum -- which is why the table's raw figure never
+appears on screen.
+
+### Laser heat: the gauge animates, and it resets on leaving the quadrant
+
+Jamie watched this happen and it explains a run of inconsistent readings.
+The Temp bar **rises gradually** after a volley rather than jumping, so a
+screenshot taken at an arbitrary moment catches it mid-climb -- which is how
+the same 400-unit volley read 26 pixels in one session and 6 in another. And
+it **resets to zero on changing quadrant**, which is the other half: several
+of the readings straddled a warp.
+
+So heat accumulates across volleys within a quadrant visit and is cleared by
+leaving. trek.h currently says "per COMMAND, not cumulative over the game",
+which is wrong in the first half and right in the second.
+
+The value itself is still not located: it is not stored as a Turbo Pascal real
+or a 16-bit integer of the fired amount anywhere in the 338KB, so the gauge
+remains the only readout and it needs a settle loop to read honestly. The
+useful bound stands from elsewhere -- a 1240-unit volley leaves efficiency at
+95% or better -- and that came from damage arithmetic, not from the bar.
+
+### What kills the ship when energy cannot: life support has a reserve
+
+Writing Life Support to zero does NOT destroy the ship. The SYSTEMS STATUS
+panel is **replaced by a "LIFE SUPPORT -- RESERVE, DAYS" gauge** counting down
+0/1/2.
+
+That resolves the death recorded as unexplained on 2026-08-20, where the ship
+was destroyed on a turn when energy had just been pinned to 5000. Jamie's
+reading is the right one: it was the rig, not a mystery. That session pinned
+the systems only BEFORE each turn, so life support could be knocked out during
+one and sit at zero across the gap, turn after turn, until the reserve ran
+out. The current rig repairs on both sides of every turn and the problem has
+not recurred.
+
+It is still a real mechanic we do not model: `SYS_LIFE` reaching zero should
+start a countdown that kills the crew, and the console should swap that panel.
+
+### Also seen
+
+* **Plasma bolts** are a distinct enemy weapon -- "639 unit hit from plasma
+  bolt", far above anything the laser law produces at that range.
+* **Casualties are reported by deck**: "There are 7 casualties reported on F
+  Deck", and they come from system damage rather than only from the hull.
+* The **crew is 387 enlisted and 43 officers**, from the briefing's first
+  page. That is 430, confirming `CREW_COMPLEMENT` from a source completely
+  independent of the score sheet it was derived from.
+* The chart's middle digit is the **base TYPE, not a count** -- the briefing
+  says so outright: "the number of Mongols, base type, and number of stars".
