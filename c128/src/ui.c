@@ -1238,3 +1238,94 @@ void ui_title(void) {
     scr_puts(28, 24, "PRESS RETURN TO BEGIN", COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
+
+/* --------------------------------------------------------------- INFO */
+
+#define INF_X   22
+#define INF_Y    6
+#define INF_W   36
+#define INF_H   12
+
+void ui_info_panel(void) {
+    unsigned char cells[QUAD_CELLS];
+    unsigned char n = 0, i, sel = 0;
+
+    for (i = 0; i < QUAD_CELLS; i++)
+        if (SEC_IS_ENEMY(sector[i])) cells[n++] = i;
+
+    for (;;) {
+        unsigned char cell, y, x, color;
+        uint16_t d, full, pct;
+        char c;
+
+        box(INF_X, INF_Y, INF_W, INF_H, COL_LABEL);
+        scr_puts((unsigned char)(INF_X + 2), INF_Y, "INFO", COL_VALUE);
+
+        if (n == 0) {
+            scr_puts((unsigned char)(INF_X + 10), (unsigned char)(INF_Y + 5),
+                     "NO CONTACT", COL_GRID);
+            scr_puts((unsigned char)(INF_X + 6), (unsigned char)(INF_Y + INF_H - 2),
+                     "RETURN TO CLOSE", COL_DEPT);
+            while (kb_waitkey() != KB_RETURN) { }
+            return;
+        }
+
+        cell = cells[sel];
+        y = (unsigned char)(cell >> 3);
+        x = (unsigned char)(cell & 7);
+        (void)cell_glyph(sector[cell], &color);
+
+        /* Same silhouette the viewer draws, so a ship looks the same wherever
+           it is shown. */
+        scr_put((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 2), 81, color);
+        scr_hline((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 2), 4, G_HLINE, color);
+        scr_put((unsigned char)(INF_X + 19), (unsigned char)(INF_Y + 2), 160, color);
+
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 4),
+                 enemy_class(sector[cell]), color);
+
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 6), "SECTOR:", COL_LABEL);
+        put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 6),
+                (uint16_t)(y + 1), 1, COL_VALUE);
+        scr_put((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 6), 45, COL_VALUE);
+        put_num((unsigned char)(INF_X + 16), (unsigned char)(INF_Y + 6),
+                (uint16_t)(x + 1), 1, COL_VALUE);
+
+        d = trek_dist((unsigned char)(y > ship.sec_y ? y - ship.sec_y : ship.sec_y - y),
+                      (unsigned char)(x > ship.sec_x ? x - ship.sec_x : ship.sec_x - x));
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 7), "RANGE:", COL_LABEL);
+        put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 7),
+                (uint16_t)(d >> 8), 1, COL_VALUE);
+        scr_put((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 7), SC_DOT, COL_VALUE);
+        put_num((unsigned char)(INF_X + 16), (unsigned char)(INF_Y + 7),
+                (uint16_t)(((d & 0xFF) * 100) >> 8), 2, COL_VALUE);
+
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 8), "BEARING:", COL_LABEL);
+        put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 8),
+                trek_bearing(y, x), 3, COL_VALUE);
+
+        /* The original reports strength as a percentage and calls it shields;
+           the raw hit points never appear on its screen. */
+        full = trek_enemy_full_hp(sector[cell]);
+        /* hp * 100 would overflow at 695 hit points, so scale by ten on both
+           sides: 6950 and 69 both fit, and the answer is the same percentage. */
+        pct  = full ? (uint16_t)(((uint16_t)(enemy_hp[cell] * 10)) / (full / 10 ? full / 10 : 1)) : 0;
+        if (pct > 100) pct = 100;
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 9), "SHIELDS:", COL_LABEL);
+        put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 9), pct, 3,
+                sys_color((unsigned char)pct));
+        scr_put((unsigned char)(INF_X + 17), (unsigned char)(INF_Y + 9), SC_PCT,
+                sys_color((unsigned char)pct));
+
+        if (n > 1)
+            scr_puts((unsigned char)(INF_X + 4), (unsigned char)(INF_Y + INF_H - 2),
+                     "SPACE=NEXT  RETURN=CLOSE", COL_DEPT);
+        else
+            scr_puts((unsigned char)(INF_X + 10), (unsigned char)(INF_Y + INF_H - 2),
+                     "RETURN TO CLOSE", COL_DEPT);
+
+        c = kb_waitkey();
+        if (c == KB_RETURN) return;
+        if (c == KB_SPACE && n > 1) sel = (unsigned char)((sel + 1) % n);
+    }
+}

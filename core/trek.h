@@ -694,6 +694,22 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 /* `damage` receives the figure delivered; pass NULL if not wanted. */
 uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage);
 
+/* Full strength of a class, so a display can show an enemy's remaining hit
+   points as the percentage the original's INFO panel calls "Shields". */
+uint16_t trek_enemy_full_hp(uint8_t type);
+
+/* Self destruct. DERIVED from the ancestor's kaboom(): everything in the
+   quadrant whose power times its distance is within 25 times our remaining
+   energy is destroyed with us. So a full tank takes the quadrant with it and
+   an empty one takes almost nothing, which is what makes it a last act rather
+   than a weapon.
+ *
+ * The password is the UI's business -- the core is not told it, because the
+ * core formats no text and compares no strings. Returns how many enemies went
+ * with us, and sets ship.lost. */
+#define SELFDESTRUCT_FACTOR  25
+uint8_t trek_self_destruct(void);
+
 /* Mission state. */
 #define GAME_ON          0
 #define GAME_WON         1   /* every Mongol destroyed */

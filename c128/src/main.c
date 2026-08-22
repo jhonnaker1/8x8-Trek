@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 
 #include "vdc.h"
 #include "egavdc.h"
@@ -26,6 +27,27 @@
 
 
 static char cmd[16];
+static Setup setup;        /* the name and password the setup screen collected */
+
+/* Whole-word command match, case-insensitive on the letters we care about.
+   The command line is already upper case coming out of the keyboard scan, so
+   this is a plain compare with the length checked -- "S" must not match
+   "SHUP", which is exactly the bug that would put the ship's destruction one
+   keystroke from raising its shields. */
+static uint8_t word_is(const char *line, const char *word) {
+    uint8_t i;
+    for (i = 0; word[i]; i++)
+        /* & 0x7F because `word` is a string literal and cl65 translates those
+           to PETSCII, where a letter sits 0x80 above its ASCII code, while the
+           keyboard scanner returns plain ASCII. Masking the high bit maps
+           PETSCII letters back and leaves ASCII untouched, so the comparison
+           is right under either compiler. This is the same mismatch that once
+           put the key table in PETSCII and made "q" a no-op; the first version
+           of this function had it too, and INFO silently fell through to the
+           unknown-command help. */
+        if (line[i] != (char)(word[i] & 0x7F)) return 0;
+    return (uint8_t)(line[i] == 0);
+}
 
 /* Collects the digits out of a command line, ignoring any separators the
    player chose to use. The original is equally relaxed: "you can use
@@ -120,15 +142,21 @@ static char linebuf[32];
    (the C128's dedicated cursor keys sit outside the 8x8 matrix input.c scans
    -- see the note there) nor spare letters, so S toggles. The message says
    which way it went, so the state is never ambiguous. */
-static void do_shields(void) {
-    if (ship.shields_up) {
-        trek_shields_down();
-        ui_message("ENGINEERING: ", "SHIELDS DOWN.");
-        return;
-    }
+/* SHUP and SHDN, as the reference card names them. This was one S key that
+   toggled, which is neither what the card says nor compatible with S)elf --
+   the card gives S to self destruct and spells shields out. */
+static void do_shields_down(void) {
+    trek_shields_down();
+    ui_message("ENGINEERING: ", "SHIELDS DOWN.");
+}
+
+static void do_shields_up(void) {
     switch (trek_shields_up()) {
         case SHIELD_OK:
             ui_message("ENGINEERING: ", "SHIELDS UP.");
+            break;
+        case SHIELD_ALREADY:
+            ui_message("ENGINEERING: ", "ALREADY UP, CAPTAIN.");
             break;
         default:
             ui_message("ENGINEERING: ", "TOO LITTLE ENERGY.");
@@ -400,6 +428,44 @@ static void do_repair(void) {
     ui_draw_all();
 }
 
+/* S)elf destruct. Gated on the password the setup screen collected, which is
+   the whole reason that prompt exists. The core is never told the password --
+   it formats no text and compares no strings -- so the check is here. */
+static void do_self(void) {
+    char buf[9];
+    uint8_t n;
+
+    ui_dialog_open("SELF DESTRUCT");
+    ui_dialog_ask("PASSWORD:", buf, sizeof buf);
+    if (strcmp(buf, setup.password) != 0) {
+        /* The ancestor's own wording, which is too good to replace. */
+        ui_dialog_line("PASSWORD-REJECTED;");
+        ui_dialog_line("CONTINUITY-EFFECTED");
+        ui_dialog_line("");
+        ui_dialog_line("HIT RETURN TO CONTINUE");
+        while (kb_waitkey() != KB_RETURN) { }
+        ui_dialog_close();
+        return;
+    }
+
+    ui_dialog_line("PASSWORD-ACCEPTED");
+    ui_dialog_line("5   4   3   2   1");
+    n = trek_self_destruct();
+    { uint8_t k = put_str(linebuf, "ENTROPY MAXIMIZED. ");
+      k += put_u16(linebuf + k, n);
+      k += put_str(linebuf + k, " TAKEN WITH US.");
+      linebuf[k] = 0;
+      ui_dialog_line(linebuf); }
+    ui_dialog_line("HIT RETURN TO CONTINUE");
+    while (kb_waitkey() != KB_RETURN) { }
+    ui_dialog_close();
+}
+
+static void do_info(void) {
+    ui_info_panel();
+    ui_draw_all();
+}
+
 static void enemy_turn(uint8_t player_fired) {
     TrekEvent ev[12];
     uint8_t n, i, k;
@@ -538,7 +604,6 @@ static void do_torpedo(const char *line) {
 
 int main(void) {
     unsigned char c;
-    Setup setup;          /* kept for the end screens: the name and rank */
 
 #ifdef TREK_DEBUG_INPUT
     /* This assignment exists to make kb_inject appear in the link map.
@@ -573,17 +638,23 @@ int main(void) {
 
         /* Only L and T pass 1: enemies manoeuvre when we shoot at them, not
            merely when a turn passes. MEASURED -- see trek.h. */
-        if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
+        /* Word commands first: SHUP and SHDN both begin with S, which the
+           card gives to self destruct. */
+        if      (word_is(cmd, "INFO")) do_info();
+        else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
+        else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
+        else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
+        else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
         else if (c == KB_L) { do_lasers();     enemy_turn(1); }
         else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
         else if (c == KB_D) { do_dock();       enemy_turn(0); }
-        else if (c == KB_S) { do_shields();    enemy_turn(0); }
+        else if (c == KB_S) do_self();     /* S)elf, per the card */
         else if (c == KB_E) { do_energy();     enemy_turn(0); }
         else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
         else if (c == KB_R) do_repair();   /* a report, not a turn */
         else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
         else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M W L T D S)HLD E X)MAX Q");
+        else if (c)          ui_message("COMPUTER: ", "M W L T D R S E Q INFO SHUP SHDN MAX");
 
         ui_draw_scan();
         ui_draw_chart();

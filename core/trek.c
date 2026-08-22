@@ -98,6 +98,8 @@ static uint16_t enemy_strength(uint8_t type) {
     }
 }
 
+uint16_t trek_enemy_full_hp(uint8_t type) { return enemy_strength(type); }
+
 void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
@@ -794,6 +796,26 @@ static uint16_t laser_factor(uint16_t dist) {
     return (uint16_t)((reach - dist + (LASER_RANGE_ZERO / 2)) / LASER_RANGE_ZERO);
 }
 
+/* Everything that has to happen when an enemy dies, in one place.
+ *
+ * It was in two places and they disagreed: the torpedo path counted the kill
+ * against ship.killed / killed_cmd and the laser path did not, so laser kills
+ * -- which is how most things die -- scored nothing at all and contributed
+ * nothing to the kill/day ratio either. Nothing caught it because both paths
+ * cleared the sector and decremented the galaxy counters correctly, so the
+ * game looked right and only the sheet was wrong. */
+static void kill_enemy(uint8_t cell) {
+    uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+
+    if (sector[cell] == SEC_COMMAND) ship.killed_cmd++;
+    else                             ship.killed++;
+
+    sector[cell]   = SEC_EMPTY;
+    enemy_hp[cell] = 0;
+    if (gal_enemies[q]) gal_enemies[q]--;
+    if (ship.enemies_left) ship.enemies_left--;
+}
+
 /* MEASURED exactly; see trek.h and MEASURED.md. Distance is applied before
    efficiency so that the readings, all of which were taken at 100%, come
    back bit for bit. */
@@ -812,7 +834,7 @@ void trek_laser_begin_volley(void) {
 
 uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
                         uint16_t *damage) {
-    uint8_t cell, q;
+    uint8_t cell;
     uint16_t d, dealt;
 
     if (damage) *damage = 0;
@@ -847,13 +869,7 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
         return FIRE_OK;
     }
 
-    enemy_hp[cell] = 0;
-    sector[cell]   = SEC_EMPTY;
-
-    q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
-    if (gal_enemies[q]) gal_enemies[q]--;
-    if (ship.enemies_left) ship.enemies_left--;
-
+    kill_enemy(cell);
     return FIRE_KILL;
 }
 
@@ -1151,17 +1167,32 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
         return TORP_OK;
     }
 
-    if (sector[cell] == SEC_COMMAND) ship.killed_cmd++;
-    else                             ship.killed++;
-
-    sector[cell]   = SEC_EMPTY;
-    enemy_hp[cell] = 0;
-    {
-        uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
-        if (gal_enemies[q]) gal_enemies[q]--;
-    }
-    if (ship.enemies_left) ship.enemies_left--;
+    kill_enemy(cell);
     return TORP_KILL;
+}
+
+uint8_t trek_self_destruct(void) {
+    uint8_t cell, n = 0;
+
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        uint16_t d, reach;
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+
+        d = (uint16_t)(trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
+                                 abs_diff((uint8_t)(cell & 7), ship.sec_x)) >> 8);
+
+        /* The ancestor tests `power * distance <= 25 * energy`. Divided through
+           by 25 instead, because 25 * 5000 does not fit 16 bits while the left
+           side does: hit points reach 695 and distance 9, so the product stays
+           under 6300. The division costs a little precision at the boundary and
+           nothing anywhere else. */
+        reach = (uint16_t)((uint16_t)(enemy_hp[cell] * d) / SELFDESTRUCT_FACTOR);
+        if (reach <= ship.energy) { kill_enemy(cell); n++; }
+    }
+
+    ship.lost = 1;
+    ship.casualties = CREW_COMPLEMENT;   /* as with any loss of the ship */
+    return n;
 }
 
 /* --------------------------------------------------------- mission state */

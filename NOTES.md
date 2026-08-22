@@ -903,7 +903,7 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: eleven of twenty-five (added 2026-08-19, count updated 2026-08-21)
+## 13. The command set: thirteen of twenty-five (added 2026-08-19, count updated 2026-08-21)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
 and it is short enough to reproduce whole. The port implements six of it.
@@ -923,10 +923,10 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `MSGS` | review old messages | needs a longer log than the four boxes hold |
 | `C)hart` | chart of known galaxy | the console shows it permanently; may be redundant here |
 | `F)ix` | control which system engineering repairs | needs a repair-priority model the core lacks |
-| `INFO` | info on enemy in current quadrant | needs the MAIN VIEWER, which now exists |
+| `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
 | `HAIL` | hail a StarBase | no mechanic behind it |
 | `A#` | acknowledge message # | no mechanic behind it |
-| `S)elf` | self destruct | uses the setup screen's password — see item 10 |
+| `S)elf` | self destruct | **done** -- the setup screen collects the password, and the ancestor's kaboom() gives the blast |
 | `RAY` | death ray | unimplemented mechanic |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | unimplemented mechanics |
 | `SAVE` | save game | deferred, see item 10 |
@@ -1359,3 +1359,18 @@ Jamie spotted this one by asking whether the same borders were missing from
 the main play screen. They were not -- `draw_panel()` was always fine -- but
 the question is what sent me to compare the two code paths instead of trusting
 a passing test.
+
+### S was bound to the wrong command (2026-08-21)
+
+The port had `S` toggling shields. The reference card gives `S` to **S)elf
+destruct** and spells shields out as `SHUP` / `SHDN` / `MAX`. Adding self
+destruct forced the collision into the open, so the dispatch now matches whole
+words before single letters -- `SHUP` begins with S, and getting that order
+wrong would put the ship's destruction one keystroke from raising its shields.
+
+The word matcher needed `& 0x7F` on the literal it compares against. cl65
+translates string literals to PETSCII, where a letter sits 0x80 above ASCII,
+while the keyboard scanner returns ASCII. The first version compared them
+directly and `INFO` silently fell through to the unknown-command help. This is
+the same mismatch that once put the key table in PETSCII and made `q` a no-op,
+which is why the existing dispatch had always used numeric KB_ constants.

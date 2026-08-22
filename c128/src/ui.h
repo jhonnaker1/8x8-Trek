@@ -68,6 +68,12 @@ uint16_t setup_seed(uint16_t entropy, uint8_t level);
 /* The title screen. Blocks on Return. */
 void ui_title(void);
 
+/* INFO: one enemy at a time -- class, sector, range, bearing and its strength
+   as a percentage, which is what the original calls its shields. SPACE steps
+   to the next, RETURN closes. The original says "up/down to select"; this port
+   has no arrow keys in its matrix, so it says what it does. */
+void ui_info_panel(void);
+
 void ui_evaluation(void);
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score);
 

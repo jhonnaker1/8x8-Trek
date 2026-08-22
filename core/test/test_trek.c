@@ -613,25 +613,6 @@ static uint8_t fire_turn(TrekEvent *ev, uint8_t max) {
 /* abs difference, for tests that need trek_dist directly. */
 static uint8_t abs_diff8(uint8_t a, uint8_t b) { return (uint8_t)(a > b ? a - b : b - a); }
 
-/* Did the one enemy of this type end up nearer the ship than it started at
-   (sy,sx)? Returns 1 if so. Used to test motion DIRECTION rather than the mere
-   fact of a move. */
-static int enemy_closed(uint8_t type, uint8_t sy, uint8_t sx) {
-    uint8_t i;
-    uint16_t was = trek_dist((uint8_t)(sy > ship.sec_y ? sy - ship.sec_y : ship.sec_y - sy),
-                             (uint8_t)(sx > ship.sec_x ? sx - ship.sec_x : ship.sec_x - sx));
-    for (i = 0; i < QUAD_CELLS; i++) {
-        if (sector[i] != type) continue;
-        {
-            uint8_t y = (uint8_t)(i >> 3), x = (uint8_t)(i & 7);
-            uint16_t now = trek_dist(
-                (uint8_t)(y > ship.sec_y ? y - ship.sec_y : ship.sec_y - y),
-                (uint8_t)(x > ship.sec_x ? x - ship.sec_x : ship.sec_x - x));
-            return now < was;
-        }
-    }
-    return 0;
-}
 
 /* Fills the eight cells around one sector with stars, so whatever is in the
    middle has nowhere to step. */
@@ -1355,6 +1336,49 @@ static void test_torpedo(void) {
     ok(trek_fire_torpedo(1, 1, &dmg) == TORP_NONE_LEFT, "cannot fire without any");
 }
 
+static void test_self_destruct(void) {
+    uint8_t n;
+    puts("self destruct");
+
+    /* The bug this pair exists to prevent: killing with LASERS never counted
+       toward the score. Both weapons share one kill routine now. */
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = 1;
+    ok(trek_fire_laser(2, 4, 500, NULL) == FIRE_KILL, "a laser can kill");
+    ok(ship.killed == 1, "and the kill is counted -- it never used to be");
+
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_COMMAND;
+    enemy_hp[(2 << 3) | 4] = 1;
+    trek_fire_laser(2, 4, 500, NULL);
+    ok(ship.killed_cmd == 1, "a Commander counts against the Commander line");
+
+    /* A full tank takes the quadrant with it. */
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(1 << 3) | 1] = SEC_COMMAND;   enemy_hp[(1 << 3) | 1] = HP_COMMAND;
+    sector[(6 << 3) | 6] = SEC_BATTLESHIP; enemy_hp[(6 << 3) | 6] = HP_BATTLESHIP;
+    ship.energy = ENERGY_START;
+    n = trek_self_destruct();
+    ok(n == 2,              "at full energy it takes everything in the quadrant");
+    ok(ship.lost,           "and the ship with it");
+    ok(ship.casualties == CREW_COMPLEMENT, "all hands, as with any loss");
+    ok(trek_game_state() == GAME_LOST, "the mission is over");
+
+    /* An empty tank takes nothing -- which is what makes it a last act rather
+       than a weapon. */
+    trek_new_game(3, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(1 << 3) | 1] = SEC_COMMAND; enemy_hp[(1 << 3) | 1] = HP_COMMAND;
+    ship.energy = 0;
+    n = trek_self_destruct();
+    ok(n == 0,  "with the banks empty it takes nothing with it");
+    ok(ship.lost, "but the ship is still lost");
+}
+
 static void test_game_state_and_score(void) {
     puts("mission state and score");
 
@@ -1498,6 +1522,7 @@ int main(void) {
     test_docking();
     test_base_relief();
     test_torpedo();
+    test_self_destruct();
     test_game_state_and_score();
 
     puts("");
