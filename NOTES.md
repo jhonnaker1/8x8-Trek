@@ -479,7 +479,12 @@ checklist of *which situations need a message*, not as text to copy.
    so `cc` can reach it is worth doing too, but it is the smaller half — a
    native test of that function still would not have caught the key table.
 
-2. **Returning to BASIC wedges the C128.** Quit currently parks with the console
+2. ~~**Returning to BASIC wedges the C128.**~~ RESOLVED 2026-08-22 -- it does
+   not, and there is no evidence it ever did. `main()` returns 0, the park loop
+   is gone, and Q now ends the program properly. See "The exit bug that was
+   never there" below. Original text follows.
+
+   **Returning to BASIC wedges the C128.** Quit currently parks with the console
    readable and RUN/STOP+RESTORE as the way out, which works but is a
    workaround, not a fix. Undiagnosed: this program runs at 2MHz, drives the VDC
    directly, and scans CIA1 behind the KERNAL's back, so there are several
@@ -1374,3 +1379,68 @@ while the keyboard scanner returns ASCII. The first version compared them
 directly and `INFO` silently fell through to the unknown-command help. This is
 the same mismatch that once put the key table in PETSCII and made `q` a no-op,
 which is why the existing dispatch had always used numeric KB_ constants.
+
+## The exit bug that was never there (2026-08-22)
+
+Open item 2 -- the oldest thing on the list, dating from the first commit that
+had a core in it -- said returning to BASIC wedged the C128, and named three
+suspects: the 2MHz switch, the direct VDC register writes, and scanning CIA1
+behind the KERNAL's back. It carried a bisect recipe and sat untouched for a
+week because, in its own words, there was "no way to observe the machine from a
+session on this host".
+
+That clause is the whole story. It was already false when it was written --
+VICE's binary monitor was there all along, and `tools/vice_mon.py` has been
+driving it since 2026-08-19. The bug was never diagnosed. It was assumed, and
+the assumption shipped a workaround to every player: *RUN/STOP + RESTORE FOR
+BASIC*.
+
+### Running the recipe
+
+`c128/test/exit_bisect.c` is the bisect the note asked for, one suspect per
+stage, in a program small enough that nothing else can be blamed:
+
+| stage | adds | returns to BASIC |
+|---|---|---|
+| 0 | nothing -- just `return 0` | yes |
+| 1 | + 2MHz on and back off | yes |
+| 2 | + `vdc_init()` / `vdc_shutdown()` | yes |
+| 3 | + a CIA1 matrix scan, SEI/CLI and all | yes |
+
+All three suspects are innocent. So `tools/exit_real.py` built the whole port,
+played it through the title, the setup screen, a quit and both end-of-game
+screens with `kb_inject`, and asked again. BASIC came back and answered
+`PRINT 6*7` with `42`.
+
+### The instrument, and the trap it exists to avoid
+
+**A wedged C128 still shows READY.** BASIC printed it before the program was
+RUN and nothing erased it. Liveness is no better: the KERNAL's 60Hz IRQ keeps
+bumping the jiffy clock long after BASIC is dead, so `vice_mon.py live` says
+yes to a machine that will never take another command. The only question worth
+asking is one only a live BASIC can answer, which is why both scripts type a
+sum and look for the answer in 40-column screen RAM. `42` cannot come from the
+echo of what was typed.
+
+Feed it as UPPERCASE ASCII. VICE passes those bytes through as PETSCII, and
+PETSCII `$50` is the `P` BASIC's parser wants; lowercase `$70` lands in the
+shifted range, which *displays* as an uppercase P on the boot charset and then
+earns a `?SYNTAX ERROR`. That error was the first proof the machine was alive,
+so the wrong case was useful once and then had to go.
+
+### The false positive, reproduced by accident
+
+The first run of `exit_real.py` reported WEDGED. It was wrong. The scripted
+keys had desynced -- `kb_inject` is a single byte with no handshake, and
+vice_mon's own notes say reading it back lies -- so the port never reached the
+quit at all and was still sitting in `kb_waitkey()` with the console up.
+
+**A program blocked on input is indistinguishable from a wedged machine.** Both
+ignore the keyboard; both leave READY on the other screen. That is almost
+certainly what was recorded as this bug in the first place, and it is the same
+class of error as the "input injection does not reach this port" and "the
+machine is hung" conclusions of 2026-08-19, which turned out to be artefacts of
+a monitor that had stopped the CPU. Three times now the instrument has been the
+thing that was broken.
+
+Fixing it took one line. Believing the note took a week.

@@ -17,7 +17,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check clean
+.PHONY: all test port-check exit-test clean
 
 all: test port-check
 
@@ -57,6 +57,18 @@ port-check:
 	else \
 	    echo "port-check: SKIPPED -- no m68k-amigaos-gcc at $(M68K)"; \
 	fi
+
+# Does the C128 build still hand the machine back to BASIC? NOT part of `all`:
+# it launches x128 five times and takes a couple of minutes, which is a poor
+# fit for a build you run constantly.
+#
+# It exists because open item 2 -- "returning to BASIC wedges the C128" -- was
+# believed for a week on no evidence, and the thing that finally settled it was
+# a script, not an opinion. Leaving that script runnable is how the answer
+# stays checkable. See NOTES.md, "The exit bug that was never there".
+exit-test:
+	python3 tools/exit_bisect.py
+	python3 tools/exit_real.py
 
 clean:
 	rm -rf build

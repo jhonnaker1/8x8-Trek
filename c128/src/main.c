@@ -684,33 +684,37 @@ int main(void) {
        in the state we found it. */
     scr_clear();
     scr_puts(28, 10, "MISSION ENDED, CAPTAIN.", EGA_TO_VDC(EGA_LTGREEN));
-    scr_puts(24, 12, "RUN/STOP + RESTORE FOR BASIC.", EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(23, 12, "BASIC IS ON THE 40-COLUMN SCREEN.", EGA_TO_VDC(EGA_LTCYAN));
 
     /* Drop back to 1MHz first, so the VIC-IIe screen is live again and the
        machine does not look dead on the other window. */
     vdc_shutdown();
 
-    /* KNOWN ISSUE -- returning to BASIC wedges the C128.
+    /* NOTES.md open item 2 -- "returning to BASIC wedges the C128" -- was
+     * never true of this program, or stopped being true before anyone could
+     * measure it. Settled 2026-08-22 and the park loop is gone.
      *
-     * `return 0` here hands control to cc65's exit path, and the machine
-     * stops responding on both screens. Not diagnosed: this program runs at
-     * 2MHz, drives the VDC directly, and scans CIA1 behind the KERNAL's
-     * back, so there are several candidates. It is no longer unobservable,
-     * though -- tools/vice_mon.py drives VICE's binary monitor and can
-     * screenshot, read memory and inject keys, which is how the setup screen
-     * and the repair report were verified. The bisect recipe below is now
-     * something a script can run rather than a plan.
+     * The note it replaces named three suspects and a bisect: the 2MHz
+     * switch, the direct VDC register writes, and scanning CIA1 behind the
+     * KERNAL's back. c128/test/exit_bisect.c runs that bisect for real, one
+     * suspect per stage, and all four stages hand the machine back to a BASIC
+     * that then evaluates arithmetic. Then tools/exit_real.py played THIS
+     * binary through to a quit and did the same: BASIC came back and answered
+     * PRINT 6*7 with 42.
      *
-     * Parking is the honest behaviour rather than a pretend one: the final
-     * console stays readable, and because interrupts are left enabled the
-     * KERNAL's NMI still works, so RUN/STOP+RESTORE gets the player a BASIC
-     * prompt. Plenty of 8-bit games never returned to BASIC at all.
+     * Why it stood for so long is the part worth keeping. The original note
+     * says there was "no way to observe the machine from a session on this
+     * host" -- a claim NOTES.md now records as simply wrong; the binary
+     * monitor was there all along. So the wedge was never diagnosed, only
+     * assumed, and the assumption cost every player an exit.
      *
-     * To diagnose properly, bisect it: return immediately from main() at the
-     * top with no vdc_init() at all and confirm a clean exit, then add back
-     * the 2MHz switch, then the VDC register writes, then the CIA scanning.
-     * The first one that wedges it is the culprit. */
-    for (;;) { }
-
+     * The trap is real, though, and it caught this session too. A program
+     * still blocked in kb_waitkey() is indistinguishable from a wedged
+     * machine: both ignore the keyboard, and the C128 still shows READY
+     * because BASIC printed it before the program ran. The first attempt at
+     * exit_real.py desynced its scripted keys, never reached the quit, and
+     * reported WEDGED. That is the same false positive the original note
+     * almost certainly recorded. Deciding it needs a question only a live
+     * BASIC can answer -- hence the arithmetic. */
     return 0;
 }
