@@ -917,7 +917,7 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `E)nergy` | energy transfer | **done** (4de6758) |
 | `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
-| `R)epair` | state of repair report | needs the modal dialog we already have |
+| `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
 | `MSGS` | review old messages | needs a longer log than the four boxes hold |
 | `C)hart` | chart of known galaxy | the console shows it permanently; may be redundant here |
 | `F)ix` | control which system engineering repairs | needs a repair-priority model the core lacks |
