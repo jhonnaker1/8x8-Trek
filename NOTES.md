@@ -849,7 +849,19 @@ Notes worth having before building it:
 saved game" prompt still needs to appear and take N, because the sequence
 reads wrong without it, but nothing behind it.
 
-### 11. Briefing pages
+### 11. Briefing pages -- CAPTURED 2026-08-21
+
+All fifteen pages are captured to `reference/shots/b*.png`. Contents worth
+knowing before building them: the crew is **387 enlisted and 43 officers**
+(which is the 430 the score sheet charges for losing the ship, confirmed
+independently); the ship is a "heavy Research/Battle Cruiser, Class IX"; and
+the chart's three digits are stated outright as "the number of Mongols, **base
+type**, and number of stars" -- a type, not a count, which our chart currently
+gets wrong.
+
+The pages are reached with Y at the first setup prompt, advanced with Enter and
+abandoned with Q, and the prompt line says so: `(Hit "Enter" for next page or
+"Q" to quit briefing)`.
 
 Shown only if the player answers Y. Paged, with "(Hit "Enter" for next page or
 "Q" to quit briefing)" and Q returning to the setup sequence at the restore

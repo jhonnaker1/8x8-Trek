@@ -970,9 +970,18 @@ static int16_t enemy_motion(uint16_t hp, uint16_t dist_whole) {
         /* Very strong: move in for the kill, but never past us. */
         motion = (int16_t)(dist_whole + 1);
     } else {
-        /* The ancestor's forces/150 - 5, which is negative below 750 and
-           positive above -- so a weak ship backs off and a strong one closes. */
-        motion = (int16_t)(forces / 150) - 5;
+        /* The ancestor's (forces + 200*Rand())/150 - 5, which is negative below
+           750 and positive above -- so a weak ship backs off and a strong one
+           closes.
+
+           The jitter was dropped when this was first ported, and restoring it
+           is what makes the observed behaviour possible. Commanders advance one
+           sector at a time and INTERMITTENTLY: three turns running in one
+           sighting, once in four or five in another. A deterministic score
+           cannot do that. This term lands typical forces either side of the
+           1-sector boundary, so the same state sometimes steps and sometimes
+           holds, which is what the original does. */
+        motion = (int16_t)((forces + trek_rand_n(200)) / 150) - 5;
     }
 
     /* Limited by command level, as the ancestor limits by skill. */

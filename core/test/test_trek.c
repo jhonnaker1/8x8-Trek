@@ -610,6 +610,26 @@ static uint8_t fire_turn(TrekEvent *ev, uint8_t max) {
     return 0;
 }
 
+/* Did the one enemy of this type end up nearer the ship than it started at
+   (sy,sx)? Returns 1 if so. Used to test motion DIRECTION rather than the mere
+   fact of a move. */
+static int enemy_closed(uint8_t type, uint8_t sy, uint8_t sx) {
+    uint8_t i;
+    uint16_t was = trek_dist((uint8_t)(sy > ship.sec_y ? sy - ship.sec_y : ship.sec_y - sy),
+                             (uint8_t)(sx > ship.sec_x ? sx - ship.sec_x : ship.sec_x - sx));
+    for (i = 0; i < QUAD_CELLS; i++) {
+        if (sector[i] != type) continue;
+        {
+            uint8_t y = (uint8_t)(i >> 3), x = (uint8_t)(i & 7);
+            uint16_t now = trek_dist(
+                (uint8_t)(y > ship.sec_y ? y - ship.sec_y : ship.sec_y - y),
+                (uint8_t)(x > ship.sec_x ? x - ship.sec_x : ship.sec_x - x));
+            return now < was;
+        }
+    }
+    return 0;
+}
+
 /* Fills the eight cells around one sector with stars, so whatever is in the
    middle has nowhere to step. */
 static void wall_in(uint8_t y, uint8_t x) {
@@ -747,32 +767,40 @@ static void test_shields(void) {
     ok(ship.energy == SHIELD_RAISE_COST - 1, "a refused raise costs nothing");
 
     /* Raised shields matter to the enemy: enemy_motion adds 1000 to its
-       forces score when ours are down, so lowering them must make an enemy
-       no less aggressive. Asserted as a RELATIVE effect on purpose -- the
+       forces score when ours are down, so lowering them must make an enemy no
+       less aggressive. Asserted as a RELATIVE effect on purpose -- the
        absolute thresholds are the ancestor's, calibrated to its power scale,
-       and do not transfer to ours (see MEASURED.md). The direction does. */
+       and do not transfer to ours (see MEASURED.md). The direction does.
+
+       Counted over many trials rather than asserted on one, because motion
+       carries the ancestor's 200*Rand() jitter: a single turn is a coin toss,
+       and the earlier one-turn version of this test was asserting the toss. */
     {
         TrekEvent ev[16];
         uint8_t mid = (uint8_t)((2 << 3) | 2);
-        uint8_t moved_up, moved_down;
+        int i, closer_up = 0, closer_down = 0;
 
-        trek_new_game(3, 31337);
-        ship.sec_y = 4; ship.sec_x = 4;
-        ship.shields_up = 1;
-        sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
-        trek_enemy_turn(ev, 16, 1);
-        moved_up = (uint8_t)(sector[mid] != SEC_COMMAND);
+        for (i = 0; i < 60; i++) {
+            trek_new_game(3, (uint16_t)(1000 + i));
+            ship.sec_y = 4; ship.sec_x = 4;
+            ship.shields_up = 1;
+            sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+            trek_enemy_turn(ev, 16, 1);
+            closer_up += enemy_closed(SEC_COMMAND, 2, 2);
 
-        trek_new_game(3, 31337);
-        ship.sec_y = 4; ship.sec_x = 4;
-        ship.shields_up = 0;
-        sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
-        trek_enemy_turn(ev, 16, 1);
-        moved_down = (uint8_t)(sector[mid] != SEC_COMMAND);
-
-        ok(moved_up && !moved_down,
-           "shields up drives a Commander off; lowering them makes it hold");
+            trek_new_game(3, (uint16_t)(1000 + i));
+            ship.sec_y = 4; ship.sec_x = 4;
+            ship.shields_up = 0;
+            sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
+            trek_enemy_turn(ev, 16, 1);
+            closer_down += enemy_closed(SEC_COMMAND, 2, 2);
+        }
+        /* Direction, not merely movement: retreating and advancing both count
+           as "moved", so counting moves says nothing about aggression. */
+        ok(closer_down >= closer_up,
+           "dropping our shields makes a Commander no less willing to close");
     }
+
 }
 
 static void test_docking(void) {

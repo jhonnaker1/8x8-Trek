@@ -2040,3 +2040,78 @@ start a countdown that kills the crew, and the console should swap that panel.
   independent of the score sheet it was derived from.
 * The chart's middle digit is the **base TYPE, not a count** -- the briefing
   says so outright: "the number of Mongols, base type, and number of stars".
+
+## Audit of the open items after 2026-08-21
+
+Sweeping the day's measurements against everything still open.
+
+### Closed
+
+**Open item 9, torpedo damage** -- capped at 355, falling with range beyond
+about 3.5. Measured over nineteen shots at three ranges.
+
+**Open item 10, torpedo accuracy** -- certain to range 5, degrading past it.
+The original announces a miss as "Clean miss, sir!".
+
+**Open item 15, are hit points fixed per class** -- YES, and every class is now
+measured: Commander 695, Battleship 355, **Scout 255**, Supply 120. The scout
+figure came from the INFO panel naming the ship, and it removes the last
+unmeasured hit-point constant.
+
+Both readings that had ever looked anomalous are accounted for. **255 was a
+scout at full strength**, not a damaged battleship as this file previously
+guessed. The scattered values -- 610, 535, 345, 320, 230 -- are Vandal Death
+Pod damage, which hits every ship in a quadrant by the same amount and roams
+between them, so any enemy may already be carrying some when we arrive. That
+mechanism was watched directly: four enemies reading 626, 286, 286, 286, each
+exactly 69 below their class figure.
+
+**The docked repair rate** -- 2.35x, not the ancestor's 4x. Refuted.
+
+**Does laser Temp accumulate across volleys** -- YES, within a quadrant visit,
+and it is **cleared on leaving the quadrant**. The gauge also animates upward
+rather than jumping, so it must be read after it settles. Previously listed as
+an open DERIVED question; trek.h's "per COMMAND, not cumulative over the game"
+is wrong in its first half.
+
+**What can destroy the ship when energy cannot** -- life support at zero starts
+a RESERVE, DAYS countdown. Not a mystery mechanic; the death recorded as
+unexplained was an artefact of a rig that repaired only before each turn.
+
+### Advanced, not closed
+
+**Open item 14, enemy motion.** Three of its four parts are now settled:
+
+* *Who* -- commanders only. Watched across a full session, and it is the
+  ancestor's own gate.
+* *When* -- on turns the player fires, not merely when a turn passes.
+* *Which way* -- toward the ship, one sector at a time. Six sightings, and not
+  one retreat has ever been observed.
+
+*How often* is what remains, and it is **intermittent**: three turns running in
+one sighting, once in four or five in another. That intermittency is itself
+evidence, because a deterministic score cannot produce it -- which is why the
+ancestor's `200*Rand()` jitter has now been restored to `enemy_motion()`. It
+was dropped when the function was first ported, spotted days ago, and set aside
+when the motion model looked refuted. With movement confirmed real but
+intermittent, it is the term that makes the observed pattern possible.
+
+The absolute thresholds are still on the ancestor's power scale and still not
+refitted.
+
+**Open item 1, the enemy count.** Two more level-3 games, both read at the
+start: 38 and 38. The series is now 40, 42, 42, 42, 34, 38, 37, 37, 38 -- nine
+games, offsets from `level*10` of 10, 12, 12, 12, 4, 8, 7, 7, 8. The mean is
+8.9 where our uniform 0..12 predicts 6, and nothing has landed in 0..3, which
+that model makes a **3.6%** event over nine games. The doubt is now firm enough
+to act on with a few more samples, and free to collect: every session starts
+games anyway.
+
+**Stars destroyed (-5)** -- the mechanism is now seen (a torpedo detonating a
+star, taking the whole quadrant with it) but the scoring line has never been
+observed non-zero.
+
+### Untouched
+
+Open item 7's falloff shape, open item 8's 1240..1500 band, open item 11
+(boarding parties), the kill/day gate, and planets. The combat rig did not run.
