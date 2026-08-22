@@ -1280,3 +1280,18 @@ Quadrant, a class letter, and a name. The letters seen are N, M and O, which
 is the Star Trek planet-class convention -- M being the habitable one. So the
 planets in item 14 are not just a mechanic to port from `planets.c`; they are
 already named and classified per galaxy, and the console has a page for them.
+
+### The hall of fame file is plain text, and needs no emulator (2026-08-21)
+
+`reference/TREK.SCR` is 300 bytes of ASCII, ten fixed records of:
+
+    <25 characters of name> CRLF <score> CRLF
+
+Ten records is **two per command level**, which matches the Hall of Fame
+screen: five rank rows, each showing two entries with the second in a smaller
+face. An empty file is dots for the names and `0` for the scores, which is
+also exactly what the screen renders, so the display is a direct dump of the
+file with no formatting logic in between.
+
+That closes the hall-of-fame half of item 14 without a measurement session --
+it was sitting in `reference/` the whole time.
