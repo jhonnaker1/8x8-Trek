@@ -918,7 +918,7 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `D)ock` | dock with a StarBase | **done** |
 | `L)asers` | fire lasers | **done** |
 | `M)ove` | move to quad/sector | **done** |
-| `Q)uit` | quit | **done** |
+| `Q)uit` | quit | **done** -- but the original asks `Quit <Y/N>?` first and ours does not |
 | `T)orps` | fire torpedoes | **done** |
 | `W)arp` | set warp speed | **done** |
 | `E)nergy` | energy transfer | **done** (4de6758) |
@@ -1444,3 +1444,52 @@ a monitor that had stopped the CPU. Three times now the instrument has been the
 thing that was broken.
 
 Fixing it took one line. Believing the note took a week.
+
+## Play again, and the two keys that were never there (2026-08-22)
+
+The end of a game is now a loop rather than a door: title, setup, game,
+evaluation, hall of fame, `PLAY AGAIN?`, and YES puts you back on the title
+screen with setup asked again. That is what the original does, measured -- see
+MEASURED.md. NO exits to BASIC, which is only possible at all because the exit
+bug turned out not to exist earlier the same day.
+
+### Y and N did not exist in this port
+
+`input.c`'s CIA1 matrix table had M W Q L T D E S X R, the digits, period,
+comma, space, RETURN and DELETE. **No Y and no N** -- and `ask_yes()` has been
+on the setup screen since it was built, asking two questions the player could
+only ever answer by pressing RETURN, which it reads as no.
+
+So `WILL YOU REQUIRE A BRIEFING (Y/N)?` has been unanswerable-yes for the whole
+life of the port, and the briefing pages captured under item 11 were
+unreachable by any keystroke. Nothing failed. The prompt appeared, RETURN
+worked, and the answer was always the same one.
+
+Matrix positions come from VICE's own `C128/gtk3_sym.vkm` as always -- `Y 3 1`,
+`N 4 7` -- never from a published table. `make verify` now reports 27 keys and
+12 letters, and still proves the whole table is ASCII in the linked binary.
+
+### What restarting had to reset
+
+`trek_new_game()` handles the core. The one piece of UI state that outlives a
+game is `msg_count`, a file static in ui.c, so without `ui_clear_messages()`
+the second game opens with the first one's damage reports still in the boxes.
+Verified by playing two games through in VICE: the second console comes up with
+nothing but AWAITING ORDERS CAPTAIN.
+
+`kb_entropy` deliberately keeps counting across games, so a second game at the
+same command level is not a replay of the first.
+
+### RETURN is not an answer here
+
+The dialog takes an explicit Y or N and ignores everything else, including
+RETURN. That is a decision, not an omission: `ask_yes()` on the setup screen
+reads a bare RETURN as *no*, and a RETURN that means yes on one screen and no
+on another is how a session ends by accident. The original gives no guidance --
+neither of its two buttons is drawn with a focus ring.
+
+### Still not done: Q does not ask
+
+The original answers `Q` with `Quit <Y/N>?` in the COMMAND panel. Ours quits on
+the keystroke. Now that Y and N exist the fix is small, but it is a change to a
+command rather than part of this routine.

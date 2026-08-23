@@ -19,6 +19,7 @@
 #include "../src/layout.h"
 #include "../src/ui.h"
 #include "../src/egavdc.h"
+#include "../src/input.h"
 #include "../../core/trek.h"
 
 /* ------------------------------------------------------------ fake VDC */
@@ -67,9 +68,17 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
     while (h--) scr_put(x, y++, ch, color);
 }
 
-/* ui.c's dialog code references these; nothing here calls them. */
+/* ui.c's dialog code references this; nothing here calls it. */
 void vdc_reg_write(unsigned char r, unsigned char v) { (void)r; (void)v; }
-char kb_waitkey(void) { return 13; }
+
+/* Scripted keyboard. The default of RETURN is what lets the blocking waits in
+   ui_title() and the repair report fall straight through; a test that has to
+   answer a specific prompt points kb_script at the keys it wants first. */
+static const char *kb_script = 0;
+char kb_waitkey(void) {
+    if (kb_script && *kb_script) return *kb_script++;
+    return KB_RETURN;
+}
 
 /* ------------------------------------------------------------- harness */
 
@@ -368,6 +377,75 @@ static void test_title_screen(void) {
     }
 }
 
+/* ------------------------------------------------------- play again */
+
+/* The prompt is MEASURED off the original -- columns 19..35, rows 5..9. What
+   this guards is the box being whole and the answer mapping to the right key.
+   The bottom edge gets its own check for the reason the title screen's does:
+   cl65 -O once dropped exactly that row while the native build was fine, so
+   the corner alone is not enough. */
+static void test_play_again(void) {
+    char buf[16];
+    char buf2[32];
+    char yes[2], no[2], junk[3];
+
+    yes[0] = KB_Y; yes[1] = 0;
+    no[0]  = KB_N; no[1]  = 0;
+
+    screen_reset();
+    kb_script = yes;
+    check(ui_play_again() == 1, "play again: Y means yes");
+
+    check(cell[5][19] == G_TL, "play again: box top left");
+    check(cell[5][35] == G_TR, "play again: box top right");
+    check(cell[9][19] == G_BL, "play again: box bottom left");
+    check(cell[9][35] == G_BR, "play again: box bottom right");
+    check(cell[9][27] == G_HLINE, "play again: box bottom edge");
+    check(off_screen == 0, "play again: nothing drawn off screen");
+
+    row_text(6, 22, 11, buf);
+    check(strcmp(buf, "PLAY AGAIN?") == 0, "play again: the original's wording");
+    row_text(8, 21, 5, buf);
+    check(strcmp(buf, "[YES]") == 0, "play again: YES button where measured");
+    row_text(8, 29, 4, buf);
+    check(strcmp(buf, "[NO]") == 0, "play again: NO button where measured");
+
+    /* The hall of fame's own prompt must not survive under the dialog: RETURN
+       does nothing here, so leaving it on screen is an instruction to press a
+       dead key. Drawn for real first -- checking a blank row on a blank screen
+       would pass without the clearing code existing at all. */
+    {
+        char seq[3];
+        seq[0] = KB_RETURN;   /* dismisses the hall of fame */
+        seq[1] = KB_Y;        /* answers the prompt */
+        seq[2] = 0;
+        screen_reset();
+        kb_script = seq;
+        ui_hall_of_fame("KIRK", 3, -300);
+        row_text(22, 29, 22, buf2);
+        check(strcmp(buf2, "HIT RETURN TO CONTINUE") == 0,
+              "play again: the hall of fame really does print that prompt");
+        check(ui_play_again() == 1, "play again: still answers after the hall of fame");
+        row_text(22, 29, 22, buf2);
+        check(strcmp(buf2, "                      ") == 0,
+              "play again: the hall of fame's RETURN prompt is cleared");
+    }
+
+    screen_reset();
+    kb_script = no;
+    check(ui_play_again() == 0, "play again: N means no");
+
+    /* RETURN is deliberately NOT a shortcut here, and neither is anything
+       else -- the setup screen reads a bare RETURN as no, and one key meaning
+       opposite things on two screens is how a session ends by accident. */
+    junk[0] = KB_RETURN; junk[1] = KB_Y; junk[2] = 0;
+    screen_reset();
+    kb_script = junk;
+    check(ui_play_again() == 1, "play again: RETURN is ignored, not an answer");
+
+    kb_script = 0;
+}
+
 /* ------------------------------------------------ state of repair report */
 
 static void test_repair_report(void) {
@@ -660,6 +738,7 @@ int main(void) {
     test_repair_report();
     test_setup_seed();
     test_title_screen();
+    test_play_again();
     test_independent();
 
     test_badge_stays_inside();

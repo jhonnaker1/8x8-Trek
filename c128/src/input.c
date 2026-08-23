@@ -42,6 +42,13 @@ static const Key keys[] = {
     { 4, 4, KB_M }, { 1, 1, KB_W }, { 7, 6, KB_Q }, { 5, 2, KB_L }, { 2, 6, KB_T },
     { 2, 2, KB_D }, { 1, 6, KB_E }, { 1, 5, KB_S }, { 2, 7, KB_X },
     { 2, 1, KB_R },
+    /* Y and N. Added 2026-08-22 for the play-again prompt, and they were
+       overdue: ask_yes() has been on the setup screen since it was built and
+       neither of its two questions could ever be answered YES, because the
+       only key that reached it was RETURN, which ask_yes counts as no. The
+       briefing the original offers has therefore been unreachable in this
+       port for its whole life. */
+    { 3, 1, KB_Y }, { 4, 7, KB_N },
     { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
     { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 },
     { 2, 0, KB_DIGIT0 + 5 }, { 2, 3, KB_DIGIT0 + 6 },

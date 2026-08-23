@@ -74,6 +74,10 @@ void ui_title(void);
    has no arrow keys in its matrix, so it says what it does. */
 void ui_info_panel(void);
 
+/* The prompt the original shows over the Hall of Fame. Non-zero for YES.
+   Blocks on an explicit Y or N -- see ui.c for why RETURN is not a shortcut. */
+uint8_t ui_play_again(void);
+
 void ui_evaluation(void);
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score);
 

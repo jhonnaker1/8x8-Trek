@@ -36,10 +36,12 @@
 #define KB_X      88
 #define KB_L      76
 #define KB_M      77
+#define KB_N      78
 #define KB_Q      81
 #define KB_R      82
 #define KB_T      84
 #define KB_W      87
+#define KB_Y      89
 
 char kb_waitkey(void);   /* blocks until one key is pressed and released */
 

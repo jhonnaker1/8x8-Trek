@@ -1239,6 +1239,52 @@ void ui_title(void) {
     while (kb_waitkey() != KB_RETURN) { }
 }
 
+/* ------------------------------------------------------- play again */
+
+/* MEASURED 2026-08-22 against the original, which does have this and does it
+   as a dialog rather than a line of text: a grey box with a magenta border
+   over the Hall of Fame, "Play Again?" above two raised buttons reading YES
+   and NO. Its pixel extent is x 150..280, y 70..130 in the 640x350 frame,
+   which on the 8x14 cell EGA laid the console out on is columns 19..35 and
+   rows 5..9 -- so the box below is the same size and in the same place.
+
+   The buttons are drawn in pixels there and cannot be here, so they are
+   bracketed instead; their measured extents (cols 21..25 and 28..32) are what
+   put [YES] and [NO] where they are.
+
+   Answering YES in the original returns to the TITLE screen and re-runs the
+   whole setup -- name, level and password are all asked again, verified by
+   playing two games through. NO exits to DOS. */
+#define PA_X  19
+#define PA_Y   5
+#define PA_W  17
+#define PA_H   5
+
+uint8_t ui_play_again(void) {
+    char c;
+
+    /* The hall of fame leaves "HIT RETURN TO CONTINUE" at the foot of the
+       screen, and RETURN is not an answer to this prompt -- so it goes,
+       rather than sitting there telling the player to press a key that does
+       nothing. */
+    scr_fill_rect(29, 22, 22, 1, SC_SPACE, COL_DEPT);
+
+    box(PA_X, PA_Y, PA_W, PA_H, EGA_TO_VDC(EGA_LTMAGENTA));
+    scr_puts(PA_X + 3, PA_Y + 1, "PLAY AGAIN?", COL_VALUE);
+    scr_puts(PA_X + 2, PA_Y + 3, "[YES]",       EGA_TO_VDC(EGA_LTRED));
+    scr_puts(PA_X + 10, PA_Y + 3, "[NO]",       EGA_TO_VDC(EGA_LTRED));
+
+    /* An explicit Y or N, and nothing else. RETURN is deliberately not a
+       shortcut for either: ask_yes() on the setup screen reads a bare RETURN
+       as NO, and a RETURN that means YES here and NO there is the kind of
+       inconsistency that ends a session by accident. */
+    for (;;) {
+        c = kb_waitkey();
+        if (c == KB_Y) return 1;
+        if (c == KB_N) return 0;
+    }
+}
+
 /* --------------------------------------------------------------- INFO */
 
 #define INF_X   22

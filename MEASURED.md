@@ -2179,3 +2179,52 @@ That reading was four shots at a single range, and this file said at the time
 that three ranges could not settle the shape. Eleven can.
 
 `ENEMY_FIRE_PCT` moves from 90 to 78.
+
+## Play Again, and two things found beside it (2026-08-22)
+
+Jamie asked for a play-again routine and I said the original had none, on the
+strength of a grep for `again\|AGAIN` over `reference/strings.txt`. That
+pattern cannot match `Again`. It is on line 18 of the file, four lines from
+`Quit <Y/N>?`, and Jamie said so. The lesson is small and cheap: when the
+answer is "the original does not do X", the grep that produced it is part of
+the claim and should be shown.
+
+### The prompt, measured
+
+Played two games in the original end to end under dosbox-automation.
+
+**It is a dialog, not a line of text.** A light-grey box with a magenta border
+over the Hall of Fame, `Play Again?` in dark blue above two raised buttons
+reading YES and NO in red. Both buttons are drawn the same -- there is no
+visible focus ring on either, so nothing here says which one RETURN would take.
+
+| | pixels (640x350) | cells (8x14) |
+|---|---|---|
+| box | x 150..280, y 70..130 | cols 19..35, rows 5..9 |
+| YES button | x 170..205 | cols 21..25 |
+| NO button | x 225..257 | cols 28..32 |
+
+The box is not cell-aligned horizontally -- 150 is not a multiple of 8 -- which
+is the original drawing in pixels because it can. On a character grid the port
+rounds to the same cells and brackets the buttons instead of embossing them.
+
+**YES returns to the TITLE screen**, not to a new game and not to the setup
+screen: the ship animation plays again and every setup question is asked from
+scratch, name, command level and self-destruct password. **NO exits to DOS**,
+through a shareware farewell screen crediting Nels Anderson, and lands back at
+`C:\>`.
+
+### Q asks first, and our port does not
+
+Typing `Q` in the original does not quit. It puts `Quit <Y/N>? _` in the
+COMMAND panel and waits. Our port quits on the keystroke. NOT implemented --
+noted here rather than fixed, because it is a change to a command rather than
+part of the play-again routine.
+
+### The incomplete-mission penalty is confirmed at -300
+
+Quitting a fresh level-3 game printed `Penalty for incomplete mission...-300`
+and a total of -300, with every other line zero. `SCORE_INCOMPLETE` in trek.h
+was already -300, and the port's own Hall of Fame printed -300 for the same
+quit in the same session. Two implementations agreeing on a number neither was
+fitted to is the useful kind of corroboration.

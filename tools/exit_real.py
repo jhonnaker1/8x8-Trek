@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Does the REAL port return to BASIC? Regression test for NOTES.md item 2.
+"""Does the REAL port get all the way out? Regression test for the whole
+end-of-game path: quit, evaluation, hall of fame, "Play Again?", and BASIC.
 
 tools/exit_bisect.py clears the three suspects that note named, one at a time,
 in a program small enough that nothing else can be blamed. This one is the
 other half: it builds the whole port, plays it through to a quit with
 kb_inject, and then asks BASIC to do arithmetic. 42 on the 40-column screen is
 the only proof that counts -- see the long comment at the end of main().
+
+It plays TWO games on purpose. The first answers YES at the play-again prompt,
+which must land back on the title screen with setup asked again; the second
+answers NO, which must reach BASIC. Answering NO is now the only way out, so
+NOTES item 2 is still covered -- it just goes through one more door.
 
 Needs the debug build, because scripted input is what plays it to the quit.
 That build differs from the release binary by one byte of state and the poll
@@ -37,13 +43,22 @@ SRC = ["src/main.c", "src/vdc.c", "src/layout.c", "src/ui.c", "src/input.c",
 # lies -- so poking faster than the port polls silently loses characters. The
 # first attempt used a flat 0.45s and desynced somewhere in the title, which
 # looked exactly like the game ignoring Q.
-SCRIPT = ([("\r", 4.0, "step1-title")] +
-          [(c, 1.0, None) for c in "\r\rKIRK\r3\rX\r"] +
-          [("", 3.0, "step2-setup")] +
-          [(c, 1.2, None) for c in "Q\r"] +
-          [("", 3.0, "step3-quit")] +
-          [(c, 1.5, None) for c in "\r\r"] +
-          [("", 3.0, "step4-exit")])
+SCRIPT = (
+    # ---- game one, answered YES ----
+    [("\r", 4.0, "step1-title")] +
+    [(c, 1.0, None) for c in "\r\rKIRK\r3\rX\r"] +
+    [("", 3.0, "step2-setup")] +
+    [(c, 1.2, None) for c in "Q\r"] +          # quit
+    [(c, 1.5, None) for c in "\r\r"] +         # evaluation, hall of fame
+    [("", 2.0, "step3-playagain")] +           # the prompt itself
+    [("Y", 3.0, "step4-title-again")] +        # YES goes back to the title
+    # ---- game two, answered NO ----
+    [(c, 1.0, None) for c in "\r\r\rSPOCK\r2\rQ\r"] +
+    [("", 2.5, "step5-setup2")] +
+    [(c, 1.2, None) for c in "Q\r"] +
+    [(c, 1.5, None) for c in "\r\r"] +
+    [("", 2.0, "step6-playagain2")] +
+    [("N", 3.0, "step7-exit")])
 
 
 def build():

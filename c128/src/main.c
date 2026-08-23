@@ -619,63 +619,78 @@ int main(void) {
 #endif
 
     vdc_init();
-    ui_title();
-    {
+
+    /* One pass per game. The original loops the whole cycle -- title, setup,
+       game, evaluation, hall of fame, "Play Again?" -- and answering YES puts
+       you back on the TITLE screen with every setup question asked again,
+       which is what this reproduces. Verified by playing two games through
+       the original end to end. */
+    for (;;) {
+        ui_title();
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two
            sittings get the same galaxy. Before this, GAME_SEED was a constant
            and every game was identical -- NOTES item 3, blocked on this screen
-           since the start. */
+           since the start. kb_entropy keeps counting across games, so a second
+           game is not a replay of the first even at the same command level. */
         trek_new_game(setup.level, setup.seed);
+
+        /* The message log is the one piece of UI state that outlives a game:
+           msg_count is a file static in ui.c, and without this the second
+           game opens with the first one's damage reports still in the boxes. */
+        ui_clear_messages();
+
+        ui_draw_all();
+        ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
+
+        for (;;) {
+            ui_read_command(cmd, sizeof cmd);
+
+            c = (unsigned char)cmd[0];
+
+            /* Only L and T pass 1: enemies manoeuvre when we shoot at them, not
+               merely when a turn passes. MEASURED -- see trek.h. */
+            /* Word commands first: SHUP and SHDN both begin with S, which the
+               card gives to self destruct. */
+            if      (word_is(cmd, "INFO")) do_info();
+            else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
+            else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
+            else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
+            else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
+            else if (c == KB_L) { do_lasers();     enemy_turn(1); }
+            else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
+            else if (c == KB_D) { do_dock();       enemy_turn(0); }
+            else if (c == KB_S) do_self();     /* S)elf, per the card */
+            else if (c == KB_E) { do_energy();     enemy_turn(0); }
+            else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
+            else if (c == KB_R) do_repair();   /* a report, not a turn */
+            else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
+            else if (c == KB_Q) break;
+            else if (c)          ui_message("COMPUTER: ", "M W L T D R S E Q INFO SHUP SHDN MAX");
+
+            ui_draw_scan();
+            ui_draw_chart();
+            ui_draw_status();
+            ui_draw_systems();
+            ui_draw_lasers();
+            ui_draw_viewer();
+            ui_draw_position();
+
+            if (trek_game_state() != GAME_ON) break;
+        }
+
+        /* The original ends with two full screens, not a line in the log: the
+           Detailed Evaluation and then the Hall of Fame. Both layouts are MEASURED
+           -- see MEASURED.md -- and the evaluation is filled straight from the
+           core's own score sheet, so what it prints is what was scored. */
+        if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
+        else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
+
+        ui_evaluation();
+        ui_hall_of_fame(setup.name, setup.level, trek_score());
+
+        if (!ui_play_again()) break;
     }
-    ui_draw_all();
-    ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
-
-    for (;;) {
-        ui_read_command(cmd, sizeof cmd);
-
-        c = (unsigned char)cmd[0];
-
-        /* Only L and T pass 1: enemies manoeuvre when we shoot at them, not
-           merely when a turn passes. MEASURED -- see trek.h. */
-        /* Word commands first: SHUP and SHDN both begin with S, which the
-           card gives to self destruct. */
-        if      (word_is(cmd, "INFO")) do_info();
-        else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
-        else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
-        else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
-        else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
-        else if (c == KB_L) { do_lasers();     enemy_turn(1); }
-        else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
-        else if (c == KB_D) { do_dock();       enemy_turn(0); }
-        else if (c == KB_S) do_self();     /* S)elf, per the card */
-        else if (c == KB_E) { do_energy();     enemy_turn(0); }
-        else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
-        else if (c == KB_R) do_repair();   /* a report, not a turn */
-        else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
-        else if (c == KB_Q) break;
-        else if (c)          ui_message("COMPUTER: ", "M W L T D R S E Q INFO SHUP SHDN MAX");
-
-        ui_draw_scan();
-        ui_draw_chart();
-        ui_draw_status();
-        ui_draw_systems();
-        ui_draw_lasers();
-        ui_draw_viewer();
-        ui_draw_position();
-
-        if (trek_game_state() != GAME_ON) break;
-    }
-
-    /* The original ends with two full screens, not a line in the log: the
-       Detailed Evaluation and then the Hall of Fame. Both layouts are MEASURED
-       -- see MEASURED.md -- and the evaluation is filled straight from the
-       core's own score sheet, so what it prints is what was scored. */
-    if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
-    else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
-
-    ui_evaluation();
-    ui_hall_of_fame(setup.name, setup.level, trek_score());
 
     /* Quit has to visibly end the game. Milestone 1 parked here in an
        endless wait_vsync() so the console would stay on screen, which made
