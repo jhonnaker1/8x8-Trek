@@ -2494,3 +2494,119 @@ Mongols", so the mechanic is right and the threshold is unmeasured.
 distances and read the kill count off the evaluation screen, which counts
 Mongols killed. One data point per game, so it needs several -- vary energy
 across runs and bracket the threshold.
+
+## One session, nine captures, and a rescue (2026-08-23)
+
+The plan was four cheap command captures plus an enemy-count sample. An
+evacuation deadline appeared mid-session and was worth abandoning the plan for.
+
+### The four commands that were blocked on "no mechanic behind it"
+
+**`MSGS`** opens a **scrollable overlay**, not a panel takeover: a grey box
+titled `PREVIOUS MESSAGES`, entries carrying their stardate, and a footer
+reading `t and t to scroll, ESC to exit` (up/down arrows). So the port needs a
+deeper log AND a scrolling viewer, which is what the command table guessed, but
+the presentation is now measured rather than assumed.
+
+**`F)ix`** opens `ENGINEERING` and asks:
+
+    System to concentrate repairs on:
+    0 to abort, L for list: _
+
+**It is not a priority list.** It is a single "concentrate on this one" pick by
+number, with `L` listing the numbering and `0` aborting. That is a far smaller
+core change than "needs a repair-priority model the core lacks" implied.
+
+**`HAIL`** costs a turn -- the stardate moved 3500.1 to 3500.2 -- and opens a
+COMMUNICATIONS box that was **empty**, presumably because no StarBase was in
+range or known. The mechanic exists; what it says when it has something to say
+is still uncaptured.
+
+**`C)hart`** produced no visible change at all on a console already showing the
+chart. Consistent with the manual's "displayed at all times unless overridden",
+so its job is probably to restore the panel after something overrides it. Not
+settled, but the cheap half is done: on a normal console it is a no-op.
+
+### New mechanic: warp speed can break the engines
+
+Setting warp 8 and moving printed:
+
+    Warp engines damaged by excessive speed.
+
+No time passed and the ship did not move. Warp 4 then worked. So high warp
+carries a damage risk that nothing in trek.h models, and the ship's own Warp
+Engines entry showed damage afterwards.
+
+### Planets, orbit and landing, all in one run
+
+`O)rbit` **requires adjacency, exactly like docking** -- from three sectors away
+it answered `NAVIGATION: Not adjacent to planet.` Moved to the neighbouring
+sector and it worked:
+
+    NAVIGATION: Entering standard orbit. Planet Androneda-4, Type N.
+    SCIENCE: Scanners show a settlement on the planet.
+
+The MAIN VIEWER switches to an **orbit display** -- an ellipse with the planet,
+labelled `STANDARD ORBIT 301`, showing `APOGEE: 92.7` and `PERIGEE: 87.3`.
+
+`LAND` opens `LANDING PARTY`:
+
+    How do you wish to get to the planet?
+    1) Shuttle Craft
+    2) Transporter
+    3) Abort landing
+
+**That is why Transporter and Shuttlecraft are two of the twelve repair
+entries** -- they are the two ways down, and damage to one presumably forces
+the other.
+
+### The rescue, which NOTES called unreachable
+
+Choosing the transporter ran the whole sequence:
+
+    Landing party to transporter...
+    Landing party is on planet...
+    Planet settlers found...
+    Evacuating settlers...
+    Landing party beaming up.
+
+And the score sheet confirmed it:
+
+    1     Rescues @ 200 each..............200
+    0     Penalty for incomplete mission...-300
+    TOTAL............................-100
+
+**`SCORE_RESCUE` 200 is CONFIRMED**, not derived. NOTES item 14 listed rescues
+as "worth +200 each in the scoring rubric and currently unreachable"; they are
+reachable, and this is the whole path: a COMMUNICATIONS deadline message, warp
+there before it expires, move adjacent, `O`, `LAND`, pick a route.
+
+### CORRECTION: a torpedo aimed AT a star is absorbed
+
+This file has a section titled "Torpedoes detonate stars, and a supernova is
+enormous". The title is too broad. Firing one torpedo directly at a star at
+5-3 gave:
+
+    Tracking #1
+    Torpedo absorbed by star.
+
+and the star was still on the scan afterwards. Re-reading the original entry,
+it describes firing **at an enemy** with a star **in the path** -- "the ray
+passed through a star at 4-4". So the two observations agree once stated
+precisely:
+
+* **target a star** -> absorbed, nothing happens, star survives
+* **star in the flight path** -> supernova, quadrant destroyed, ship thrown
+
+Which means the `Stars destroyed @ -5` scoring line comes from the transit
+case, and a port that only implements "aim at star" will never score it.
+
+Also captured in passing: the torpedo dialog asks `Number to fire:` FIRST, then
+`Sector to fire #1 at:` per torpedo -- our port asks only for a sector.
+
+### Enemy counts
+
+Level 3 gave **38**, the tenth sample. Level 2 gave **30** -- the **first
+non-level-3 sample this project has**, which is the reading the count formula
+actually needs. Series so far: level 3 = 40, 42, 42, 42, 34, 38, 37, 37, 38,
+38; level 2 = 30.

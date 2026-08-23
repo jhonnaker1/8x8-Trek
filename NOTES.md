@@ -1045,15 +1045,15 @@ and it is short enough to reproduce whole.
 | `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
-| `MSGS` | review old messages | needs a longer log than the four boxes hold |
-| `C)hart` | chart of known galaxy | the console shows it permanently; may be redundant here |
-| `F)ix` | control which system engineering repairs | needs a repair-priority model the core lacks |
+| `MSGS` | review old messages | MEASURED 2026-08-23: a scrollable `PREVIOUS MESSAGES` overlay, entries stamped with their stardate, up/down to scroll and ESC to exit. Needs a deeper log and a scrolling viewer |
+| `C)hart` | chart of known galaxy | MEASURED 2026-08-23: a no-op on a console already showing the chart, so its job is probably restoring the panel after something overrides it |
+| `F)ix` | control which system engineering repairs | MEASURED 2026-08-23: NOT a priority list -- `ENGINEERING` asks "System to concentrate repairs on", one system by number, `L` for the list, `0` aborts. Much smaller than assumed |
 | `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
-| `HAIL` | hail a StarBase | no mechanic behind it |
+| `HAIL` | hail a StarBase | MEASURED 2026-08-23: costs a turn and opens a COMMUNICATIONS box -- empty with no base in range, so what it says is still uncaptured |
 | `A#` | acknowledge message # | no mechanic behind it |
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | unimplemented mechanic |
-| `O)rbit`, `LAND`, `USE` | planets, landing, crystals | unimplemented mechanics |
+| `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |
 | `SAVE` | save game | deferred, see item 10 |
 | `SND` | toggle sound | **done** -- toggles the same flag the original keeps at DGROUP+0x1cc8 |
 | `Shift-F1` | boss mode | screen blanker |
@@ -1106,8 +1106,10 @@ them, and each is a chunk of core work:
   happen" (manual l.573-577). The ancestor's `deathray()` has the failure
   table.
 - **Self destruct** — `S)elf`, gated on the password collected at setup.
-- **Rescues** — worth **+200 each** in the scoring rubric and currently
-  unreachable. The evacuation deadline messages already seen in the original
+- **Rescues** — worth **+200 each**, ~~currently unreachable~~ **CAPTURED
+  2026-08-23 and confirmed at exactly +200**: a COMMUNICATIONS deadline
+  message, warp there in time, move adjacent, `O)rbit`, `LAND`, choose
+  transporter or shuttle. The evacuation deadline messages already seen in the original
   ("Planet Gallista-8, quad 8-4, requests evacuation. They can only hold out
   until 3516.5") are the trigger, and the event queue can already carry them.
 - **Stars destroyed** — **-5 each** in the rubric. Needs a torpedo that can
