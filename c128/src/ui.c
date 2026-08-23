@@ -914,6 +914,16 @@ static const char *const sys_name[SYS_COUNT] = {
     "L.R. SCANNER",    "COMPUTER",      "TRANSPORTER",    "SHUTTLECRAFT"
 };
 
+/* The same names, for anything outside this file that needs them -- F)ix lists
+   them so the player can pick a number. */
+const char *ui_sys_name(uint8_t i) {
+    /* Written as an if rather than a ternary: cc65 rejects the conditional
+       here, one arm being `const char *const` from the table and the other a
+       plain string literal. */
+    if (i < SYS_COUNT) return sys_name[i];
+    return "";
+}
+
 /* Stardates, in tenths, to mend `pts` points at `rate` points per stardate,
    rounded to the nearest tenth. Both rates are MEASURED -- see trek.h -- and
    these figures are computed from OUR constants rather than transcribed off

@@ -219,6 +219,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.casualties   = 0;
     ship.lost         = 0;
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
+    ship.repair_focus = 0;
     ship.warp         = WARP_START;
     ship.shields_up   = 0;
     ship.stardate     = STARDATE_START;
@@ -291,12 +292,23 @@ static void advance_time(uint16_t tenths) {
     else ship.energy = (uint16_t)(ship.energy + gain);
 
     /* MEASURED: floor(20 * stardates), applied to every damaged system at
-       the full rate rather than divided between them. */
+       the full rate rather than divided between them.
+     *
+     * That measurement is what makes F)ix awkward to model. If every system
+     * already repairs at the full rate, "concentrate repairs on" cannot mean
+     * dividing a budget -- there is no budget. It has to be a multiplier on
+     * the chosen system, and REPAIR_FOCUS_FACTOR is DERIVED, not measured.
+     * The experiment that would settle it: damage two systems to the same
+     * percentage, concentrate on one, let several stardates pass undocked and
+     * compare how far each recovered. */
     if (mend) {
         for (i = 0; i < SYS_COUNT; i++) {
+            uint16_t m = mend;
             if (ship.sys[i] >= 100) continue;
-            if (ship.sys[i] + mend >= 100) ship.sys[i] = 100;
-            else ship.sys[i] = (uint8_t)(ship.sys[i] + mend);
+            if (ship.repair_focus == (uint8_t)(i + 1))
+                m = (uint16_t)(m * REPAIR_FOCUS_FACTOR);
+            if (ship.sys[i] + m >= 100) ship.sys[i] = 100;
+            else ship.sys[i] = (uint8_t)(ship.sys[i] + m);
         }
     }
 }
@@ -1140,6 +1152,7 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     ship.torps--;
     cell = (uint8_t)((sy << 3) | sx);
 
+    if (sector[cell] == SEC_STAR) return TORP_ABSORBED;
     if (!SEC_IS_ENEMY(sector[cell])) return TORP_MISS;
 
     d     = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));

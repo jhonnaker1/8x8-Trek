@@ -51,6 +51,9 @@ void ui_dialog_close(void);
    the original gives it a full-width panel of its own. */
 void ui_repair_report(void);
 
+/* Full system names, in SYS_* order. F)ix needs them to print its list. */
+const char *ui_sys_name(uint8_t i);
+
 /* What the setup screen collects, in the original's own order. Saving is not
    implemented, so answering yes to the restore prompt reports no saved game
    and carries on -- which is what the original does with no file on disk. */

@@ -494,6 +494,82 @@ static void do_self(void) {
     ui_dialog_close();
 }
 
+/* F)ix. MEASURED 2026-08-23 off the original's own dialog:
+
+       ENGINEERING
+       System to concentrate repairs on:
+       0 to abort, L for list: _
+
+   NOT a repair-priority list, which is what the command table assumed for
+   weeks -- one system, by number, with L listing the numbering. The effect is
+   REPAIR_FOCUS_FACTOR in trek.h and is DERIVED, not measured; see the note
+   there for the experiment that would settle it. */
+static void do_fix(void) {
+    char buf[8];
+    /* Its own buffer, NOT the shared linebuf, which is 32 bytes -- the
+       two-column list is 40 characters wide and overran it, and the overflow
+       landed in the message panel's department field. It showed up on screen
+       as "LECRAFTAWAITING ORDERS CAPTAIN": the tail of SHUTTLECRAFT. */
+    char row[48];
+    uint8_t i;
+
+    ui_dialog_open("ENGINEERING");
+    for (;;) {
+        ui_dialog_line("SYSTEM TO CONCENTRATE REPAIRS ON:");
+        ui_dialog_ask("0 TO ABORT, L FOR LIST:", buf, sizeof buf);
+
+        if (buf[0] == KB_L || buf[0] == 'l') {
+            /* TWO COLUMNS, on a fresh page. Twelve systems one per line
+               overflows the dialog's eleven rows, and the scroll is a redraw
+               -- so the player asked for the list and got its last five. */
+            ui_dialog_open("ENGINEERING");
+            for (i = 0; i < SYS_COUNT / 2; i++) {
+                uint8_t k = put_u16(row, (uint16_t)(i + 1));
+                k += put_str(row + k, ") ");
+                k += put_str(row + k, ui_sys_name(i));
+                while (k < 24) row[k++] = ' ';
+                k += put_u16(row + k, (uint16_t)(i + 1 + SYS_COUNT / 2));
+                k += put_str(row + k, ") ");
+                k += put_str(row + k, ui_sys_name((uint8_t)(i + SYS_COUNT / 2)));
+                row[k] = 0;
+                ui_dialog_line(row);
+            }
+            continue;
+        }
+
+        i = (uint8_t)grab_num(buf);
+        if (i == 0) { ui_dialog_close(); return; }
+        if (i > SYS_COUNT) { snd_beep(); continue; }
+
+        ship.repair_focus = i;
+        { uint8_t k = put_str(row, "CONCENTRATING ON ");
+          k += put_str(row + k, ui_sys_name((uint8_t)(i - 1)));
+          row[k] = 0;
+          ui_dialog_line(row); }
+        ui_dialog_line("HIT RETURN TO CONTINUE");
+        while (kb_waitkey() != KB_RETURN) { }
+        ui_dialog_close();
+        return;
+    }
+}
+
+/* C)hart. MEASURED 2026-08-23: on a console already showing the chart this is
+   a NO-OP in the original -- nothing on screen changed. The manual says the
+   chart is "displayed at all times unless overridden", so redrawing the panel
+   is exactly what the command is for, and it costs no turn. */
+static void do_chart(void) {
+    ui_draw_chart();
+}
+
+/* HAIL. MEASURED 2026-08-23: it costs a turn -- the stardate moved 3500.1 to
+   3500.2 -- and opens a COMMUNICATIONS box which was EMPTY, there being no
+   StarBase in range. What it says when a base IS in range has not been
+   captured, so nothing is invented here: the turn is spent and the department
+   answers with nothing, which is what was seen. */
+static void do_hail(void) {
+    ui_message("COMMUNICATIONS: ", "");
+}
+
 /* SND, from the reference card. The original keeps a sound on/off byte that
    every one of its sound sites tests first -- [0x1cc8] in its data segment,
    found while extracting the music -- so this is its mechanic, not an
@@ -619,9 +695,56 @@ static void enemy_turn(uint8_t player_fired) {
 
 /* One torpedo destroys a standard Mongol outright, confirmed against the
    original -- nothing has ever survived one to report a damage figure. */
+/* One torpedo, fired and reported. Split out because the original fires a
+   SALVO -- it asks how many first, then a sector per tube -- and the reporting
+   is identical for each. */
+static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
+    uint16_t dmg = 0;
+    uint8_t  r;
+
+    ui_dialog_line("TRACKING...");
+    snd_effect(SFX_B);
+    r = trek_fire_torpedo(sy, sx, &dmg);
+    switch (r) {
+        case TORP_KILL:
+            ui_dialog_line("MONGOL DESTROYED!");
+            break;
+        /* MEASURED 2026-08-23: aiming at a star spends the torpedo and does
+           nothing -- the star survives, and the original says so rather than
+           calling it a miss. A star in the FLIGHT PATH is the other case, a
+           supernova that takes the quadrant, and this port does not ray-march
+           yet, so that one is still unmodelled. */
+        case TORP_ABSORBED:
+            ui_dialog_line("TORPEDO ABSORBED BY STAR.");
+            break;
+        case TORP_OK: {
+            uint8_t k = put_str(linebuf, "MONGOL DAMAGED -- ");
+            k += put_u16(linebuf + k, dmg);
+            k += put_str(linebuf + k, " UNIT HIT");
+            linebuf[k] = 0;
+            ui_dialog_line(linebuf);
+            break;
+        }
+        case TORP_MISS:
+            /* The original's own wording, read off its screen. */
+            ui_dialog_line("CLEAN MISS, SIR!");
+            break;
+        default:
+            ui_dialog_line("TUBES CANNOT FIRE.");
+            break;
+    }
+}
+
+/* T)orps. MEASURED 2026-08-23: the original asks HOW MANY first -- "Number to
+   fire:" -- then a sector per torpedo, "Sector to fire #1 at:". It has three
+   tubes and refuses more. This port asked only for a single sector.
+
+   "t35" still fires one straight at 3,5. That shortcut is ours, not the
+   original's, and costs nothing to keep. */
 static void do_torpedo(const char *line) {
     uint8_t d[8];
     uint8_t n = grab_digits(line, d, 8);
+    uint8_t salvo = 1, shot;
     char buf[8];
 
     if (ship.torps == 0) {
@@ -632,47 +755,49 @@ static void do_torpedo(const char *line) {
 
     ui_dialog_open("ENERGY TORPEDO CONTROL");
 
-    /* "t35" fires straight at 3,5; a bare "t" asks, as the original does. */
-    if (n != 2) {
-        ui_dialog_ask("SECTOR TO FIRE AT:", buf, sizeof buf);
-        n = grab_digits(buf, d, 8);
-    }
-    if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
-        snd_beep();
-        ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+    if (n == 2) {                      /* the "t35" shortcut: one, right now */
+        if (d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
+            snd_beep();
+            ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+            ui_dialog_close();
+            return;
+        }
+        fire_one_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1));
         ui_dialog_close();
         return;
     }
 
-    ui_dialog_line("TRACKING...");
-    snd_effect(SFX_B);
-    {
-        uint16_t dmg = 0;
-        uint8_t  r = trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
-                                       &dmg);
-        switch (r) {
-            case TORP_KILL:
-                ui_dialog_line("MONGOL DESTROYED!");
-                break;
-            case TORP_OK: {
-                /* New: a Commander survives one. MEASURED -- torpedo damage
-                   caps at 355 and a Commander has 695, so this branch was
-                   unreachable before today. */
-                uint8_t k = put_str(linebuf, "MONGOL DAMAGED -- ");
-                k += put_u16(linebuf + k, dmg);
-                k += put_str(linebuf + k, " UNIT HIT");
-                linebuf[k] = 0;
-                ui_dialog_line(linebuf);
-                break;
-            }
-            case TORP_MISS:
-                /* The original's own wording, read off its screen. */
-                ui_dialog_line("CLEAN MISS, SIR!");
-                break;
-            default:
-                ui_dialog_line("TUBES CANNOT FIRE.");
-                break;
+    ui_dialog_ask("NUMBER TO FIRE:", buf, sizeof buf);
+    salvo = (uint8_t)grab_num(buf);
+    if (salvo == 0) { ui_dialog_close(); return; }
+    if (salvo > TORP_TUBES) {
+        snd_beep();
+        ui_dialog_line("CAPTAIN, WE HAVE ONLY THREE TUBES.");
+        salvo = TORP_TUBES;
+    }
+    if (salvo > ship.torps) {
+        uint8_t k = put_str(linebuf, "CAPTAIN, THERE ARE ONLY ");
+        k += put_u16(linebuf + k, (uint16_t)ship.torps);
+        k += put_str(linebuf + k, " LEFT.");
+        linebuf[k] = 0;
+        snd_beep();
+        ui_dialog_line(linebuf);
+        salvo = ship.torps;
+    }
+
+    for (shot = 1; shot <= salvo; shot++) {
+        uint8_t k = put_str(linebuf, "SECTOR TO FIRE #");
+        k += put_u16(linebuf + k, (uint16_t)shot);
+        k += put_str(linebuf + k, " AT:");
+        linebuf[k] = 0;
+        ui_dialog_ask(linebuf, buf, sizeof buf);
+        n = grab_digits(buf, d, 8);
+        if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
+            snd_beep();
+            ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+            continue;
         }
+        fire_one_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1));
     }
     ui_dialog_close();
 }
@@ -738,6 +863,7 @@ int main(void) {
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
             if      (word_is(cmd, "SND"))  do_sound();
+            else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
@@ -750,6 +876,8 @@ int main(void) {
             else if (c == KB_E) { do_energy();     enemy_turn(0); }
             else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
+            else if (c == KB_C) do_chart();    /* MEASURED: costs no turn */
+            else if (c == KB_F) do_fix();      /* choosing does not cost one either */
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
             /* MEASURED: the original answers Q with "Quit <Y/N>?" in the
                COMMAND panel rather than quitting on the keystroke. */
@@ -760,7 +888,7 @@ int main(void) {
                belongs in the comment rather than being quietly lost. */
             else if (c) {
                 snd_beep();
-                ui_message("COMPUTER: ", "M W L T D R S E Q SND INFO SHUP SHDN MAX");
+                ui_message("COMPUTER: ", "M W L T D R S E Q C F SND INFO HAIL SHUP SHDN MAX");
             }
 
             /* After the enemy turn, not just after a move: a tractor beam

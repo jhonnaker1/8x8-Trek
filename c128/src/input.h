@@ -31,8 +31,10 @@
 #define KB_PERIOD 46
 #define KB_DIGIT0 48
 #define KB_DIGIT9 57
+#define KB_C      67
 #define KB_D      68
 #define KB_E      69
+#define KB_F      70
 #define KB_S      83
 #define KB_X      88
 #define KB_L      76

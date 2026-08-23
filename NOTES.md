@@ -1028,7 +1028,7 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: fourteen of twenty-five (added 2026-08-19, count updated 2026-08-22)
+## 13. The command set: seventeen of twenty-five (added 2026-08-19, count updated 2026-08-23)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
 and it is short enough to reproduce whole.
@@ -1046,10 +1046,10 @@ and it is short enough to reproduce whole.
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
 | `MSGS` | review old messages | MEASURED 2026-08-23: a scrollable `PREVIOUS MESSAGES` overlay, entries stamped with their stardate, up/down to scroll and ESC to exit. Needs a deeper log and a scrolling viewer |
-| `C)hart` | chart of known galaxy | MEASURED 2026-08-23: a no-op on a console already showing the chart, so its job is probably restoring the panel after something overrides it |
-| `F)ix` | control which system engineering repairs | MEASURED 2026-08-23: NOT a priority list -- `ENGINEERING` asks "System to concentrate repairs on", one system by number, `L` for the list, `0` aborts. Much smaller than assumed |
+| `C)hart` | chart of known galaxy | **done** 2026-08-23 -- redraws the chart panel and costs no turn, which is exactly the no-op the original performs on a console already showing it |
+| `F)ix` | control which system engineering repairs | **done** 2026-08-23 -- `ENGINEERING` asks for one system by number, `L` lists all twelve in two columns, `0` aborts. `REPAIR_FOCUS_FACTOR` is DERIVED and carries the experiment that would settle it |
 | `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
-| `HAIL` | hail a StarBase | MEASURED 2026-08-23: costs a turn and opens a COMMUNICATIONS box -- empty with no base in range, so what it says is still uncaptured |
+| `HAIL` | hail a StarBase | **done** 2026-08-23 as measured -- costs a turn and posts an empty COMMUNICATIONS entry. What it says with a base IN RANGE is still uncaptured, so nothing is invented |
 | `A#` | acknowledge message # | no mechanic behind it |
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | unimplemented mechanic |

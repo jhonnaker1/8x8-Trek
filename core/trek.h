@@ -302,6 +302,13 @@ extern uint8_t sector[QUAD_CELLS];
 #define SYS_SHUTTLE     11
 #define SYS_COUNT       12
 
+/* F)ix -- "System to concentrate repairs on". MEASURED 2026-08-23 that the
+ * command exists and takes ONE system by number, with L for a list and 0 to
+ * abort; it is not a priority ordering. The FACTOR is DERIVED: since every
+ * damaged system already mends at the full rate (see trek.c), concentrating
+ * can only be a multiplier, and its size is unmeasured. */
+#define REPAIR_FOCUS_FACTOR  2
+
 typedef struct {
     uint8_t  quad_y, quad_x;
     uint8_t  sec_y, sec_x;
@@ -323,6 +330,9 @@ typedef struct {
     uint8_t  level;         /* 1..5, the command level / rank */
     uint16_t enemies_left;
     uint8_t  sys[SYS_COUNT];  /* repair percentage, 0..100 */
+    uint8_t  repair_focus;    /* 0 = spread across everything, else 1+index of
+                                 the one system engineering is concentrating
+                                 on -- the F)ix command. */
     uint16_t killed;          /* standard Mongols destroyed */
     uint16_t killed_cmd;      /* command ships, scored separately */
     uint16_t casualties;
@@ -655,6 +665,13 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 #define TORP_MISS        2
 #define TORP_NONE_LEFT   3
 #define TORP_BAD_COORDS  4
+/* MEASURED 2026-08-23: firing a torpedo AT a star answers "Torpedo absorbed by
+ * star." and the star survives -- it is not a miss, and the shot is spent. A
+ * star in the FLIGHT PATH is a different case entirely: it goes supernova and
+ * takes the quadrant with it. This port does not ray-march yet, so only the
+ * first case is modelled; the second is what the "Stars destroyed @ -5"
+ * scoring line comes from. */
+#define TORP_ABSORBED    5   /* the target cell held a star */
 
 /* Torpedo damage. MEASURED 2026-08-21 against the original, by writing a large
  * hit-point value into the target so it SURVIVES the shot and then reading the
@@ -689,6 +706,11 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
  *
  * FITTED from one long-range block, so the slope is soft: 16% per unit past
  * the sure range gives 68% at range 7 where 4/7 was seen. */
+/* Three tubes. MEASURED from the original's own refusals -- "Captain, we have
+ * only three tubes." and "Captain, only N tubes are functional." -- and it
+ * asks how many to fire before it asks where. */
+#define TORP_TUBES             3
+
 #define TORP_SURE_DIST         5   /* whole sectors; inside this it cannot miss */
 #define TORP_MISS_PCT_PER_UNIT 16
 /* `damage` receives the figure delivered; pass NULL if not wanted. */

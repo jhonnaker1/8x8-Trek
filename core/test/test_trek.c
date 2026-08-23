@@ -1497,6 +1497,47 @@ static void test_game_state_and_score(void) {
     ok(trek_score() > 0, "a maximal game still scores positive, not wrapped");
 }
 
+static void test_star_and_focus(void) {
+    /* --- a torpedo aimed at a star is absorbed, not a miss (2026-08-23) */
+    {
+        uint16_t dmg = 99;
+        uint8_t r;
+        trek_new_game(3, 1234);
+        /* put a star where we can shoot it, and make sure we have a torpedo */
+        sector[(3 << 3) | 4] = SEC_STAR;
+        ship.torps = 5;
+        r = trek_fire_torpedo(3, 4, &dmg);
+        ok(r == TORP_ABSORBED, "a torpedo aimed at a star is absorbed");
+        ok(dmg == 0, "an absorbed torpedo does no damage");
+        ok(ship.torps == 4, "and it is still spent");
+        ok(sector[(3 << 3) | 4] == SEC_STAR, "the star survives");
+    }
+
+    /* --- F)ix concentrates repairs on one system */
+    {
+        uint8_t plain, focused;
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LASERS] = 50;
+        ship.sys[SYS_SHIELDS] = 50;
+        ship.repair_focus = 0;
+        { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
+        plain = ship.sys[SYS_LASERS];
+        ok(ship.sys[SYS_SHIELDS] == plain,
+              "with no focus every damaged system mends at the same rate");
+
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LASERS] = 50;
+        ship.sys[SYS_SHIELDS] = 50;
+        ship.repair_focus = SYS_LASERS + 1;
+        { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
+        focused = ship.sys[SYS_LASERS];
+        ok(focused > ship.sys[SYS_SHIELDS],
+              "the focused system mends faster than the rest");
+        ok(ship.sys[SYS_SHIELDS] == plain,
+              "and the others mend exactly as they would have");
+    }
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -1524,10 +1565,13 @@ int main(void) {
     test_torpedo();
     test_self_destruct();
     test_game_state_and_score();
+    test_star_and_focus();
 
     puts("");
     if (failures) {
-        printf("%d FAILURE(S)\n", failures);
+    
+
+    printf("%d FAILURE(S)\n", failures);
         return 1;
     }
     puts("all core tests pass");
