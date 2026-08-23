@@ -893,7 +893,10 @@ prompt. At least eleven pages; the section headings observed, in order:
 
 Two things this costs. The text is **long** -- eleven-odd pages of three or
 four paragraphs each -- which on a 6502 is a real chunk of the binary and
-probably wants compressing or paging off disk. And it is **Anderson's prose**,
+probably wants compressing or paging off disk. **Sized and designed 2026-08-22:
+see "Briefing pages: where the text can live, and why not an REU" below.** The
+short version is 7,574 bytes of prose against 1,688 bytes free, so it cannot go
+in the binary at all, and disk I/O is the prerequisite. And it is **Anderson's prose**,
 which is copyrightable: the same rule already recorded for the message
 catalogue applies, so these are a specification of *what each page covers*,
 not text to copy.
@@ -1688,3 +1691,121 @@ is about 2000 samples a second. PAL went from +43% to +0.7%.
 pitch from the median of its run rather than its first window -- a window
 straddling a note boundary autocorrelates against two pitches at once, and one
 such reading swung a note from +0.4% to -2.0% and tripped the threshold.
+
+## Briefing pages: where the text can live, and why not an REU (2026-08-22)
+
+Design work only, no code. Item 11 has the captures; this is what to do with
+them when the time comes.
+
+### The arithmetic that decides it
+
+| | bytes |
+|---|---|
+| The original's briefing prose | **7,574** |
+| Byte-pair compressed, 96 codes plus a 192-byte table | **~4,350** |
+| Free space in `trek128.prg` | **1,688** ($B800 less BSS ending $B168) |
+
+`MAIN` is $1C0D..$B800 -- that is the config's $A3F3 minus the 2K stack. The
+text is 4.5x the room available and 2.6x even compressed. **It cannot go in the
+C128 binary**, and trimming code will not change that.
+
+A word dictionary of the 128 commonest words scores about the same as
+byte-pair, 4,182 bytes plus a 774-byte dictionary, and is easier to decode.
+Either is fine; neither is close to fitting.
+
+### What is actually eating the budget
+
+| segment | bytes | share |
+|---|---|---|
+| CODE | 32,497 | **81.4%** |
+| RODATA | 4,761 | 11.9% |
+| BSS -- every byte of live game state | **808** | 2.0% |
+
+**97% of what is used is code and read-only data.** This is worth stating
+plainly because it inverts the intuition: the port is not short of room for
+data, it is short of room for instructions.
+
+### Copyright decides the shape, and it helps
+
+The prose is Anderson's, so it cannot be committed -- the same rule as the
+message catalogue and the extracted music. Two options: generate it at build
+time from the user's own shareware copy, which leaves a public build with no
+briefing at all; or write our own pages covering the same material, which item
+11 already calls for ("a specification of what each page covers, not text to
+copy").
+
+Write our own. The useful consequence is that **the byte budget becomes a
+design target rather than a constraint to fight**.
+
+### Three places it can live on a C128, all free
+
+**The VDC's spare RAM.** The port already drives 16K of it and uses about 12K
+-- screen at $0000, attributes at $0800, the KERNAL's charset at $2000..$3FFF.
+That leaves **$1000..$1FFF, 4KB**, reachable with `vdc_set_address` and
+`vdc_data_read`, which already exist. Write the briefing to fit 4KB compressed
+and it lands in memory we are already paying for, on every C128, with no bank
+switching. UNVERIFIED: that the charset really is at $2000 here. The port never
+touches register 28, so it is wherever the KERNAL put it -- read it back before
+relying on it.
+
+**Bank 1.** The C128 has 128K and cc65's target uses about 40K of bank 0, so
+**bank 1's 64K is idle**. `INDFET`/`INDSTA` at $FF74/$FF77 read and write across
+banks at roughly 30 cycles a byte -- a 2KB page in about 30ms at 2MHz, nothing
+for a page turn. This is the general answer for elbow room on this machine.
+
+CAUTION, and it touches recent work: **BASIC keeps its variables in bank 1**,
+and this port now returns to BASIC cleanly. Using bank 1 would clobber them.
+Probably harmless at a fresh prompt, but it is exactly the shape of thing that
+would resurrect open item 2, so it wants testing rather than assuming.
+
+**Disk.** A file, read a page at a time. Slow on a 1541, which is why loading
+once into VDC RAM or bank 1 beats paging from disk every time.
+
+### The prerequisite is disk I/O, and it is shared
+
+However the text is stored, it has to arrive, and this port has never done disk
+I/O. That same piece of infrastructure serves `SAVE` and writing `TREK.SCR`.
+It is the real first step, not the briefing.
+
+### Across the ports: this is the project's first ASSET
+
+Briefing text is neither core logic nor platform presentation, and the repo has
+no concept for that yet. Introduce one deliberately:
+
+- **`assets/briefing.txt`** -- one source of truth, page-delimited plain text,
+  wrapped at RUNTIME rather than baked, so the same asset serves 80 columns and
+  anything narrower later.
+- **`tools/gen_briefing.py`** -- compiles it per target into a compressed blob
+  plus a page index. The decoder is about 100 bytes of platform code.
+- **C128**: loaded once from disk into the VDC's spare 4KB, or bank 1 if it
+  outgrows that.
+- **Amiga**: 512K makes it a non-problem -- link it in, uncompressed if you
+  like. Same asset and same tool, because the point is that the text does not
+  fork.
+- **Atari VBXE**: 64K of base RAM puts it in the same squeeze as the C128, and
+  **VBXE's 512K of video RAM through the MEMAC window is the direct analogue of
+  the VDC trick**. The two constrained targets get the same shape of answer.
+
+`core/` never sees any of it.
+
+### Would an REU help? No -- asked and answered
+
+An REU is a DMA store and **the 8502 cannot execute from it**. It moves data
+between main RAM and expansion RAM, and data is 2% of our problem. It does
+nothing about the 81% that is code.
+
+For the data problems it could solve, the VDC's spare RAM and bank 1 are both
+free and present on every C128, where an REU is hardware most players do not
+have. It also does not remove the disk-I/O prerequisite: the briefing still has
+to get into the REU somehow.
+
+**The one case where it genuinely wins is code overlays** -- DMA a block of code
+into main RAM and jump to it, which is the classic technique and would let the
+port grow well past 40K. Against that: the program has to be restructured into
+overlays with a resident manager, a non-REU fallback has to exist or the build
+forks, and the manager itself costs code -- spending the scarcest resource to
+buy more of it.
+
+Revisit only if the port genuinely outgrows 40K of code, which planets, save
+and the death ray together might eventually manage. VICE emulates it (`-reu`,
+`-reusize`), so it would be testable the same day.
