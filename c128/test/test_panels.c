@@ -377,6 +377,30 @@ static void test_title_screen(void) {
     }
 }
 
+/* ------------------------------------------------------ the ship's word */
+
+/* EGA Trek calls them Mongols, everywhere: the STATUS panel reads "Mongols:",
+   the enemy classes are Mongol Commander and Mongol Battleship, and the score
+   sheet counts "Mongols killed". This port said ENEMIES on the status panel,
+   which is the ancestor's word and nobody else's. Asserted rather than just
+   fixed, because it is the kind of thing that drifts back. */
+static void test_calls_them_mongols(void) {
+    const Panel *p = &panels[P_STATUS];
+    char buf[16];
+    unsigned char y;
+
+    screen_reset();
+    set_all(100);
+    ui_draw_status();
+
+    for (y = (unsigned char)(p->y + 1); y < (unsigned char)(p->y + p->h - 1); y++) {
+        row_text(y, (unsigned char)(p->x + 2), 7, buf);   /* labels sit at x+2 */
+        if (strcmp(buf, "MONGOLS") == 0) break;
+    }
+    check(y < (unsigned char)(p->y + p->h - 1),
+          "status panel calls them MONGOLS, as the original does");
+}
+
 /* --------------------------------------------------- quit confirmation */
 
 /* MEASURED: the original answers Q with "Quit <Y/N>?" on the COMMAND line
@@ -778,6 +802,7 @@ int main(void) {
     test_title_screen();
     test_play_again();
     test_quit_confirm();
+    test_calls_them_mongols();
     test_independent();
 
     test_badge_stays_inside();

@@ -227,7 +227,8 @@ void ui_draw_status(void) {
     scr_puts(lx, y, "WARP", COL_LABEL);
     put_tenths((unsigned char)(vx - 1), y, (uint16_t)ship.warp, COL_VALUE);
     y++;
-    scr_puts(lx, y, "ENEMIES", COL_LABEL);
+    /* The original's own word, and its own panel label: "Mongols:". */
+    scr_puts(lx, y, "MONGOLS", COL_LABEL);
     put_num(vx, y, ship.enemies_left, 5, EGA_TO_VDC(EGA_LTRED));
 }
 
@@ -816,13 +817,21 @@ void ui_dialog_line(const char *text) {
 
 /* Reads a line at (x0,y), echoing as it goes and handling backspace. Shared by
    the modal dialog and the setup screen so both behave identically. */
-static void read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max) {
+/* Returns 1 normally, 0 if the player pressed ESC. A RETURN VALUE and not an
+   out-parameter on purpose: cc65 -O has crashed outright on an out-parameter
+   in this codebase before, and it is recorded as a trap to avoid. */
+static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max) {
     unsigned char n = 0;
     char c;
 
     for (;;) {
         scr_put((unsigned char)(x0 + n), y, 32 + 128, COL_VALUE);   /* cursor */
         c = kb_waitkey();
+        if (c == KB_ESC) {
+            scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE);
+            buf[0] = 0;
+            return 0;
+        }
         if (c == KB_RETURN) { scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE); break; }
         if (c == KB_DELETE) {
             if (n) {
@@ -839,17 +848,25 @@ static void read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max
         n++;
     }
     buf[n] = '\0';
+    return 1;
 }
 
-void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
+/* Same, but ESC abandons the prompt and returns 0. Only self destruct wants
+   this -- EGA Trek's own prompt says "Hit ESC to abort". */
+uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max) {
     unsigned char y;
 
     dlg_room();
     y = (unsigned char)(DLG_Y + dlg_row);
     scr_puts((unsigned char)(DLG_X + 2), y, prompt, COL_DEPT);
     dlg_row++;
-    read_field((unsigned char)(DLG_X + 2 + strlen(prompt) + 1), y, buf, max);
+    return read_field((unsigned char)(DLG_X + 2 + strlen(prompt) + 1), y, buf, max);
 }
+
+void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
+    (void)ui_dialog_ask_esc(prompt, buf, max);
+}
+
 
 void ui_dialog_close(void) {
     unsigned char x, y;

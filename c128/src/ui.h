@@ -39,6 +39,10 @@ uint8_t ui_confirm(const char *prompt);
 void ui_dialog_open(const char *title);
 void ui_dialog_line(const char *text);
 void ui_dialog_ask(const char *prompt, char *buf, uint8_t max);
+
+/* As ui_dialog_ask, but ESC abandons the prompt and returns 0. EGA Trek's
+   self-destruct prompt says "Hit ESC to abort"; nothing else offers it. */
+uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max);
 void ui_dialog_close(void);
 
 /* The STATE OF REPAIR report: every system's condition, and how long it would

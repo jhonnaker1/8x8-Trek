@@ -24,6 +24,7 @@
 
 #define KB_NONE   0
 #define KB_RETURN 13
+#define KB_ESC    27
 #define KB_DELETE 20
 #define KB_SPACE  32
 #define KB_COMMA  44

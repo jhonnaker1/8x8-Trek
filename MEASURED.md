@@ -2429,3 +2429,68 @@ damaged!" and "Captain, we have insufficient energy!". A second copy of the
 same beep sits in the command parser, guarding a field that is too long.
 
 So it is not a generic bleep: it is the sound of the ship declining an order.
+
+## Auditing the port against EGA Trek rather than the ancestor (2026-08-22)
+
+Jamie: "lets make sure the commands we do match egatrek. if its only in the
+ancestor we should reconcile."
+
+### The method
+
+Extract every user-visible string literal from the port and ask two questions
+of each: does it appear in EGA Trek's own string table, and does it appear in
+the ancestor's source? The interesting set is **in the ancestor, not in EGA
+Trek**, and it is small enough to read.
+
+A first pass that only checked "does the ancestor contain these words" was
+useless -- it flagged 52 of 114 strings, because both games are about captains,
+shields, energy and torpedoes. The two-sided test cut it to ten, of which four
+were real.
+
+### What it found
+
+**Self destruct was speaking the wrong game entirely.** The port printed
+"PASSWORD-REJECTED; CONTINUITY-EFFECTED", "PASSWORD-ACCEPTED" and "ENTROPY
+MAXIMIZED. n TAKEN WITH US." -- all of them the ancestor's. The comment
+defending it read "the ancestor's own wording, which is too good to replace",
+which is the wrong test for a port of EGA Trek.
+
+EGA Trek has its own sequence, and it was sitting in the extracted strings the
+whole time:
+
+    "Enter self-destruct password: "        "Hit ESC to abort"
+    ">>SELF-DESTRUCT SEQUENCE COMMENCING<<"
+    ">>DESTRUCT ABORTED<<"
+    ">>WRONG PASSWORD, DESTRUCT ABORTED<<"
+
+**The abort path came with it.** EGA Trek offers ESC and this port had no way
+out of the prompt at all, which is a different command, not a different
+wording. ESC is row 7 column 7 in the matrix and was simply missing.
+
+**The STATUS panel said ENEMIES.** EGA Trek says "Mongols:" -- on the panel, in
+the ship classes, and in the score sheet. ENEMIES is the ancestor's word and
+nobody else's. Now asserted by a test, because it is the kind of thing that
+drifts back.
+
+**"TORPEDOES" with two Es** in one docking message, where EGA Trek spells it
+"torpedos" throughout and the rest of this port already did.
+
+### What survived the audit
+
+The three-pool energy transfer is EGA Trek's, CONFIRMED in DOSBox-X. The
+scheduled-event mechanic is EGA Trek's, its deadline messages seen in captures;
+only the timing model is the ancestor's. Enemy motion, the fire law, the docked
+repair rate and hit points were all ancestor-derived once and are all measured
+now.
+
+### The one thing still taken from the wrong game
+
+`SELFDESTRUCT_FACTOR 25` -- the blast model is the ancestor's `kaboom()`:
+everything whose power times distance is within 25 times remaining energy dies.
+EGA Trek's manual says only "With any luck, you will at least take a few
+Mongols", so the mechanic is right and the threshold is unmeasured.
+
+**The experiment:** destruct with known energy against enemies at known
+distances and read the kill count off the evaluation screen, which counts
+Mongols killed. One data point per game, so it needs several -- vary energy
+across runs and bracket the threshold.

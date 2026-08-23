@@ -50,6 +50,9 @@ static const Key keys[] = {
        briefing the original offers has therefore been unreachable in this
        port for its whole life. */
     { 3, 1, KB_Y }, { 4, 7, KB_N },
+    /* ESC, because EGA Trek's self-destruct prompt says "Hit ESC to abort"
+       and a destruct sequence with no way out is not the same command. */
+    { 7, 7, KB_ESC },
     { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
     { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 },
     { 2, 0, KB_DIGIT0 + 5 }, { 2, 3, KB_DIGIT0 + 6 },

@@ -252,7 +252,7 @@ static void do_dock(void) {
                     ui_message("HELM: ", "DOCKED. ALL STORES FULL.");
                     break;
                 case BASE_SUPPLY:
-                    ui_message("HELM: ", "DOCKED. TORPEDOES ONLY.");
+                    ui_message("HELM: ", "DOCKED. TORPEDOS ONLY.");
                     break;
                 default:
                     ui_message("HELM: ", "DOCKED. NO STORES HERE.");
@@ -439,30 +439,54 @@ static void do_repair(void) {
 
 /* S)elf destruct. Gated on the password the setup screen collected, which is
    the whole reason that prompt exists. The core is never told the password --
-   it formats no text and compares no strings -- so the check is here. */
+   it formats no text and compares no strings -- so the check is here.
+ *
+ * RECONCILED 2026-08-22. This used to speak the ANCESTOR: "PASSWORD-REJECTED;
+ * CONTINUITY-EFFECTED", "PASSWORD-ACCEPTED", "ENTROPY MAXIMIZED. n TAKEN WITH
+ * US." The comment justifying it said the ancestor's wording was "too good to
+ * replace", which is the wrong test entirely -- this is a port of EGA Trek, and
+ * EGA Trek has its own sequence, extracted from its binary:
+ *
+ *     "Enter self-destruct password: "   "Hit ESC to abort"
+ *     ">>SELF-DESTRUCT SEQUENCE COMMENCING<<"
+ *     ">>DESTRUCT ABORTED<<"
+ *     ">>WRONG PASSWORD, DESTRUCT ABORTED<<"
+ *
+ * The abort path came with it. A destruct prompt with no way out is not the
+ * same command, and ESC had to be added to the key matrix to offer it.
+ *
+ * STILL DERIVED: the blast itself is the ancestor's kaboom() -- see
+ * SELFDESTRUCT_FACTOR in trek.h. That is the last piece of an implemented
+ * command still taken from the wrong game. */
 static void do_self(void) {
     char buf[9];
     uint8_t n;
 
     ui_dialog_open("SELF DESTRUCT");
-    ui_dialog_ask("PASSWORD:", buf, sizeof buf);
-    if (strcmp(buf, setup.password) != 0) {
-        /* The ancestor's own wording, which is too good to replace. */
-        ui_dialog_line("PASSWORD-REJECTED;");
-        ui_dialog_line("CONTINUITY-EFFECTED");
-        ui_dialog_line("");
+    ui_dialog_line("HIT ESC TO ABORT");
+
+    if (!ui_dialog_ask_esc("ENTER SELF-DESTRUCT PASSWORD:", buf, sizeof buf)) {
+        ui_dialog_line(">>DESTRUCT ABORTED<<");
         ui_dialog_line("HIT RETURN TO CONTINUE");
         while (kb_waitkey() != KB_RETURN) { }
         ui_dialog_close();
         return;
     }
 
-    ui_dialog_line("PASSWORD-ACCEPTED");
-    ui_dialog_line("5   4   3   2   1");
+    if (strcmp(buf, setup.password) != 0) {
+        ui_dialog_line(">>WRONG PASSWORD, DESTRUCT ABORTED<<");
+        ui_dialog_line("HIT RETURN TO CONTINUE");
+        while (kb_waitkey() != KB_RETURN) { }
+        ui_dialog_close();
+        return;
+    }
+
+    ui_dialog_line(">>SELF-DESTRUCT SEQUENCE COMMENCING<<");
     n = trek_self_destruct();
-    { uint8_t k = put_str(linebuf, "ENTROPY MAXIMIZED. ");
-      k += put_u16(linebuf + k, n);
-      k += put_str(linebuf + k, " TAKEN WITH US.");
+    /* "Mongol ship(s) destroyed" is EGA Trek's own phrasing, from the death
+       pod's damage report. */
+    { uint8_t k = put_u16(linebuf, n);
+      k += put_str(linebuf + k, " MONGOL SHIP(S) DESTROYED.");
       linebuf[k] = 0;
       ui_dialog_line(linebuf); }
     ui_dialog_line("HIT RETURN TO CONTINUE");

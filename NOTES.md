@@ -926,10 +926,10 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: thirteen of twenty-five (added 2026-08-19, count updated 2026-08-21)
+## 13. The command set: fourteen of twenty-five (added 2026-08-19, count updated 2026-08-22)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
-and it is short enough to reproduce whole. The port implements six of it.
+and it is short enough to reproduce whole.
 
 | command | what it does | state |
 |---|---|---|
@@ -949,11 +949,11 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
 | `HAIL` | hail a StarBase | no mechanic behind it |
 | `A#` | acknowledge message # | no mechanic behind it |
-| `S)elf` | self destruct | **done** -- the setup screen collects the password, and the ancestor's kaboom() gives the blast |
+| `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | unimplemented mechanic |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | unimplemented mechanics |
 | `SAVE` | save game | deferred, see item 10 |
-| `SND` | toggle sound | needs item 12 |
+| `SND` | toggle sound | **done** -- toggles the same flag the original keeps at DGROUP+0x1cc8 |
 | `Shift-F1` | boss mode | screen blanker |
 
 Plus the function keys, which are shortcuts rather than new commands:
