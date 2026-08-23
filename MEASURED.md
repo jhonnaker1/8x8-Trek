@@ -2228,3 +2228,94 @@ and a total of -300, with every other line zero. `SCORE_INCOMPLETE` in trek.h
 was already -300, and the port's own Hall of Fame printed -300 for the same
 quit in the same session. Two implementations agreeing on a number neither was
 fitted to is the useful kind of corroboration.
+
+## The music is note data, not audio (2026-08-22)
+
+Jamie asked whether the soundtracks could be got out of the original or would
+have to be recorded. They can be got out, and recording would be strictly
+worse: the original is Turbo Pascal driving the PC speaker, so what is in the
+binary is **exact frequencies in Hz and exact durations in timer ticks**. A
+capture would produce square waves to pitch-detect back into the numbers that
+are already sitting there.
+
+`tools/extract_music.py` dumps all of it. Nothing it produces is committed --
+see the copyright note at the end.
+
+### Finding it
+
+`tp_labels.csv` already had the runtime's `SOUND` at load-module offset
+0x0227D6. Scanning the image for far calls to it gives **eight sites**, which
+is few enough to read by hand: a 440Hz/250ms beep (twice), four procedural
+sweeps, and one routine that walks a byte array. That routine is the player.
+
+It is an **ISR** -- register-saving prologue, `mov ds, DGROUP`, `iret` -- on
+the stock 18.2065Hz timer. Nothing in the game code writes PIT ports 40h or
+43h, so that rate is never reprogrammed and one tick is 54.9ms.
+
+    StartMusic(track: pointer; repeats: word; tempo: byte)
+
+### The format
+
+A track is a flat byte array of **(duration, frequency/10) pairs**, terminated
+by a zero duration. Frequency 0 is a rest. Duration is in ticks, multiplied by
+the tempo argument; both music tracks pass tempo 1.
+
+Storing frequency as a byte times ten is the whole design, and it has a
+consequence worth deciding about: **every pitch is quantised to 10Hz**, so the
+notes are up to about 22 cents out. A4 lands on exactly 440, but D4 is 290Hz
+(22 cents flat) and C5 is 520Hz (11 cents flat). That detuning is part of how
+the game sounded. Reproducing it or correcting it is a port decision, not a
+bug to fix silently.
+
+### DGROUP, derived twice
+
+Track pointers are DS-relative. The data segment base was brute-forced first
+-- the only base in the entire file at which all five short tracks parse as
+valid pairs with correct terminators, one candidate out of ~13,000 -- and then
+confirmed independently by the ISR's own `mov ax, 0x28a2 / mov ds, ax`, since
+0x28a2 * 16 + LOAD_BASE is the same address, 0x2D820. Two routes, one answer,
+which is what turns a fit into a fact.
+
+### The seven tracks
+
+| DS offset | what | notes | length | repeats |
+|---|---|---|---|---|
+| 0x057E | **title music** | 205 | 45.5s | 99 |
+| 0x071A | **end-of-game music** | 319 | 43.5s | 99 |
+| 0x099A | effect | 2 | 0.1s | variable |
+| 0x09A0 | effect | 6 | 0.3s | 1 |
+| 0x09AE | effect | 2 | 0.8s | 1 |
+| 0x09B4 | effect | 2 | 0.8s | 1 |
+| 0x09BA | effect | 3 | 0.9s | 1 |
+
+Which of the two long tracks was which was **read out of the running game**,
+not inferred: dosbox-automation's memory API, the player's current-track
+variable at DGROUP+0x1cb6, sampled on the title screen (0x057E, flag set, 99
+repeats left) and again at the end of a game (0x071A). Both are real tunes --
+the title opens on a two-second rest then D4 D4 D4 D4 F4 in D major, the
+end-of-game on a descending F#5 E5 D5 figure.
+
+This confirms what Jamie described: **a track on the opening screen, effects
+during play, a different track at the end**. The in-game effects are the five
+short tracks plus code that does not use the player at all.
+
+### The effects that are not tracks
+
+Four `Sound`/`Delay` sites at 0x00747B..0x0074E9 are **procedural sweeps**: a
+loop running a frequency from 37Hz to 1000Hz playing f, 2f and 3f for 2ms
+each, and a second from 1200Hz upward at 1ms. Around six seconds of rising
+three-harmonic noise -- an explosion or self destruct, not a tune.
+
+### What SND toggles
+
+Every sound site tests `[0x1cc8]` first and skips if it is zero, and the
+player's ISR clears the playing flag when it finds it zero. That byte is the
+sound on/off switch, which is the mechanic behind the `SND` command still open
+on the command list.
+
+### Copyright
+
+The note data is Anderson's creative work in the same way the message prose
+is, so `tools/extract_music.py` writes into `build/` and **nothing extracted is
+committed**. The repo keeps the method, not the material -- the same rule
+`reference/` is gitignored under.

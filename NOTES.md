@@ -863,8 +863,13 @@ knowing before building them: the crew is **387 enlisted and 43 officers**
 (which is the 430 the score sheet charges for losing the ship, confirmed
 independently); the ship is a "heavy Research/Battle Cruiser, Class IX"; and
 the chart's three digits are stated outright as "the number of Mongols, **base
-type**, and number of stars" -- a type, not a count, which our chart currently
-gets wrong.
+type**, and number of stars" -- a type, not a count.
+
+CORRECTED 2026-08-22: this item used to end "which our chart currently gets
+wrong". It does not; `ui_draw_chart()` prints `gal_base[q]`, which is the type
+enum. What is still unverified is the NUMBERING -- ours is 1 StarBase,
+2 Research, 3 Supply, and nothing has ever checked that against the digit the
+original prints. Every capture so far has a 0 in that position.
 
 The pages are reached with Y at the first setup prompt, advanced with Enter and
 abandoned with Q, and the prompt line says so: `(Hit "Enter" for next page or
@@ -898,6 +903,19 @@ not text to copy.
 The original uses the PC speaker. The C128 has a SID, the Amiga four channels
 of sampled audio, and the Atari POKEY, so this is the one area where every
 port can beat the original outright rather than approximate it.
+
+~~Nothing is captured yet~~ -- **the note data is extracted, 2026-08-22**. It
+never needed an audio path: the original is Turbo Pascal driving the PC
+speaker, so the binary holds exact frequencies and durations rather than sound.
+Two music tracks (title, 45.5s; end of game, 43.5s), five short effect tracks
+and two procedural sweeps, all dumped by `tools/extract_music.py`. Format,
+derivation and the 10Hz pitch quantisation are in MEASURED.md.
+
+Nothing extracted is committed -- the notes are Anderson's work like the prose.
+`[0x1cc8]` is the original's sound on/off byte, which is what `SND` toggles.
+
+What remains for this item is the port side: a SID driver, and deciding which
+core events make which noise. Original text follows.
 
 Nothing is captured yet -- the emulator driver has no audio path, so working
 out what the original plays and when is its own task. Likely: firing, hits,
