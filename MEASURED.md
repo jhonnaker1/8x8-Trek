@@ -2347,3 +2347,56 @@ I said did not exist. Both were cheap to check with instruments already
 running. The rule is in the port plan memory now: when the question is what the
 original does, measure it or ask -- do not infer it and write it down as if it
 were known.
+
+## All five sound effects identified (2026-08-22)
+
+The five short tracks were extracted days before anything was known about what
+they were for. Naming them by ear, or by the shape of their frequencies, would
+have been invention. The routines name themselves.
+
+### Method: resolve the strings each calling routine prints
+
+Turbo Pascal pushes string constants CS-relative -- `mov di, imm; push cs; push
+di` -- so resolving one needs the code segment of the routine doing the
+pushing, which is not in the file anywhere. But a far CALL to that routine
+carries it: `9A off seg`. So for each effect, find the enclosing procedure by
+scanning back for `push bp; mov bp, sp`, find a far call whose target is that
+procedure to learn its segment, and then every CS-relative string in its body
+resolves.
+
+Five procedures, five unambiguous answers:
+
+| track | what its own routine prints | so it is |
+|---|---|---|
+| 0x099A | "Amount to fire at ", " unit hit on ", "Lasers overheat" | **lasers fire** |
+| 0x09A0 | "ENERGY TORPEDO CONTROL", "Number to fire: ", "Tracking #" | **torpedo launch** |
+| 0x09AE | "Status", "Green", "Yellow", "Alert", ">>ALERT<<" | **status goes to ALERT** |
+| 0x09B4 | "Vandal Death Pod enters quadrant: " | **the death pod arrives** |
+| 0x09BA | "WARNING:  Mongol at ", "StarBase shields protect Lexington" | **incoming Mongol fire** |
+
+Jamie had already said the alert was "when you jump into a quadrant with
+Mongols", and a dynamic run had caught 0x09AE firing on exactly one warp out of
+seven. The strings say why: it belongs to the routine that draws the status
+panel, and the panel goes to ALERT on arriving somewhere with Mongols in it.
+
+### Most in-game noise is not the player at all
+
+Worth recording, because it explains a run that looked like a failure. A full
+combat exchange -- alert, lasers, hits, damage, casualties -- moved the track
+pointer NOT ONCE. The player handles these five effects and nothing else. The
+rest of the game's noise comes from code that calls the runtime's Sound()
+directly: two 440Hz/250ms beeps, and four procedural sweeps running a frequency
+from 37Hz to 1000Hz playing f, 2f and 3f for 2ms each.
+
+### The rig's two traps, each of which cost a run
+
+**The track pointer is never cleared.** Only the playing flag drops when a
+track ends, so an effect replaying is indistinguishable from silence. Ten
+actions reported "silent" against a game that was visibly firing lasers. The
+fix is to poke the pointer to a sentinel before each action, which is safe only
+while the flag is down -- the ISR returns before dereferencing it then.
+
+**A rig that drives the setup screen must start from a fresh emulator.** Run it
+against an emulator that already has a game going and it types the setup
+answers into the game. That produced a whole table of nonsense and a baseline
+reading that sent me looking for an effect at the wrong moment.

@@ -1592,11 +1592,26 @@ build that breaks without gitignored material is a build nobody else can run.
 
 ### Not done
 
-The five short effect tracks are extracted and callable but **unwired**: their
-call sites in the original are known, what each one MEANS is not, and guessing
-which noise belongs to firing rather than docking is exactly the kind of
-invention this file exists to prevent. The end-of-game track plays through the
-identical path as the title track but has not been recorded and measured.
+~~The five short effect tracks are extracted and callable but unwired.~~ DONE
+2026-08-22 -- all five identified and wired. Each was named by resolving the
+strings its calling routine prints, so none of it is matched by ear: lasers,
+torpedo launch, the ALERT the status panel raises on arriving somewhere with
+Mongols, the Vandal Death Pod's arrival, and incoming Mongol fire. See
+MEASURED.md.
+
+The effects voice was recorded and measured too, because voice 2 and the sfx
+branch of `music_tick()` had never run in any test and a wrong register offset
+there would have been silent: 495Hz then 1000Hz, twice, against 500 and 1000
+expected, with the durations in the right 4:10 ratio.
+
+A turn plays ONE sound, not one per event -- the effects voice is monophonic,
+and the death pod outranks ordinary fire because in the original it has its own
+effect and its own line in the damage report. The alert fires after the enemy
+turn rather than after a move, because a tractor beam drags the ship into a new
+quadrant on someone else's turn.
+
+The end-of-game track plays through the identical path as the title track but
+has not been recorded and measured.
 
 ### Where the title track stops -- corrected 2026-08-22
 

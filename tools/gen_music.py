@@ -27,11 +27,13 @@ OUT    = "c128/src/music_data.h"
 TRACKS = [
     ("MUS_TITLE", 0x057E, "title screen"),
     ("MUS_END",   0x071A, "end of game"),
-    ("SFX_A",     0x099A, "unidentified -- called from 0x00A052"),
-    ("SFX_B",     0x09A0, "unidentified -- called from 0x00BA78"),
-    ("SFX_C",     0x09AE, "unidentified -- called from 0x01C760"),
-    ("SFX_D",     0x09B4, "unidentified -- called from 0x020C49"),
-    ("SFX_E",     0x09BA, "unidentified -- called from 0x016D5A"),
+    # All five IDENTIFIED 2026-08-22 by resolving the strings each calling
+    # routine prints. See MEASURED.md; the routine's own words name it.
+    ("SFX_A",     0x099A, "lasers fire"),
+    ("SFX_B",     0x09A0, "torpedo launch"),
+    ("SFX_C",     0x09AE, "status goes to ALERT"),
+    ("SFX_D",     0x09B4, "Vandal Death Pod enters the quadrant"),
+    ("SFX_E",     0x09BA, "incoming Mongol fire"),
 ]
 
 

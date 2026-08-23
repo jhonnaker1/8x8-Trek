@@ -268,6 +268,11 @@ static void do_dock(void) {
     }
 }
 
+/* SFX_A and SFX_B are MEASURED, not matched by ear: the routine that starts
+   0x099A in the original is the one that prints "Amount to fire at " and
+   "Lasers overheat", and the routine that starts 0x09A0 prints "ENERGY TORPEDO
+   CONTROL" and "Number to fire". Each effect belongs to the command whose code
+   launches it. */
 static void do_lasers(void) {
     uint8_t cell, y, x, found = 0;
     unsigned char what;
@@ -308,6 +313,7 @@ static void do_lasers(void) {
         energy = grab_num(line);
         if (energy == 0) continue;
 
+        snd_effect(SFX_A);
         switch (trek_fire_laser(y, x, energy, &dealt)) {
             case FIRE_OK:
             case FIRE_KILL: {
@@ -476,9 +482,35 @@ static void do_info(void) {
     ui_draw_all();
 }
 
+/* The alert.
+ *
+ * MEASURED: the original starts 0x09AE from the routine whose strings are
+ * "Status", "Green", "Yellow", "Alert" and ">>ALERT<<" -- so it is the sound
+ * of the status panel going to Alert, which is what happens on arriving in a
+ * quadrant that has Mongols in it. Jamie described it exactly that way before
+ * the strings confirmed it.
+ *
+ * Only on ARRIVING: a quadrant does not re-alert every turn you sit in it. */
+static uint8_t alert_quad = 0xFF;
+
+static void alert_check(void) {
+    uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    if (q == alert_quad) return;
+    alert_quad = q;
+    if (gal_enemies[q]) snd_effect(SFX_C);
+}
+
+/* Which noise a turn makes. The effects voice is monophonic, so a turn with
+   three hits in it plays one sound, not three restarts of the same one -- and
+   the death pod outranks ordinary fire because in the original it has its own
+   effect and its own line in the damage report. */
+static uint8_t turn_sfx;
+
 static void enemy_turn(uint8_t player_fired) {
     TrekEvent ev[12];
     uint8_t n, i, k;
+
+    turn_sfx = 0xFF;
 
     /* Scheduled events first, then the enemy. A base falling or a tractor
        beam is something that happened during the time the turn consumed, so
@@ -499,6 +531,7 @@ static void enemy_turn(uint8_t player_fired) {
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 break;
             case EV_HIT:
+                if (turn_sfx == 0xFF) turn_sfx = SFX_E;
                 k  = put_u16(linebuf, ev[i].amount);
                 k += put_str(linebuf + k, " HIT FROM ");
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
@@ -538,6 +571,7 @@ static void enemy_turn(uint8_t player_fired) {
                 ui_message("HELM: ", linebuf);
                 continue;
             case EV_POD_HIT:
+                turn_sfx = SFX_D;      /* MEASURED: the pod has its own sound */
                 k  = put_str(linebuf, "DEATH POD ");
                 k += put_u16(linebuf + k, ev[i].amount);
                 k += put_str(linebuf + k, " ON ALL");
@@ -553,6 +587,8 @@ static void enemy_turn(uint8_t player_fired) {
         linebuf[k] = 0;
         ui_message("DAMAGE: ", linebuf);
     }
+
+    if (turn_sfx != 0xFF) snd_effect(turn_sfx);
 }
 
 /* One torpedo destroys a standard Mongol outright, confirmed against the
@@ -581,6 +617,7 @@ static void do_torpedo(const char *line) {
     }
 
     ui_dialog_line("TRACKING...");
+    snd_effect(SFX_B);
     {
         uint16_t dmg = 0;
         uint8_t  r = trek_fire_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
@@ -658,6 +695,7 @@ int main(void) {
            msg_count is a file static in ui.c, and without this the second
            game opens with the first one's damage reports still in the boxes. */
         ui_clear_messages();
+        alert_quad = 0xFF;      /* a new galaxy alerts on its first quadrant */
 
         ui_draw_all();
         ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
@@ -687,6 +725,11 @@ int main(void) {
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
             else if (c == KB_Q) break;
             else if (c)          ui_message("COMPUTER: ", "M W L T D R S E Q INFO SHUP SHDN MAX");
+
+            /* After the enemy turn, not just after a move: a tractor beam
+               drags the ship to another quadrant on someone else's turn, and
+               arriving that way deserves the alert every bit as much. */
+            alert_check();
 
             ui_draw_scan();
             ui_draw_chart();
