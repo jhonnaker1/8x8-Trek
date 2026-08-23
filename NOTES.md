@@ -549,24 +549,85 @@ checklist of *which situations need a message*, not as text to copy.
    test is still a materially different proposition from one that cannot --
    that part stands, it just no longer distinguishes these two.
 
-## Platform suitability (from the Uno lineup)
+## Platform suitability (from the Uno lineup, revised 2026-08-22)
 
-Ranked for *this* game, whose demands are the opposite of Uno's — high information
-density, colour as annotation rather than content. **Column count is the deciding
-factor.**
+Ranked for *this* game, whose demands are the opposite of Uno's: high
+information density, and colour carrying meaning rather than decoration -- red
+for Mongols, green for a healthy system, yellow for stars, cyan for labels.
 
-- **Best:** `amiga` (640×200 bitmap, 16 colours), `atari` **VBXE in HR mode**
-  (640×200 bitmap, 16 colours — same spec as the Amiga, see below), `c128` VDC
-  (80×25 text), `x16` (80×60), `f256` (80×60). (`dos` — the original platform —
-  is reference-only, not a build target; see Platform order above.)
-- **Workable, needs a paged UI:** the 40-column colour machines — `c64`,
-  `plus4`, `cbm510`, `mega65`, `coco`
-- **Poor fit:** `pet` (80 columns but monochrome — colour carries real information
-  here), `vic20` (RAM), `zxspectrum` and `ti99` (32×24, attribute clash /
-  colour-per-glyph), `apple` (40×24 mono)
+**Two hard rules.** At least **80 columns**, because the nine-panel console was
+laid out on an 80x25 grid and paging it is solving a different game. And enough
+**colour at that width** -- a machine that only reaches 80 columns by dropping
+to two or four colours fails, because the colour is information.
 
-The C64 is a perfectly good target but the *hard* one for this game — 40 columns
-against a nine-panel console means solving paging first and the game second.
+That second rule is what ruled the stock Atari out of this project until VBXE
+came into the picture, and it rules out more than it first appears.
+
+### Tier 1 -- 80 columns and 16 colours, proven in the Uno lineup
+
+| target | how | CPU |
+|---|---|---|
+| **C128 VDC** | 80x25 text, 16 colours per cell | 8502 |
+| **Amiga** (OCS/ECS, KS2.0+) | 640x200 bitmap, 16 colours | 68000 |
+| **Atari 800XL + VBXE**, HR mode | 640xN bitmap, 16 colours | 6502 |
+| **Commander X16** | VERA text 80x60, per-cell fg+bg from 256 | 65C02 |
+| **Foenix F256** | Vicky text 80x60, per-cell colour via CLUTs | 65C02 |
+
+The **stock Atari is out** and only VBXE brings it in -- ANTIC's text modes stop
+at 40 columns. Exactly the same split Uno hit, for the same reason.
+
+### Tier 2 -- capable, but at 80 columns Uno never went there
+
+- **MEGA65.** The Uno port compiled as a C64 program and drove the VIC-IV for a
+  40-column screen; its own README says 80 columns needs **native C65 mode**.
+  The VIC-IV does 80x25 with per-cell colour and a great deal more, so the
+  machine is clearly Tier 1 material -- the work is the mode, not the hardware.
+- **CoCo 3.** The GIME has a genuine 80-column text mode with per-character
+  attributes, where the Uno port used 40 columns. A fourth CPU family (6809)
+  already has a toolchain here (CMOC, XRoar). **UNVERIFIED: how many colours
+  are simultaneously available at 80 columns** -- the attribute byte is
+  understood to carry three bits each of foreground and background out of a
+  64-colour palette, which would be eight at a time and enough. Check before
+  counting on it.
+
+### Tier 3 -- 80 columns exist, but the colour collapses
+
+- **Atari ST / STE.** Its three modes are 320x200 in 16 colours (only 40
+  columns), 640x200 in **4 colours**, and 640x400 monochrome. So 80 columns
+  costs all but four colours, or all of them. The STE's deeper palette does not
+  help: it widens the choice, not the count. The escape is per-scanline palette
+  switching, which is real but heavy. **Out unless someone wants that fight.**
+- **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
+  buys only a second colour pair -- four colours, same trap as the ST.
+  **INFERENCE worth testing:** SCREEN 7 is 512x212 with 16 colours *per pixel*
+  and no attribute clash, and a 6-pixel-wide font would put 85 columns in that
+  512, which is 80 with room over. The V9938's hardware blitter is what makes
+  glyph drawing affordable on a 3.58MHz Z80. If that holds, MSX2 moves to Tier
+  1 and becomes the cheapest wide-colour target here after the C128.
+
+### Out
+
+- **PET 8032** -- 80 columns and monochrome. Colour carries information in this
+  game, so a mono port would be a different game.
+- **Apple IIe** -- the 80-column card is text-only monochrome, and double
+  hi-res colour is artifacted down to about 140 real colour pixels.
+- **Everything at 40 columns or fewer**: C64, C64 OS, Plus/4, CBM-II 510,
+  VIC-20, ZX Spectrum, TI-99/4A. An earlier version of this section listed the
+  40-column colour machines as "workable, needs a paged UI". **That is
+  superseded** -- the 80-column rule is the rule.
+- **DOS** -- the original's own platform, reference oracle only, not a build
+  target. Its EGA mode 10h at 640x350x16 is where the console came from.
+
+### Text or bitmap, and why both are already proven
+
+Uno shipped both approaches, and the split maps cleanly onto this lineup.
+**Text-mode targets** (C128, X16, F256, MEGA65, CoCo 3) can put the console on
+the screen directly, one panel character per cell, which is how the original
+did it. **Bitmap targets** (Amiga, VBXE, and MSX2 if the narrow-font idea
+holds) have to draw their own glyphs and pay for a font, and get finer panel
+borders and free pixel artwork in exchange.
+
+Neither changes `core/`. That is the whole point of the split.
 
 ## Driving the original under automation (2026-08-16)
 
