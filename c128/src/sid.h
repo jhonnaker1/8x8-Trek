@@ -24,6 +24,10 @@ void snd_off(void);         /* full stop, for the way out */
 void snd_music(uint8_t track);   /* start a looping track, or MUS_NONE */
 void snd_effect(uint8_t track);  /* fire a one-shot on the effects voice */
 
+/* The original's refusal beep: 440Hz for 250ms, MEASURED, and the sound it
+   makes when the ship declines an order. Blocking, as it is there. */
+void snd_beep(void);
+
 /* Advances the music. Call it from anywhere that waits -- it is cheap, it
    times itself off the VIC raster, and calling it more often than once per
    frame costs nothing but a compare. kb_waitkey() is the important caller:

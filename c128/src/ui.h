@@ -27,6 +27,10 @@ void ui_clear_messages(void);
    it goes and handles backspace. */
 void ui_read_command(char *buf, uint8_t max);
 
+/* A Y/N question on the COMMAND line, which is where the original asks its
+   quit confirmation. Non-zero for yes; takes an explicit Y or N only. */
+uint8_t ui_confirm(const char *prompt);
+
 /* Modal dialog, the way the original runs weapons and energy transfers: a
    bordered box drawn over the console, its own running transcript inside,
    and the console restored when it closes. Putting these exchanges in the

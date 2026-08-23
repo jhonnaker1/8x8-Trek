@@ -936,7 +936,7 @@ and it is short enough to reproduce whole. The port implements six of it.
 | `D)ock` | dock with a StarBase | **done** |
 | `L)asers` | fire lasers | **done** |
 | `M)ove` | move to quad/sector | **done** |
-| `Q)uit` | quit | **done** -- but the original asks `Quit <Y/N>?` first and ours does not |
+| `Q)uit` | quit | **done** -- asks `QUIT <Y/N>?` on the COMMAND line first, as the original does |
 | `T)orps` | fire torpedoes | **done** |
 | `W)arp` | set warp speed | **done** |
 | `E)nergy` | energy transfer | **done** (4de6758) |
@@ -1506,11 +1506,14 @@ reads a bare RETURN as *no*, and a RETURN that means yes on one screen and no
 on another is how a session ends by accident. The original gives no guidance --
 neither of its two buttons is drawn with a focus ring.
 
-### Still not done: Q does not ask
+### Q asks now -- done 2026-08-22
 
-The original answers `Q` with `Quit <Y/N>?` in the COMMAND panel. Ours quits on
-the keystroke. Now that Y and N exist the fix is small, but it is a change to a
-command rather than part of this routine.
+The original answers `Q` with `Quit <Y/N>?` in the COMMAND panel; ours quit on
+the keystroke, which made an accidental Q the most expensive typo in the game.
+`ui_confirm()` puts the question on the command line where the original puts
+it, takes an explicit Y or N -- RETURN included in what it ignores, same rule
+as the play-again prompt -- and clears the line afterwards, because a stale
+`QUIT <Y/N>?` sitting under the next command would be worse than no prompt.
 
 ## Sound: the SID driver, and a bug that was three semitones from its cause (2026-08-22)
 
@@ -1619,3 +1622,69 @@ It plays on the title screen ONLY and stops the moment the briefing question
 appears. This port originally let it run through the setup screen, which was
 recorded here as a guess at the time; Jamie corrected it and the original's own
 player flag confirms it -- see MEASURED.md.
+
+## The refusal beep, and two bugs behind one wrong number (2026-08-22)
+
+Asked for "the rest of the original's noise" -- the procedural sweeps and the
+440Hz beeps that do not go through the music player. Identifying them the same
+way as the effects, by resolving the strings their routines print, split the
+job in half.
+
+### The sweeps are the death ray, so they are not ported
+
+The procedure at 0x007375 prints "the death ray is experimental in nature",
+"wish to continue <Y/N>?", "Preparing death ray..." and "Firing!" -- and then
+runs the sweeps. Two of them: 37Hz to 1000Hz playing f, 2f and 3f for 2ms each,
+about 5.8 seconds; and 1200Hz to 3000Hz at 1ms a step, about 1.8 seconds.
+
+`RAY` is an unimplemented command. Porting its sound first would be dead code
+for a mechanic that does not exist, so the measurement above is the spec for
+when `RAY` lands and nothing was written.
+
+### The beep is the refusal beep, and it is ported
+
+Sound(440); Delay(250); NoSound, from seven call sites -- two in the laser
+dialog and five in the torpedo dialog, every one of them a refusal: no
+torpedoes, tubes damaged, not enough energy. It is the sound of the ship
+declining an order, and it is wired to the same refusals here, plus an unknown
+command, which is marked DERIVED because the original beeps at a field its
+parser rejects rather than at an unrecognised command.
+
+440Hz is 44 in the tenths the track data already uses, so it needs no
+arithmetic of its own.
+
+### $D012 is a low byte, and using it raw is wrong in two different ways
+
+Both showed up here, and the second had been silently wrong all along.
+
+**As a line number** it can be 256 too high, because bit 8 is a separate read
+in $D011. That was the region-detection bug: every note 3.8% sharp.
+
+**As a frame marker it goes backwards TWICE per frame** -- once at the
+255-to-256 crossing and again at the real wrap. Whether a caller sees one or
+both depends on how fast it polls. The beep, timed from a tight loop, came out
+half length. The music, polled from the key loop, came out right.
+
+So `raster_line()` now does the validated read -- $D011 either side of $D012,
+retry if bit 8 moved -- and everything else is built on it. It can never return
+a wrong number, and one decrease means one frame at any sampling rate.
+
+### The music tempo was right by luck
+
+MEASURED, and the reason the beep had to be chased: **`snd_poll()` was being
+called 82 times a second**. A full pass of the key matrix scan takes about
+12ms, because `key_down()` does a runtime variable shift per key and cc65
+compiles that to a subroutine loop. Against frames of 16.7ms (NTSC) and 20ms
+(PAL) that is 1.4 samples per frame, where catching every frame needs two.
+
+NTSC happened to land right. **PAL music ran 45% slow** and had done since the
+driver was written -- and `make sound-check` could not see it, because every
+note was the right note, just held too long.
+
+The poll now happens inside the matrix scan rather than once around it, which
+is about 2000 samples a second. PAL went from +43% to +0.7%.
+
+`sound_check.py` now asserts TEMPO as well as pitch, and measures each note's
+pitch from the median of its run rather than its first window -- a window
+straddling a note boundary autocorrelates against two pitches at once, and one
+such reading swung a note from +0.4% to -2.0% and tripped the threshold.

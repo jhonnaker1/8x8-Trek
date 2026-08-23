@@ -684,6 +684,39 @@ void ui_draw_position(void) {
     put_num((unsigned char)(x + 16), y, (uint16_t)(ship.sec_x + 1), 1, COL_VALUE);
 }
 
+/* A yes/no question on the COMMAND line, where the original asks it.
+ *
+ * MEASURED: typing Q in the original does not quit. It puts "Quit <Y/N>? " in
+ * the COMMAND panel and waits. Ours quit on the keystroke until now, which
+ * made an accidental Q the most expensive typo in the game.
+ *
+ * Explicit Y or N and nothing else, RETURN included -- the same rule as
+ * ui_play_again(), and for the same reason: ask_yes() on the setup screen
+ * reads a bare RETURN as no, and a RETURN meaning yes on one screen and no on
+ * another is how a session ends by accident. */
+uint8_t ui_confirm(const char *prompt) {
+    const Panel *p = &panels[P_COMMAND];
+    unsigned char x0 = (unsigned char)(p->x + 2);
+    unsigned char y  = (unsigned char)(p->y + 1);
+    unsigned char len;
+    char c;
+
+    scr_hline(x0, y, (unsigned char)(p->w - 3), SC_SPACE, COL_LABEL);
+    scr_puts(x0, y, prompt, COL_LABEL);
+    for (len = 0; prompt[len]; len++) { }
+    scr_put((unsigned char)(x0 + len + 1), y, 32 + 128, COL_VALUE);
+
+    for (;;) {
+        c = kb_waitkey();
+        if (c == KB_Y || c == KB_N) break;
+    }
+
+    /* Leave the line as we found it: the caller either quits, in which case
+       the console is about to go, or carries on and wants a clean prompt. */
+    scr_hline(x0, y, (unsigned char)(p->w - 3), SC_SPACE, COL_LABEL);
+    return (uint8_t)(c == KB_Y);
+}
+
 void ui_read_command(char *buf, uint8_t max) {
     const Panel *p = &panels[P_COMMAND];
     unsigned char x0 = (unsigned char)(p->x + 2);

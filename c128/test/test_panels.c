@@ -377,6 +377,44 @@ static void test_title_screen(void) {
     }
 }
 
+/* --------------------------------------------------- quit confirmation */
+
+/* MEASURED: the original answers Q with "Quit <Y/N>?" on the COMMAND line
+   rather than quitting on the keystroke. This checks the prompt lands there,
+   that Y and N mean what they say, and that the line is left clean -- a stale
+   "QUIT <Y/N>?" sitting under the next command would be worse than no prompt
+   at all. */
+static void test_quit_confirm(void) {
+    char buf[24];
+    char yes[2], no[3];
+    const Panel *p = &panels[P_COMMAND];
+    unsigned char x0 = (unsigned char)(p->x + 2);
+    unsigned char y  = (unsigned char)(p->y + 1);
+
+    yes[0] = KB_Y; yes[1] = 0;
+    no[0] = KB_RETURN; no[1] = KB_N; no[2] = 0;   /* RETURN must not answer */
+
+    screen_reset();
+    kb_script = yes;
+    check(ui_confirm("QUIT <Y/N>?") == 1, "quit: Y confirms");
+
+    screen_reset();
+    kb_script = no;
+    check(ui_confirm("QUIT <Y/N>?") == 0,
+          "quit: RETURN is ignored and N declines");
+
+    /* Drawn where the command line is, and cleared afterwards. */
+    screen_reset();
+    kb_script = yes;
+    ui_confirm("QUIT <Y/N>?");
+    row_text(y, x0, 11, buf);
+    check(strcmp(buf, "           ") == 0,
+          "quit: the prompt does not outlive the answer");
+    check(off_screen == 0, "quit: nothing drawn off screen");
+
+    kb_script = 0;
+}
+
 /* ------------------------------------------------------- play again */
 
 /* The prompt is MEASURED off the original -- columns 19..35, rows 5..9. What
@@ -739,6 +777,7 @@ int main(void) {
     test_setup_seed();
     test_title_screen();
     test_play_again();
+    test_quit_confirm();
     test_independent();
 
     test_badge_stays_inside();

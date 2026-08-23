@@ -81,8 +81,21 @@ static unsigned char key_down(unsigned char i) {
 /* Index of the first key held, or 0xFF. */
 static unsigned char scan(void) {
     unsigned char i;
-    for (i = 0; i < KEY_COUNT; i++)
+    for (i = 0; i < KEY_COUNT; i++) {
+        /* Sound advances HERE, inside the matrix scan, not once per pass
+           around it. MEASURED: a full pass of this loop takes about 12ms --
+           key_down() does a runtime variable shift per key, which cc65
+           compiles to a subroutine loop -- so polling once per pass gives 82
+           samples a second against 50 or 60 frames. Frame detection needs at
+           least two samples per frame and had 1.4, so it missed frames: PAL
+           music ran 45% slow, and NTSC was right by luck. From in here it is
+           roughly 2000 samples a second.
+
+           Outside key_down()'s SEI/CLI on purpose -- the atomic pair is the
+           CIA strobe and read, and nothing here touches CIA1. */
+        snd_poll();
         if (key_down(i)) return i;
+    }
     return 0xFF;
 }
 
@@ -125,12 +138,6 @@ char kb_waitkey(void) {
             return c;
         }
 #endif
-        /* Sound advances here because here is where this port spends every
-           second it is not drawing -- the title screen's music plays entirely
-           inside this loop. snd_poll() times itself off the VIC raster, so
-           calling it far more often than once a frame is just a compare. */
-        snd_poll();
-
         kb_entropy++;
         i = scan();
         if (i != 0xFF) {

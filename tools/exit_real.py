@@ -52,6 +52,7 @@ SCRIPT = (
     [(c, 1.0, None) for c in "\r\rKIRK\r3\rX\r"] +
     [("", 3.0, "step2-setup")] +
     [(c, 1.2, None) for c in "Q\r"] +          # quit
+    [("Y", 1.5, None)] +                       # ... and confirm it
     [(c, 1.5, None) for c in "\r\r"] +         # evaluation, hall of fame
     [("", 2.0, "step3-playagain")] +           # the prompt itself
     [("Y", 3.0, "step4-title-again")] +        # YES goes back to the title
@@ -59,6 +60,7 @@ SCRIPT = (
     [(c, 1.0, None) for c in "\r\r\rSPOCK\r2\rQ\r"] +
     [("", 2.5, "step5-setup2")] +
     [(c, 1.2, None) for c in "Q\r"] +
+    [("Y", 1.5, None)] +
     [(c, 1.5, None) for c in "\r\r"] +
     [("", 2.0, "step6-playagain2")] +
     [("N", 3.0, "step7-exit")])

@@ -283,6 +283,7 @@ static void do_lasers(void) {
         if (SEC_IS_ENEMY(sector[cell])) found++;
 
     if (!found) {
+        snd_beep();
         ui_message("SCIENCE: ", "NO ENEMY SHIPS HERE");
         return;
     }
@@ -327,6 +328,7 @@ static void do_lasers(void) {
                 break;
             }
             case FIRE_NO_ENERGY:
+                snd_beep();
                 ui_dialog_line("INSUFFICIENT ENERGY, CAPTAIN!");
                 ui_dialog_close();
                 return;
@@ -599,6 +601,7 @@ static void do_torpedo(const char *line) {
     char buf[8];
 
     if (ship.torps == 0) {
+        snd_beep();
         ui_message("WEAPONS: ", "CAPTAIN, WE HAVE NO TORPEDOS!");
         return;
     }
@@ -611,6 +614,7 @@ static void do_torpedo(const char *line) {
         n = grab_digits(buf, d, 8);
     }
     if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
+        snd_beep();
         ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
         ui_dialog_close();
         return;
@@ -723,8 +727,17 @@ int main(void) {
             else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
-            else if (c == KB_Q) break;
-            else if (c)          ui_message("COMPUTER: ", "M W L T D R S E Q INFO SHUP SHDN MAX");
+            /* MEASURED: the original answers Q with "Quit <Y/N>?" in the
+               COMMAND panel rather than quitting on the keystroke. */
+            else if (c == KB_Q) { if (ui_confirm("QUIT <Y/N>?")) break; }
+            /* DERIVED, not measured: the original beeps at a field its
+               parser refuses, not at an unknown command. A refused order is
+               near enough the same thing, but the distinction is real and
+               belongs in the comment rather than being quietly lost. */
+            else if (c) {
+                snd_beep();
+                ui_message("COMPUTER: ", "M W L T D R S E Q SND INFO SHUP SHDN MAX");
+            }
 
             /* After the enemy turn, not just after a move: a tractor beam
                drags the ship to another quadrant on someone else's turn, and

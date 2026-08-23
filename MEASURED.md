@@ -2400,3 +2400,32 @@ while the flag is down -- the ISR returns before dereferencing it then.
 against an emulator that already has a game going and it types the setup
 answers into the game. That produced a whole table of nonsense and a baseline
 reading that sent me looking for an effect at the wrong moment.
+
+## The death ray's sound, measured but not ported (2026-08-22)
+
+The four Sound/Delay sites at 0x00747B..0x0074E9 belong to the death ray. The
+procedure that contains them prints "Captain, I wish to remind you that the
+death ray is experimental in nature and has been highly prone to failures",
+"wish to continue <Y/N>? ", "Preparing death ray..." and "Firing!".
+
+Two sweeps, both procedural rather than note data:
+
+| sweep | range | step | per step | length |
+|---|---|---|---|---|
+| firing | 37Hz to 1000Hz, playing **f, 2f and 3f** | 1Hz | 2ms each of the three | ~5.8s |
+| second | 1200Hz to 3000Hz | 1Hz | 1ms | ~1.8s |
+
+Both are gated on the sound flag at DGROUP+0x1cc8 and end with NoSound.
+
+Not ported: `RAY` is not implemented, and a sound for a mechanic that does not
+exist is dead code. This table is the specification for when it is.
+
+## The refusal beep (2026-08-22)
+
+`Sound(440); Delay(250); NoSound`, reached from **seven call sites**, all of
+them refusals -- two inside the laser dialog and five inside the torpedo
+dialog, alongside "Captain, we have no torpedos!", "Captain, all tubes are
+damaged!" and "Captain, we have insufficient energy!". A second copy of the
+same beep sits in the command parser, guarding a field that is too long.
+
+So it is not a generic bleep: it is the sound of the ship declining an order.
