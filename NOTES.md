@@ -572,16 +572,15 @@ came into the picture, and it rules out more than it first appears.
 | **Atari 800XL + VBXE**, HR mode | 640xN bitmap, 16 colours | 6502 |
 | **Commander X16** | VERA text 80x60, per-cell fg+bg from 256 | 65C02 |
 | **Foenix F256** | Vicky text 80x60, per-cell colour via CLUTs | 65C02 |
+| **MEGA65**, native C65 mode | 80x25, VIC-IV H640, per-cell colour on all 2000 cells | 45GS02 |
 
 The **stock Atari is out** and only VBXE brings it in -- ANTIC's text modes stop
 at 40 columns. Exactly the same split Uno hit, for the same reason.
 
 ### Tier 2 -- capable, but at 80 columns Uno never went there
 
-- **MEGA65.** The Uno port compiled as a C64 program and drove the VIC-IV for a
-  40-column screen; its own README says 80 columns needs **native C65 mode**.
-  The VIC-IV does 80x25 with per-cell colour and a great deal more, so the
-  machine is clearly Tier 1 material -- the work is the mode, not the hardware.
+(MEGA65 was here until 2026-08-23, when Jamie built it -- see below.)
+
 - **CoCo 3 -- VERIFIED 2026-08-22, and it qualifies.** Booted a real CoCo 3
   ROM in XRoar and typed a BASIC test: `WIDTH 80`, then `ATTR f,b` across all
   eight foreground and eight background values, with an 80-character ruler to
@@ -2002,3 +2001,46 @@ that reading a file that does not exist is not an error until you check the
 status channel. Then `SAVE`, which is the same plumbing carrying
 `trek_state_save()`. Then the briefing, which is the one that also needs the
 asset pipeline and a decision about VDC RAM versus bank 1.
+
+## MEGA65 is Tier 1, and it is the friendliest target on the list (2026-08-23)
+
+Jamie added a **native-mode 80-column build** to the Uno port (commit `7334f3c`
+there), which turns the entry above from an inference into a proven target.
+
+**Why the old Uno port could not do it, which is the useful part.** That build
+is a cc65 `c64`-target binary loading at `$0801`, so the machine is in C64 mode
+-- where 80 columns do not exist, and setting VIC-IV's H640 bit from inside
+changes nothing. Colour RAM makes it concrete: 80x25 is **2000 cells** and a
+C64-mode program can only reach the 1K window at `$D800`. The native build
+links at **`$2001` with a BASIC 65 header**, which is what actually selects
+C65/MEGA65 mode; there H640 works and mega65-libc reaches the real colour RAM
+at `$FF80000` through the 45GS02's 32-bit addressing, so every cell gets its
+own colour.
+
+### Three things that make it unusually cheap for THIS game
+
+**The video seam already matches.** Its `m65native.c` exposes
+`scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and `wait_vsync` -- the
+same primitives, with the same signatures, as this port's `c128/src/vdc.c`.
+The platform layer would be a rewrite of one file, not a redesign.
+
+**The PETSCII literal trap disappears.** cc65 applies a charmap to string
+literals, which has bitten this project four separate times -- blank panel
+titles, a PETSCII key table, the dispatch constants, and `word_is()` again on
+2026-08-22. **llvm-mos has no charmap concept at all**: literals are plain
+ASCII. An entire class of silent bug does not exist on that toolchain.
+
+**Binaries are 2.3x tighter.** 11,316 bytes against cc65's 26,042 for the same
+Uno game. That matters more than it sounds, because the C128's briefing problem
+is entirely a code-ceiling problem -- 81% of a 40K budget is CODE. On MEGA65
+that pressure largely goes away.
+
+### Tooling, all present on this machine
+
+- **llvm-mos** at `~/llvm-mos`, with a `mega65` platform in `mos-platform/`.
+  Prebuilt for macOS, unlike the TMS9900, vbcc and Open Watcom toolchains.
+  cc65 has no MEGA65 target, so this is the route.
+- **Xemu** (`/Applications/Xemu.app`) for `xmega65`, plus a MEGA65 ROM.
+
+Unlike Uno, this port would need only the native build -- there is no reason to
+ship a 40-column MEGA65 version of a game whose console is 80 columns wide.
