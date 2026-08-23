@@ -20,6 +20,11 @@ shared core plus a per-platform video/sound/input layer.
 
 ### Platform order: C128-VDC → Amiga (DOS-EGA is not a build target)
 
+> **Superseded 2026-08-23 as to what comes after the C128.** The order is now
+> C128 -> MEGA65 -> (X16, F256, CoCo 3) -> Amiga + VBXE together; see item 8
+> under *Open questions* for the reasoning. Everything below about the C128
+> being first, and about DOS-EGA not being a build target, still stands.
+
 **The original `EGATREK.EXE` is a reference oracle, not something we're remaking.**
 The DOS release already exists (mode 10h, 640×350×16) — no Watcom build of our
 own core is planned for DOS. Instead, `EGATREK_unpacked.exe` runs live in
@@ -527,27 +532,83 @@ checklist of *which situations need a message*, not as text to copy.
    the 1978 formulas as the starting model — 1/distance falloff with a (2,3)
    random multiplier, the 15% no-damage threshold, ray-marched torpedoes with no
    accuracy roll, and `1000*(kills/stardates)^2` for score.
-8. Not yet decided: where Atari VBXE (HR) sits in the port order now that it's
-   first-tier. It shares the Amiga's 640×200×16 target, so the two could share
-   a bitmap-layer design even though the CPUs and framebuffer access differ
-   wildly (flat chip RAM vs an 8K banked MEMAC window).
+8. **Port order -- RESOLVED 2026-08-23.** The question this item used to ask
+   (where does Atari VBXE sit relative to the Amiga, given they share a
+   640x200x16 target?) is not answerable in that form any more. It was a
+   two-way question from when those were the only two candidates, and its one
+   distinguishing argument -- that VBXE was the only automatable leg -- was
+   withdrawn on 2026-08-19 when `tools/vice_mon.py` proved otherwise. There are
+   six Tier-1 targets now. Ranking six is a question we cannot answer yet and
+   would gain nothing from answering.
 
-   **An argument for VBXE that hasn't been weighed: it is the only leg with an
-   automatable verification loop.** AltirraSDL plus AltirraBridge
-   (`~/AltirraBridge-nightly-macos-arm64`) can drive an Atari headlessly —
-   screenshots, frame-stepping, memory and CPU reads, breakpoints, injected
-   input. ~~VICE offers nothing equivalent here~~ -- that stopped being
-   true on 2026-08-19. `tools/vice_mon.py` drives VICE's binary monitor:
-   screenshots, memory reads and writes, symbol lookup from the linked map,
-   and key injection, all verified end to end. The monitor DOES halt the
-   machine on its first command, which is what the original claim was really
-   about, but `CMD_EXIT` resumes it and the tool does that automatically.
+   **The six are not comparable, so split them by what they cost.**
 
-   So this argument for VBXE is withdrawn: both legs are automatable now, and
-   the port order should be decided on the merits of the targets rather than
-   on which one can be tested. A port whose output can be asserted on in a
-   test is still a materially different proposition from one that cannot --
-   that part stands, it just no longer distinguishes these two.
+   *Text-mode siblings* -- X16, F256, MEGA65, and CoCo 3 down in Tier 2. Each
+   puts the console on a hardware text grid with per-cell colour, so the
+   platform layer is a rewrite of `c128/src/vdc.c` against the same four
+   primitives. MEGA65's `m65native.c` already exposes `scr_put(x, y, ch,
+   color)`, `scr_puts`, `scr_clear` and `wait_vsync` -- the same names with the
+   same signatures. Whichever goes first, the rest follow nearly mechanically,
+   and their order among themselves is close to arbitrary.
+
+   *Bitmap targets* -- Amiga and VBXE. Both need a layer the other four do not:
+   a font, a glyph blitter, and a dirty-cell scheme so we are not repainting
+   2000 cells a frame. That is the same design work twice. Separating them by
+   three text ports means designing it, forgetting it, and rediscovering it.
+   They get planned together and built consecutively.
+
+   So the original question does have an answer, just not the one it was
+   reaching for: **VBXE sits next to the Amiga**, at the end, because they
+   share a problem -- not because either is the hardest target.
+
+   ### The portability argument for doing the Amiga early is weaker than it looks
+
+   Worth writing down, because it is the instinct that would otherwise make the
+   68000 leg port #2. The reasoning goes: a big-endian 32-bit target with a
+   different compiler is what really stress-tests the core's portability
+   contract. But most of that is already under continuous test:
+
+   - `make port-check` compiles `core/` for the 68000 with `-Werror` on every
+     `make all`, so the compile axis never goes unwatched.
+   - The native test suite runs the core with a **32-bit `int`** already. The
+     "int is wider than cc65's" case is covered. The genuinely dangerous
+     direction is the narrow one -- a 16-bit intermediate overflowing -- and
+     that is the target we run in an emulator every day.
+
+   What is left that only a real 68000 run would find is **byte order**, and it
+   has no consequence anywhere in this codebase today. It acquires one the
+   moment `trek_state_save()` exists. That makes it a serialiser design
+   decision, not a discovery to be made on a 68000 -- pin the order explicitly
+   and it is byte-identical on every target and testable natively. See the byte
+   order pin in the disk I/O seam below.
+
+   ### The gate matters more than the order
+
+   **Nothing starts until disk I/O lands on the C128.** Storage is the fourth
+   and last seam -- video, keyboard, sound, storage. Begin port #2 before it
+   exists and you implement three seams, discover the fourth, and go back
+   through every port. That is the same argument already recorded for settling
+   the disk seam once instead of discovering it three times; it applies one
+   level up, to ports rather than features.
+
+   ### The order
+
+       C128 -> MEGA65 -> (X16, F256, then CoCo 3) -> Amiga + VBXE together
+
+   MEGA65 as port #2 is a modest claim and the limits should be stated. It does
+   **not** unblock the C128 briefing -- that still has to fit on the C128, which
+   is what the disk seam is for. What it buys: the cheapest possible proof that
+   the platform layer is genuinely a layer, the only target where the cc65
+   charmap bug class does not exist at all, a toolchain and emulator both
+   installed and both proven the same week, and binaries 2.3x tighter, which
+   gives the briefing somewhere to be seen at full size before the C128 has to
+   compress it.
+
+   The Amiga going last is a deliberate reversal of the ordering at the top of
+   this file. It stays valuable -- a fourth CPU family, a real bitmap, the port
+   that would make this a genuinely cross-platform project rather than a
+   6502 family tree -- but its *diagnostic* value is largely being collected
+   for free already.
 
 ## Platform suitability (from the Uno lineup, revised 2026-08-22)
 
@@ -1168,8 +1229,10 @@ combat, movement, repair, events, docking and scoring. Of what remains open:
 - `F)ix` -- SST repairs every damaged system evenly with no priority choice.
 - `INFO`, the title screen, the briefing prose, the hall of fame. SST has
   `plaque()`, a printed certificate, not a high score table.
-- The custom charset, the VBXE port order, the C128 return-to-BASIC bug.
-  Platform work; the ancestor is a terminal program.
+- The custom charset, the port order, the C128 return-to-BASIC bug. Platform
+  work; the ancestor is a terminal program. (The last two are settled now --
+  the bug was never real, and the order was decided on 2026-08-23 -- but they
+  are listed here because the ancestor contributed nothing to either.)
 - The DERIVED numbers still waiting on the game. The source cannot confirm its
   own guesses -- that is the whole point of the predict-then-verify loop.
 
@@ -1976,6 +2039,32 @@ order.
 This is the same class of rule as the 16-bit arithmetic constraints already in
 trek.h, and it is already half-enforced: `make port-check` compiles the core for
 the 68000, so a native round-trip test plus that target catches most of it.
+
+### The byte order pin: little-endian, always, everywhere
+
+"In a defined order" above is not a definition, so define it. **Every multi-byte
+value is serialised low byte first**, regardless of the host:
+
+    buf[n]   = (uint8_t)(v & 0xFF);
+    buf[n+1] = (uint8_t)(v >> 8);
+
+and read back the same way, never by casting the buffer to a `uint16_t *`. That
+is the 6502's native order, so the 8-bit ports pay nothing; the 68000 pays two
+shifts per field and gets files that interchange.
+
+**Why this is settled here and not discovered on the Amiga.** Byte order has no
+consequence anywhere in this codebase today -- nothing crosses a machine
+boundary. It acquires one the instant `trek_state_save()` exists, and the
+failure mode is the nasty kind: a save file written on the C128 and loaded on
+the Amiga would come back with every field byte-swapped, while **every test on
+both machines passes**, because each round-trips its own bytes happily. It is
+the same trap as the struct `memcpy` above, one level finer.
+
+Pinning it now also removes the last real portability question a 68000 port
+would have answered -- see item 8, where that is part of why the Amiga is no
+longer port #2. A native test that writes a state buffer and asserts its exact
+bytes against a fixed expected array closes it for good, on the build machine,
+with no emulator involved.
 
 ### The C128 needs a disk image before it needs disk code
 
