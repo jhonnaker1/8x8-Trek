@@ -31,8 +31,11 @@ SHOTS = os.path.join(BUILD, "bisect")
 PRG   = os.path.join(BUILD, "trek128-exit.prg")
 MAP   = os.path.join(BUILD, "trek128-exit.map")
 
+# Kept in step with c128/Makefile by hand. It drifted once already: adding the
+# SID driver broke this script and not the build, because the build has the
+# list and this has a copy.
 SRC = ["src/main.c", "src/vdc.c", "src/layout.c", "src/ui.c", "src/input.c",
-       "../core/trek.c"]
+       "src/sid.c", "src/music_data.c", "../core/trek.c"]
 
 # title, briefing=no, restore=no, name, level, password, then Q and the two
 # end-of-game screens. RETURN alone answers "no" to the Y/N prompts because

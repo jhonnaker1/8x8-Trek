@@ -1511,3 +1511,96 @@ neither of its two buttons is drawn with a focus ring.
 The original answers `Q` with `Quit <Y/N>?` in the COMMAND panel. Ours quits on
 the keystroke. Now that Y and N exist the fix is small, but it is a change to a
 command rather than part of this routine.
+
+## Sound: the SID driver, and a bug that was three semitones from its cause (2026-08-22)
+
+Item 12's port half. `c128/src/sid.c` plays the extracted tracks on the C128's
+SID, and `make sound-check` proves it does by recording VICE and measuring the
+pitches.
+
+Two voices, deliberately: voice 1 carries music, voice 2 effects, so a hit
+during a track does not chop the tune. The original had one PC speaker and
+could not do that. It is the cheapest possible way to take up what this file
+has always said about sound -- that it is the one area where every port can
+beat the original outright rather than approximate it.
+
+### No interrupt of our own
+
+The original's player is an ISR. This one is polled from `kb_waitkey()`, which
+is where the port spends every second it is not drawing -- the whole 45-second
+title track plays inside that loop. `snd_poll()` times itself by watching the
+VIC raster go backwards, so calling it far more often than once a frame costs
+a compare, and it needs no interrupt.
+
+That was a risk decision, not laziness. Hooking the IRQ would mean taking it
+from a KERNAL this port already goes behind the back of in `kb_waitkey()`, and
+NOTES item 2 is a standing reminder of what undiagnosed machine-level trouble
+costs here.
+
+### Three constants, all measured, one assumption refuted
+
+* **The C128's 2MHz mode does NOT change SID pitch.** The port runs the whole
+  game at 2MHz, so it mattered. The same note measured 424.8Hz in both modes --
+  ratio 0.997.
+* **PAL and NTSC clock the SID differently and it is audible**: the same
+  frequency word gives 424.8Hz on PAL and 440.4Hz on NTSC, half a semitone
+  apart, against 423.9 and 440.1 predicted.
+* Frame rates differ by 20% on top of that, so tempo needs the region too.
+
+So the port detects the region and scales at runtime. `sidfreq.h` holds the
+arithmetic and `test_sid.c` checks every byte value against the formula in
+double precision -- which earned its place immediately by catching two wrong
+multipliers, both arithmetic slips of mine, before a note was ever played.
+
+### The region detector, and why the obvious version is wrong
+
+Reconstructing a raster line means reading $D012 for the low byte and $D011 for
+bit 8. **Two reads, with the raster moving between them.** When it crosses 255
+to 256 in that gap, a stale low byte gets 256 added and the routine sees line
+510 on a machine that has 263. Everything above 300 read as PAL, so it answered
+PAL on every machine.
+
+The only symptom was that every note played **3.8% sharp** -- which is exactly
+the ratio of the two SID clocks, and nothing else in the game was different.
+
+So the fixed version never reconstructs the line at all. Lines 256..311 exist
+only on PAL and 256..262 only on NTSC, so the LOW BYTE while bit 8 is set
+reaches 55 on one and 6 on the other. Measured at both clock speeds on both
+machines: PAL 55 and 55, NTSC 0 and 6. Nothing lands near the threshold. The
+sample is taken with $D011 read either side of $D012 and discarded if bit 8
+moved across it.
+
+### VICE saves its configuration, and that misled the diagnosis
+
+The recording that showed the 3.8% error was made on an NTSC machine while I
+was comparing it against a PAL measurement taken an hour earlier. Nothing had
+changed on the command line -- an earlier `-ntsc` had persisted into `vicerc`.
+**Always pass the region flag explicitly**; `sound_check.py` does, and says so.
+
+Two instrument mistakes in the same session are worth naming together, because
+they are the same mistake: reading a live raster counter through the binary
+monitor gives 12, because the monitor freezes the machine and every sample
+comes from the same instant. Park the result in memory and read THAT.
+
+### Copyright, and what a clone gets
+
+`tools/gen_music.py` writes `c128/src/music_data.{h,c}` and both are
+gitignored. The note data is Anderson's creative work exactly like the message
+prose. On a clone without `reference/` the generator writes empty tracks
+instead of failing, so the port still builds and simply plays nothing -- a
+build that breaks without gitignored material is a build nobody else can run.
+
+### Not done
+
+The five short effect tracks are extracted and callable but **unwired**: their
+call sites in the original are known, what each one MEANS is not, and guessing
+which noise belongs to firing rather than docking is exactly the kind of
+invention this file exists to prevent. The end-of-game track plays through the
+identical path as the title track but has not been recorded and measured.
+
+### Where the title track stops -- corrected 2026-08-22
+
+It plays on the title screen ONLY and stops the moment the briefing question
+appears. This port originally let it run through the setup screen, which was
+recorded here as a guess at the time; Jamie corrected it and the original's own
+player flag confirms it -- see MEASURED.md.

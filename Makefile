@@ -17,7 +17,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check exit-test clean
+.PHONY: all test port-check exit-test sound-check clean
 
 all: test port-check
 
@@ -69,6 +69,17 @@ port-check:
 exit-test:
 	python3 tools/exit_bisect.py
 	python3 tools/exit_real.py
+
+# Does the port play the right notes? NOT part of `all`: it launches x128 twice
+# and records audio, which takes a couple of minutes.
+#
+# Sound fails silently -- a wrong frequency constant plays every note at the
+# wrong pitch and nothing reports an error. This records the title screen on
+# BOTH regions and measures. Both, because getting one right and the other
+# wrong is exactly what a broken region detector looks like, and that is the
+# bug this was written for.
+sound-check:
+	python3 tools/sound_check.py
 
 clean:
 	rm -rf build

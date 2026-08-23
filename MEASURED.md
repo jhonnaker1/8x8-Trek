@@ -2319,3 +2319,31 @@ The note data is Anderson's creative work in the same way the message prose
 is, so `tools/extract_music.py` writes into `build/` and **nothing extracted is
 committed**. The repo keeps the method, not the material -- the same rule
 `reference/` is gitignored under.
+
+## The title track stops at the briefing question (2026-08-22)
+
+Jamie said the opening track plays on the opening screen only and stops as soon
+as the briefing question appears. Measured, and he is right.
+
+The original's player keeps a "playing" flag at DGROUP+0x1cc9 and the current
+track pointer at +0x1cb6. Read live through dosbox-automation:
+
+| screen | track | playing |
+|---|---|---|
+| title | 0x057E | **1** |
+| "Will you require a briefing (Y/N)?" | 0x057E | **0** |
+
+The pointer still holds 0x057E because nothing clears it -- only the flag goes
+down. So the track is stopped, not finished: 0x057E is 45.5 seconds long and
+the flag was already 0 within a couple of seconds of leaving the title.
+
+The port had this wrong and said so at the time: it let the track run through
+the setup screen, recorded as an explicit guess rather than a measurement. It
+now stops between `ui_title()` and `ui_setup()`.
+
+**This is the second time this session that a claim about the original was
+settled by Jamie rather than by my own search**, after the "Play Again?" prompt
+I said did not exist. Both were cheap to check with instruments already
+running. The rule is in the port plan memory now: when the question is what the
+original does, measure it or ask -- do not infer it and write it down as if it
+were known.

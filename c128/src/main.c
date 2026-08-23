@@ -6,6 +6,7 @@
 #include "layout.h"
 #include "ui.h"
 #include "input.h"
+#include "sid.h"
 #include "../../core/trek.h"
 
 /* 8x8 Trek -- C128 VDC port, milestone 2.
@@ -461,6 +462,15 @@ static void do_self(void) {
     ui_dialog_close();
 }
 
+/* SND, from the reference card. The original keeps a sound on/off byte that
+   every one of its sound sites tests first -- [0x1cc8] in its data segment,
+   found while extracting the music -- so this is its mechanic, not an
+   invention. */
+static void do_sound(void) {
+    snd_toggle();
+    ui_message("COMPUTER: ", snd_enabled() ? "SOUND ON" : "SOUND OFF");
+}
+
 static void do_info(void) {
     ui_info_panel();
     ui_draw_all();
@@ -619,6 +629,7 @@ int main(void) {
 #endif
 
     vdc_init();
+    snd_init();
 
     /* One pass per game. The original loops the whole cycle -- title, setup,
        game, evaluation, hall of fame, "Play Again?" -- and answering YES puts
@@ -626,7 +637,15 @@ int main(void) {
        which is what this reproduces. Verified by playing two games through
        the original end to end. */
     for (;;) {
+        /* The title track belongs to the title screen and nothing else. It
+           stops the moment the briefing question appears -- Jamie played this
+           game and said so, and the original's own player state confirms it:
+           the track is running on the title screen and stopped by the time the
+           setup screen is up. An earlier version of this let it run through
+           setup, which was a guess this file admitted to at the time. */
+        snd_music(MUS_TITLE);
         ui_title();
+        snd_music(MUS_NONE);
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two
            sittings get the same galaxy. Before this, GAME_SEED was a constant
@@ -652,7 +671,8 @@ int main(void) {
                merely when a turn passes. MEASURED -- see trek.h. */
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
-            if      (word_is(cmd, "INFO")) do_info();
+            if      (word_is(cmd, "SND"))  do_sound();
+            else if (word_is(cmd, "INFO")) do_info();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
             else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
@@ -686,6 +706,8 @@ int main(void) {
         if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
         else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
 
+        /* And 0x071A at the end, read the same way at the evaluation screen. */
+        snd_music(MUS_END);
         ui_evaluation();
         ui_hall_of_fame(setup.name, setup.level, trek_score());
 
@@ -697,6 +719,8 @@ int main(void) {
        Q indistinguishable from a hang once there was a command loop to quit
        out of. Acknowledge, wait for the captain, then hand the machine back
        in the state we found it. */
+    snd_music(MUS_NONE);
+
     scr_clear();
     scr_puts(28, 10, "MISSION ENDED, CAPTAIN.", EGA_TO_VDC(EGA_LTGREEN));
     scr_puts(23, 12, "BASIC IS ON THE 40-COLUMN SCREEN.", EGA_TO_VDC(EGA_LTCYAN));
@@ -704,6 +728,7 @@ int main(void) {
     /* Drop back to 1MHz first, so the VIC-IIe screen is live again and the
        machine does not look dead on the other window. */
     vdc_shutdown();
+    snd_off();      /* a SID still gated would howl at BASIC forever */
 
     /* NOTES.md open item 2 -- "returning to BASIC wedges the C128" -- was
      * never true of this program, or stopped being true before anyone could

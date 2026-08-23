@@ -1,11 +1,19 @@
 CC65_TARGET = c128
-SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c ../core/trek.c
+SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c src/music_data.c \
+      ../core/trek.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
 
-.PHONY: all run monitor test verify clean
+.PHONY: all run monitor test verify music clean
 
 all: $(OUT)
+
+# The note data is Nels Anderson's, so it is generated rather than committed --
+# see tools/gen_music.py. On a clone without reference/ this still writes a
+# valid header with empty tracks, so the build never depends on gitignored
+# material being present.
+music src/music_data.h src/music_data.c:
+	cd .. && python3 tools/gen_music.py
 
 # The EGA->VDC colour mapping is pure arithmetic, so it is proven natively on
 # the build machine rather than by squinting at an emulator. Getting it wrong
@@ -16,6 +24,8 @@ test:
 	cc -Wall -Wextra -o build/test_panels test/test_panels.c src/ui.c \
 	   src/layout.c ../core/trek.c
 	./build/test_panels
+	cc -Wall -Wextra -o build/test_sid test/test_sid.c -lm
+	./build/test_sid
 
 # Inspects the LINKED binary, which is the only place cc65's character-set
 # translation is visible. Native cc does no such translation, so `make test`
@@ -26,6 +36,7 @@ verify: $(OUT)
 	python3 tools/verify_prg.py
 
 HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
+      src/sid.h src/sidfreq.h src/music_data.h \
       ../core/ega.h ../core/trek.h
 
 # -m emits a map file. That is not housekeeping: tools/vice_mon.py can write
@@ -63,4 +74,4 @@ run: verify
 	x128 -autostart $(OUT)
 
 clean:
-	rm -f build/*.prg build/test_egavdc build/test_panels src/*.o
+	rm -f build/*.prg build/test_egavdc build/test_panels build/test_sid src/*.o src/music_data.h src/music_data.c

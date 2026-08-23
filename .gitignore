@@ -12,6 +12,11 @@
 # Fetch it yourself from the Internet Archive item `EGATrek`.
 reference/
 
+# Generated note data. EGA Trek's music is Anderson's creative work in the same
+# way its prose is, so tools/gen_music.py writes this and it is never committed.
+c128/src/music_data.h
+c128/src/music_data.c
+
 # Build output
 build/
 *.o

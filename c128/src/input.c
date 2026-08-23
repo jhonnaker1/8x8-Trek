@@ -1,5 +1,6 @@
 #include <6502.h>
 #include "input.h"
+#include "sid.h"
 
 #define CIA1_PRA (*(volatile unsigned char *)0xDC00)
 #define CIA1_PRB (*(volatile unsigned char *)0xDC01)
@@ -102,7 +103,7 @@ char kb_waitkey(void) {
     /* Wait out whatever is still held, so one physical press yields exactly
        one character rather than repeating for as long as a finger rests on
        the key. */
-    while (scan() != 0xFF) { }
+    while (scan() != 0xFF) { snd_poll(); }
     settle();
 
     for (;;) {
@@ -124,6 +125,12 @@ char kb_waitkey(void) {
             return c;
         }
 #endif
+        /* Sound advances here because here is where this port spends every
+           second it is not drawing -- the title screen's music plays entirely
+           inside this loop. snd_poll() times itself off the VIC raster, so
+           calling it far more often than once a frame is just a compare. */
+        snd_poll();
+
         kb_entropy++;
         i = scan();
         if (i != 0xFF) {
