@@ -596,11 +596,26 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
 
 ### Tier 3 -- 80 columns exist, but the colour collapses
 
-- **Atari ST / STE.** Its three modes are 320x200 in 16 colours (only 40
-  columns), 640x200 in **4 colours**, and 640x400 monochrome. So 80 columns
-  costs all but four colours, or all of them. The STE's deeper palette does not
-  help: it widens the choice, not the count. The escape is per-scanline palette
-  switching, which is real but heavy. **Out unless someone wants that fight.**
+- **The whole Atari 16/32-bit line -- OUT, Jamie's call 2026-08-22.**
+
+  ST, Mega ST, STE and Mega STE share the same three modes: 320x200 in 16
+  colours (only 40 columns), 640x200 in **4 colours**, and 640x400 monochrome.
+  So 80 columns costs all but four colours, or all of them. The STE's deeper
+  palette widens the choice, not the count, and the Mega STE is an STE with a
+  faster CPU and cache -- same Shifter. The escape would be per-scanline
+  palette switching, but the console's panels sit side by side, so a single
+  scanline crosses three of them and it would need mid-line changes. Demo work.
+
+  **TT030 and Falcon030 do qualify on paper** -- TT Medium is 640x480 in 16
+  colours and the Falcon's VIDEL reaches 640x480 in 256 -- and Hatari emulates
+  both (`--machine tt|falcon`, `--tos-res ttmed`). Never verified here: the only
+  EmuTOS image on this machine is the ARAnyM build, which bus-errors on TT
+  hardware.
+
+  It does not matter, because **the machines that could show the console are the
+  ones nobody has, and the ones people own cannot show it.** Targeting TT and
+  Falcon alone would be a port with almost no installed base. Do not re-open
+  this.
 - **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
   buys only a second colour pair -- four colours, same trap as the ST.
 
