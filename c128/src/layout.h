@@ -12,8 +12,11 @@
    ASCII -- see the API note in vdc.h). Screen code = PETSCII - 0x40 for the
    0xA0-0xBF block, PETSCII - 0x80 for 0xC0-0xDF.
 
-   UNVERIFIED: derived by hand, not yet confirmed against a running VDC.
-   Milestone 1 renders the frame precisely so these can be checked by eye. */
+   VERIFIED: these were derived by hand and once shipped marked UNVERIFIED.
+   c128/test/test_panels.c now asserts their actual bitmaps against VICE's
+   C128 character ROM (chargen-390059-01.bin, 8 bytes per glyph in screen
+   code order), so an invented screen code fails on the build machine rather
+   than on screen. See "Screen codes are checkable" in NOTES.md. */
 #define G_HLINE    64    /* PETSCII 0xC0  --  */
 #define G_VLINE    93    /* PETSCII 0xDD  |   */
 #define G_TL      112    /* PETSCII 0xB0  ,-  */

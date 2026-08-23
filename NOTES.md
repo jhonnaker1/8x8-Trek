@@ -511,18 +511,114 @@ checklist of *which situations need a message*, not as text to copy.
    is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for
    exact column boundaries. Everything reads that one table, so it's a
    single-site edit. The same capture settles which glyphs the original uses.
-5. Breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm the real
-   constants — laser falloff, the no-damage threshold, boarding gates, scoring
-   weights. `combat-model.md` has the 1978 values as the hypothesis to test.
-   **Everything in `core/trek.h` marked PROVISIONAL is waiting on this**: the
-   enemy-count-per-level formula, both travel energy scales, impulse timing,
-   starting energy and torpedoes, and the 30-stardate mission length. Only the
-   shield ceiling (2500) and the converter rate (400/stardate) come from the
-   manual.
-6. Custom charset. The port currently uses the KERNAL's stock character set;
-   EGA Trek's panels want CP437-style glyphs. `commodore-uno/c128/src/vdc.c` has
-   the upload path, including the VDC's 16-byte-per-glyph slot padding, and
-   `tools/gen_charset.py` the generator precedent.
+5. **The PROVISIONAL sweep -- REPOINTED 2026-08-23.** This item used to read:
+   breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm laser
+   falloff, the no-damage threshold, boarding gates and scoring weights,
+   because *"everything in `core/trek.h` marked PROVISIONAL is waiting on
+   this"* -- the enemy-count formula, both travel energy scales, impulse
+   timing, starting energy and torpedoes, and the 30-stardate mission length.
+
+   **That list is stale, and it dissolved on its own.** `core/trek.h` now
+   carries **two** PROVISIONAL markers and one of them is the legend defining
+   the word, so there is exactly one real PROVISIONAL left (below). Every other
+   name on the list is settled: `IMPULSE_ENERGY_UNIT` is MEASURED,
+   `ENERGY_PER_DAY` comes from the manual, the scoring weights are measured,
+   the enemy count is FITTED from five readings.
+
+   **And not one of them was settled by a breakpoint.** They fell to driving
+   the original under `dosbox-automation` and reading screens and memory. The
+   DOSBox-X debugger has still never been used on this project.
+
+   ### PROVISIONAL is an observation problem; FITTED is a code-reading problem
+
+   That is the reassignment this item needed. The legend already says FITTED
+   means "chosen to match readings, but not uniquely determined", which is the
+   definition of a quantity where **more samples will never converge**. Playing
+   the game harder cannot settle those. Reading the binary can. So the static
+   analysis effort belongs on the FITTED tier, not the PROVISIONAL one:
+
+   - the enemy-count-per-level formula (trek.h l.76)
+   - `TORP_BASE` and `TORP_SPREAD` (l.694-701)
+   - the long-range falloff slope, 16% per unit past the first (l.707)
+   - the score kill-rate term (l.762)
+
+   The route is **not** the DOSBox-X debugger. It is `tools/dis16.py` plus
+   `tools/tp_runtime_map.py`, which already resolved the `SOUND`/`DELAY` calls
+   and the CS-relative string constants. Extending an instrument that works
+   beats standing up one that never has.
+
+   ### The one surviving PROVISIONAL, and the shortcut to it
+
+       /* PROVISIONAL: a hit that gets past the shields can wreck a system. */
+       #define SYSTEM_DAMAGE_THRESHOLD  100
+
+   Neither the chance nor the severity has been measured. This looks like it
+   needs the damage array's address, which is **not** in the mapped ship record
+   at 181910..182012 -- but it does not. SYSTEMS STATUS draws its bars at
+   already-measured pixel positions (y267, 275, 283 ... 339, each 7px tall and
+   50px wide, x261..310), so **bar length reads the percentage straight off a
+   PNG**. Take penetrating hits, capture before and after, diff the bar
+   lengths. No new memory mapping, and it is a `probe_original.py` session of
+   the same shape as the ones already run.
+
+   **Loose thread from that same measurement: it recorded TEN bars, and
+   `trek.h` has twelve systems.** Either the original shows fewer than it
+   models, or our system list is wrong. Worth settling in the same session,
+   because it is free once the panel is being read.
+
+6. **Custom charset -- REFRAMED 2026-08-23.** This item used to say the port
+   uses the KERNAL's stock character set and that *"EGA Trek's panels want
+   CP437-style glyphs"*.
+
+   **There is no CP437 charset in the original to copy.** EGA Trek runs in BIOS
+   mode 16, 640x350 EGA **graphics** -- which is why `GET /video/text` is
+   useless against it and why the panel table had to be measured off pixels.
+   Its frames were read as maximal single-colour *runs*: they are pixel lines,
+   not box-drawing characters. Its text is bitmap glyphs drawn at whatever
+   pitch it likes inside those frames. Asking for CP437 fidelity is asking to
+   match something that is not there.
+
+   What is really underneath this item splits in two, and only one half has
+   anything to do with a character set.
+
+   ### (a) The letterforms -- the real visible gap, and it is measurable
+
+   PETSCII uppercase is a distinctive Commodore face and it does not look like
+   EGA Trek. The useful fact: the EGA BIOS carries an **8x8** font alongside
+   the 8x14 one, and 8x8 is exactly the VDC's cell. It sits in the video BIOS
+   ROM at C000 in the same DOSBox instance we already drive, so
+   `GET /memory/{off}/{len}` can dump it -- pattern-match one known glyph to
+   find the table base. Same instrument as everything else on this project, and
+   no hand-drawing of 96 glyphs.
+
+   **UNKNOWN, and it is a small measurement:** whether EGA Trek's own text *is*
+   that ROM font, or Turbo Pascal's Graph unit drawing its own. Capture a glyph
+   from a frame and compare bitmaps before assuming.
+
+   ### (b) Game symbols -- custom art either way
+
+   The ship, Mongols, bases, stars, planets, the torpedo icons. These are pixel
+   art in the original and they are custom art for us whatever font we use.
+   Nothing to do with CP437, and this is the half where a custom charset
+   actually earns its cost.
+
+   **Borders are close to a wash.** PETSCII single-line box-drawing renders the
+   frames well already, and unlike when this item was written those glyphs are
+   no longer guesses -- `c128/test/test_panels.c` asserts their bitmaps against
+   `chargen-390059-01.bin`.
+
+   ### It is NOT disk-gated, unlike the briefing
+
+   Worth stating because the opposite is the natural assumption. A full
+   256-glyph set is 4K of data in a binary already 81% code against a 40K
+   budget, and that *would* put this behind the disk seam. But the console
+   needs roughly 96 glyphs -- uppercase, digits, punctuation, symbols -- at 8
+   source bytes each, which is about 768 bytes, expanded to the VDC's 16-byte
+   slots only during the upload. That fits in the binary. This item can be done
+   whenever it is wanted.
+
+   `commodore-uno/c128/src/vdc.c` has the upload path including the slot
+   padding, and `tools/gen_charset.py` there is the generator precedent.
 7. ~~**Game core, next pieces.**~~ Largely DONE: systems and repair, lasers,
    torpedoes, enemy fire and movement, docking, scoring, and a scheduled
    event queue all exist. Original text follows. Galaxy state, the distance table and the message
