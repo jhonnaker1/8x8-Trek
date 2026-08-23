@@ -582,13 +582,17 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   40-column screen; its own README says 80 columns needs **native C65 mode**.
   The VIC-IV does 80x25 with per-cell colour and a great deal more, so the
   machine is clearly Tier 1 material -- the work is the mode, not the hardware.
-- **CoCo 3.** The GIME has a genuine 80-column text mode with per-character
-  attributes, where the Uno port used 40 columns. A fourth CPU family (6809)
-  already has a toolchain here (CMOC, XRoar). **UNVERIFIED: how many colours
-  are simultaneously available at 80 columns** -- the attribute byte is
-  understood to carry three bits each of foreground and background out of a
-  64-colour palette, which would be eight at a time and enough. Check before
-  counting on it.
+- **CoCo 3 -- VERIFIED 2026-08-22, and it qualifies.** Booted a real CoCo 3
+  ROM in XRoar and typed a BASIC test: `WIDTH 80`, then `ATTR f,b` across all
+  eight foreground and eight background values, with an 80-character ruler to
+  confirm the width. The ruler fills the line and the capture holds **eight
+  distinct hues**, which is the attribute byte's three bits each of foreground
+  and background, indexing palette slots that are themselves reprogrammable
+  from 64. Eight is exactly what the console needs -- white values, cyan
+  labels, green healthy systems, yellow stars, red Mongols, magenta, grey,
+  black -- so it fits, tightly, and the palette being programmable means we can
+  pick the closest eight to EGA's set. A fourth CPU family (6809) with a
+  toolchain already proven here (CMOC, XRoar).
 
 ### Tier 3 -- 80 columns exist, but the colour collapses
 
@@ -599,11 +603,31 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   switching, which is real but heavy. **Out unless someone wants that fight.**
 - **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
   buys only a second colour pair -- four colours, same trap as the ST.
-  **INFERENCE worth testing:** SCREEN 7 is 512x212 with 16 colours *per pixel*
-  and no attribute clash, and a 6-pixel-wide font would put 85 columns in that
-  512, which is 80 with room over. The V9938's hardware blitter is what makes
-  glyph drawing affordable on a 3.58MHz Z80. If that holds, MSX2 moves to Tier
-  1 and becomes the cheapest wide-colour target here after the C128.
+
+  **The SCREEN 7 idea, and an honest account of trying to check it.** SCREEN 7
+  (GRAPHIC6) is 512x212 with 16 colours *per pixel* and no attribute clash, so
+  a 6-pixel-wide font would put 85 columns in that 512 -- 80 with room over.
+  The arithmetic is certain and the mode is textbook; what is NOT established
+  is anything I measured myself.
+
+  Tried it in openMSX on a stock Philips NMS 8250 (V9938, 128K VRAM) and did
+  not get an answer. Two things went wrong and both are worth recording so the
+  next attempt does not repeat them. **Typing into MSX BASIC is timing-fragile**
+  -- the machine reaches its prompt somewhere between 30 and 60 emulated
+  seconds depending on the run, and a `type` issued early is silently swallowed,
+  which produced several runs that looked like SCREEN 7 failing when nothing had
+  been typed at all. And **openMSX's raw screenshot size does not indicate the
+  video mode**: the boot logo renders 640x480 and BASIC 320x240, which I read as
+  512-wide versus 256-wide and it is not that. Setting R#0 and R#1 to GRAPHIC6
+  through the debug interface took (they read back 0x0A/0x60) and the render
+  stayed 320x240, so the screenshot size proves nothing either way.
+
+  **What would actually settle it is a benchmark, not a datasheet check.** The
+  mode's existence was never the real risk -- the risk is whether glyph
+  blitting a full 80x25 console is affordable on a 3.58MHz Z80, even with the
+  V9938's hardware blitter. That needs a cartridge built with SDCC, which the
+  Uno msx2 port already has a working toolchain for, not another afternoon of
+  poking BASIC. Until then MSX2 stays here rather than in Tier 1.
 
 ### Out
 
