@@ -1104,7 +1104,11 @@ them, and each is a chunk of core work:
   The SCREEN is built (2026-08-21) and shows the current game's entry in its
   rank row; the file is not written, because that needs disk I/O and is
   deliberately absent along with save and restore. `TREK.SCR`'s format is
-  known: ten records of a 25-character name, CRLF, a score, CRLF.
+  known: ten records of a 25-character name padded with '.', CRLF, the score in
+  decimal, CRLF — line-oriented text, not fixed records, since the score line
+  varies in length. **This is the FIRST thing to build once disk I/O exists**,
+  because it is the smallest real file and puts almost nothing at stake — see
+  "Disk I/O: the seam, decided before anyone starts".
 
 ## 15. What is left to take from the ancestor, and what is not (added 2026-08-19)
 
@@ -1850,7 +1854,11 @@ once into VDC RAM or bank 1 beats paging from disk every time.
 
 However the text is stored, it has to arrive, and this port has never done disk
 I/O. That same piece of infrastructure serves `SAVE` and writing `TREK.SCR`.
-It is the real first step, not the briefing.
+It is the real first step, not the briefing. **Its seam is decided -- see "Disk
+I/O: the seam, decided before anyone starts" below.** In short: serialisation
+lives in `core/` as byte arrays and is tested natively; storage is four
+functions per platform; and the briefing is the LAST of the three to build, not
+the first.
 
 ### Across the ports: this is the project's first ASSET
 
@@ -1894,3 +1902,88 @@ buy more of it.
 Revisit only if the port genuinely outgrows 40K of code, which planets, save
 and the death ray together might eventually manage. VICE emulates it (`-reu`,
 `-reusize`), so it would be testable the same day.
+
+## Disk I/O: the seam, decided before anyone starts (2026-08-22)
+
+Three things wait on this and none of them should be built first: the briefing
+pages, `SAVE`, and writing `TREK.SCR`. Deciding the shape once is cheaper than
+discovering it three times.
+
+### Yes, it is different on every port
+
+| target | API | names |
+|---|---|---|
+| C128, X16 | KERNAL through cc65's `cbm.h` | device 8, PETSCII, `0:NAME,S,R` |
+| Amiga | AmigaDOS `Open`/`Read`/`Close`, or plain stdio | real paths, `PROGDIR:trek.scr` |
+| Atari + VBXE | CIO and IOCBs | `D:NAME.EXT` |
+| F256 | FoenixMCP calls to the SD card | MCP paths |
+| MEGA65 | C65 DOS / SD | |
+| CoCo 3 | Disk BASIC, or OS-9 | |
+
+The error models differ too -- "file not found" and "no drive attached" are not
+the same condition everywhere, and only some of these can tell them apart.
+
+### The split that matters: serialisation is core, storage is platform
+
+**Serialisation belongs in `core/`.** It knows the structs, it is identical on
+every target, and it touches no I/O:
+
+    uint16_t trek_state_save(uint8_t *buf, uint16_t max);   /* bytes written */
+    uint8_t  trek_state_load(const uint8_t *buf, uint16_t len);
+
+The payoff is that it is **testable on the build machine with no disk and no
+emulator** -- play a game, round-trip it through a buffer, assert every field
+comes back identical. That is the same discipline as the EGA-to-VDC mapping and
+`sidfreq.h`, and it is why those two are the parts of this port that have never
+silently broken.
+
+**Storage belongs in the platform layer**, and it is about four functions:
+
+    uint8_t  plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got);
+    uint8_t  plat_write_all(const char *name, const void *buf, uint16_t len);
+    uint8_t  plat_open(const char *name);          /* streaming, for the briefing */
+    uint16_t plat_read(void *buf, uint16_t len);
+
+Names are short opaque tokens the platform maps to its own syntax. `core/` must
+never see a path, a device number or a logical file number. The C128
+implementation is perhaps sixty lines: `cbm_open`, `cbm_read`, `cbm_write`,
+`cbm_close`, all in `cbm.h`.
+
+### Decide this before a byte is written: NO memcpy OF STRUCTS
+
+The core targets the 6502 (little-endian) and the 68000 (big-endian), and
+struct padding differs between compilers as well. A `memcpy` of `ship` would
+produce files that disagree between ports **and would pass every test on the
+machine that wrote them**. Serialise explicitly, byte at a time, in a defined
+order.
+
+This is the same class of rule as the 16-bit arithmetic constraints already in
+trek.h, and it is already half-enforced: `make port-check` compiles the core for
+the 68000, so a native round-trip test plus that target catches most of it.
+
+### The C128 needs a disk image before it needs disk code
+
+The port autostarts a bare PRG today. File I/O needs a real disk, and **`c1541`
+ships with VICE and is already installed here**, so `make d64` can build one
+carrying `trek128.prg` alongside the data files. Small Makefile change, but note
+it changes what `make run` means, and `tools/exit_real.py` and
+`tools/sound_check.py` both autostart the PRG directly.
+
+### Start with the hall of fame, not the briefing
+
+`TREK.SCR` is the smallest real file and its format is MEASURED, not guessed --
+`reference/TREK.SCR` is 300 bytes of plain text:
+
+    25 characters of name, padded with '.'   CRLF
+    the score in decimal                     CRLF
+
+ten times over. The name field is fixed at 25; the score line is variable
+length, so the file is line-oriented text rather than fixed records -- the
+sample is exactly 300 bytes only because every score in it is `0`.
+
+It exercises open, read, write and close end to end with almost nothing at
+stake, which is the right way to find out that a 1541 wants `0:` prefixes and
+that reading a file that does not exist is not an error until you check the
+status channel. Then `SAVE`, which is the same plumbing carrying
+`trek_state_save()`. Then the briefing, which is the one that also needs the
+asset pipeline and a decision about VDC RAM versus bank 1.
