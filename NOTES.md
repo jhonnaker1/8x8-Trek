@@ -2466,3 +2466,80 @@ anyway. `make rund` boots it.
 a file sees no drive there. `tools/exit_real.py` and `tools/sound_check.py`
 autostart the PRG directly and are unaffected only because neither touches a
 file.
+
+## llvm-mos on the C128: it works, and it is worth about 6K (2026-08-23)
+
+Jamie's suggestion, tried the same day. Short version: **the whole port
+compiles, links, runs and renders correctly under llvm-mos**, and it buys
+roughly 6,000 bytes -- which is the difference between "cannot add disk I/O"
+and "can add disk I/O with room to spare".
+
+### First, a correction
+
+An earlier measurement in this session put llvm-mos at **3.2x smaller** than
+cc65, comparing a small program built from `trek.c`, `serial.c` and `hof.c`
+(14,997 bytes against 4,625). **That figure was wrong as a statement about
+code density.** It was mostly cc65's fixed runtime overhead, which amortises
+away on a real binary. On the whole port:
+
+| | CODE | RODATA | total |
+|---|---|---|---|
+| cc65 `-O` | 34,471 | 5,081 | 39,552 |
+| llvm-mos `-Os` | 33,228 | 5,073 | 38,301 |
+| llvm-mos `-Oz` | **30,003** | 5,099 | **35,098** |
+
+**13% smaller on code, 11% on code plus data.** Real, useful, not
+transformative on its own.
+
+`-Oz` matters: it is 3,200 bytes better than `-Os` on this codebase, which is
+most of the win. `-flto` adds nothing on top of either.
+
+### Where the other third of the headroom comes from
+
+Not code density -- the memory model.
+
+    cc65      MAIN = $A3F3 - $800 stack, carved out of the program's space
+    llvm-mos  ram  = ORIGIN $1C01, LENGTH $A3FF, __stack = $C000 growing down
+
+That is **2,060 bytes** llvm-mos does not reserve up front. Add the 4,454 from
+code size and the headroom is about 6,500, which matches what was measured:
+linking the port **plus `core/hof.c` and `core/serial.c`** ends at $A89A with
+roughly **6,000 bytes free**, against cc65's 210 free *without* those two
+files.
+
+llvm-mos also put BSS inside the main region without complaint, so the
+`$1300` low-RAM relocation in `trek128.cfg` is a cc65 workaround that a
+migration would simply drop.
+
+### What had to change: one file
+
+Every other file compiled **unchanged**, with zero errors: `vdc.c`, `ui.c`,
+`main.c`, `input.c`, `sid.c`, `layout.c`, `music_data.c`, and all of `core/`.
+That includes `<6502.h>`'s `SEI()`/`CLI()`, which llvm-mos provides.
+
+The exception is `c128/src/storage.c`. **llvm-mos's `cbm.h` has the entire
+high-level file API inside an `#if 0`** -- `cbm_open`, `cbm_close`, `cbm_read`,
+`cbm_write`, `cbm_load`, `cbm_save` are all disabled, leaving only the raw
+KERNAL primitives (`cbm_k_setlfs`, `cbm_k_setnam`, `cbm_k_open`,
+`cbm_k_chkin`, `cbm_k_chrin`, `cbm_k_readst`, `cbm_k_close`). Storage would be
+rewritten against those: perhaps forty more lines, and arguably better, since
+this port already wants control of the status channel.
+
+### Verified running, not just building
+
+In VICE, from the llvm-mos binary: the title screen, the setup prompts, the
+full nine-panel console, and the `MSGS` overlay including its log read back
+out of VDC RAM. Identical to the cc65 build on screen.
+
+The cc65 charmap bug class -- four separate bugs in this project -- does not
+exist on this toolchain, and `make verify` would become redundant rather than
+load-bearing.
+
+### What this does to the bank-1 plan
+
+Largely retires it. Bank 1 was ~5K through a C128-only mechanism with a real
+trap in it; llvm-mos is ~6K, deletes a bug class, drops the low-RAM linker
+workaround, and is **the same toolchain the MEGA65 port needs anyway**, so the
+work transfers instead of being spent once. Bank 1 stays available if the port
+later needs more than 6K, and code overlays remain the only thing that lifts
+the ceiling rather than raising it.
