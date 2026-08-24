@@ -2317,3 +2317,72 @@ a known-safe 650 bytes for an unmeasured 512 is the wrong way round.
 With `MSGS`, `A#`, the arrow keys and the log all in, MAIN has **210 bytes**
 free and BSS can still grow by about 1,650 into low RAM. The pressure is
 entirely on CODE, which is what the 81%-code breakdown above already said.
+
+### Where the next 5K comes from: bank 1, not a 64K VDC (2026-08-23)
+
+Asked directly whether C128 bank 1 RAM or a 64K VDC would help. Measured the
+segments before answering, because the answer turns on the split:
+
+| segment | bytes | what is in it |
+|---|---|---|
+| CODE | 34,471 | ui.o 13,469 · trek.o 10,056 · main.o 6,504 · rest ~4,400 |
+| RODATA | 5,081 | strings ~3,570 · music data 1,106 · tables ~400 |
+
+Together **39,552 of MAIN's ~40,435**. The ceiling is CODE *and* RODATA, and
+that is what decides between the two options: only one of them touches either.
+
+#### 64K VDC -- no, and it costs something
+
+It buys 48K more of the one thing this port is NOT short of. A 16K VDC has
+about 4K free after screen, attributes and character set, and the message log
+took 2K of it. **It does nothing for CODE or RODATA.**
+
+It also excludes stock flat C128s, which is a hardware requirement bought for
+storage we do not need. The only case that could justify it is the briefing,
+and that is prose we are writing ourselves to budget, with disk streaming
+already chosen as the mechanism.
+
+#### Bank 1 -- yes, and worth more than it sounds
+
+**Every C128 ever sold has 128K**, so requiring bank 1 costs no compatibility
+at all. That is the asymmetry against the VDC.
+
+**Move RODATA there and MAIN gains 5,081 bytes** -- CODE headroom goes from 210
+to about 5,300, which is roughly the charset upload plus `RAY` plus the planet
+model with room to spare.
+
+Access is not exotic. The KERNAL's `FETCH` at `$FF74`, with `STASH` and
+`CMPARE` at `$FF77` and `$FF7A`, live in shared ROM and read across banks
+without any hand-rolled MMU switching. The change is bounded: a `scr_puts_far`
+that fetches into a ~40-byte buffer and draws, plus the message path. Only one
+string ever needs to be resident.
+
+**Hand-rolling MMU switches around executing code is where bank 1 gets
+dangerous.** `FETCH` is not that, and the distinction is the whole reason this
+is a contained change rather than an architecture.
+
+**Code overlays in bank 1** -- copying a subsystem in when needed -- are the
+only option here that lifts the CODE ceiling rather than deferring it. Also the
+most invasive, and cc65's overlay support against the `c128` target is not a
+well-trodden path. Held in reserve.
+
+#### What outranks both
+
+**Bank 1 is C128-only work. The disk seam is work every port needs.** They
+solve the same problem for this machine -- get bulk data out of the address
+space -- but the seam already gates `SAVE`, `TREK.SCR`, the briefing and port
+#2, and MEGA65, X16, F256 and Amiga all need storage regardless. MEGA65 has no
+pressure at all, so none of the banking transfers to it.
+
+And a fourth option that neither question named: **the port does not have to be
+one binary.** Setup, briefing and game as separately loaded programs is how
+8-bit games handled exactly this, and it is disk work too.
+
+#### The order
+
+Disk seam first. Then, if the C128 is still tight -- and it will be, because
+`RAY` and the planet model are both still to come -- **RODATA to bank 1 via
+`FETCH`**. That does the portable work first and keeps the C128-specific
+complexity as a targeted fix rather than a design.
+
+Skip the 64K VDC unless something later actually needs the room.
