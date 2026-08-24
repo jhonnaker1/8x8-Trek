@@ -2572,30 +2572,47 @@ and watching them come back on the hall of fame screen in the right
 place-major slots -- first place bright, second dim. That also confirms the
 record layout on real hardware rather than just in a unit test.
 
-### Writing does NOT, and here is everything known about it
+### ~~Writing does NOT~~ CORRECTED 2026-08-23: writing works too
 
-The data reaches the disk. A run that recorded JAMIE at -730 put those exact
-bytes into the image, in the correct record. What never happens is the
-**close**: the new directory entry is created and left open, reading back as a
-splat file (`*seq`, zero blocks), so the next read finds nothing.
+**The previous entry here was wrong, and so was the commit message that went
+with it.** It said the C128 write never committed its directory entry. The
+write was fine; the *observation* was not.
 
-Ruled out, each by measurement rather than argument:
+The symptom was real enough: after a write, the directory entry in the host
+`.d64` read back as type `0x01` -- SEQ with the closed bit clear, zero blocks.
+That is exactly what a 1541 entry looks like between open and close, so it read
+as "the close never happened".
 
-- **The 2MHz clock.** Suspected first, and a slow-down was written with a
-  confident comment before it was tested. A probe then read the same file
-  twice, once at 2MHz and once at 1MHz, and got identical results. The
-  workaround was deleted.
-- **`@` replace.** Worse, not better: it left the entry as type 0xA1, the
-  replace-pending bit still set. Scratching first at least removes the old
-  entry cleanly.
-- **CLRCHN/CLOSE ordering.** Swapped, no difference, reverted.
-- **SETBNK.** Tested by reading into a buffer at `$AE78`, which is BASIC ROM
-  in bank 15. It works.
+**It had not happened in the host image.** VICE's drive keeps its own view of
+the disk and writes the directory sector back on its own schedule, so the file
+on the host lags the file on the emulated disk. Jamie called this before I did
+-- twice, first about closing VICE too quickly and then about it not writing
+the image until a reset, a quit or an eject.
 
-The remaining suspect is llvm-mos's KERNAL close wrapper, on the grounds that
-`cbm_k_chkout` in the same library is already provably broken. **Next thing to
-try: the OPEN/CHKOUT/BSOUT/CLOSE sequence in assembly against the vectors
-directly.**
+Three measurements settled it, all of them asking the DRIVE rather than the
+host file:
+
+- **Write then read back in the same run.** 340 bytes out, 340 back,
+  byte-identical, clean status.
+- **Two games in one session.** Game one records ALPHA; answer PLAY AGAIN;
+  game two's hall of fame shows ALPHA read back off the disk alongside its own
+  BETA. That is the real feature working end to end.
+- **VALIDATE.** `V0:` rebuilds the BAM and **deletes any file whose entry is
+  still flagged open**. After a validate the file was still there and still
+  read back 340 bytes -- which a genuinely unclosed file could not do. The host
+  image then showed `0x81`, closed, because the validate had forced the drive
+  to rewrite the directory.
+
+The `@`-replace finding above is now suspect for the same reason; scratch-first
+is kept because it is the safer conventional pattern, not because `@` was
+proven broken.
+
+### The rule this leaves behind
+
+**Ask the drive, not the host image.** Reading a `.d64` that VICE is currently
+managing answers a different question from the one being asked, and it will
+answer it confidently and wrongly. The reliable checks are a read-back inside
+the same run, a second run in the same session, or `V0:` followed by a read.
 
 ### Two hours of the debugging were a bad test rig, not a bug
 

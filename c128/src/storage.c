@@ -157,19 +157,17 @@ static void cmd_send(const char *cmd) {
     cbm_k_clrch();
 }
 
-/* SCRATCH FIRST, DO NOT USE `@` REPLACE.
+/* SCRATCH FIRST rather than `@` replace.
  *
- * The obvious way to rewrite a file is `@0:NAME,S,W`, and it does not work
- * here. MEASURED 2026-08-23: after a write that reported success at every
- * step -- open 0, ckout 0, READST 0 on every byte, status 00 -- the new data
- * was on the disk but the directory entry read back as type 0xA1: a SEQ file
- * with the REPLACE-PENDING bit still set and a nonsense block count. The
- * replace had been started and never committed, so the next read still got
- * the old file.
+ * The obvious way to rewrite a file is `@0:NAME,S,W`. When it was tried, the
+ * directory entry in the host image read back as type 0xA1 -- a SEQ file with
+ * the REPLACE-PENDING bit still set.
  *
- * This is CBM DOS's save-with-replace, which has a bad reputation on 1541s
- * for exactly this. The reliable pattern is older and simpler: scratch the
- * file, then create it fresh.
+ * CAVEAT ADDED 2026-08-23: that 0xA1 reading came from the host image, which
+ * has since been shown to lag the drive -- so `@` replace may well be fine
+ * too. Scratch-first is kept anyway: it is the older and more widely
+ * recommended pattern on CBM DOS, it costs one command, and it is not worth
+ * re-testing a working path to save it.
  *
  * A scratch of a file that does not exist reports 01, FILES SCRATCHED with a
  * count of zero, or 62 -- neither is a failure here, so the status after this
@@ -225,32 +223,31 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) 
     return STOR_OK;
 }
 
-/* KNOWN BROKEN 2026-08-23 -- writing does not commit. READ WORKS; this does
- * not, and the failure is at the very last step.
+/* WRITING WORKS. It was reported broken on 2026-08-23 and that was wrong --
+ * the fault was in how it was being observed, not in this code.
  *
- * What is established, all by dumping the d64's directory sector after a run
- * rather than by reasoning:
+ * The symptom was a directory entry in the host .d64 that read back as a
+ * splat file: type 0x01, SEQ with the closed bit clear, zero blocks. That is
+ * exactly what a 1541 entry looks like BETWEEN open and close, so it read as
+ * "the close never happened".
  *
- *   - the DATA reaches the disk. A run that recorded JAMIE at -730 put those
- *     exact bytes in the image, in the right place-major record.
- *   - the OLD entry is removed correctly by scratch().
- *   - the NEW entry is created and never closed. It reads back as a splat
- *     file -- `*seq`, zero blocks -- so the next read finds nothing.
- *   - `@` replace is worse, not better: it left the entry as type 0xA1, with
- *     the replace-pending bit set and a nonsense block count.
- *   - swapping CLRCHN and CLOSE changes nothing.
- *   - none of it is the 2MHz clock, which was tested and cleared.
+ * It had not happened *in the host image*. VICE's drive keeps its own view
+ * and writes the directory sector back on its own schedule, so the file on
+ * the host lags the file on the emulated disk. Three measurements settled it:
  *
- * So the fault is in the final CLOSE, and the most likely suspect is
- * llvm-mos's own KERNAL wrapper: `cbm_k_chkout` in the SAME library is
- * provably broken (it references __CHKOUT where the platform defines
- * __CKOUT, and fails at link), so a second bad wrapper is not a stretch.
+ *   - write 340 bytes, then read them back in the same run: 340 bytes,
+ *     byte-identical, clean status.
+ *   - play a game that records a score, answer PLAY AGAIN, play another: the
+ *     first game's name is read back off the disk and shown by the second.
+ *   - send VALIDATE (`V0:`), which DELETES splat files, and then re-open the
+ *     file: it is still there and still reads. A genuinely unclosed file does
+ *     not survive that. Afterwards the host image showed 0x81, closed --
+ *     because the validate forced the drive to rewrite the directory.
  *
- * Next thing to try: write the OPEN/CHKOUT/BSOUT/CLOSE sequence in assembly
- * against the KERNAL vectors directly, bypassing the wrappers entirely.
- *
- * Until then a finished game is displayed correctly and simply is not saved.
- * The hall of fame still READS, which is most of what it is for. */
+ * THE LESSON, and it cost most of two sessions: **ask the drive, not the host
+ * image.** Reading a .d64 that VICE is managing answers a different question
+ * from the one being asked. See NOTES.md.
+ */
 uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
     const unsigned char *p = (const unsigned char *)buf;
     uint16_t i;
