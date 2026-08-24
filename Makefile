@@ -21,12 +21,28 @@ M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
 all: test port-check
 
-test: build/test_trek
+test: build/test_trek build/test_serial build/test_hof
 	./build/test_trek
+	./build/test_serial
+	./build/test_hof
 
 build/test_trek: core/test/test_trek.c core/trek.c core/trek.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ core/test/test_trek.c core/trek.c
+
+# The hall of fame's FILE FORMAT, which is the original's and not ours. Kept
+# apart from the game rules for the same reason as test_serial.
+build/test_hof: core/test/test_hof.c core/hof.c core/hof.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ core/test/test_hof.c core/hof.c
+
+# The disk seam's core half. Worth its own binary rather than more cases in
+# test_trek: it is the only test whose real subject is the FILE FORMAT, and it
+# has to keep passing unchanged when the game rules around it move.
+build/test_serial: core/test/test_serial.c core/serial.c core/trek.c \
+                   core/serial.h core/trek.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ core/test/test_serial.c core/serial.c core/trek.c
 
 # Compiles the core for the 68000 as a portability check -- it is not linked
 # and nothing is run.
@@ -53,6 +69,8 @@ port-check:
 	@if [ -x "$(M68K)" ]; then \
 	    echo "port-check: compiling the core for 68000"; \
 	    $(M68K) -c -O2 -Wall -Wextra -Werror -o /dev/null core/trek.c && \
+	    $(M68K) -c -O2 -Wall -Wextra -Werror -o /dev/null core/serial.c && \
+	    $(M68K) -c -O2 -Wall -Wextra -Werror -o /dev/null core/hof.c && \
 	    echo "port-check: clean"; \
 	else \
 	    echo "port-check: SKIPPED -- no m68k-amigaos-gcc at $(M68K)"; \

@@ -2386,3 +2386,83 @@ Disk seam first. Then, if the C128 is still tight -- and it will be, because
 complexity as a targeted fix rather than a design.
 
 Skip the 64K VDC unless something later actually needs the room.
+
+## The disk seam, built (2026-08-23)
+
+The shape was decided on 2026-08-22 and is unchanged. What follows is what
+building it actually found.
+
+### The core half is done and needs no machine
+
+- **`core/serial.c`** -- `trek_state_save` / `trek_state_load`, 507 bytes per
+  save, little-endian pinned, no I/O and no filename. Covers the galaxy, the
+  ship, the sector, enemy hit points, **the event queue and the RNG**. Those
+  last two are easy to forget and both are load-bearing: without the RNG a
+  restored game replays the same rolls from a fixed seed, and without the
+  schedule every deadline the COMMUNICATIONS panel promised silently stops
+  existing.
+- **`core/hof.c`** -- TREK.SCR parse and format, plus `hof_offer`.
+- **`core/storage.h`** -- the four-function platform contract.
+- Both are in `make test` and both compile for the 68000 under `port-check`.
+
+They are separate translation units from `trek.c` on purpose: ld65 links whole
+modules, so anything added to trek.c is in every binary whether it is called or
+not. A port with no `SAVE` simply does not list `serial.c`.
+
+### TREK.SCR is place-major, and that is not the natural guess
+
+Ten records, five ranks. The hall of fame shows **two entries per rank**, a
+bright first place and a dim second -- so ten records are five ranks by two
+places. Which record is which was settled by writing a file with `SLOT0`
+through `SLOT9` in order and reading the names back off the original's screen:
+
+    Lt. Commander  SLOT0 / SLOT5      Commodore  SLOT3 / SLOT8
+    Commander      SLOT1 / SLOT6      Admiral    SLOT4 / SLOT9
+    Captain        SLOT2 / SLOT7
+
+**Records 0..4 are first place for ranks 1..5; records 5..9 are second place.**
+Rank-major -- 0 and 1 both belonging to rank 1 -- is what the file looks like
+and it is wrong. `hof_index()` is the only place that knows.
+
+Also measured in the same session: the file is written **only when a score
+qualifies**, not on exit. A scuttled ship scored -930 and TREK.SCR's mtime did
+not move, so **scores can be negative** and a formatter without a minus sign
+writes a file it cannot read back.
+
+### A macro that native cc accepted and cc65 refused
+
+The field list was first written once as a macro taking `P8`/`P16` as
+parameters and expanded two ways. Native `cc` is happy. **cc65's preprocessor
+does not expand a function-like macro that arrived as a macro argument** --
+`Undefined symbol: SAVE8`. The field list is now written out twice, with the
+round-trip test keeping the two honest.
+
+Same shape as every other trap here: the build machine is happy and the target
+toolchain is not.
+
+### The C128 half is written, measured, and does not fit
+
+`c128/src/storage.c` is the KERNAL implementation -- `cbm_open`/`read`/`write`/
+`close`, `0:` prefixes, `@0:` for replace, and the status channel, because
+**opening a file that does not exist SUCCEEDS on a CBM drive** and the failure
+only appears when you ask channel 15. A port that skips that reads a missing
+hall of fame as a valid empty one.
+
+It is **815 bytes of CODE against 210 free**, and with `core/hof.c` alongside
+it the link overflows by **2,920 bytes**. It is committed compiled and
+measured but NOT in `SRC`, because the number is the finding.
+
+cc65 has no slack left to give: `-Os` is four bytes worse than `-O`, and `-Oi`
+overflows on its own.
+
+### `make d64` exists
+
+`c1541` builds `build/trek128.d64` carrying `trek128` and an **empty**
+`trek.scr` -- empty rather than copied from `reference/`, because the
+original's file is Anderson's and a fresh install should have a blank table
+anyway. `make rund` boots it.
+
+`make run` still autostarts the bare PRG and always did, so a build that reads
+a file sees no drive there. `tools/exit_real.py` and `tools/sound_check.py`
+autostart the PRG directly and are unaffected only because neither touches a
+file.

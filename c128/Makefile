@@ -4,7 +4,7 @@ SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c src/music
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
 
-.PHONY: all run monitor test verify music clean
+.PHONY: all run rund d64 monitor test verify music clean
 
 all: $(OUT)
 
@@ -72,6 +72,34 @@ run: verify
 	# and are harmless. An earlier version of this comment claimed the
 	# flag suppressed them. It does not; only the RUN is its doing.
 	x128 -autostart $(OUT)
+
+# A real disk, because file I/O needs one. c1541 ships with VICE and is already
+# installed here. This is what `SAVE`, the hall of fame and the briefing will
+# all load and store through.
+#
+# NOTE WHAT THIS CHANGES: `make run` autostarts a bare PRG and always has, so
+# a build that reads TREK.SCR sees no drive. tools/exit_real.py and
+# tools/sound_check.py autostart the PRG directly too, and are unaffected only
+# because neither touches a file. Use `make rund` for anything that does.
+D64 = build/trek128.d64
+
+d64: $(D64)
+
+$(D64): $(OUT)
+	@mkdir -p build
+	rm -f $(D64)
+	c1541 -format "ega trek,01" d64 $(D64) >/dev/null
+	c1541 -attach $(D64) -write $(OUT) trek128 >/dev/null
+	@# The hall of fame ships EMPTY rather than copied from reference/: the
+	@# original's TREK.SCR is Anderson's file, and an all-zero table is
+	@# exactly what a fresh install should have anyway.
+	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
+	c1541 -attach $(D64) -write build/trek.scr trek.scr,s >/dev/null
+	@echo "d64: $(D64)"
+	@c1541 -attach $(D64) -dir
+
+rund: $(D64)
+	x128 -autostart $(D64)
 
 clean:
 	rm -f build/*.prg build/test_egavdc build/test_panels build/test_sid src/*.o src/music_data.h src/music_data.c

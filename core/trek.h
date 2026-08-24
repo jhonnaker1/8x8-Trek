@@ -558,6 +558,16 @@ void     trek_unschedule(uint8_t kind);
 uint8_t  trek_is_scheduled(uint8_t kind);
 uint16_t trek_scheduled(uint8_t kind);   /* absolute stardate, or SCHED_NEVER */
 
+/* Restoring a saved game needs to put back state that is otherwise private to
+   trek.c: the RNG and the schedule as ABSOLUTE dates, where trek_schedule()
+   takes an offset from now. Only core/serial.c calls these. They live here
+   rather than the serialiser having its own copy of the state, because two
+   copies of the schedule is exactly how a reloaded game ends up with
+   deadlines the panel promised and the queue has never heard of. */
+uint16_t trek_rng_state(void);
+void     trek_rng_restore(uint16_t v);
+void     trek_sched_restore(uint8_t kind, uint16_t when);
+
 /* Exponential deviate with the given mean, both in tenths of a stardate --
  * the ancestor's expran(), which is -mean * ln(u).
  *

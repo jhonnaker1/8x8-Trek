@@ -157,6 +157,13 @@ void trek_enter_quadrant(void) {
    rather than a queue. Declared here rather than beside the event code
    because trek_new_game seeds the schedule and comes first. */
 static uint16_t sched[SCHED_COUNT];
+
+/* For core/serial.c only -- see the note in trek.h. */
+uint16_t trek_rng_state(void) { return rng_state; }
+void trek_rng_restore(uint16_t v) { rng_state = v ? v : 1; }
+void trek_sched_restore(uint8_t kind, uint16_t when) {
+    if (kind < SCHED_COUNT) sched[kind] = when;
+}
 uint8_t  base_under_attack = GAL_CELLS;
 uint8_t  bases_lost = 0;
 
