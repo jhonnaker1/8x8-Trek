@@ -576,10 +576,19 @@ checklist of *which situations need a message*, not as text to copy.
    lengths. No new memory mapping, and it is a `probe_original.py` session of
    the same shape as the ones already run.
 
-   **Loose thread from that same measurement: it recorded TEN bars, and
-   `trek.h` has twelve systems.** Either the original shows fewer than it
-   models, or our system list is wrong. Worth settling in the same session,
-   because it is free once the panel is being read.
+   ~~**Loose thread: it recorded TEN bars against twelve systems.**~~ **NOT
+   OPEN, and it never was.** MEASURED.md has carried "SYSTEMS STATUS lists
+   twelve systems, not ten" since an earlier session: the console panel shows
+   ten and the `REPAIR` dialog lists twelve -- the console's ten plus
+   Transporter and Shuttlecraft, which the manual documents as damageable and
+   which only matter for `LAND`.
+
+   **This is the third time in two days I have written up a settled question as
+   open** -- the others being what toggles NAVIGATION's two modes, and boss
+   mode. All three were already recorded, in MEASURED.md or NOTES.md or the
+   manual. **Search MEASURED.md and NOTES.md before adding anything to this
+   list**, and remember the manual is unreadable to grep until it is converted
+   (see item 5 above).
 
 6. **Custom charset -- REFRAMED 2026-08-23.** This item used to say the port
    uses the KERNAL's stock character set and that *"EGA Trek's panels want
