@@ -1205,7 +1205,7 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: seventeen of twenty-five (added 2026-08-19, count updated 2026-08-23)
+## 13. The command set: nineteen of twenty-five (added 2026-08-19, count updated 2026-08-23)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
 and it is short enough to reproduce whole.
@@ -1222,12 +1222,12 @@ and it is short enough to reproduce whole.
 | `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
-| `MSGS` | review old messages | **fully specified** 2026-08-23 -- geometry, colours, the 10px line pitch, opens scrolled to the bottom, scrolls one LINE at a time, opens on an empty log, costs no turn. See MEASURED.md |
+| `MSGS` | review old messages | **done** 2026-08-23 -- 32-entry log in VDC RAM at $1000, scrolling viewer, opens at the bottom, ESC only. Built to the capture; see MEASURED.md |
 | `C)hart` | chart of known galaxy | **done** 2026-08-23 -- redraws the chart panel and costs no turn, which is exactly the no-op the original performs on a console already showing it |
 | `F)ix` | control which system engineering repairs | **done** 2026-08-23 -- `ENGINEERING` asks for one system by number, `L` lists all twelve in two columns, `0` aborts. `REPAIR_FOCUS_FACTOR` is DERIVED and carries the experiment that would settle it |
 | `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
 | `HAIL` | hail a StarBase | **done** 2026-08-23 as measured -- costs a turn and posts an empty COMMUNICATIONS entry. What it says with a base IN RANGE is still uncaptured, so nothing is invented |
-| `A#` | acknowledge message # | **fully specified** 2026-08-23 -- `A1` dismisses the first panel box, bare `A` clears all, out of range is a silent no-op, costs no turn, and the message STAYS in the MSGS log. The numbers are never displayed: the player counts boxes |
+| `A#` | acknowledge message # | **done** 2026-08-23 -- `A1` dismisses the first panel box, bare `A` clears all, out of range is a silent no-op, costs no turn, and the message stays in the log. No numbers are drawn on the boxes, because the original draws none |
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | unimplemented mechanic |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |
@@ -2263,3 +2263,57 @@ that pressure largely goes away.
 
 Unlike Uno, this port would need only the native build -- there is no reason to
 ship a 40-column MEGA65 version of a game whose console is 80 columns wide.
+
+## The C128 binary hit its ceiling, and BSS moved out (2026-08-23)
+
+Building `MSGS` was the first change this port could not fit. Worth recording
+in full, because the number everyone was working from was wrong.
+
+### The free-space figure in the briefing note is stale
+
+The briefing arithmetic above says **1,688 bytes free**. That was measured
+before the SID driver and six commands landed. When `MSGS` began, the real
+figure was **395 bytes** -- `$B800` less a BSS ending at `$B675`. The viewer,
+the log and the arrow keys came to about 800 bytes of code, so the link failed
+by 330.
+
+Anyone reasoning from the 1,688 figure -- for the charset, for the briefing --
+is reasoning from a number that has not been true for weeks. **Read the map,
+not this file.**
+
+### Two places the space came from, and one that was refused
+
+**The log went into VDC RAM.** Thirty-two message entries are 1,792 bytes and
+there was never a version of that which fits in 8502 RAM. The VDC has 16K of
+its own, of which this port uses the screen at `$0000`, the attributes at
+`$0800` and the KERNAL's character set at `$2000` -- leaving `$1000..$1FFF`
+unused. A message log is close to the ideal tenant: written once per message,
+read only while `MSGS` is open, and never touched in the turn loop.
+
+**BSS moved to `$1300`.** `c128/trek128.cfg` is cc65's stock `c128.cfg` with
+one line changed. MAIN is `$1C0D..$B800` and BSS was sitting in the middle of
+the only space CODE has; the C128's free block between the KERNAL work areas
+and the start of BASIC text at `$1C00` is 2,304 bytes doing nothing. Moving
+650 bytes of BSS there bought 650 bytes of MAIN.
+
+**VERIFIED, not assumed.** `$1300..$1BFF` was filled with a rolling pattern
+through VICE's binary monitor while the port ran, then read back three times
+over thirty seconds: **zero bytes changed**, with the machine confirmed live
+between each read. The KERNAL's 60Hz IRQ is the only other thing executing.
+
+**The limit of that test, stated because it will matter:** the port was sitting
+on the title screen and has done no disk I/O, because it has none yet. When the
+disk seam lands, re-run the same experiment across an open-read-close cycle
+before trusting this. KERNAL file handling is the one subsystem that allocates
+buffers, and it is the one the test did not exercise.
+
+**Shrinking the stack was refused.** Dropping `__STACKSIZE__` from 2K to 1.5K
+also links, and it was tried first. It was rejected because a stack overflow is
+silent corruption and nothing here has measured the high-water mark -- trading
+a known-safe 650 bytes for an unmeasured 512 is the wrong way round.
+
+### Where it stands
+
+With `MSGS`, `A#`, the arrow keys and the log all in, MAIN has **210 bytes**
+free and BSS can still grow by about 1,650 into low RAM. The pressure is
+entirely on CODE, which is what the 81%-code breakdown above already said.

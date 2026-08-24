@@ -55,6 +55,8 @@ static const Key keys[] = {
     { 7, 7, KB_ESC },
     /* C)hart and F)ix, both from the reference card. */
     { 2, 4, KB_C }, { 2, 5, KB_F },
+    /* A, for A# -- acknowledge a message. */
+    { 1, 2, KB_A },
     { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
     { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 },
     { 2, 0, KB_DIGIT0 + 5 }, { 2, 3, KB_DIGIT0 + 6 },

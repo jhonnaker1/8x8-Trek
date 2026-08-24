@@ -564,9 +564,15 @@ static unsigned char msg_height(unsigned char slot) {
     return (unsigned char)(MSG_H - (MSG_SLOTS - 1) * MSG_BOX_H);
 }
 
-static char     msg_dept[MSG_SLOTS][16];
-static char     msg_text[MSG_SLOTS][MSG_WIDTH + 1];
-static uint16_t msg_date[MSG_SLOTS];
+/* The panel holds no message text of its own -- only which log entries are
+   still showing. MEASURED 2026-08-23: the panel is a QUEUE of messages
+   awaiting acknowledgement and MSGS is a permanent RECORD, and A1 removes a
+   message from the first without touching the second. Two separate things,
+   so the panel stores four indices and the text lives once, in the log.
+
+   This also happens to be what made the build fit. Four copies of a message
+   cost 220 bytes of a binary that had 395 left; four indices cost four. */
+static unsigned char panel_slot[MSG_SLOTS];
 static unsigned char msg_count = 0;
 
 /* Department colours. Yellow and orange are measured -- they are the border
@@ -667,12 +673,10 @@ static void log_append(const char *dept, const char *text, uint16_t date) {
 /* `n` counts from the OLDEST entry still held, so callers index a list rather
    than a ring. Once the log has wrapped, entry 0 is whatever log_head points
    at, because that is the slot about to be overwritten. */
-static void log_fetch(unsigned char n) {
-    unsigned char slot, i;
-
-    slot = (log_count < LOG_SLOTS)
-         ? n
-         : (unsigned char)((log_head + n) % LOG_SLOTS);
+/* By absolute slot. The panel indexes this way, because a panel entry has to
+   keep pointing at the same message while newer ones arrive behind it. */
+static void log_fetch_slot(unsigned char slot) {
+    unsigned char i;
 
     vdc_set_address(log_addr(slot));
     view_date = vdc_data_read();
@@ -681,6 +685,15 @@ static void log_fetch(unsigned char n) {
     view_dept[LOG_DEPT] = '\0';
     for (i = 0; i < LOG_TEXT; i++) view_text[i] = (char)vdc_data_read();
     view_text[LOG_TEXT] = '\0';
+}
+
+/* By position from the OLDEST entry still held, which is how MSGS reads it.
+   Once the log has wrapped, entry 0 is whatever log_head points at, because
+   that is the slot about to be overwritten. */
+static void log_fetch(unsigned char n) {
+    log_fetch_slot((log_count < LOG_SLOTS)
+                   ? n
+                   : (unsigned char)((log_head + n) % LOG_SLOTS));
 }
 
 void ui_clear_messages(void) {
@@ -696,9 +709,15 @@ static void msg_box(unsigned char slot) {
     unsigned char y = msg_top(slot);
     unsigned char right = (unsigned char)(MSG_X + MSG_W - 1);
     unsigned char bottom = (unsigned char)(y + msg_height(slot) - 1);
-    unsigned char color = dept_color(msg_dept[slot]);
+    unsigned char color;
     unsigned char dlen, rem;
     char tbuf[MSG_WIDTH + 1];
+
+    /* Pulls the text out of VDC RAM into view_dept/view_text. Everything
+       below reads those, not arrays of its own. C89 wants the declarations
+       first, so the fetch comes after them rather than beside its comment. */
+    log_fetch_slot(panel_slot[slot]);
+    color = dept_color(view_dept);
 
     scr_hline((unsigned char)(MSG_X + 1), y, (unsigned char)(MSG_W - 2),
               G_HLINE, color);
@@ -713,19 +732,19 @@ static void msg_box(unsigned char slot) {
     scr_vline(right, (unsigned char)(y + 1),
               (unsigned char)(msg_height(slot) - 2), G_VLINE, color);
 
-    put_tenths((unsigned char)(right - 7), y, msg_date[slot], color);
+    put_tenths((unsigned char)(right - 7), y, view_date, color);
 
     /* The VDC auto-increments its update address, so a line running past the
        right edge does not clip -- it wraps onto the next row and lands in
        whatever is there. Clamp here rather than trusting callers. */
-    dlen = (unsigned char)strlen(msg_dept[slot]);
+    dlen = (unsigned char)strlen(view_dept);
     if (dlen > MSG_W - 2) dlen = (unsigned char)(MSG_W - 2);
     rem = (unsigned char)(MSG_W - 2 - dlen);
     if (rem > MSG_WIDTH) rem = MSG_WIDTH;
 
     scr_puts((unsigned char)(MSG_X + 1), (unsigned char)(y + 1),
-             msg_dept[slot], COL_DEPT);
-    strncpy(tbuf, msg_text[slot], rem);
+             view_dept, COL_DEPT);
+    strncpy(tbuf, view_text, rem);
     tbuf[rem] = '\0';
     scr_puts((unsigned char)(MSG_X + 1 + dlen), (unsigned char)(y + 1),
              tbuf, color);
@@ -739,30 +758,44 @@ static void msg_redraw(void) {
 
 void ui_message(const char *dept, const char *text) {
     unsigned char i;
+    unsigned char slot = log_head;      /* where log_append is about to put it */
+
+    log_append(dept, text, ship.stardate);
 
     if (msg_count == MSG_SLOTS) {
-        /* Oldest scrolls off the top, as the original's stack does. */
-        for (i = 1; i < MSG_SLOTS; i++) {
-            strcpy(msg_dept[i - 1], msg_dept[i]);
-            strcpy(msg_text[i - 1], msg_text[i]);
-            msg_date[i - 1] = msg_date[i];
-        }
+        /* Oldest scrolls off the panel, as the original's stack does. It
+           stays in the log: falling off the panel is not acknowledgement. */
+        for (i = 1; i < MSG_SLOTS; i++) panel_slot[i - 1] = panel_slot[i];
         msg_count--;
     }
 
-    strncpy(msg_dept[msg_count], dept, 15);
-    msg_dept[msg_count][15] = '\0';
-    strncpy(msg_text[msg_count], text, MSG_WIDTH);
-    msg_text[msg_count][MSG_WIDTH] = '\0';
-    msg_date[msg_count] = ship.stardate;
-    msg_count++;
+    panel_slot[msg_count++] = slot;
+    msg_redraw();
+}
 
-    /* The panel keeps its own four copies rather than reading them back out
-       of VDC RAM on every redraw. Duplicated storage, but the duplicate is
-       220 bytes that were already spent and the alternative is 256 VDC reads
-       per message. */
-    log_append(dept, text, ship.stardate);
+/* A#, MEASURED 2026-08-23. `n` is 1-based by position down the panel, which
+ * is how the player counts them -- the original prints no numbers on the
+ * boxes and this port does not either, because adding them would be a change
+ * to the game rather than a port of it.
+ *
+ * Dismisses from the PANEL only. The message stays in the log and MSGS still
+ * shows it afterwards; that was captured explicitly, because the natural
+ * implementation deletes and the original does not.
+ *
+ * n == 0 means bare `A`, which the original treats as "clear them all".
+ * Out of range is a silent no-op: `A5` against an empty panel drew nothing
+ * and reported nothing. */
+void ui_ack(uint8_t n) {
+    unsigned char i;
 
+    if (n == 0) {
+        msg_count = 0;
+    } else if (n <= msg_count) {
+        for (i = n; i < msg_count; i++) panel_slot[i - 1] = panel_slot[i];
+        msg_count--;
+    } else {
+        return;                        /* silent, as the original is */
+    }
     msg_redraw();
 }
 
@@ -1109,6 +1142,118 @@ void ui_repair_report(void) {
 
     scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
              "HIT RETURN TO CONTINUE", COL_DEPT);
+}
+
+/* ------------------------------------------------------------- MSGS */
+
+/* The PREVIOUS MESSAGES overlay, MEASURED 2026-08-23 -- see MEASURED.md for
+ * the capture. Four behaviours were captured rather than guessed, and three
+ * of them are not what the obvious implementation does:
+ *
+ *   - it opens SCROLLED TO THE BOTTOM, newest visible, with the topmost
+ *     entry routinely cut off mid-way. That cut is how it says there is more
+ *     above, so it is a feature, not an accident of arithmetic.
+ *   - it scrolls ONE LINE per keypress, not one entry.
+ *   - it opens on an EMPTY log rather than refusing.
+ *   - it costs no turn.
+ *
+ * Colours are the original's: cyan title and border, magenta StarDate line,
+ * green message text, red footer. Note the department colour does NOT carry
+ * in here -- COMMUNICATIONS is yellow and DAMAGE REPORT orange on the panel,
+ * and both are green in this box. Measured on one of each in one capture.
+ *
+ * Two deliberate departures, both forced:
+ *
+ * GEOMETRY. The original's content lines sit on a 10-PIXEL pitch, so eleven
+ * of them fit in about ten character rows. A character display cannot
+ * compress like that, so the box is 15 rows here against the original's ~10.
+ * The same trade the short range scan and chart panels already make. The
+ * COLUMNS are the original's exactly: 25..65.
+ *
+ * FILL. The original's box is filled dark grey. This port's box() draws
+ * spaces in the border colour, which on the VDC shows the screen background
+ * through -- a per-cell background would mean reverse-video spaces. Left
+ * alone so this box matches every other dialog in the port rather than
+ * being the only filled one. */
+#define MSGV_X      25
+#define MSGV_Y       6
+#define MSGV_W      41
+#define MSGV_LINES  11
+#define MSGV_H      (MSGV_LINES + 4)   /* border, title, lines, footer, border */
+
+#define COL_MSGV_TITLE  EGA_TO_VDC(EGA_CYAN)
+#define COL_MSGV_DATE   EGA_TO_VDC(EGA_MAGENTA)
+#define COL_MSGV_TEXT   EGA_TO_VDC(EGA_GREEN)
+#define COL_MSGV_FOOT   EGA_TO_VDC(EGA_RED)
+
+/* Every log entry occupies two lines here -- the StarDate line and one line
+   of text. The original wraps its text to as many as three; this port's
+   messages are one line of 36 characters by construction (see MSG_WIDTH), so
+   there is nothing to wrap. Scrolling still works in LINES, as measured,
+   which is why this is a line count and not an entry count. */
+#define MSGV_PER_ENTRY 2
+
+static void msgv_draw(unsigned char top) {
+    unsigned char r, line, entry, last = 0xFF;
+    unsigned char x = (unsigned char)(MSGV_X + 1);
+    unsigned char total = (unsigned char)(log_count * MSGV_PER_ENTRY);
+
+    for (r = 0; r < MSGV_LINES; r++) {
+        unsigned char y = (unsigned char)(MSGV_Y + 2 + r);
+
+        scr_hline(x, y, (unsigned char)(MSGV_W - 2), SC_SPACE, COL_MSGV_TEXT);
+
+        line = (unsigned char)(top + r);
+        if (line >= total) continue;
+
+        entry = (unsigned char)(line / MSGV_PER_ENTRY);
+        /* Consecutive lines share an entry, so fetch only on the change.
+           Halves the VDC traffic a redraw costs. */
+        if (entry != last) { log_fetch(entry); last = entry; }
+
+        if ((line % MSGV_PER_ENTRY) == 0) {
+            scr_puts(x, y, "STARDATE:", COL_MSGV_DATE);
+            put_tenths((unsigned char)(x + 10), y, view_date, COL_MSGV_DATE);
+        } else {
+            scr_puts((unsigned char)(x + 1), y, view_dept, COL_MSGV_TEXT);
+            scr_puts((unsigned char)(x + 1 + strlen(view_dept)), y,
+                     view_text, COL_MSGV_TEXT);
+        }
+    }
+}
+
+void ui_messages_view(void) {
+    unsigned char total = (unsigned char)(log_count * MSGV_PER_ENTRY);
+    unsigned char top;
+    char c;
+
+    box(MSGV_X, MSGV_Y, MSGV_W, MSGV_H, COL_MSGV_TITLE);
+    scr_puts((unsigned char)(MSGV_X + 12), MSGV_Y, "PREVIOUS MESSAGES",
+             COL_MSGV_TITLE);
+    /* 30 characters centred in a 41-wide box. The wording is this port's:
+       the original draws real up and down arrow glyphs, which the C128's
+       stock character set has no equivalent of at these screen codes. */
+    scr_puts((unsigned char)(MSGV_X + 5), (unsigned char)(MSGV_Y + MSGV_H - 1),
+             "UP/DOWN TO SCROLL, ESC TO EXIT", COL_MSGV_FOOT);
+
+    /* Opens at the bottom. Measured, and it is the opposite of what a
+       from-the-top viewer would do. */
+    top = (total > MSGV_LINES) ? (unsigned char)(total - MSGV_LINES) : 0;
+
+    for (;;) {
+        msgv_draw(top);
+        c = kb_waitkey();
+        /* ESC only. The original's footer says "ESC to exit" where its other
+           screens say "HIT RETURN TO CONTINUE", and it distinguishes the two
+           deliberately -- so this one does too, rather than accepting both
+           for convenience. */
+        if (c == KB_ESC) break;
+        if (c == KB_UP   && top > 0) top--;
+        if (c == KB_DOWN && total > MSGV_LINES
+                         && top < (unsigned char)(total - MSGV_LINES)) top++;
+    }
+
+    ui_draw_all();
 }
 
 /* ---------------------------------------------------------- setup screen */

@@ -43,15 +43,15 @@ HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
 # guest memory, but only if it knows where a variable lives, and the map is
 # the only place that says. Poking ship state and screenshotting the result is
 # the fastest way to check a panel without playing to that state.
-$(OUT): $(SRC) $(HDR)
-	cl65 -t $(CC65_TARGET) -O -m build/trek128.map -o $(OUT) $(SRC)
+$(OUT): $(SRC) $(HDR) trek128.cfg
+	cl65 -t $(CC65_TARGET) -C trek128.cfg -O -m build/trek128.map -o $(OUT) $(SRC)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
 # must not have it. Separate output means `make run` can never accidentally
 # launch the instrumented one.
-$(DEBUG_OUT): $(SRC) $(HDR)
-	cl65 -t $(CC65_TARGET) -O -DTREK_DEBUG_INPUT \
+$(DEBUG_OUT): $(SRC) $(HDR) trek128.cfg
+	cl65 -t $(CC65_TARGET) -C trek128.cfg -O -DTREK_DEBUG_INPUT \
 	     -m build/trek128-debug.map -o $(DEBUG_OUT) $(SRC)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and

@@ -71,11 +71,44 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
 /* ui.c's dialog code references this; nothing here calls it. */
 void vdc_reg_write(unsigned char r, unsigned char v) { (void)r; (void)v; }
 
+/* A fake 16K of VDC RAM.
+ *
+ * Not a stub that swallows writes -- a real array with a real auto-incrementing
+ * update address, because the message log lives out there now and a stub would
+ * make every log assertion below pass vacuously. The auto-increment is the
+ * part worth modelling: log_append and log_fetch_slot both set the address
+ * once and then stream, so an increment that did not happen would corrupt
+ * every entry after the first and a swallowing stub would never show it. */
+static unsigned char vdc_ram[16384];
+static unsigned int  vdc_addr = 0;
+
+void vdc_set_address(unsigned int addr) { vdc_addr = addr & 0x3FFF; }
+
+void vdc_data_write(unsigned char v) {
+    vdc_ram[vdc_addr] = v;
+    vdc_addr = (vdc_addr + 1) & 0x3FFF;
+}
+
+unsigned char vdc_data_read(void) {
+    unsigned char v = vdc_ram[vdc_addr];
+    vdc_addr = (vdc_addr + 1) & 0x3FFF;
+    return v;
+}
+
 /* Scripted keyboard. The default of RETURN is what lets the blocking waits in
    ui_title() and the repair report fall straight through; a test that has to
    answer a specific prompt points kb_script at the keys it wants first. */
 static const char *kb_script = 0;
+
+/* ui_messages_view() redraws the whole console on its way out, so by the time
+   it returns there is nothing of the overlay left to assert on. This copies
+   the screen the moment the viewer blocks for a key -- which is exactly the
+   state a player would be looking at. */
+static unsigned char snap[VDC_ROWS][VDC_COLS];
+static int snap_armed = 0;
+
 char kb_waitkey(void) {
+    if (snap_armed) { memcpy(snap, cell, sizeof snap); snap_armed = 0; }
     if (kb_script && *kb_script) return *kb_script++;
     return KB_RETURN;
 }
@@ -103,6 +136,31 @@ static void row_text(unsigned char y, unsigned char x, unsigned char n, char *ou
     out[n] = 0;
 }
 
+
+/* Is `needle` anywhere on the screen? MSGS scrolls, so a test that asserted a
+   fixed row would be asserting the scroll offset by accident. */
+static int in_snapshot(const char *needle) {
+    unsigned char y, x, i, n = (unsigned char)strlen(needle);
+    char buf[VDC_COLS + 1];
+
+    for (y = 0; y < VDC_ROWS; y++) {
+        for (x = 0; x + n <= VDC_COLS; x++) {
+            for (i = 0; i < n; i++) buf[i] = (char)snap[y][x + i];
+            buf[n] = 0;
+            if (strcmp(buf, needle) == 0) return 1;
+        }
+    }
+    return 0;
+}
+
+/* Runs the viewer, capturing what it put on screen. ESC because that is the
+   only key it accepts -- see ui.c. A test that forgot it would hang. */
+static void view_messages(void) {
+    snap_armed = 1;
+    kb_script = "\x1b";
+    ui_messages_view();
+    kb_script = 0;
+}
 
 /* Every panel's interior must be disjoint from every other panel's, or one
    redraw silently erases part of another. This is what caught the old
@@ -787,6 +845,72 @@ static void test_badge_stays_inside(void) {
     check(painted > 0,     "badge: something is actually drawn");
 }
 
+/* A#, against the capture of 2026-08-23. Every assertion here is a measured
+   behaviour, not a design choice, and three of them are the opposite of what
+   the natural implementation does. */
+static void test_ack(void) {
+    char buf[16];
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("COMMUNICATIONS: ", "ONE");
+    ui_message("DAMAGE: ", "TWO");
+    ui_message("HELM: ", "THREE");
+
+    /* A1 takes the FIRST box and the rest move up. */
+    ui_ack(1);
+    row_text((unsigned char)(MSG_Y + 1), (unsigned char)(MSG_X + 1), 8, buf);
+    check(strcmp(buf, "DAMAGE: ") == 0, "A1 removes the first box");
+    row_text((unsigned char)(MSG_Y + 4), (unsigned char)(MSG_X + 1), 6, buf);
+    check(strcmp(buf, "HELM: ") == 0, "and the rest move up");
+
+    /* Out of range does nothing at all, and says nothing. */
+    ui_ack(9);
+    row_text((unsigned char)(MSG_Y + 1), (unsigned char)(MSG_X + 1), 8, buf);
+    check(strcmp(buf, "DAMAGE: ") == 0, "A9 is a silent no-op");
+
+    /* Bare A clears the lot. */
+    ui_ack(0);
+    check(cell[MSG_Y + 1][MSG_X + 1] == 32, "bare A clears every box");
+}
+
+/* The panel is a queue and the log is a record: acknowledging empties the
+   first without touching the second. This is the one that would have been
+   got wrong -- the obvious implementation deletes. */
+static void test_log_outlives_the_panel(void) {
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("COMMUNICATIONS: ", "KEEPME");
+    ui_message("DAMAGE: ", "TWO");
+    ui_ack(0);                       /* clear the panel entirely */
+
+    view_messages();
+    check(in_snapshot("KEEPME"),
+          "an acknowledged message is still in the MSGS log");
+}
+
+/* MEASURED: MSGS opens scrolled to the BOTTOM, newest visible, and the log
+   goes deeper than the panel's four. Eight messages means the first ones are
+   long gone from the panel and must still be reachable here. */
+static void test_msgs_opens_at_the_bottom(void) {
+    unsigned char i;
+    char text[8];
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    for (i = 0; i < 8; i++) {
+        sprintf(text, "MSG%u", i);
+        ui_message("HELM: ", text);
+    }
+
+    view_messages();
+    check(in_snapshot("MSG7"),  "MSGS opens showing the newest message");
+    check(!in_snapshot("MSG0"), "and the oldest is scrolled off the top");
+}
+
 int main(void) {
     trek_new_game(3, 12345);
 
@@ -814,6 +938,9 @@ int main(void) {
     test_message_stack();
     test_message_stamps();
     test_message_scroll();
+    test_ack();
+    test_log_outlives_the_panel();
+    test_msgs_opens_at_the_bottom();
 
     if (failures) { printf("%d failure(s)\n", failures); return 1; }
     printf("console panels: all checks passed\n");

@@ -23,6 +23,14 @@ void ui_draw_position(void);
 void ui_message(const char *dept, const char *text);
 void ui_clear_messages(void);
 
+/* A#, and MSGS. MEASURED 2026-08-23: the panel is a QUEUE awaiting
+   acknowledgement and the log is a permanent RECORD, so ui_ack() dismisses
+   from the panel and the message is still there when MSGS next opens.
+   `n` is 1-based down the panel; 0 is bare `A`, which clears all of them;
+   out of range is a silent no-op. Neither command costs a turn. */
+void ui_ack(uint8_t n);
+void ui_messages_view(void);
+
 /* Prompts in the COMMAND panel and returns a NUL-terminated line. Echoes as
    it goes and handles backspace. */
 void ui_read_command(char *buf, uint8_t max);

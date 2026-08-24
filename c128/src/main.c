@@ -165,6 +165,16 @@ static void do_shields_up(void) {
     }
 }
 
+/* The number in A#, or 0 for a bare A -- which the original reads as "all",
+   so 0 is a real answer here and not a failure value. Anything that is not a
+   digit is treated as absent for the same reason: the original's out-of-range
+   A5 was a silent no-op, so there is nothing to report. */
+static uint8_t ack_arg(const char *cmd) {
+    if (cmd[1] >= KB_DIGIT0 && cmd[1] <= KB_DIGIT9)
+        return (uint8_t)(cmd[1] - KB_DIGIT0);
+    return 0;
+}
+
 /* Names for the three pools, in the 1/2/3 order trek_divert uses. */
 static const char *pool_name(unsigned char p) {
     switch (p) {
@@ -862,7 +872,8 @@ int main(void) {
                merely when a turn passes. MEASURED -- see trek.h. */
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
-            if      (word_is(cmd, "SND"))  do_sound();
+            if      (word_is(cmd, "MSGS")) ui_messages_view();
+            else if (word_is(cmd, "SND"))  do_sound();
             else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
@@ -879,6 +890,13 @@ int main(void) {
             else if (c == KB_C) do_chart();    /* MEASURED: costs no turn */
             else if (c == KB_F) do_fix();      /* choosing does not cost one either */
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
+            /* A#, MEASURED: dismisses one message from the panel by its
+               position, and a bare A dismisses all of them. The digit is
+               optional, which is why this is not a word_is() -- and it must
+               be tested AFTER the word commands, or "A" would swallow
+               nothing but is cheap enough to sit here with the other
+               single-key ones. Costs no turn. */
+            else if (c == KB_A) ui_ack(ack_arg(cmd));
             /* MEASURED: the original answers Q with "Quit <Y/N>?" in the
                COMMAND panel rather than quitting on the keystroke. */
             else if (c == KB_Q) { if (ui_confirm("QUIT <Y/N>?")) break; }
@@ -888,7 +906,7 @@ int main(void) {
                belongs in the comment rather than being quietly lost. */
             else if (c) {
                 snd_beep();
-                ui_message("COMPUTER: ", "M W L T D R S E Q C F SND INFO HAIL SHUP SHDN MAX");
+                ui_message("COMPUTER: ", "M W L T D R S E Q C F A SND MSGS INFO HAIL SHUP SHDN MAX");
             }
 
             /* After the enemy turn, not just after a move: a tractor beam
