@@ -53,6 +53,10 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max);
 uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max);
 void ui_dialog_close(void);
 
+/* Closes with no "hit return" prompt. SAVE uses this because the original's
+   save box closes as soon as it has a file name. */
+void ui_dialog_dismiss(void);
+
 /* The STATE OF REPAIR report: every system's condition, and how long it would
    take to mend docked and adrift. Its own screen rather than a dialog line
    because twelve systems plus headers do not fit the modal box, and because
@@ -62,10 +66,14 @@ void ui_repair_report(void);
 /* Full system names, in SYS_* order. F)ix needs them to print its list. */
 const char *ui_sys_name(uint8_t i);
 
-/* What the setup screen collects, in the original's own order. Saving is not
-   implemented, so answering yes to the restore prompt reports no saved game
-   and carries on -- which is what the original does with no file on disk. */
+/* What the setup screen collects, in the original's own order. Answering yes
+   to the restore prompt now reads a saved game; if the file is missing it
+   reports so and carries on, which is what the original does. */
 typedef struct {
+    /* Non-zero if ui_setup() restored a saved game instead of collecting a
+       new one. main() must NOT call trek_new_game() in that case -- doing so
+       would generate a fresh galaxy straight over the one just loaded. */
+    uint8_t  restored;
     char     name[13];
     char     password[9];
     uint8_t  level;      /* 1..5 */
@@ -74,6 +82,10 @@ typedef struct {
 } Setup;
 
 void ui_setup(Setup *s);
+
+/* SAVE. Costs no turn, as the original's does. Asks for a file name with
+   EGATREK.SAV as the default. */
+void ui_save_game(const Setup *s);
 
 /* The seed derivation, exposed so it can be tested without a keyboard. Mixing
    in the level keeps two identically-timed sittings at different difficulties

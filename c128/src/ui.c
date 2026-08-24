@@ -7,6 +7,7 @@
 #include "egavdc.h"
 #include "../../core/trek.h"
 #include "../../core/hof.h"
+#include "../../core/serial.h"
 #include "../../core/storage.h"
 #include "../../core/ega.h"
 
@@ -1008,6 +1009,23 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
 }
 
 
+/* Closes WITHOUT the "hit return" prompt.
+ *
+ * Split out 2026-08-24 for SAVE. Every dialog in this port ends by asking for
+ * a RETURN, which is right for the ones reporting something the player must
+ * read -- a weapons exchange, an energy transfer. It is wrong for SAVE:
+ * MEASURED, the original's save box closes the moment it has a file name and
+ * asks for nothing more. Jamie noticed the extra keystroke immediately. */
+void ui_dialog_dismiss(void) {
+    unsigned char x, y;
+
+    for (y = 0; y < DLG_H; y++)
+        for (x = 0; x < DLG_W; x++)
+            scr_put((unsigned char)(DLG_X + x), (unsigned char)(DLG_Y + y),
+                    SC_SPACE, COL_LABEL);
+    ui_draw_all();
+}
+
 void ui_dialog_close(void) {
     unsigned char x, y;
 
@@ -1258,6 +1276,128 @@ void ui_messages_view(void) {
     ui_draw_all();
 }
 
+/* ------------------------------------------------------------ SAVE/RESTORE */
+
+/* The save file: a small UI header, then the core's own blob.
+ *
+ * `core/serial.c` serialises the GAME -- galaxy, ship, event queue, RNG. It
+ * does not know the player's name or self-destruct password, and it should
+ * not: those belong to this screen, not to the rules. So the file is
+ *
+ *     [13] name, NUL padded
+ *     [ 9] self-destruct password, NUL padded
+ *     [ 2] command level, low byte first (matches core/serial.c's rule)
+ *     [  ] TREK_SAVE_SIZE bytes from trek_state_save()
+ *
+ * The core half already carries its own magic and version and refuses
+ * anything it does not recognise, so this header needs neither.
+ *
+ * MEASURED 2026-08-24: the original's file is plain text and starts with the
+ * banner "EGATrek 3.0" then the player's name -- the same two ideas, version
+ * and name, arrived at independently. Ours is binary and deliberately NOT
+ * interchangeable with it; nothing in this project ever claimed it would be.
+ *
+ * The default name is the original's: EGATREK.SAV, which is eleven characters
+ * and so fits a CBM directory entry unchanged. */
+#define SAVE_HDR   (13 + 9 + 2)
+#define SAVE_BYTES (SAVE_HDR + TREK_SAVE_SIZE)
+#define SAVE_DEFAULT "EGATREK.SAV"
+
+/* ONE buffer, shared with the hall of fame.
+ *
+ * SAVE and the hall of fame can never be in flight at the same time -- one is
+ * a command inside a game, the other runs after the game has ended -- and
+ * neither holds anything in here across a call. Sharing costs a comment and
+ * buys 384 bytes, which mattered: the port had about 2,800 bytes of RAM left
+ * when SAVE was written and two separate buffers overflowed it by 319. */
+/* ONE BYTE LARGER THAN THE BIGGEST FILE, deliberately.
+ *
+ * plat_read_all() treats "filled the buffer exactly" as a possible silent
+ * truncation and returns STOR_ERROR, because it genuinely cannot tell a file
+ * that fit from one that did not. That guard is right, and it means every
+ * caller must offer more room than the file needs. A save is exactly
+ * SAVE_BYTES long, so passing a SAVE_BYTES buffer made every restore fail
+ * with NO SAVED GAME FOUND while the file sat on the disk, correctly written
+ * and correctly closed. */
+#define IO_BUF_SIZE (((SAVE_BYTES + 1) > HOF_BUF) ? (SAVE_BYTES + 1) : HOF_BUF)
+static uint8_t io_buf[IO_BUF_SIZE];
+#define save_buf io_buf
+
+/* Copies a NUL-terminated string into a fixed field, padding with NUL. Same
+   once-terminated-always-padded rule as core/hof.c, and for the same reason:
+   the caller's buffer is shorter than the field and reading past it drags in
+   whatever follows -- which put a self-destruct password in the hall of fame
+   once already. */
+static void save_put(unsigned char *dst, const char *src, unsigned char n) {
+    unsigned char i;
+    char c = 1;
+    for (i = 0; i < n; i++) {
+        if (c) c = src[i];
+        dst[i] = (unsigned char)(c ? c : 0);
+    }
+}
+
+/* Non-zero if it was written. */
+static uint8_t save_write(const Setup *s, const char *name) {
+    uint16_t n;
+
+    save_put(save_buf,      s->name,     13);
+    save_put(save_buf + 13, s->password,  9);
+    save_buf[22] = s->level;
+    save_buf[23] = 0;
+
+    n = trek_state_save(save_buf + SAVE_HDR, TREK_SAVE_SIZE);
+    if (n != TREK_SAVE_SIZE) return 0;
+
+    return (uint8_t)(plat_write_all(name, save_buf, SAVE_BYTES) == STOR_OK);
+}
+
+/* Non-zero if a game was restored. Fills the caller's Setup from the file so
+   the hall of fame still knows who was flying. */
+static uint8_t save_read(Setup *s, const char *name) {
+    uint16_t got = 0;
+    unsigned char i;
+
+    /* SAVE_BYTES + 1 so a full-length save does not look truncated -- see the
+       note on IO_BUF_SIZE. The exact length is then checked here. */
+    if (plat_read_all(name, save_buf, SAVE_BYTES + 1, &got) != STOR_OK) return 0;
+    if (got != SAVE_BYTES) return 0;
+    if (!trek_state_load(save_buf + SAVE_HDR, TREK_SAVE_SIZE)) return 0;
+
+    for (i = 0; i < 13; i++) s->name[i] = (char)save_buf[i];
+    s->name[12] = '\0';
+    for (i = 0; i < 9; i++) s->password[i] = (char)save_buf[13 + i];
+    s->password[8] = '\0';
+    s->level = save_buf[22];
+    return 1;
+}
+
+/* SAVE. MEASURED 2026-08-24: the original opens a SAVE GAME box asking for a
+   file name and offering Enter for the default, and it COSTS NO TURN. */
+void ui_save_game(const Setup *s) {
+    char name[18];
+
+    ui_dialog_open("SAVE GAME");
+    ui_dialog_line("<RETURN> FOR DEFAULT");
+    ui_dialog_ask("FILE NAME:", name, sizeof name);
+    if (!name[0]) strcpy(name, SAVE_DEFAULT);
+
+    /* MEASURED: on success the original just CLOSES -- no confirmation, no
+       second keypress. An earlier version here printed "GAME SAVED." and
+       waited for RETURN, which is one keystroke the original never asks for.
+       Failure is different: a disk error that flashed past unread would be
+       the worst outcome of the whole command, so that one stops and waits. */
+    if (save_write(s, name)) {
+        ui_dialog_dismiss();
+        return;
+    }
+
+    ui_dialog_line("");
+    ui_dialog_line("COULD NOT SAVE.");
+    ui_dialog_ask("HIT RETURN TO CONTINUE", name, 2);
+    ui_dialog_close();
+}
+
 /* ---------------------------------------------------------- setup screen */
 
 /* The prompts, in the original's order and its own words -- captured from a
@@ -1280,6 +1420,8 @@ void ui_setup(Setup *s) {
     char buf[8];
     unsigned char y;
 
+    s->restored = 0;
+
     scr_clear();
     scr_puts(31, 1, "U.S.S. LEXINGTON", COL_VALUE);
     scr_puts(36, 2, "RCB-92",           COL_VALUE);
@@ -1288,11 +1430,23 @@ void ui_setup(Setup *s) {
     s->briefing = ask_yes(7, "WILL YOU REQUIRE A BRIEFING (Y/N)?");
 
     if (ask_yes(9, "RESTORE A SAVED GAME (Y/N)?")) {
-        /* Saving is deliberately not built yet. This is what the original
-           does when the disk holds no game, so the prompt can stay honest
-           rather than being left out of the sequence. */
-        scr_puts(4, 10, "NO SAVED GAME FOUND.", EGA_TO_VDC(EGA_LTRED));
-        y = 11;
+        /* MEASURED 2026-08-24: the original asks for a file name here with a
+           default and an ESC abort, and on success goes STRAIGHT to the
+           console -- it does not go on to ask the name, level and password,
+           because the save already holds them. */
+        char fname[18];
+
+        scr_puts(2, 10, "FILE NAME, <RETURN> FOR DEFAULT, <ESC> TO ABORT:",
+                 COL_LABEL);
+        if (read_field(51, 10, fname, sizeof fname)) {
+            if (!fname[0]) strcpy(fname, SAVE_DEFAULT);
+            if (save_read(s, fname)) {
+                s->restored = 1;
+                return;                 /* nothing else to ask */
+            }
+            scr_puts(4, 11, "NO SAVED GAME FOUND.", EGA_TO_VDC(EGA_LTRED));
+        }
+        y = 12;
     } else {
         y = 10;
     }
@@ -1439,7 +1593,8 @@ static const char *const rank_name[5] = {
  * the player has just finished a game -- and refusing to show the screen
  * because a file is missing would be worse than showing a blank one. */
 static HofEntry hof[HOF_ENTRIES];
-static uint8_t  hof_buf[HOF_BUF];
+/* Shares io_buf with SAVE -- see the note there. */
+#define hof_buf io_buf
 
 #define HOF_FILE "TREK.SCR"
 

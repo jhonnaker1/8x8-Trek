@@ -1205,7 +1205,7 @@ core. `core/` must not gain an audio call. The event list the core already
 returns (`EV_HIT`, `EV_ENEMY_MOVED`, `EV_BASE_LOST` and the rest) is the right
 seam -- each platform decides what noise an event makes.
 
-## 13. The command set: nineteen of twenty-five (added 2026-08-19, count updated 2026-08-23)
+## 13. The command set: twenty of twenty-five (added 2026-08-19, count updated 2026-08-23)
 
 `reference/EGATREK.REF`, the quick reference card, is the authoritative list
 and it is short enough to reproduce whole.
@@ -1231,7 +1231,7 @@ and it is short enough to reproduce whole.
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | **fully specified** 2026-08-24 -- refusal with no enemies, the WEAPONS CONTROL warning, `Preparing`/`Firing!`, and four outcomes of which the fourth DESTROYS THE SHIP and prints a Top Secret loss report this port does not have. See MEASURED.md |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |
-| `SAVE` | save game | **fully specified** 2026-08-24 -- `SAVE GAME` box, `File Name:`, `<Enter> for default` = `EGATREK.SAV`, costs no turn; restore is on the setup screen with `<ESC> to abort`. The disk seam it needs is already built |
+| `SAVE` | save game | **done** 2026-08-24 -- `SAVE GAME` box with `EGATREK.SAV` as the default, closes on one keypress as the original's does, costs no turn. Restore is on the setup screen and skips the rest of it. Verified end to end: save, destroy the ship, play again, restore, identical galaxy |
 | `SND` | toggle sound | **done** -- toggles the same flag the original keeps at DGROUP+0x1cc8 |
 | `Shift-F1` | boss mode | **fully specified** 2026-08-24, and it is NOT a screen blanker -- it shells out to `COMMAND.COM` via `GetEnv('COMSPEC')` and `EXIT` returns. No C128 equivalent; the port should blank the VDC and wait for a key |
 
@@ -2625,3 +2625,74 @@ the serial clock rate.
 And twice more, `c1541 -read` returned stale contents because VICE still held
 the image open. **Check the raw d64 bytes, and let VICE exit before trusting
 anything c1541 says about a disk the emulator was just using.**
+
+## SAVE, and four bugs it took to get there (2026-08-24)
+
+Twenty of twenty-five. Verified end to end in VICE: save a game, self destruct,
+answer PLAY AGAIN, restore -- and the same galaxy, quadrant, sector, stardate
+and Mongol count come back.
+
+### The shape
+
+`core/serial.c` serialises the GAME. It does not know the player's name or
+self-destruct password and should not, so `ui.c` wraps its own header round the
+core's blob:
+
+    [13] name        [9] password      [2] level      [507] trek_state_save()
+
+The core half already carries magic and a version and refuses what it does not
+recognise, so the header needs neither. The original's own file is plain text
+beginning `EGATrek 3.0` and then the player's name -- the same two ideas,
+version and name, arrived at independently. Ours is binary and deliberately
+not interchangeable.
+
+### Four bugs, three of them mine and one inherited
+
+**1. The BASIC header went to the wrong region.** The new linker script
+declares `lowram` before `ram`, and a section with no explicit region goes to
+the FIRST one declared -- so `.basic_header` landed at `$1300` while the PRG
+still claimed to load at `$1C01`. It loaded and sat at `READY`, because `RUN`
+found no BASIC line. `>ram` is now explicit, with a comment saying why.
+
+**2. The scratch status was never read.** `plat_write_all` scratches the old
+file first, and a CBM drive holds ONE pending status per channel. Leaving
+`01, FILES SCRATCHED` queued meant the status check after the write read that
+instead of the write's own result -- so the file landed correctly and the
+command reported `STOR_ERROR`. `scratch()` now consumes its own reply.
+
+**3. My own truncation guard rejected every save.** `plat_read_all` treats
+"filled the buffer exactly" as possible truncation, because it cannot tell a
+file that fit from one that did not. That is right, and it means callers must
+offer more room than the file needs. A save is exactly `SAVE_BYTES` long, so a
+`SAVE_BYTES` buffer failed every restore with NO SAVED GAME FOUND while the
+file sat on the disk, correctly written and correctly closed.
+
+**4. Every dialog asked for RETURN twice.** Not new, and not confined to SAVE:
+`do_self()` and `do_fix()` printed `HIT RETURN TO CONTINUE` with
+`ui_dialog_line` and waited, and then `ui_dialog_close()` printed its own and
+waited again. Jamie spotted the double keystroke -- one green, one cyan -- and
+that it affected self destruct too. Four sites fixed; `ui_dialog_close()` was
+always doing both jobs.
+
+### One deliberate departure, and a new helper for it
+
+MEASURED: the original's save box **closes the moment it has a file name** --
+no confirmation, no second keypress. Every dialog in this port ends by asking
+for RETURN, which is right when the box reports something that must be read and
+wrong here. `ui_dialog_dismiss()` closes without prompting; SAVE uses it on
+success. Failure still stops and waits, because a disk error that flashed past
+unread would be the worst outcome of the command.
+
+### Memory: writable data moved below the program
+
+SAVE's serialiser costs about 2.5K of code, and the release build came down to
+EIGHT bytes of headroom while the debug build would not link at all. llvm-mos's
+stock script puts everything above `$1C01` and ignores the RAM below, so
+`c128/trek128.ld` moves `.data`, `.bss` and `.noinit` to `$1300..$1BFF` -- the
+same block the cc65 build used and verified. Headroom above the program went
+from 8 bytes to **1,657**.
+
+### Still to do, noticed while capturing
+
+The original binds shields to the **up and down arrow keys**; this port has
+only `SHUP`/`SHDN` as words. The arrows are in the matrix now.

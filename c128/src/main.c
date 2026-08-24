@@ -477,16 +477,12 @@ static void do_self(void) {
 
     if (!ui_dialog_ask_esc("ENTER SELF-DESTRUCT PASSWORD:", buf, sizeof buf)) {
         ui_dialog_line(">>DESTRUCT ABORTED<<");
-        ui_dialog_line("HIT RETURN TO CONTINUE");
-        while (kb_waitkey() != KB_RETURN) { }
         ui_dialog_close();
         return;
     }
 
     if (strcmp(buf, setup.password) != 0) {
         ui_dialog_line(">>WRONG PASSWORD, DESTRUCT ABORTED<<");
-        ui_dialog_line("HIT RETURN TO CONTINUE");
-        while (kb_waitkey() != KB_RETURN) { }
         ui_dialog_close();
         return;
     }
@@ -499,8 +495,6 @@ static void do_self(void) {
       k += put_str(linebuf + k, " MONGOL SHIP(S) DESTROYED.");
       linebuf[k] = 0;
       ui_dialog_line(linebuf); }
-    ui_dialog_line("HIT RETURN TO CONTINUE");
-    while (kb_waitkey() != KB_RETURN) { }
     ui_dialog_close();
 }
 
@@ -556,8 +550,6 @@ static void do_fix(void) {
           k += put_str(row + k, ui_sys_name((uint8_t)(i - 1)));
           row[k] = 0;
           ui_dialog_line(row); }
-        ui_dialog_line("HIT RETURN TO CONTINUE");
-        while (kb_waitkey() != KB_RETURN) { }
         ui_dialog_close();
         return;
     }
@@ -852,7 +844,12 @@ int main(void) {
            and every game was identical -- NOTES item 3, blocked on this screen
            since the start. kb_entropy keeps counting across games, so a second
            game is not a replay of the first even at the same command level. */
-        trek_new_game(setup.level, setup.seed);
+        /* A restored game already HAS a galaxy, a ship and an event queue --
+           see ui_setup(). Calling trek_new_game() here would generate a fresh
+           one straight over the top of it, which is the whole reason Setup
+           carries the flag rather than main guessing from the level. */
+        if (!setup.restored)
+            trek_new_game(setup.level, setup.seed);
 
         /* The message log is the one piece of UI state that outlives a game:
            msg_count is a file static in ui.c, and without this the second
@@ -872,7 +869,8 @@ int main(void) {
                merely when a turn passes. MEASURED -- see trek.h. */
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
-            if      (word_is(cmd, "MSGS")) ui_messages_view();
+            if      (word_is(cmd, "SAVE")) ui_save_game(&setup);
+            else if (word_is(cmd, "MSGS")) ui_messages_view();
             else if (word_is(cmd, "SND"))  do_sound();
             else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
@@ -906,7 +904,7 @@ int main(void) {
                belongs in the comment rather than being quietly lost. */
             else if (c) {
                 snd_beep();
-                ui_message("COMPUTER: ", "M W L T D R S E Q C F A SND MSGS INFO HAIL SHUP SHDN MAX");
+                ui_message("COMPUTER: ", "M W L T D R S E Q C F A SND MSGS SAVE INFO HAIL SHUP SHDN MAX");
             }
 
             /* After the enemy turn, not just after a move: a tractor beam

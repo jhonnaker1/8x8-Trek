@@ -7,7 +7,7 @@
 # -Oz, NOT -Os. Measured on this codebase: -Oz is 3,200 bytes smaller than -Os,
 # which is most of the win. -flto adds nothing on top of either.
 MOSCC = $(HOME)/llvm-mos/bin/mos-c128-clang
-CFLAGS = -Oz -I src -I ../core -Wall
+CFLAGS = -Oz -I src -I ../core -Wall -T trek128.ld
 
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/music_data.c src/storage.c \
@@ -33,7 +33,7 @@ test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
 	cc -Wall -Wextra -o build/test_panels test/test_panels.c src/ui.c \
-	   src/layout.c ../core/trek.c ../core/hof.c
+	   src/layout.c ../core/trek.c ../core/hof.c ../core/serial.c
 	./build/test_panels
 	cc -Wall -Wextra -o build/test_sid test/test_sid.c -lm
 	./build/test_sid
@@ -55,7 +55,7 @@ HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
 # guest memory, but only if it knows where a variable lives, and the map is
 # the only place that says. Poking ship state and screenshotting the result is
 # the fastest way to check a panel without playing to that state.
-$(OUT): $(SRC) $(HDR)
+$(OUT): $(SRC) $(HDR) trek128.ld
 	@mkdir -p build
 	$(MOSCC) $(CFLAGS) -Wl,-Map=build/trek128.map -o $(OUT) $(SRC)
 
@@ -63,7 +63,7 @@ $(OUT): $(SRC) $(HDR)
 # script can poke to fake a keypress (see src/input.h), and the release build
 # must not have it. Separate output means `make run` can never accidentally
 # launch the instrumented one.
-$(DEBUG_OUT): $(SRC) $(HDR)
+$(DEBUG_OUT): $(SRC) $(HDR) trek128.ld
 	@mkdir -p build
 	$(MOSCC) $(CFLAGS) -DTREK_DEBUG_INPUT \
 	     -Wl,-Map=build/trek128-debug.map -o $(DEBUG_OUT) $(SRC)

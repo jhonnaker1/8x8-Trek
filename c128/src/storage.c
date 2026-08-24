@@ -170,8 +170,14 @@ static void cmd_send(const char *cmd) {
  * re-testing a working path to save it.
  *
  * A scratch of a file that does not exist reports 01, FILES SCRATCHED with a
- * count of zero, or 62 -- neither is a failure here, so the status after this
- * is deliberately not checked. */
+ * count of zero, or 62. Neither is a failure here -- but the reply MUST STILL
+ * BE READ.
+ *
+ * Not reading it is a bug that costs the whole command: the drive holds one
+ * pending status per channel, so "01, FILES SCRATCHED" stays queued and the
+ * status check AFTER the write reads that instead of the write's own result.
+ * The file lands on the disk correctly and plat_write_all reports STOR_ERROR,
+ * which is exactly what happened the first time SAVE ran end to end. */
 static void scratch(const char *name) {
     char cmd[20];
     char *p = cmd;
@@ -179,6 +185,7 @@ static void scratch(const char *name) {
     *p++ = 'S'; *p++ = '0'; *p++ = ':';
     strcpy(p, name);
     cmd_send(cmd);
+    (void)cmd_status();          /* consume it; the value is not interesting */
 }
 
 /* 62 is FILE NOT FOUND. Everything else non-zero is a real fault. */
