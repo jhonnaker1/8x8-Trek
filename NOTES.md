@@ -1239,11 +1239,23 @@ Plus the function keys, which are shortcuts rather than new commands:
 F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship, F5 Max Energy, F6 Fix
 Systems, F7 Xfer Energy, F8 Repair Status, F9 Set Speed, F10 Dock.
 
+~~**Three of these are wiring, not features.**~~ CLOSED in `4de6758`,
+"Shields and energy transfer: the port can defend itself now". `E)nergy`,
+`SHUP`/`SHDN` and `MAX` are all dispatched from `c128/src/main.c` and the
+table above marks them done. Original text follows, because the *reasoning*
+still applies to whatever is in this state next.
+
 **Three of these are wiring, not features.** `trek_divert()` is written and
 tested with no way to call it, and `ship.shields_up` is modelled and read by
 the enemy turn with no way to change it — so the port currently cannot raise
 its own shields. That is a bigger hole in how the game plays than anything on
 the front-end list, and it is the cheapest thing here to close.
+
+**The pattern worth keeping:** a core function that is written, tested and
+unreachable reads as finished on every instrument this project has. The native
+suite passes, `port-check` passes, and the game still cannot do the thing.
+Nothing catches that but reading the dispatch, so a mechanic is not done until
+a key reaches it.
 
 ### What EGA Trek dropped from the ancestor, and why it matters
 
