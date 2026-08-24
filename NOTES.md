@@ -511,7 +511,22 @@ checklist of *which situations need a message*, not as text to copy.
    is a 320×175 half-scale screenshot where a cell is 4×7 px — too coarse for
    exact column boundaries. Everything reads that one table, so it's a
    single-site edit. The same capture settles which glyphs the original uses.
-5. **The PROVISIONAL sweep -- REPOINTED 2026-08-23.** This item used to read:
+5. **READ THE MANUAL FIRST -- it was unreadable to grep until 2026-08-24.**
+   `reference/manual.txt` is ISO-8859 with high-bit box-drawing characters and
+   this project's `grep` silently returns nothing on it, so every search of it
+   ever run came back empty and was read as "the manual does not say". Convert
+   it before searching:
+
+       python3 -c "import re;print(re.sub(r'[^\x20-\x7e]',' ',
+         open('reference/manual.txt',encoding='latin1').read()))"
+
+   It closes eight items that were being carried as unmeasured, including the
+   warp damage rule, `REPAIR_FOCUS_FACTOR` (3, not the DERIVED 2), the energium
+   gate, and what switches NAVIGATION between its two modes. It also documents
+   a damage effect for **every one of the twelve systems**, of which the port
+   implements exactly one. Full audit in MEASURED.md.
+
+5b. **The PROVISIONAL sweep -- REPOINTED 2026-08-23.** This item used to read:
    breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm laser
    falloff, the no-damage threshold, boarding gates and scoring weights,
    because *"everything in `core/trek.h` marked PROVISIONAL is waiting on

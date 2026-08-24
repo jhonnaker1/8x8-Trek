@@ -2927,3 +2927,77 @@ What the manual actually says:
 
 That last one explains the session above completely: the mode changed under me
 because my desynced scripted keys put a stray `M` into the coordinate prompt.
+
+## The manual answers a dozen open questions, and grep could not read it (2026-08-24)
+
+`reference/manual.txt` is **ISO-8859 with high-bit box-drawing characters**, and
+this project's `grep` silently returns nothing on it. Every search of the manual
+this session and before came back empty, which read as "the manual does not say"
+when it meant "the tool did not look". Converting it first --
+
+    python3 -c "import re;print(re.sub(r'[^\x20-\x7e]',' ',
+      open('reference/manual.txt',encoding='latin1').read()))"
+
+-- turns 38K of documentation from invisible into searchable, and it answers
+questions this project has been carrying as unmeasured for weeks.
+
+### Open items the manual CLOSES
+
+| item | the manual's answer |
+|---|---|
+| **Warp-speed engine damage** | "maximum warp speed is approximately **warp 1 plus 0.09 times percentage of repair**" |
+| **`REPAIR_FOCUS_FACTOR`** (DERIVED 2) | **3x**. The full table: 1x normal, **2.5x docked**, **3x focused**, **5x focused and docked** |
+| **What toggles NAVIGATION's two modes** | automatic mode needs the computer at **100%**; below that manual entry is the only way to move. Typing `M` at the coordinate prompt switches voluntarily |
+| **`USE` / energium gate** | "regulations prohibit the use of raw energium except in extreme emergencies; your **shields must be under 50% and main energy under 20%**" |
+| **Hall of fame depth** | "if you get one of the **top two scores for your command level**" -- independent confirmation of the place-major layout measured from a crafted TREK.SCR |
+| **Boss mode** | "Hit Shift-F1 and you **shell to MS-DOS** ... when you're ready to return, type `EXIT`" -- stated plainly, and derived the hard way instead |
+| **Supernova chart marker** | "quadrants with supernovas cause the scanners to overload and **display all 9's**" -- the `999` seen in a capture |
+| **Base types** | chart digit **1 = StarBase, 2 = research station, 3 = supply depot**. StarBase replenishes everything; supply gives life support and torpedoes; research gives life support only |
+
+### Open items the manual does NOT answer
+
+Worth recording so they are not searched for again: **boarding parties** (the
+word does not appear), **tractor beams**, the **laser heat band's numbers**
+("watch the gauge to prevent overheating", no figures), the **kill/day scoring
+gate**, and the **enemy-count-per-level formula** ("higher levels must contend
+with more enemy ships"). Those stay measurement work.
+
+### The big one: eleven of twelve systems take damage that does NOTHING
+
+The manual specifies an effect for every system. The port models all twelve
+repair percentages, draws them on SYSTEMS STATUS, and repairs them -- and
+`sys[SYS_CONVERTER]` is **the only one any rule consults**. Everything below is
+documented and unimplemented:
+
+| system | documented effect |
+|---|---|
+| Warp Engines | max warp = 1 + 0.09 x pct |
+| Impulse Engines | below **50%** they simply stop |
+| Lasers | pct is directly the fraction of energy converted to damage -- 100% does twice the damage of 50% |
+| EnTorp Tubes | **100% = three tubes, 67-99% = two, 34-66% = one** |
+| Short Range Scanners | above 90% full; **below 90% cannot see anything smaller than a star**; below 50% dead |
+| Long Range Scanners | **below 100% cannot detect enemy ships**; below 50% dead |
+| Computer | chart entries can be lost and need re-scanning; **automatic navigation needs 100%** |
+| Life Support | must be 100% to make food and oxygen; without it the ship lasts **two days** on reserves |
+| Transporter | must be **100%** to use |
+| Shuttlecraft | must be **100%** to use, and takes **0.2 stardays** round trip |
+| Shields | pct is how efficiently shield energy becomes actual shielding |
+
+This is the largest single body of specified-but-unbuilt work in the project,
+and none of it needs an emulator to settle.
+
+### Smaller rules, also documented and worth checking against the port
+
+- Shields at 100% energy: **no enemy fire penetrates**, energy only drains from
+  the shields. Once fire penetrates, main energy is lost and systems damage.
+- Raising shields costs a little main energy; **lowering costs nothing**.
+- Torpedo **accuracy is thrown off when fired with shields raised**.
+- Torpedoes replenish at a StarBase **or supply station**.
+- Docked at a StarBase, **its shields protect you** from enemy lasers.
+- Warp travel with shields raised costs **double** -- already implemented
+  (`core/trek.c`, `if (ship.shields_up) cost *= 2`).
+- Move accepts `6235` as well as `6,2,3,5`, and `m6235` on the command line;
+  `WARP` accepts `w5.2` inline.
+- Enemy colours: battleship light blue, command red, scout purple, **supply
+  green**.
+- Directions are measured with **0 degrees directly to the right**.
