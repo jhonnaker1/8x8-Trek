@@ -1219,7 +1219,7 @@ and it is short enough to reproduce whole.
 | `T)orps` | fire torpedoes | **done** |
 | `W)arp` | set warp speed | **done** |
 | `E)nergy` | energy transfer | **done** (4de6758) |
-| `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
+| `SHUP` / `SHDN` | shields up / down (arrow keys) | **done as words** (4de6758); **the ARROW KEYS are still unbound** -- MEASURED 2026-08-24, both `EGATREK.REF` ("Shields Up (use up arrow)") and the in-game F1 help give the arrows as the primary binding. The matrix has them since `MSGS`; this is a two-line change and the last outstanding correction to an implemented command |
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
 | `MSGS` | review old messages | **done** 2026-08-23 -- 32-entry log in VDC RAM at $1000, scrolling viewer, opens at the bottom, ESC only. Built to the capture; see MEASURED.md |
