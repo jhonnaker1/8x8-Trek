@@ -570,30 +570,50 @@ checklist of *which situations need a message*, not as text to copy.
    uses the KERNAL's stock character set and that *"EGA Trek's panels want
    CP437-style glyphs"*.
 
-   **There is no CP437 charset in the original to copy.** EGA Trek runs in BIOS
+   **The frames are not characters, but the text is.** EGA Trek runs in BIOS
    mode 16, 640x350 EGA **graphics** -- which is why `GET /video/text` is
    useless against it and why the panel table had to be measured off pixels.
-   Its frames were read as maximal single-colour *runs*: they are pixel lines,
-   not box-drawing characters. Its text is bitmap glyphs drawn at whatever
-   pitch it likes inside those frames. Asking for CP437 fidelity is asking to
-   match something that is not there.
+   The frames were read as maximal single-colour *runs*: they are pixel lines,
+   not box-drawing characters, and there is no character grid to copy them
+   from. The **text** is a different story -- 8x8 bitmap glyphs on an 8-pixel
+   grid, and CP437 turned out to be half of where they come from. See (a).
 
-   What is really underneath this item splits in two, and only one half has
-   anything to do with a character set.
+   (An earlier revision of this item said flatly that there was no CP437 in the
+   original at all. That was too strong, and dumping the fonts is what showed
+   it: the frames argument is right, and it does not carry to the text.)
 
-   ### (a) The letterforms -- the real visible gap, and it is measurable
+   What is really underneath this item splits in two.
+
+   ### (a) The letterforms -- DUMPED 2026-08-23, and it is two fonts
 
    PETSCII uppercase is a distinctive Commodore face and it does not look like
-   EGA Trek. The useful fact: the EGA BIOS carries an **8x8** font alongside
-   the 8x14 one, and 8x8 is exactly the VDC's cell. It sits in the video BIOS
-   ROM at C000 in the same DOSBox instance we already drive, so
-   `GET /memory/{off}/{len}` can dump it -- pattern-match one known glyph to
-   find the table base. Same instrument as everything else on this project, and
-   no hand-drawing of 96 glyphs.
+   EGA Trek. That gap is now closed as a *measurement*: `tools/dump_font.py`
+   extracts the font the player actually sees, and the answer is a split one.
 
-   **UNKNOWN, and it is a small measurement:** whether EGA Trek's own text *is*
-   that ROM font, or Turbo Pascal's Graph unit drawing its own. Capture a glyph
-   from a frame and compare bitmaps before assuming.
+       digits, punctuation, space   ->  the BIOS ROM CP437 8x8 font
+       letters A-Z and a-z          ->  a 464-byte table inside EGATREK.EXE
+
+   So the two previous versions of this item were each half right. CP437 *is*
+   in there -- 8x8, pulled from the video BIOS at run time -- but the 58
+   alphabetic slots are overridden by a table linked into the executable, one
+   pixel wider and rounder than the ROM's. The full audit, the probe glyphs
+   that locate each base, and the trap that makes a naive dump ship x86
+   instructions as bitmaps are in MEASURED.md, "The font is two fonts".
+
+   **The port needs both halves.** Taking only the ROM font gives correct
+   digits, punctuation and box-drawing with visibly wrong letters -- and the
+   letters are most of what a player reads.
+
+   Two things deliberately left unverified rather than assumed: whether a real
+   EGA card's 8x8 ROM font is byte-identical to the S3 BIOS DOSBox emulates
+   here (the game reads these at run time, so on real hardware this half was
+   whatever the player's card carried), and whose face the letter table is --
+   Turbo Pascal's Graph unit is the obvious suspect and has not been checked.
+
+   Output lands in `build/` and is **never committed**, same rule as
+   `tools/gen_music.py`: the ROM half is DOSBox's table and the letter half is
+   lifted out of Anderson's binary, and both regenerate from sources anyone
+   using this repo has to fetch for themselves anyway.
 
    ### (b) Game symbols -- custom art either way
 

@@ -2610,3 +2610,88 @@ Level 3 gave **38**, the tenth sample. Level 2 gave **30** -- the **first
 non-level-3 sample this project has**, which is the reading the count formula
 actually needs. Series so far: level 3 = 40, 42, 42, 42, 34, 38, 37, 37, 38,
 38; level 2 = 30.
+
+## The font is two fonts (2026-08-23)
+
+Item 6 assumed EGA Trek's panels wanted CP437 glyphs, and the last revision of
+that item argued the opposite -- that a 640x350 graphics-mode game has no
+character set to copy at all. **Both were half right**, which only came out by
+dumping the fonts and comparing them glyph by glyph.
+
+    digits, punctuation, space   ->  the BIOS ROM CP437 8x8 font
+    letters A-Z and a-z          ->  a 464-byte table inside EGATREK.EXE
+
+`tools/dump_font.py` extracts both and assembles the font the player actually
+sees. Output goes to `build/` and is never committed, same rule as
+`tools/gen_music.py`.
+
+### How each was found, and why neither offset was assumed
+
+Both bases are unaligned and both would have been got wrong by arithmetic, so
+each is located by pattern-matching a glyph whose bitmap is known:
+
+- **ROM font at 0xC01F5.** The video BIOS reads through `/memory` like any
+  other address -- 32K at 0xC0000 with a valid 55AA signature. The probe is
+  glyph 1, the CP437 smiley, whose 8x8 form cannot collide with the 8x14 set's
+  version of the same glyph (fourteen bytes, blank rows top and bottom). Three
+  assertions then confirm the base: glyph 0 blank, 0xDB solid, 0xB1 the 55/AA
+  dither. The 8x14 table is also present, at 0x1924.
+- **Letter table at 0x1B149 in `EGATREK_unpacked.exe`.** The probe is `'A'`
+  as read off a 640x350 capture -- a measurement, not a font lookup. Every
+  letter of "Welcome aboard Captain!" then resolved to a single hit at a
+  consistent base.
+
+**The table starts AT `'A'` and ends at `'z'`** -- 58 glyphs, 464 bytes. Below
+0x41 and above 0x7A is x86 code, and reading it as glyphs produces convincing
+nonsense: index 0x20, where a blank space belongs, holds `6E 00 5F 5E 06 E8 95
+FB`. That is the trap this file exists to record. A dump that assumed a
+256-glyph table would have shipped instructions as bitmaps and only found out
+on screen.
+
+### The audit that settled it
+
+Every glyph on the briefing prompt and the setup screen was compared against
+both sources:
+
+| characters | ROM | EXE |
+|---|---|---|
+| `! / < > ? : ( ) , -` and space | match | absent |
+| digits `1 2 3 5` | match | absent |
+| `C Y a b c d e f g i l m n o p q r t u y` | differ | match |
+| `I N W _ ` + backtick + ` x` | match | match (identical in both) |
+
+The punctuation and digits are **not present anywhere** in the executable or in
+640K of conventional memory -- searched as 8-byte runs, zero hits -- while they
+are on screen at that moment. That is what makes the split a measurement rather
+than an inference.
+
+Six of the 58 letter slots are byte-identical in both fonts, so they prove
+nothing either way; the other 52 are decisively the executable's.
+
+### What the letters actually differ by
+
+One pixel of width, consistently. The executable's face is rounder and fills
+more of the cell:
+
+        'e'  EXE            ROM
+             .#####..       .####...
+             ##...##.       ##..##..
+             #######.       ######..
+             ##......       ##......
+             .######.       .####...
+
+### Consequences for item 6
+
+- The port needs **both halves**. Taking only the ROM font gives the right
+  digits, punctuation and box-drawing with visibly wrong letters.
+- 464 bytes of letters plus whichever CP437 glyphs the console actually uses is
+  well inside what the C128 binary can carry, so item 6 stays un-gated by disk.
+- **UNVERIFIED:** whether a real EGA card's ROM 8x8 font is byte-identical to
+  the S3 Trio64 BIOS DOSBox emulates here (`machine = svga_s3`). The CP437 8x8
+  set is meant to be common to both, but that has not been tested on this
+  machine, and the game pulls these glyphs from the BIOS at run time -- so on
+  real hardware the non-letter half was whatever the player's video card
+  carried.
+- **UNVERIFIED:** whose face the letter table is. It is linked into the
+  executable, which is all that has been established. Turbo Pascal's Graph unit
+  is the obvious suspect and has not been checked.
