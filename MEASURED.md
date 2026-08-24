@@ -2903,6 +2903,27 @@ card. The in-game list is not the authority.
     Captain, that is our current location!
     But captain, the navigation computer shows no such location.
 
-and `NAVIGATION` has **two input modes** that alternate: `Quad, Sector:` taking
-`8,6,4,4`, and `DeltaX:` / `DeltaY:` taking two relative numbers one at a time.
-What toggles between them is not established.
+and `NAVIGATION` has **two input modes**: `Quad, Sector:` taking `8,6,4,4`,
+and `DeltaX:` / `DeltaY:` taking two relative numbers one at a time.
+
+**CORRECTION 2026-08-24: "what toggles between them" was written here as not
+established, and it was documented in two places I already had.** The manual
+(l.515-529) explains it, and NOTES.md has carried "Damaged computer changes how
+M works" since an earlier session, citing that same passage. Straight into the
+trap [[negative-claims-about-egatrek]] exists to prevent: I reported an unknown
+without checking the sources on the shelf.
+
+What the manual actually says:
+
+- **Automated** is the default: absolute `Quad, Sector`, **vertical first**.
+  Giving only a sector is an impulse move inside the current quadrant.
+- **Manual** asks `DeltaX` (vertical) then `DeltaY` (horizontal), relative and
+  signed. **The digit before the decimal point is QUADRANTS and the digit after
+  it is SECTORS**, each 0-7. Moving from 1,8,1,8 to 2,6,1,6 is DeltaX `1.0`,
+  DeltaY `-2.2`.
+- It switches **automatically when the navigation computer is damaged** -- then
+  it is the only way to move -- and **voluntarily by typing just `M`** at the
+  coordinate prompt.
+
+That last one explains the session above completely: the mode changed under me
+because my desynced scripted keys put a stray `M` into the coordinate prompt.
