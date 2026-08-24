@@ -2695,3 +2695,86 @@ more of the cell:
 - **UNVERIFIED:** whose face the letter table is. It is linked into the
   executable, which is all that has been established. Turbo Pascal's Graph unit
   is the obvious suspect and has not been checked.
+
+## MSGS and A#, captured whole (2026-08-23)
+
+Both were listed as blocked on "no mechanic behind it". One session settled
+both, and `A#` turned out to be a real mechanic that would have been invented
+wrongly: the port's message panel is not the archive, and acknowledging is not
+deleting. Captures in `reference/shots/msgs/`.
+
+### A#: the panel is a queue, the log is a record
+
+| | |
+|---|---|
+| `A1` | removes the **first** message box from the panel; the rest move up |
+| bare `A` | clears **every** message from the panel |
+| `A5` with an empty panel | silent no-op, no error, nothing drawn |
+| any of them | **costs no turn** -- the stardate did not move |
+| after `A1` | the acknowledged message is **still in MSGS** |
+
+So messages are numbered **1-based by position in the panel, top to bottom**,
+and acknowledging dismisses from the panel only.
+
+**The numbers are not displayed anywhere.** No capture this project has taken
+shows a digit on a message box, and this session looked for one deliberately.
+The player counts boxes down from the top. That is worth knowing before
+building it, because the obvious port -- print a number in each box border --
+would be an addition to the original, not a port of it.
+
+### MSGS: an archive, and it is not the panel
+
+- **Costs no turn.** 3500.0 before, 3500.0 after.
+- **Opens on an empty log**, drawing the box, the title and the footer with
+  nothing between them. It does not refuse.
+- **Opens scrolled to the BOTTOM**, newest visible. The topmost entry is
+  routinely cut off mid-way, which is how it announces there is more above.
+- **Scrolls one LINE per keypress**, not one entry, clamped at both ends.
+  Verified by pressing up once and watching the window move exactly one line.
+- Acknowledged messages remain. The log is not a view of the panel.
+
+### The overlay, measured off a 640x350 frame
+
+Outer box **x 200..520, y 160..302** -- 321x143 pixels, which is columns 25..65
+and about rows 11.4..21.6. Fill is EGA dark grey (8); the border is a cyan
+rectangle inset three pixels.
+
+    y 162   PREVIOUS MESSAGES              cyan (3), centred
+    y 177   StarDate: 3520.7               MAGENTA (5), x=210
+    y 187     COMMUNICATIONS: ...          GREEN (2), x=218
+    y 197     ...wrapped, up to 3 lines
+    ...      eleven content lines in all
+    y 288   ^ and v to scroll, ESC to exit RED (4), centred
+
+**Content lines are on a 10-pixel pitch**, starting at y=177 -- neither the
+14-pixel character row nor the 8-pixel font height. A graphics-mode game can
+put text wherever it likes, and this is the third panel where it does (the
+short range scan and SYSTEMS STATUS were the first two). Eleven lines of 10px
+occupy what a character display would need eleven rows for, so on the VDC the
+box has to be **taller in rows than the original is**, exactly as the scan and
+chart panels already are.
+
+**Entry shape:** one `StarDate: N.N` line, then the message indented one
+character and wrapped to at most three lines. Variable height, 2 to 4 lines.
+
+**Department colour does NOT carry into the overlay.** On the panel,
+COMMUNICATIONS is yellow and DAMAGE REPORT orange. In the overlay both are
+green, with only the `StarDate:` line coloured differently. Measured on an
+entry of each kind in the same capture, so this is not a sampling artefact.
+
+### A discrepancy left as observed, not explained
+
+The panel stamps its boxes with one stardate and the log shows another for the
+same message:
+
+| message | panel border | MSGS |
+|---|---|---|
+| Ceti Alpha-8 evacuation | 3520.1 | 3520.7 |
+| Life Support failing | 3520.2 | 3520.7 |
+| Lasers failing (54%) | 3542.1 | 3542.7 |
+
+The log's value looks like the stardate at the END of the turn and the panel's
+like the moment inside the move when the event fired. Both readings ended in
+.7, which is either the pattern or a coincidence of two moves of similar
+length -- two samples cannot tell those apart, so nothing is concluded here.
+The port stamps at message time, which matches the panel.

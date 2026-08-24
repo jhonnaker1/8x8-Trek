@@ -23,6 +23,19 @@
 #include <stdint.h>
 
 #define KB_NONE   0
+
+/* The two arrow keys, and the one place in this header where a value is NOT
+   ASCII: there is no ASCII code for a cursor key. These are taken from the
+   unused control range, which this port never produces otherwise, rather than
+   from PETSCII's 145/17 -- a PETSCII value here would read as though the
+   translation trap this header warns about had been let back in.
+
+   They come off the C128's DEDICATED cursor keys, not the C64-style shared
+   CRSR key, so no shift decoding is involved. See input.c: those live on the
+   extended matrix and need a different strobe. */
+#define KB_UP     1
+#define KB_DOWN   2
+
 #define KB_RETURN 13
 #define KB_ESC    27
 #define KB_DELETE 20

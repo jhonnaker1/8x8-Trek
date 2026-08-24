@@ -17,6 +17,9 @@ Example, from a fresh launch to a level-3 game:
 
     python3 tools/drive_original.py line:  line:n line:n line:3 line:3 \\
                                    line:abc shot:console
+
+Actions: line:TEXT, type:TEXT, key:NAME (KBD_ is prepended), enter, wait:SECS,
+shot:NAME.
 """
 import json
 import os
@@ -60,6 +63,18 @@ def line(text="", pause=2.0):
     enter(pause)
 
 
+def key(name, pause=1.5):
+    """One named key, press and release.
+
+    MSGS is the first command in this project that needs keys with no
+    character: its viewer scrolls on the arrows and closes on ESC, and
+    /input/type has nothing to say about any of them."""
+    call("/input/sequence", {"events": [
+        {"t": 0, "type": "key", "key": "KBD_" + name, "pressed": True},
+        {"t": 60, "type": "key", "key": "KBD_" + name, "pressed": False}]})
+    time.sleep(pause)
+
+
 def shot(name):
     path = os.path.join(OUT, name + ".png")
     with open(path, "wb") as f:
@@ -79,6 +94,8 @@ def main():
             print(shot(arg[5:]))
         elif arg == "enter":
             enter()
+        elif arg.startswith("key:"):
+            key(arg[4:])
         elif arg.startswith("wait:"):
             time.sleep(float(arg[5:]))
         else:

@@ -1222,12 +1222,12 @@ and it is short enough to reproduce whole.
 | `SHUP` / `SHDN` | shields up / down (arrow keys) | **done** (4de6758) |
 | `MAX` | divert maximum energy to shields | **done** (4de6758) |
 | `R)epair` | state of repair report | **done** (4799972) -- its own screen, not the dialog: twelve systems plus headers do not fit thirteen lines |
-| `MSGS` | review old messages | MEASURED 2026-08-23: a scrollable `PREVIOUS MESSAGES` overlay, entries stamped with their stardate, up/down to scroll and ESC to exit. Needs a deeper log and a scrolling viewer |
+| `MSGS` | review old messages | **fully specified** 2026-08-23 -- geometry, colours, the 10px line pitch, opens scrolled to the bottom, scrolls one LINE at a time, opens on an empty log, costs no turn. See MEASURED.md |
 | `C)hart` | chart of known galaxy | **done** 2026-08-23 -- redraws the chart panel and costs no turn, which is exactly the no-op the original performs on a console already showing it |
 | `F)ix` | control which system engineering repairs | **done** 2026-08-23 -- `ENGINEERING` asks for one system by number, `L` lists all twelve in two columns, `0` aborts. `REPAIR_FOCUS_FACTOR` is DERIVED and carries the experiment that would settle it |
 | `INFO` | info on enemy in current quadrant | **done** -- class, sector, range, bearing and strength as a percentage, SPACE to step |
 | `HAIL` | hail a StarBase | **done** 2026-08-23 as measured -- costs a turn and posts an empty COMMUNICATIONS entry. What it says with a base IN RANGE is still uncaptured, so nothing is invented |
-| `A#` | acknowledge message # | no mechanic behind it |
+| `A#` | acknowledge message # | **fully specified** 2026-08-23 -- `A1` dismisses the first panel box, bare `A` clears all, out of range is a silent no-op, costs no turn, and the message STAYS in the MSGS log. The numbers are never displayed: the player counts boxes |
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
 | `RAY` | death ray | unimplemented mechanic |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |

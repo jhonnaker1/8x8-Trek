@@ -83,10 +83,76 @@ static unsigned char key_down(unsigned char i) {
     return pressed;
 }
 
+/* The C128's DEDICATED cursor keys, which the C64-style matrix above cannot
+ * reach.
+ *
+ * The C64 has one shared CRSR key per axis: down unshifted, up shifted. The
+ * C128 adds four separate keys, and they hang off three extra column lines
+ * K0-K2 in the VIC-IIe's register $D02F rather than off CIA1's PRA. VICE's
+ * keymap (the same authority as the table above) lists them as rows 8, 9 and
+ * 10, and its "duplicate the cursor keys (c128 mode)" block gives
+ *
+ *     Up 10 3      Down 10 4      Left 10 5      Right 10 6
+ *
+ * so row 10 is K2 -- line index 2 here -- and the column is read back on PRB
+ * exactly as before.
+ *
+ * Taking this route rather than the shared key is a deliberate choice: the
+ * shared one would need the shift state decoded to tell up from down, and
+ * every shift-reading bug this port might have had would land on a scrolling
+ * viewer where holding a key is normal.
+ *
+ * PRA must be driven high while this runs, or a normal column is still
+ * selected and the read is the union of two keys. */
+#define VIC_KBD (*(volatile unsigned char *)0xD02F)
+
+typedef struct {
+    unsigned char line;  /* 0, 1, 2 for keymap rows 8, 9, 10 */
+    unsigned char prb;   /* keymap column, as above */
+    char          ch;
+} ExtKey;
+
+static const ExtKey extkeys[] = {
+    { 2, 3, KB_UP }, { 2, 4, KB_DOWN },
+};
+
+#define EXT_COUNT (sizeof extkeys / sizeof extkeys[0])
+
+/* Same SEI/CLI reasoning as key_down(): the KERNAL's 60Hz IRQ strobes the
+   keyboard too, and it touches $D02F as well as CIA1, so BOTH have to be
+   saved, driven and put back inside one atomic block. */
+static unsigned char key_down_ext(unsigned char i) {
+    unsigned char save_pra, save_k, pressed;
+
+    SEI();
+    save_pra = CIA1_PRA;
+    save_k   = VIC_KBD;
+    CIA1_PRA = 0xFF;
+    VIC_KBD  = (unsigned char)~(1 << extkeys[i].line);
+    pressed  = (unsigned char)((CIA1_PRB & (1 << extkeys[i].prb)) == 0);
+    VIC_KBD  = save_k;
+    CIA1_PRA = save_pra;
+    CLI();
+
+    return pressed;
+}
+
+/* One index space covers both tables: below KEY_COUNT is the CIA1 matrix,
+   at or above it is `extkeys[i - KEY_COUNT]`. Callers never split them. */
+static unsigned char key_down_any(unsigned char i) {
+    if (i < KEY_COUNT) return key_down(i);
+    return key_down_ext((unsigned char)(i - KEY_COUNT));
+}
+
+static char key_char(unsigned char i) {
+    if (i < KEY_COUNT) return keys[i].ch;
+    return extkeys[i - KEY_COUNT].ch;
+}
+
 /* Index of the first key held, or 0xFF. */
 static unsigned char scan(void) {
     unsigned char i;
-    for (i = 0; i < KEY_COUNT; i++) {
+    for (i = 0; i < KEY_COUNT + EXT_COUNT; i++) {
         /* Sound advances HERE, inside the matrix scan, not once per pass
            around it. MEASURED: a full pass of this loop takes about 12ms --
            key_down() does a runtime variable shift per key, which cc65
@@ -99,7 +165,7 @@ static unsigned char scan(void) {
            Outside key_down()'s SEI/CLI on purpose -- the atomic pair is the
            CIA strobe and read, and nothing here touches CIA1. */
         snd_poll();
-        if (key_down(i)) return i;
+        if (key_down_any(i)) return i;
     }
     return 0xFF;
 }
@@ -147,7 +213,7 @@ char kb_waitkey(void) {
         i = scan();
         if (i != 0xFF) {
             settle();                /* debounce the contact bounce */
-            if (key_down(i)) return keys[i].ch;
+            if (key_down_any(i)) return key_char(i);
         }
     }
 }

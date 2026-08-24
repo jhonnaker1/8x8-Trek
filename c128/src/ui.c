@@ -586,8 +586,107 @@ static void msg_clear_region(void) {
     scr_fill_rect(MSG_X, MSG_Y, MSG_W, MSG_H, SC_SPACE, COL_LABEL);
 }
 
+/* ------------------------------------------------------ the message log */
+
+/* MSGS reviews messages that have already scrolled off the four-box panel,
+ * so it needs an archive deeper than the panel. The archive lives in **VDC
+ * RAM**, not in the 8502's.
+ *
+ * That is not cleverness for its own sake. When this was written the linked
+ * binary had 395 bytes left between the end of BSS and the top of MAIN --
+ * NOT the 1,688 the briefing note recorded, which was measured before the
+ * sound driver and six commands landed. Thirty-two entries of panel-shaped
+ * message cost 1,792 bytes. There is no version of this that fits in 8502
+ * RAM.
+ *
+ * The VDC has 16K of its own and this port uses three regions of it: the
+ * screen at $0000, the attributes at $0800, and the character set the KERNAL
+ * left at $2000. **$1000..$1FFF is unused**, which is 4K going spare on the
+ * far side of a bus the CPU's memory map never sees.
+ *
+ * A message log is close to the ideal tenant for it. VDC RAM is slow -- every
+ * byte is a register write, an address set-up and a ready poll -- but this is
+ * written once per message and read only while MSGS is open. Nothing in the
+ * turn loop touches it.
+ *
+ * The stride is 64 rather than the 55 an entry needs, so the offset is a
+ * shift instead of a multiply. The nine wasted bytes an entry are free: they
+ * are bytes of a region nothing else can use. */
+#define LOG_BASE    0x1000
+#define LOG_STRIDE  64          /* power of two on purpose -- see above */
+#define LOG_SLOTS   32
+#define LOG_DEPT    16
+#define LOG_TEXT    (MSG_WIDTH + 1)
+
+/* Entry layout, within the 64-byte stride:
+     0..1    stardate in tenths, low byte first
+     2..17   department, NUL padded
+     18..54  text, NUL padded
+     55..63  unused */
+#define LOG_OFF_DEPT  2
+#define LOG_OFF_TEXT  (LOG_OFF_DEPT + LOG_DEPT)
+
+static unsigned char log_count = 0;   /* entries written, capped at LOG_SLOTS */
+static unsigned char log_head  = 0;   /* next slot to write; wraps */
+
+/* Where MSGS puts the entry it is currently drawing. Statics rather than out
+   parameters: cc65 -O has miscompiled an out parameter in this port before
+   (see read_field), and this build passes -O. */
+static char     view_dept[LOG_DEPT + 1];
+static char     view_text[LOG_TEXT + 1];
+static uint16_t view_date;
+
+static unsigned int log_addr(unsigned char slot) {
+    return (unsigned int)LOG_BASE + ((unsigned int)slot << 6);
+}
+
+/* Copies a NUL-terminated string into `n` bytes, padding with NUL. Written as
+   one pass because the VDC's update address auto-increments: seeking again
+   per byte would cost an address set-up and a ready poll each time. */
+static void log_put_str(const char *src, unsigned char n) {
+    unsigned char i;
+    unsigned char c = 1;             /* nonzero until the terminator is hit */
+
+    for (i = 0; i < n; i++) {
+        if (c) c = (unsigned char)src[i];
+        vdc_data_write(c);
+    }
+}
+
+static void log_append(const char *dept, const char *text, uint16_t date) {
+    vdc_set_address(log_addr(log_head));
+    vdc_data_write((unsigned char)(date & 0xFF));
+    vdc_data_write((unsigned char)(date >> 8));
+    log_put_str(dept, LOG_DEPT);
+    log_put_str(text, LOG_TEXT);
+
+    log_head = (unsigned char)((log_head + 1) % LOG_SLOTS);
+    if (log_count < LOG_SLOTS) log_count++;
+}
+
+/* `n` counts from the OLDEST entry still held, so callers index a list rather
+   than a ring. Once the log has wrapped, entry 0 is whatever log_head points
+   at, because that is the slot about to be overwritten. */
+static void log_fetch(unsigned char n) {
+    unsigned char slot, i;
+
+    slot = (log_count < LOG_SLOTS)
+         ? n
+         : (unsigned char)((log_head + n) % LOG_SLOTS);
+
+    vdc_set_address(log_addr(slot));
+    view_date = vdc_data_read();
+    view_date |= (uint16_t)vdc_data_read() << 8;
+    for (i = 0; i < LOG_DEPT; i++) view_dept[i] = (char)vdc_data_read();
+    view_dept[LOG_DEPT] = '\0';
+    for (i = 0; i < LOG_TEXT; i++) view_text[i] = (char)vdc_data_read();
+    view_text[LOG_TEXT] = '\0';
+}
+
 void ui_clear_messages(void) {
     msg_count = 0;
+    log_count = 0;
+    log_head  = 0;
     msg_clear_region();
 }
 
@@ -657,6 +756,12 @@ void ui_message(const char *dept, const char *text) {
     msg_text[msg_count][MSG_WIDTH] = '\0';
     msg_date[msg_count] = ship.stardate;
     msg_count++;
+
+    /* The panel keeps its own four copies rather than reading them back out
+       of VDC RAM on every redraw. Duplicated storage, but the duplicate is
+       220 bytes that were already spent and the alternative is 256 VDC reads
+       per message. */
+    log_append(dept, text, ship.stardate);
 
     msg_redraw();
 }
