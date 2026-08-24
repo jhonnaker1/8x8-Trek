@@ -2778,3 +2778,131 @@ like the moment inside the move when the event fired. Both readings ended in
 .7, which is either the pattern or a coincidence of two moves of similar
 length -- two samples cannot tell those apart, so nothing is concluded here.
 The port stamps at message time, which matches the panel.
+
+## One session, three commands: SAVE, boss mode and RAY (2026-08-24)
+
+Run before implementing any of them, on the principle that the cost driver on
+this list is what is still unmeasured rather than what needs writing. All three
+came back with something that would have been got wrong by inference.
+
+### SAVE, and restore
+
+`SAVE` opens a **`SAVE GAME`** box asking:
+
+    File Name: _
+    <Enter> for default
+
+The default is **`EGATREK.SAV`**. It **costs no turn** -- the stardate did not
+move. The restore side is on the setup screen, after `Restore a saved game
+<Y/N>? Y`:
+
+    File name, <Enter> for default, <ESC> to abort:
+
+Restoring works and comes back to the exact saved state -- same quadrant,
+sector, stardate and Mongol count.
+
+**The file is PLAIN TEXT**, 1,896 bytes, and its shape is worth knowing even
+though this port's own format is binary and deliberately not compatible:
+
+    EGATrek 3.0        <- version banner, first line
+    CAPTURE            <- player name
+    2
+     2.0000000000E+00  <- Turbo Pascal reals, written with Write()
+     3.5000000000E+03  <- stardate 3500
+     ...
+
+The version banner on line one is the same idea as `TREK_SAVE_VERSION` in
+`core/serial.h`, arrived at independently. Anderson refused an unknown version
+the same way we do.
+
+### Boss mode: it SHELLS OUT, and that is not what "screen blanker" implied
+
+The command table here has described `Shift-F1` as a screen blanker since the
+reference card was first read. It is not. **It runs `COMMAND.COM` and you type
+`EXIT` to come back**, with the game state completely intact.
+
+The evidence, in the order it arrived:
+
+- Pressing it drops to a **real, live DOS prompt** -- typing `VER` echoes.
+- **`COMSPEC` is in the string table** as a standalone entry, which is exactly
+  what Turbo Pascal's `GetEnv('COMSPEC')` compiles to.
+- There is **no fake-prompt text anywhere in the binary**, so nothing is being
+  drawn to imitate DOS.
+- Typing `EXIT` returns straight to the console, stardate unchanged.
+
+**Why it looked broken first.** Under automation it produced only "a flash":
+`Exec` fails immediately when `COMSPEC` is not set, which is the failure
+looking exactly like a screen blank. Injected Shift-F1 also never triggered it
+at all -- Jamie pressing the key on the real window is what produced it, and
+Jamie asking "are there special commands in boss mode?" is what sent the search
+to the string table where `COMSPEC` was sitting.
+
+**For the port:** a shell-out has no C128 equivalent worth imitating. Blank the
+VDC and wait for a key, and record here that the original does something else.
+
+### RAY: four outcomes, and one of them destroys your ship
+
+Refused with no enemies present, costing no turn:
+
+    SCIENCE: Scanners show no enemy ships in this quadrant.
+
+With enemies, `WEAPONS CONTROL` asks first, in the original's own words:
+
+    Captain, I wish to remind you that the death ray is experimental in
+    nature and has been highly prone to failures. Are you sure that you
+    wish to continue <Y/N>?
+
+Answering Y prints `Preparing death ray...` then `Firing!`, then one of **four
+outcomes**, which the string table holds in this order:
+
+    It worked!
+    Death ray misfires.
+    Nothing happens...Reports coming in from all decks...half the crew
+      has turned into some kind of mutants!
+    The apparatus is going unstable!
+
+**The fourth destroys the ship.** Observed live: Jamie watched
+`Preparing / Firing! / The apparatus is going unstable!` and then the ship
+self-destructed. The screenshots at four-second intervals missed the unstable
+message entirely and caught only the aftermath -- a reminder that a polled
+capture is not a recording.
+
+**That aftermath is a screen this port does not have**, and it is not the
+ordinary Detailed Evaluation:
+
+    Dept. of Space / EARTH HEADQUARTERS / Top Secret
+    From: Commander, Earth Sector
+    To:   Headquarters
+    Date: 3526.6
+    Re:   Loss of U.S.S. Lexington, RCB-92
+
+    U.S.S. Lexington destroyed by death ray explosion this stardate, with
+    loss of all aboard.  Results of operations prior to loss follow:
+
+     Stardays in action: 26.6
+     Mongol ships destroyed per stardate: 0.04
+     Score: -701
+
+ONE SAMPLE. Which of the four outcomes is how likely is not measured, and the
+ancestor's failure table is a hypothesis for that, not an answer.
+
+### Bonus: shields are the ARROW KEYS
+
+`F1` opens `COMMANDS AVAILABLE`, the in-game command list, and it says shields
+are the up and down arrows. `EGATREK.REF` agrees: `SHUP Shields Up (use up
+arrow)`. This port implemented `SHUP`/`SHDN` as word commands only. It now has
+arrow keys in the matrix (added for `MSGS`), so binding them is a small change
+and the original's own primary binding.
+
+Note also that **boss mode is NOT in the F1 help** -- only on the reference
+card. The in-game list is not the authority.
+
+### Bonus: four M)ove refusals, none of them previously recorded
+
+    But captain, that quadrant contains a supernova!
+    Captain, that is our current location!
+    But captain, the navigation computer shows no such location.
+
+and `NAVIGATION` has **two input modes** that alternate: `Quad, Sector:` taking
+`8,6,4,4`, and `DeltaX:` / `DeltaY:` taking two relative numbers one at a time.
+What toggles between them is not established.

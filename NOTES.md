@@ -1229,11 +1229,11 @@ and it is short enough to reproduce whole.
 | `HAIL` | hail a StarBase | **done** 2026-08-23 as measured -- costs a turn and posts an empty COMMUNICATIONS entry. What it says with a base IN RANGE is still uncaptured, so nothing is invented |
 | `A#` | acknowledge message # | **done** 2026-08-23 -- `A1` dismisses the first panel box, bare `A` clears all, out of range is a silent no-op, costs no turn, and the message stays in the log. No numbers are drawn on the boxes, because the original draws none |
 | `S)elf` | self destruct | **done** -- EGA Trek's own sequence and its ESC abort, RECONCILED 2026-08-22; the blast model is still the ancestor's kaboom() |
-| `RAY` | death ray | unimplemented mechanic |
+| `RAY` | death ray | **fully specified** 2026-08-24 -- refusal with no enemies, the WEAPONS CONTROL warning, `Preparing`/`Firing!`, and four outcomes of which the fourth DESTROYS THE SHIP and prints a Top Secret loss report this port does not have. See MEASURED.md |
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |
-| `SAVE` | save game | deferred, see item 10 |
+| `SAVE` | save game | **fully specified** 2026-08-24 -- `SAVE GAME` box, `File Name:`, `<Enter> for default` = `EGATREK.SAV`, costs no turn; restore is on the setup screen with `<ESC> to abort`. The disk seam it needs is already built |
 | `SND` | toggle sound | **done** -- toggles the same flag the original keeps at DGROUP+0x1cc8 |
-| `Shift-F1` | boss mode | screen blanker |
+| `Shift-F1` | boss mode | **fully specified** 2026-08-24, and it is NOT a screen blanker -- it shells out to `COMMAND.COM` via `GetEnv('COMSPEC')` and `EXIT` returns. No C128 equivalent; the port should blank the VDC and wait for a key |
 
 Plus the function keys, which are shortcuts rather than new commands:
 F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship, F5 Max Energy, F6 Fix
