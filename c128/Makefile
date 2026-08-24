@@ -1,6 +1,17 @@
-CC65_TARGET = c128
-SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c src/music_data.c \
-      ../core/trek.c
+# llvm-mos, not cc65. MIGRATED 2026-08-23 -- see NOTES.md "llvm-mos on the
+# C128". The short version: cc65 left 210 bytes of MAIN free and the disk seam
+# needed 815, llvm-mos leaves about 6,000 with the seam already linked, and the
+# charmap bug class that bit this project four separate times does not exist on
+# this toolchain.
+#
+# -Oz, NOT -Os. Measured on this codebase: -Oz is 3,200 bytes smaller than -Os,
+# which is most of the win. -flto adds nothing on top of either.
+MOSCC = $(HOME)/llvm-mos/bin/mos-c128-clang
+CFLAGS = -Oz -I src -I ../core -Wall
+
+SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
+      src/music_data.c src/storage.c \
+      ../core/trek.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
 
@@ -22,7 +33,7 @@ test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
 	cc -Wall -Wextra -o build/test_panels test/test_panels.c src/ui.c \
-	   src/layout.c ../core/trek.c
+	   src/layout.c ../core/trek.c ../core/hof.c
 	./build/test_panels
 	cc -Wall -Wextra -o build/test_sid test/test_sid.c -lm
 	./build/test_sid
@@ -37,22 +48,25 @@ verify: $(OUT)
 
 HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
       src/sid.h src/sidfreq.h src/music_data.h \
-      ../core/ega.h ../core/trek.h
+      ../core/ega.h ../core/trek.h ../core/hof.h ../core/storage.h \
+      ../core/serial.h
 
 # -m emits a map file. That is not housekeeping: tools/vice_mon.py can write
 # guest memory, but only if it knows where a variable lives, and the map is
 # the only place that says. Poking ship state and screenshotting the result is
 # the fastest way to check a panel without playing to that state.
-$(OUT): $(SRC) $(HDR) trek128.cfg
-	cl65 -t $(CC65_TARGET) -C trek128.cfg -O -m build/trek128.map -o $(OUT) $(SRC)
+$(OUT): $(SRC) $(HDR)
+	@mkdir -p build
+	$(MOSCC) $(CFLAGS) -Wl,-Map=build/trek128.map -o $(OUT) $(SRC)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
 # must not have it. Separate output means `make run` can never accidentally
 # launch the instrumented one.
-$(DEBUG_OUT): $(SRC) $(HDR) trek128.cfg
-	cl65 -t $(CC65_TARGET) -C trek128.cfg -O -DTREK_DEBUG_INPUT \
-	     -m build/trek128-debug.map -o $(DEBUG_OUT) $(SRC)
+$(DEBUG_OUT): $(SRC) $(HDR)
+	@mkdir -p build
+	$(MOSCC) $(CFLAGS) -DTREK_DEBUG_INPUT \
+	     -Wl,-Map=build/trek128-debug.map -o $(DEBUG_OUT) $(SRC)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows

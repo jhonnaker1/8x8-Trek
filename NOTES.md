@@ -2543,3 +2543,68 @@ workaround, and is **the same toolchain the MEGA65 port needs anyway**, so the
 work transfers instead of being spent once. Bank 1 stays available if the port
 later needs more than 6K, and code overlays remain the only thing that lifts
 the ceiling rather than raising it.
+
+## The migration to llvm-mos, and the disk write that still does not commit (2026-08-23)
+
+The port now builds with llvm-mos. `c128/trek128.cfg` is gone -- the low-RAM
+BSS relocation was a cc65 workaround and llvm-mos does not need it.
+
+### What the move actually took
+
+**One file.** Everything else compiled unchanged. `c128/src/storage.c` had to
+be rewritten against the raw KERNAL calls because llvm-mos's `<cbm.h>` keeps
+the whole high-level file API inside an `#if 0`.
+
+**One library bug found on the way.** `cbm_k_chkout` does not link: it
+references `__CHKOUT` where the C128 platform's `kernal.S` defines `__CKOUT`.
+`cbm_k_ckout` is the same vector and works. Worth remembering, because it
+means the wrappers in this library are not all sound.
+
+**`-Oz`, and the Makefile says so.** 3,200 bytes better than `-Os` here.
+
+Headroom now, with the disk seam, the hall of fame, `hof.c` and `serial.c` all
+linked in: **about 3,000 bytes**, against cc65's 210 with none of them.
+
+### Reading works, end to end
+
+Verified by writing a `TREK.SCR` full of `RDTEST0..RDTEST9` onto a disk image
+and watching them come back on the hall of fame screen in the right
+place-major slots -- first place bright, second dim. That also confirms the
+record layout on real hardware rather than just in a unit test.
+
+### Writing does NOT, and here is everything known about it
+
+The data reaches the disk. A run that recorded JAMIE at -730 put those exact
+bytes into the image, in the correct record. What never happens is the
+**close**: the new directory entry is created and left open, reading back as a
+splat file (`*seq`, zero blocks), so the next read finds nothing.
+
+Ruled out, each by measurement rather than argument:
+
+- **The 2MHz clock.** Suspected first, and a slow-down was written with a
+  confident comment before it was tested. A probe then read the same file
+  twice, once at 2MHz and once at 1MHz, and got identical results. The
+  workaround was deleted.
+- **`@` replace.** Worse, not better: it left the entry as type 0xA1, the
+  replace-pending bit still set. Scratching first at least removes the old
+  entry cleanly.
+- **CLRCHN/CLOSE ordering.** Swapped, no difference, reverted.
+- **SETBNK.** Tested by reading into a buffer at `$AE78`, which is BASIC ROM
+  in bank 15. It works.
+
+The remaining suspect is llvm-mos's KERNAL close wrapper, on the grounds that
+`cbm_k_chkout` in the same library is already provably broken. **Next thing to
+try: the OPEN/CHKOUT/BSOUT/CLOSE sequence in assembly against the vectors
+directly.**
+
+### Two hours of the debugging were a bad test rig, not a bug
+
+Worth recording because it wasted more time than the real fault. The first
+symptom was a blank hall of fame, and the cause was that `TREK.SCR` had never
+been written to the test disk -- the `c1541` command ran from the wrong
+directory and its error went unread. That sent the whole first diagnosis after
+the serial clock rate.
+
+And twice more, `c1541 -read` returned stale contents because VICE still held
+the image open. **Check the raw d64 bytes, and let VICE exit before trusting
+anything c1541 says about a disk the emulator was just using.**

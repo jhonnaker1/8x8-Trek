@@ -6,6 +6,8 @@
 #include "input.h"
 #include "egavdc.h"
 #include "../../core/trek.h"
+#include "../../core/hof.h"
+#include "../../core/storage.h"
 #include "../../core/ega.h"
 
 /* Raw screen codes. Letters are 1..26 in the C64/C128 set, digits 48..57 --
@@ -1422,8 +1424,38 @@ static const char *const rank_name[5] = {
     "LT. COMMANDER", "COMMANDER", "CAPTAIN", "COMMODORE", "ADMIRAL"
 };
 
+/* The hall of fame, now persistent.
+ *
+ * MEASURED 2026-08-23: TWO entries per rank, a bright first place and a dim
+ * second, and the file behind them is place-major -- records 0..4 are first
+ * place for ranks 1..5, records 5..9 second. core/hof.c owns that mapping.
+ *
+ * The table is read, offered the finished game, and written back only if the
+ * score earned a place. The original does the same: a scuttled ship scoring
+ * -930 left TREK.SCR's timestamp untouched.
+ *
+ * A missing or corrupt file reads as an EMPTY hall of fame and the game
+ * carries on. There is nowhere useful to report a disk fault at this point --
+ * the player has just finished a game -- and refusing to show the screen
+ * because a file is missing would be worse than showing a blank one. */
+static HofEntry hof[HOF_ENTRIES];
+static uint8_t  hof_buf[HOF_BUF];
+
+#define HOF_FILE "TREK.SCR"
+
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
-    unsigned char i, y;
+    unsigned char i, y, j, idx;
+    uint16_t got = 0;
+    uint16_t n;
+
+    if (plat_read_all(HOF_FILE, hof_buf, sizeof hof_buf, &got) != STOR_OK ||
+        !hof_parse(hof_buf, got, hof))
+        hof_clear(hof);
+
+    if (name[0] && hof_offer(hof, level, name, score)) {
+        n = hof_format(hof, hof_buf, sizeof hof_buf);
+        if (n) plat_write_all(HOF_FILE, hof_buf, n);
+    }
 
     scr_clear();
     scr_puts(33, 1, "DEPT. OF SPACE", COL_VALUE);
@@ -1435,16 +1467,20 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     scr_puts(46, 8, "RANK", COL_LABEL);
     scr_puts(62, 8, "SCORE", COL_LABEL);
 
-    for (i = 0; i < 5; i++) {
-        unsigned char j;
+    for (i = 0; i < HOF_RANKS; i++) {
         y = (unsigned char)(10 + i * 2);
         scr_puts(46, y, rank_name[i], COL_VALUE);
-        if (level == (uint8_t)(i + 1) && name[0]) {
-            scr_puts(16, y, name, COL_MSG);
-            put_signed(62, y, score, 6, COL_MSG);
-        } else {
-            for (j = 0; j < 20; j++) scr_put((unsigned char)(16 + j), y, SC_DOT, COL_GRID);
-            put_signed(62, y, 0, 6, COL_GRID);
+
+        /* First place bright, second place dim on the row below -- which is
+           how the original distinguishes them, and why ten records fit in
+           five rank rows. */
+        for (j = 0; j < HOF_PLACES; j++) {
+            unsigned char row = (unsigned char)(y + j);
+            unsigned char col = j ? COL_GRID : COL_MSG;
+
+            idx = hof_index((uint8_t)(i + 1), j);
+            scr_puts(16, row, hof[idx].name, col);
+            put_signed(62, row, hof[idx].score, 6, col);
         }
     }
 

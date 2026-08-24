@@ -108,6 +108,36 @@ static void test_offer(void) {
 /* A corrupt file must read as an EMPTY hall of fame, never a partly-filled
    one -- half a table from the disk and half from memory is the worse
    failure. */
+/* A name shorter than the field must not drag in whatever follows it.
+ *
+ * REGRESSION, seen on screen 2026-08-23: the setup screen's name buffer is 13
+ * bytes and the self-destruct password sits directly after it, so copying 25
+ * bytes and padding only the NULs recorded a Captain called WROTE as
+ * "WROTE......BOOM......" -- with the password in the hall of fame. Neither
+ * read was far enough out of bounds to fault, so nothing but the display
+ * could have caught it. */
+static void test_short_name_does_not_run_on(void) {
+    HofEntry t[HOF_ENTRIES];
+    /* A name buffer with live data immediately after it, exactly as the setup
+       struct puts the password after the name. */
+    struct { char name[13]; char secret[9]; } setup;
+    uint8_t i, idx;
+
+    memset(&setup, 0, sizeof setup);
+    strcpy(setup.name, "WROTE");
+    strcpy(setup.secret, "BOOM");
+
+    hof_clear(t);
+    check(hof_offer(t, 3, setup.name, 100), "the score is accepted");
+
+    idx = hof_index(3, 0);
+    check(strncmp(t[idx].name, "WROTE", 5) == 0, "the name is recorded");
+    for (i = 5; i < HOF_NAME; i++)
+        check(t[idx].name[i] == '.', "and every byte after it is padding");
+    check(strstr(t[idx].name, "BOOM") == NULL,
+          "nothing from past the name's end leaks in");
+}
+
 static void test_refuses_garbage(void) {
     uint8_t buf[HOF_BUF];
     HofEntry t[HOF_ENTRIES];
@@ -125,6 +155,7 @@ int main(void) {
     test_shipped_file();
     test_round_trip();
     test_offer();
+    test_short_name_does_not_run_on();
     test_refuses_garbage();
 
     if (failures) { printf("%d failure(s)\n", failures); return 1; }

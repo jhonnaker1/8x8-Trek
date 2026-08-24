@@ -17,6 +17,8 @@
 
 #include "../src/vdc.h"
 #include "../src/layout.h"
+#include "../../core/hof.h"
+#include "../../core/storage.h"
 #include "../src/ui.h"
 #include "../src/egavdc.h"
 #include "../src/input.h"
@@ -67,6 +69,45 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
                unsigned char ch, unsigned char color) {
     while (h--) scr_put(x, y++, ch, color);
 }
+
+/* A fake disk.
+ *
+ * ui_hall_of_fame() reads TREK.SCR, offers the finished game to it and writes
+ * it back, so the tests need somewhere for that to happen. An in-memory file
+ * is not just a stub to satisfy the linker: it makes the whole
+ * read-offer-write-display path testable on the build machine, which is where
+ * the place-major record layout would otherwise only be checkable by playing
+ * a game to the end on a real drive. */
+#define COL_GRID_TEST EGA_TO_VDC(EGA_DKGRAY)
+
+static unsigned char disk[512];
+static uint16_t      disk_len = 0;
+static int           disk_present = 1;   /* 0 simulates a missing file */
+static int           disk_writes = 0;
+
+uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) {
+    (void)name;
+    *got = 0;
+    if (!disk_present) return STOR_NOTFOUND;
+    if (disk_len > max) return STOR_ERROR;
+    memcpy(buf, disk, disk_len);
+    *got = disk_len;
+    return STOR_OK;
+}
+
+uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
+    (void)name;
+    if (len > sizeof disk) return STOR_ERROR;
+    memcpy(disk, buf, len);
+    disk_len = len;
+    disk_present = 1;
+    disk_writes++;
+    return STOR_OK;
+}
+
+uint8_t  plat_open(const char *name) { (void)name; return STOR_NOTFOUND; }
+uint16_t plat_read(void *buf, uint16_t len) { (void)buf; (void)len; return 0; }
+void     plat_close(void) { }
 
 /* ui.c's dialog code references this; nothing here calls it. */
 void vdc_reg_write(unsigned char r, unsigned char v) { (void)r; (void)v; }
@@ -911,6 +952,56 @@ static void test_msgs_opens_at_the_bottom(void) {
     check(!in_snapshot("MSG0"), "and the oldest is scrolled off the top");
 }
 
+/* The hall of fame, end to end: read the file, offer the game, write it back,
+ * and put it on screen in the right row.
+ *
+ * The row placement is the part worth asserting. MEASURED 2026-08-23: two
+ * entries per rank, first place bright on the rank's own row and second place
+ * dim on the row below -- which is why ten records fit in five rank rows, and
+ * why the file is place-major rather than rank-major. Getting that wrong puts
+ * an Admiral's score on the Captain's line and nothing else complains. */
+static void test_hall_of_fame_persists(void) {
+    char buf[32];
+
+    /* No file at all. The screen must still draw. */
+    disk_present = 0; disk_len = 0; disk_writes = 0;
+    screen_reset();
+    ui_hall_of_fame("", 3, 0);
+    check(disk_writes == 0, "an empty game writes nothing");
+    row_text(14, 16, 5, buf);
+    check(strcmp(buf, ".....") == 0, "a missing file draws a blank table");
+
+    /* A Captain scores. Level 3 is the third rank row, y = 10 + 2*2. */
+    screen_reset();
+    ui_hall_of_fame("PICARD", 3, 500);
+    check(disk_writes == 1, "a qualifying score is written back");
+    row_text(14, 16, 6, buf);
+    check(strcmp(buf, "PICARD") == 0, "first place sits on the rank's own row");
+
+    /* A second Captain, scoring less, takes the dim row below. */
+    screen_reset();
+    ui_hall_of_fame("KIRK", 3, 200);
+    row_text(14, 16, 6, buf);
+    check(strcmp(buf, "PICARD") == 0, "the better score keeps first place");
+    row_text(15, 16, 4, buf);
+    check(strcmp(buf, "KIRK") == 0, "and the lesser one takes the row below");
+    check(attr[15][16] == COL_GRID_TEST, "second place is drawn dim");
+
+    /* Another rank is a separate table that happens to share a file. */
+    screen_reset();
+    ui_hall_of_fame("ADAMA", 5, 50);
+    row_text(18, 16, 5, buf);
+    check(strcmp(buf, "ADAMA") == 0, "an Admiral lands on the Admiral row");
+    row_text(14, 16, 6, buf);
+    check(strcmp(buf, "PICARD") == 0, "without disturbing the Captain's");
+
+    /* And it survives a reload, which is the whole point of the file. */
+    screen_reset();
+    ui_hall_of_fame("", 1, 0);
+    row_text(14, 16, 6, buf);
+    check(strcmp(buf, "PICARD") == 0, "the table survives a round trip to disk");
+}
+
 int main(void) {
     trek_new_game(3, 12345);
 
@@ -941,6 +1032,7 @@ int main(void) {
     test_ack();
     test_log_outlives_the_panel();
     test_msgs_opens_at_the_bottom();
+    test_hall_of_fame_persists();
 
     if (failures) { printf("%d failure(s)\n", failures); return 1; }
     printf("console panels: all checks passed\n");

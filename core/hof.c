@@ -75,11 +75,16 @@ uint16_t hof_format(const HofEntry *in, uint8_t *buf, uint16_t max) {
 
     for (i = 0; i < HOF_ENTRIES; i++) {
         if ((uint16_t)(pos + HOF_NAME + 12) > max) return 0;
-        for (j = 0; j < HOF_NAME; j++) {
-            char c = in[i].name[j];
-            /* The original pads with dots. A NUL or a space in the middle of
-               the field would make a file its own reader rejects. */
-            buf[pos + j] = (uint8_t)(c ? c : PAD);
+        {
+            /* Same rule as hof_offer: the first NUL ends the name and the
+               rest of the field is padding, not a byte-by-byte substitution.
+               The original pads with dots, and a NUL or a space in the middle
+               of the field would make a file its own reader rejects. */
+            char c = 1;
+            for (j = 0; j < HOF_NAME; j++) {
+                if (c) c = in[i].name[j];
+                buf[pos + j] = (uint8_t)(c ? c : PAD);
+            }
         }
         pos = (uint16_t)(pos + HOF_NAME);
         buf[pos++] = '\r'; buf[pos++] = '\n';
@@ -102,8 +107,22 @@ uint8_t hof_offer(HofEntry *tbl, uint8_t level, const char *name, int16_t score)
        an Admiral's score never displaces a Captain's. */
     if (place == first) tbl[second] = tbl[first];
 
-    for (j = 0; j < HOF_NAME; j++)
-        tbl[place].name[j] = name[j] ? name[j] : PAD;
+    /* Once the terminator is reached, EVERYTHING after it is padding. The
+       first version tested each byte on its own and padded only the NULs,
+       which reads straight past the end of the caller's buffer: the setup
+       screen's name is 13 bytes and its password sits directly after it, so
+       a Captain called WROTE was recorded as "WROTE......BOOM......" with the
+       self-destruct password baked into the hall of fame. Seen on screen
+       2026-08-23, which is the only place it could have been seen -- both
+       buffers are live memory and neither read was out of bounds enough to
+       fault. */
+    {
+        char c = 1;
+        for (j = 0; j < HOF_NAME; j++) {
+            if (c) c = name[j];
+            tbl[place].name[j] = c ? c : PAD;
+        }
+    }
     tbl[place].name[HOF_NAME] = '\0';
     tbl[place].score = score;
     return 1;
