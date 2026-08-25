@@ -514,8 +514,11 @@ than more play.
 
 - **The briefing.** The last thing the disk seam was built for; needs
   `plat_open`/`plat_read`, the one part of the seam never exercised.
-- **The CP437 charset.** Both font halves dump on demand; what is left is the
-  VDC upload path and the game symbols.
+- ~~**The CP437 charset.**~~ **NOT DOING IT on the C128 -- Jamie's call
+  2026-08-24.** PETSCII text and lettered ships are an acceptable position for
+  this platform. See "The charset is dropped on the C128" below. Other ports
+  decide for themselves; this is presentation, and presentation is per-platform
+  by design.
 
 ### Wanted on their own merits
 
@@ -2903,3 +2906,47 @@ on boss mode's back. Nothing else depends on it.
 Also worth keeping recorded: **boss mode is absent from the in-game F1 help**
 and appears only on the reference card, so the help screen is not the authority
 on what commands exist.
+
+## The charset is dropped on the C128 (Jamie's call, 2026-08-24)
+
+The port keeps the KERNAL's stock character set: PETSCII text, and ships drawn
+as letters -- `E` for the Lexington, `K` battleship, `C` command, `S` scout,
+`P` supply, `#` base, `O` planet -- with the measured EGA colours carrying the
+identification, which is what the manual says they are for.
+
+**Why, beyond the cost.** The font data cannot be committed. The CP437 half is
+DOSBox's table and the letter half is lifted out of Anderson's binary, so
+`tools/dump_font.py` writes into gitignored `build/` like `gen_music.py` does.
+A public clone with no `reference/` would get no charset at all and fall back to
+PETSCII anyway -- so the work would only ever have benefited people who already
+have the original. Drawing ~96 glyphs of our own would fix that and is real
+work for a purely cosmetic gain.
+
+`tools/dump_font.py` stays. The measurement it made is worth keeping whether or
+not anything consumes it, and a later port may want it.
+
+### This does not bind the other ports
+
+`core/` is what must never vary -- the rules, the constants, the save format.
+Presentation is per-platform by design and always has been, so the Amiga and
+VBXE legs will draw their own glyphs because they have no character generator
+to reuse, and MEGA65 has room to do whatever it likes.
+
+**The risk worth naming: the C128 is the FIRST port, so its ceiling is the only
+one anyone has tested, and it is easy to let it define the content for
+everything.** It should not. MEGA65 has 384K and the Amiga is flat. Where a
+later target can do better, it should.
+
+### For the record, the C128 is not uniquely constrained
+
+`init-mmu.o` sets MMU config `$0E`, which already banks BASIC out: RAM from
+`$0000` to `$BFFF`, KERNAL at `$C000-$FFFF`. The MMU treats `$C000-$FFFF` as
+one unit, so banking it to RAM would take the KERNAL with it -- no disk I/O and
+no IRQ. **`$C000` is a hard ceiling**, not a default left unraised, and the
+~42K we have is close to the practical maximum for a program that uses the
+KERNAL. Bank 1's 64K remains available for DATA through `FETCH`/`STASH`.
+
+Against the rest of the lineup that is mid-table, not last: the X16 has about
+38K of contiguous low RAM, slightly LESS than this; a 130XE with VBXE has
+roughly 40-48K below the OS ROM plus four 16K banks; CoCo 3 and F256 page 8K at
+a time out of far more; MEGA65 and the Amiga have no pressure worth the name.
