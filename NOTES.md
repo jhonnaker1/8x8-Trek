@@ -510,12 +510,25 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 
 ### Run 1 is DONE (2026-08-24) -- see MEASURED.md
 
-Four items in, six out. The repair rates were wrong in two ways at once (47
-should be 50, and a focus starves every other system rather than merely
-outpacing it), the stardate discrepancy was never real, and HAIL in range,
-distress signals, base-under-attack, the tractor beam and progressive damage
-messages all turned up on the way past. What run 1 did NOT reach: Supply and
-Research docking quantities, and the full turn-cost table.
+Four items in, and a great deal more out.
+
+- **The repair rates were wrong in two ways at once**: 47 should be 50, and a
+  focus STARVES every other system rather than merely outpacing it. Fixed.
+- **The stardate discrepancy was never real** -- the log prints
+  `stardate:message-number`, and HAIL costs no time at all.
+- **The turn-cost table is done, and it is one sentence**: time advances only
+  on movement and docking. Combat is free.
+- **The planet chain is captured end to end** -- ORBIT, LAND, USE, the gate,
+  the confirmation and the payoff. Energium takes energy ABOVE its maximum.
+- **Movement is a straight line and objects block it**, for quadrant changes as
+  well as in-quadrant hops. This port teleports.
+- Free on the way past: HAIL in range, a distress signal and a base-under-
+  attack event WITH their deadline stardates -- and proof the deadline is
+  enforced, since the base in 4-2 was destroyed after its own ran out.
+
+The only run-1 item left is **Supply and Research docking quantities**: every
+base encountered was a StarBase. That wants the base-type array located in
+memory rather than another survey.
 
 ### Measurement -- only NUMBERS remain
 

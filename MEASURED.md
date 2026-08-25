@@ -3295,3 +3295,118 @@ stations were not reached this run.
   `engines cannot take over warp 1.0`.
 - The `DOCK` refusal with no base adjacent is `NAVIGATION: Not adjacent to
   planet.` -- the original's own wording, planet and all.
+
+## Run 1, second half: the turn-cost table, and the planet chain entire
+
+### Time advances ONLY on movement and docking
+
+Measured by reading the stardate real either side of each command. Everything
+below is **0.0 stardates**:
+
+    HELP  MSGS  SND  REPAIR  FIX  INFO  W<n>  HAIL  MAX  A#
+    shields up  shields down  LASERS  TORPS  ENERGY  SAVE
+    ORBIT  LAND (transporter)  USE
+
+    DOCK                     0.1
+    M, quadrant change       variable
+
+That is the whole table, and it is a much stronger statement than a list of
+costs: **combat is free.** Firing lasers, launching torpedoes, raising shields,
+diverting power, scanning an enemy -- none of it moves the clock. The clock is
+distance and docking.
+
+Quadrant-change samples at warp 3, all one or two quadrants: 0.8227, 0.9663,
+1.2222, 2.5972, 2.7330. One-quadrant moves are not a constant, so the cost is a
+real distance, not a quadrant count.
+
+### Movement is a straight line and objects block it
+
+Both kinds. An in-quadrant move from 4-4 to 6-3 with a star at 5-4 gives
+`Blocked by object at 5-4`. A quadrant-change move is ALSO a path through the
+current quadrant: from 8-6 sector 4-4 heading west, `Blocked by object at 4-3`.
+Stepping to a clear row first and repeating the same move works.
+
+This port teleports in both cases.
+
+### The planet chain, captured end to end
+
+`ORBIT` (0.0 stardates):
+
+    NAVIGATION: Entering standard orbit.
+    Planet Sigma-7, Type O.
+    SCIENCE: Scanners indicate the presence of energium on planet.
+
+So planets are named `<Greek letter>-<digit>` and carry a TYPE letter, and the
+orbit scan is what reveals energium.
+
+`LAND` opens `LANDING PARTY`:
+
+    How do you wish to get to the planet?
+      1) Shuttle Craft
+      2) Transporter
+      3) Abort landing
+
+Transporter costs 0.0 stardates and runs a four-beat sequence: party to
+transporter, party on planet, `energium successfully mined`, party beaming up.
+
+`USE` opens `USE AN ITEM` with a numbered inventory carrying quantities:
+
+    Which item do you wish to use?
+      1. Raw energium (1)
+
+Refused outside the gate, in the First Officer's voice: regulations do not
+allow such a dangerous procedure except under extreme low energy conditions.
+Inside the gate (energy 500 of 5000, shields 300 of 2500) it asks first --
+Engineering warns it is an extremely hazardous procedure and asks Y/N -- and
+then:
+
+    Attempting to load energium...
+    Crystal loaded...it appears good!
+    Energy levels increasing...
+
+**Energy went 500 to 7435 and shields 300 to 2500.** The energy figure is the
+result worth staring at: 7435 is well ABOVE the 5000 maximum every other
+mechanic clamps to. Energium overcharges the ship.
+
+`it appears good!` is doing obvious work -- there is a bad crystal branch, and
+it was not sampled.
+
+### The ENGINEERING REPORT, which E opens
+
+    1) Main Energy:      3749.5   75%
+    2) Impulse Engines:   493.8   99%
+    3) Shields:          2500.0  100%
+
+    Divert energy (Y/N)? _
+
+    Systems marked in red are damaged
+
+Three pools, absolute value and **percentage of that pool's maximum** -- which
+independently confirms the note in trek.h that this percentage is CHARGE and
+not state of repair. 3749.5 of 5000 is 75%.
+
+### The attack deadline is real and it is enforced
+
+`The StarBase in 4-2 reports that it is under attack. They can last until
+3512.7.` was followed, after 3512.7 passed, by `The StarBase in 4-2 has been
+destroyed`, and the galaxy chart's base digit for 4-2 went from 1 to 0.
+
+So base-under-attack is a timed event with a stardate deadline and a permanent
+consequence for ignoring it. Same shape as the distress signal captured
+earlier: `Planet Xevious-8, quad 8-8, requests evacuation. They can only hold
+out until 3508.7.`
+
+### The galaxy chart is E-B-S, coloured per digit
+
+Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
+bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
+enemies, one base and six stars.
+
+### Not reached, and now the only run-1 item left
+
+**Supply and Research docking quantities.** Every base this run turned out to
+be a StarBase -- 5-5, 4-2 and the one hailed from two quadrants away all
+announce themselves as StarBases. A StarBase restores energy and shields to
+full in one 0.1-stardate turn. The other two types were never found, and
+finding them wants either a base-type array located in memory or a longer
+survey than run 1 had left in it.
