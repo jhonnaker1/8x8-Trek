@@ -520,6 +520,35 @@ than more play.
   decide for themselves; this is presentation, and presentation is per-platform
   by design.
 
+### OPEN BUG: no sound since the music moved to bank 1
+
+**Reported by Jamie 2026-08-24, and NOT fixed.** The music was silent before
+the far-store fix because `far_load("MUSIC.DAT")` was failing; that failure is
+gone and it is STILL silent.
+
+What is verified: `far_len` is 3,359 (2,267 strings + 1,092 music), `mus_base`
+is 2,267, `mus_ok` is set. So the file loads and the driver has been told where
+it is. **That is state, not sound** -- I called it fixed on the strength of
+those three numbers, which was the wrong standard for a thing you listen to.
+
+Where to look next, roughly in order of suspicion:
+
+- `mus_on` is never set, or `snd_music()` is refused earlier than expected.
+  Read `mus_on` and `note_left` from the monitor WHILE the title screen is up.
+- The far offsets are wrong by a track: `mus_offset[]` is generated from note
+  counts, and a track's terminator may not be counted the way the loader lays
+  it out. Dump the first bytes at `mus_base` and compare against
+  `c128/build/music.dat`.
+- `snd_poll()` is not reaching `music_tick()` -- the region detector and the
+  tick accumulator are untouched by this work, but a far read per note change
+  is new and could be starving the poll loop.
+- `sid_check` / `make sound-check` records VICE and measures pitches; it has
+  caught silent failures before and has not been run since the move.
+
+**The lesson to carry:** sound fails silently in the most literal way, which is
+exactly why `make sound-check` exists. Verifying the loader's state proves the
+data arrived, not that anything plays.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
