@@ -484,10 +484,16 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 
 ### Corrections to commands already marked done
 
-- **`M)ove` manual mode.** DeltaX/DeltaY, signed, digit-before-the-point is
-  quadrants and after it is sectors. Not a convenience: below 100% computer it
-  is the ONLY way to move, so a port without it strands the player.
-- **`M)ove` and `W)arp` shorthands** -- `6235`, `m6235`, `w5.2`.
+- ~~**`M)ove` manual mode.**~~ **DONE 2026-08-24.** `M` with no coordinates
+  opens the `NAVIGATION` dialog; typing `M` there switches to `DELTAX:` /
+  `DELTAY:`; a computer below 100% goes straight there and says COMPUTER
+  DAMAGED. `trek_move_delta()` is in core so the arithmetic is natively
+  tested against the manual's own worked example, and a delta that stays
+  inside the quadrant uses the impulse engines rather than being billed as a
+  warp jump.
+- ~~**`M)ove` and `W)arp` shorthands.**~~ Already worked -- `grab_digits`
+  ignores separators, so `6235`, `m6235` and `w5.2` all parsed before anyone
+  checked.
 - **`SELFDESTRUCT_FACTOR`** is still the last ancestor-derived number inside an
   implemented command.
 
@@ -2813,3 +2819,43 @@ omits Transporter and Shuttlecraft, which appear only in its `REPAIR` dialog.
 This port's panel is already a departure -- two columns of abbreviations, to fit
 a 40x14 region -- and dropping two systems would lose information the player can
 otherwise only get by opening a dialog. Twelve stays.
+
+## Manual movement, and the linker guard it forced (2026-08-24)
+
+`trek_autonav_ok()` was written the same day and deliberately left with no
+caller, because wiring it without a fallback would have stranded a player the
+new damage rules had just damaged. This is the fallback.
+
+- `M` with coordinates still works, including `m6235` and `m35`.
+- `M` alone opens `NAVIGATION` asking `QUAD, SECTOR:`.
+- Typing `M` there switches to `DELTAX:` then `DELTAY:`, as the manual says.
+- **A computer below 100% goes straight to manual entry** and says COMPUTER
+  DAMAGED. Inline coordinates are ignored in that state too -- they are
+  automatic navigation, and the shorthand must not be a way round a
+  restriction the long form obeys.
+
+`trek_move_delta()` lives in **core**, not the UI. The first version did the
+arithmetic in `main.c`, where nothing can test it; moving it means the manual's
+own worked example is a native assertion -- 1,8,1,8 with DeltaX 1.0 and DeltaY
+-2.2 lands on 2,6,1,6 -- along with the four edges and the rule that a delta
+staying inside the quadrant is an **impulse** hop rather than a warp jump.
+
+Verified on the machine: the computer poked to 80% through VICE's monitor took
+`M` straight to `DELTAX:`, and `0.1` moved the ship one sector down within its
+quadrant.
+
+### The linker now enforces the stack
+
+Adding this took MAIN down to about a hundred bytes, and llvm-mos's stock
+script runs the region right up to `$C000` where `__stack` grows DOWN -- so a
+build can succeed and then corrupt itself with the linker none the wiser.
+`trek128.ld` now stops the region 64 bytes short, which turns that into a link
+error.
+
+Sixty-four rather than something generous because llvm-mos gives a
+non-reentrant program a STATIC stack -- this one has 181 bytes of
+`.Lstatic_stack` in `.noinit` -- and the soft stack is for recursion and
+alloca, neither of which this code uses. It is a tripwire, not an allocation.
+**It caught something immediately**: the release build fitted and the debug
+build, which is ~76 bytes larger, did not. Factoring the duplicated coordinate
+dispatch out of `do_move` and `do_move_prompt` paid for both.

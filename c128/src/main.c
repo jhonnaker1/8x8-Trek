@@ -379,26 +379,123 @@ static void report_move(uint8_t r) {
 /* Coordinates arrive 1-based, as the original presents them, and are
    converted to the core's 0-based indexing here -- the boundary between
    presentation and core is exactly the right place for it. */
+/* Manual movement: DeltaX then DeltaY, relative and signed.
+ *
+ * MEASURED from the manual (l.515-529) and confirmed on a running original.
+ * The number format is the part that surprises: **the digit before the
+ * decimal point is QUADRANTS and the digit after it is SECTORS**, each 0..7.
+ * Moving from 1,8,1,8 to 2,6,1,6 is DeltaX 1.0 and DeltaY -2.2.
+ *
+ * DeltaX is VERTICAL and DeltaY is horizontal, which is the opposite of the
+ * usual convention and matches the original's vertical-first coordinates.
+ *
+ * This is not a convenience. The manual: "Automatic navigation requires the
+ * computer to be 100% repaired." Below that it is the ONLY way to move, so a
+ * port without it strands a player it has just damaged -- which is why
+ * trek_autonav_ok() was written on 2026-08-24 and deliberately left unwired
+ * until this existed.
+ *
+ * Returns 1 if the field parsed, 0 on ESC or nonsense. The parsed value is a
+ * signed count of SECTORS, since a quadrant is eight of them. */
+static uint8_t read_delta(const char *prompt, int16_t *out) {
+    char buf[10];
+    const char *p;
+    uint8_t neg = 0, q = 0, sec = 0;
+
+    if (!ui_dialog_ask_esc(prompt, buf, sizeof buf)) return 0;
+
+    p = buf;
+    while (*p == ' ') p++;
+    if (*p == '-') { neg = 1; p++; }
+    else if (*p == '+') p++;
+
+    if (*p < KB_DIGIT0 || *p > KB_DIGIT9) return 0;
+    q = (uint8_t)(*p++ - KB_DIGIT0);
+
+    if (*p == '.' || *p == ',') {
+        p++;
+        if (*p < KB_DIGIT0 || *p > KB_DIGIT9) return 0;
+        sec = (uint8_t)(*p - KB_DIGIT0);
+    }
+    if (q > 7 || sec > 7) return 0;
+
+    *out = (int16_t)(q * QUAD_DIM + sec);
+    if (neg) *out = (int16_t)(-*out);
+    return 1;
+}
+
+/* Absolute coordinates, 1-based as the player types them. Two numbers is an
+   impulse hop inside the quadrant, four is a warp jump; anything else is not
+   a location. Shared by the command line and the NAVIGATION dialog so the
+   two cannot drift. */
+static void move_absolute(const uint8_t *d, uint8_t n) {
+    uint8_t i;
+
+    for (i = 0; i < n; i++)
+        if (d[i] < 1 || d[i] > 8) { ui_message("NAVIGATION: ", "NO SUCH LOCATION"); return; }
+
+    if (n == 2)
+        report_move(trek_move_impulse((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1)));
+    else if (n == 4)
+        report_move(trek_move_warp((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
+                                   (uint8_t)(d[2] - 1), (uint8_t)(d[3] - 1)));
+    else
+        ui_message("NAVIGATION: ", "NO SUCH LOCATION");
+}
+
+static void do_move_manual(void) {
+    int16_t dy, dx;
+
+    if (!read_delta("DELTAX:", &dy)) { ui_dialog_close(); return; }
+    if (!read_delta("DELTAY:", &dx)) { ui_dialog_close(); return; }
+    ui_dialog_dismiss();
+    report_move(trek_move_delta(dy, dx));
+}
+
+/* The NAVIGATION dialog, which the original opens when M arrives with no
+   coordinates on it. Automatic entry takes "6,2,3,5" or a bare "3,5" for an
+   impulse hop; typing just M switches to manual entry, as the manual says. */
+static void do_move_prompt(void) {
+    char buf[16];
+    uint8_t d[8], n;
+
+    ui_dialog_open("NAVIGATION");
+
+    /* A damaged computer gives no choice -- straight to manual. */
+    if (!trek_autonav_ok()) {
+        ui_dialog_line("COMPUTER DAMAGED");
+        do_move_manual();
+        return;
+    }
+
+    if (!ui_dialog_ask_esc("QUAD, SECTOR:", buf, sizeof buf)) {
+        ui_dialog_close();
+        return;
+    }
+
+    /* MEASURED: "enter just an M when asked for the coordinates and the
+       computer will switch movement entry to manual". */
+    if (buf[0] == KB_M || buf[0] == KB_M + 32) { do_move_manual(); return; }
+
+    n = grab_digits(buf, d, 8);
+    ui_dialog_dismiss();
+    move_absolute(d, n);
+}
+
 static void do_move(const char *line) {
     uint8_t d[8];
     uint8_t n = grab_digits(line, d, 8);
-    uint8_t i;
 
-    for (i = 0; i < n; i++) {
-        if (d[i] < 1 || d[i] > 8) {
-            ui_message("NAVIGATION: ", "NO SUCH LOCATION");
-            return;
-        }
-    }
+    /* "M" on its own opens the dialog; "m6235" and "m35" carry their
+       coordinates on the command line, which the manual documents as the
+       abbreviated form.
 
-    if (n == 2) {
-        report_move(trek_move_impulse((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1)));
-    } else if (n == 4) {
-        report_move(trek_move_warp((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
-                                   (uint8_t)(d[2] - 1), (uint8_t)(d[3] - 1)));
-    } else {
-        ui_message("NAVIGATION: ", "GIVE SECTOR OR QUAD+SEC");
-    }
+       Coordinates ARE automatic navigation, though, so a damaged computer
+       ignores them and goes to manual entry -- otherwise the shorthand would
+       be a way round a restriction the long form obeys. */
+    if (n == 0 || !trek_autonav_ok()) { do_move_prompt(); return; }
+
+    move_absolute(d, n);
 }
 
 static void do_warp(const char *line) {

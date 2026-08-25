@@ -745,6 +745,27 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
     return MOVE_OK;
 }
 
+uint8_t trek_move_delta(int16_t dy, int16_t dx) {
+    int16_t ry = (int16_t)(ship.quad_y * QUAD_DIM + ship.sec_y) + dy;
+    int16_t rx = (int16_t)(ship.quad_x * QUAD_DIM + ship.sec_x) + dx;
+    uint8_t qy, qx, sy, sx;
+
+    if (ry < 0 || rx < 0 ||
+        ry >= GAL_DIM * QUAD_DIM || rx >= GAL_DIM * QUAD_DIM)
+        return MOVE_BAD_COORDS;
+
+    qy = (uint8_t)(ry / QUAD_DIM); sy = (uint8_t)(ry % QUAD_DIM);
+    qx = (uint8_t)(rx / QUAD_DIM); sx = (uint8_t)(rx % QUAD_DIM);
+
+    /* Staying in this quadrant is an impulse hop. Warping across a couple of
+       sectors would charge warp energy for a journey the impulse engines are
+       there to make. */
+    if (qy == ship.quad_y && qx == ship.quad_x)
+        return trek_move_impulse(sy, sx);
+
+    return trek_move_warp(qy, qx, sy, sx);
+}
+
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
     uint16_t d, cost, tenths;
 

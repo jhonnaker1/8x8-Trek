@@ -904,4 +904,17 @@ uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx);
 
+/* Manual movement: a signed offset in SECTORS on each axis, `dy` vertical and
+ * `dx` horizontal. The UI parses the original's "1.0" and "-2.2" notation --
+ * digit before the point is quadrants, after it is sectors -- and hands the
+ * result here as eight-sectors-to-the-quadrant.
+ *
+ * This is core rather than UI because it is arithmetic on the galaxy, and
+ * because the platform layer is where nothing can test it. It also picks the
+ * right engine: a delta that stays inside the current quadrant is an impulse
+ * hop, not a warp jump.
+ *
+ * Manual l.515-529, and the ONLY way to move with the computer below 100%. */
+uint8_t trek_move_delta(int16_t dy, int16_t dx);
+
 #endif

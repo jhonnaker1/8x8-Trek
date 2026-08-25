@@ -28,7 +28,22 @@ __basic_zp_end = 0x0090;
 MEMORY {
     /* $1300..$1BFF, 2,304 bytes. Code and read-only data stay above. */
     lowram (rw) : ORIGIN = 0x1300, LENGTH = 0x0900
-    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF
+    /* SHORT OF $C000 ON PURPOSE.
+     *
+     * 0xA3FF would run the region right up to $C000, which is where __stack
+     * starts and grows DOWN -- so the stock script lets a build succeed and
+     * then corrupt itself, with the linker none the wiser. This reserves a
+     * guard so that overflowing it is a LINK ERROR instead.
+     *
+     * Why only 64 bytes: llvm-mos gives a non-reentrant program a STATIC
+     * stack, and this one has 181 bytes of `.Lstatic_stack` in .noinit. The
+     * soft stack at $C000 is for recursion and alloca, neither of which this
+     * code uses, and nothing in the link map references it. So the guard is a
+     * tripwire rather than a real allocation.
+     *
+     * If that assumption ever breaks -- recursion, a function pointer table,
+     * alloca -- raise this and expect to have to free space for it. */
+    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40
 }
 
 __rc0 = __basic_zp_start;

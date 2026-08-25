@@ -1636,6 +1636,63 @@ static void test_damage_effects(void) {
     }
 }
 
+/* Manual movement, the manual's own worked example.
+ *
+ * "if you want to move one quadrant down and two quadrants plus two sectors
+ * left (i.e., from 1,8,1,8 to 2,6,1,6) DeltaX would be 1.0 and DeltaY would
+ * be -2.2" -- l.522-526. Those are the original's 1-based coordinates; the
+ * core is 0-based, so 1,8,1,8 is quad (0,7) sector (0,7).
+ *
+ * The offsets arrive in SECTORS: 1.0 is +8, -2.2 is -(2*8+2) = -18. */
+static void test_manual_movement(void) {
+    printf("manual movement (DeltaX/DeltaY)\n");
+
+    trek_new_game(3, 7);
+    ship.quad_y = 0; ship.quad_x = 7;
+    ship.sec_y  = 0; ship.sec_x  = 7;
+    ship.energy = ENERGY_MAX;
+    ship.warp   = WARP_MAX;
+
+    trek_move_delta(8, -18);
+    ok(ship.quad_y == 1 && ship.quad_x == 5,
+       "the manual's example lands in quadrant 2,6 (0-based 1,5)");
+    ok(ship.sec_y == 0 && ship.sec_x == 5,
+       "and in sector 1,6 (0-based 0,5)");
+
+    /* Off the edge in either direction is refused, not wrapped. A galaxy that
+       wraps would let a delta walk the ship out of the 8x8 sector entirely. */
+    ship.quad_y = 0; ship.quad_x = 0; ship.sec_y = 0; ship.sec_x = 0;
+    ok(trek_move_delta(-1, 0) == MOVE_BAD_COORDS, "north of the galaxy is refused");
+    ok(trek_move_delta(0, -1) == MOVE_BAD_COORDS, "west of the galaxy is refused");
+    ship.quad_y = 7; ship.quad_x = 7; ship.sec_y = 7; ship.sec_x = 7;
+    ok(trek_move_delta(1, 0) == MOVE_BAD_COORDS, "south of the galaxy is refused");
+    ok(trek_move_delta(0, 1) == MOVE_BAD_COORDS, "east of the galaxy is refused");
+
+    /* A delta that stays inside the quadrant must use the impulse engines,
+       not warp -- otherwise a two-sector hop is billed as a warp jump. */
+    {
+        uint16_t before;
+        trek_new_game(3, 11);
+        ship.quad_y = 3; ship.quad_x = 3;
+        ship.sec_y  = 3; ship.sec_x  = 3;
+        ship.impulse = IMPULSE_MAX;
+        ship.energy  = ENERGY_MAX;
+        before = ship.impulse;
+        sector[(3 << 3) | 5] = SEC_EMPTY;
+        trek_move_delta(0, 2);
+        ok(ship.quad_y == 3 && ship.quad_x == 3, "a small delta stays in the quadrant");
+        ok(ship.impulse < before, "and is billed to the impulse engines");
+    }
+
+    /* And with the impulse engines out, that same hop is refused rather than
+       silently promoted to a warp jump. */
+    trek_new_game(3, 11);
+    ship.quad_y = 3; ship.quad_x = 3; ship.sec_y = 3; ship.sec_x = 3;
+    ship.sys[SYS_IMPULSE] = 10;
+    ok(trek_move_delta(0, 2) == MOVE_NO_IMPULSE,
+       "a within-quadrant delta needs working impulse engines");
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -1665,6 +1722,7 @@ int main(void) {
     test_game_state_and_score();
     test_star_and_focus();
     test_damage_effects();
+    test_manual_movement();
 
     puts("");
     if (failures) {
