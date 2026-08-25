@@ -469,6 +469,11 @@ checklist of *which situations need a message*, not as text to copy.
 Read this first; the numbered items below are the historical record of how each
 one got here.
 
+**The plan for clearing the measurement items is at the end of this file** --
+"THE MEASUREMENT SESSION PLAN", five runs, written 2026-08-24 and not yet run.
+Measure everything, then implement, then size, then place in bank 1, then fix
+the bugs. In that order, and for the reason given there.
+
 **Before adding anything to this list, search for it.** Three settled questions
 were written up as open in two days. `reference/manual.txt` is ISO-8859 and
 **invisible to grep** until converted; `reference/strings.txt` is plain ASCII
@@ -3172,3 +3177,154 @@ Bank 1 is BASIC's variable storage, which is safe here because the game is
 started with RUN (which clears variables) and BASIC is not running while it
 plays. What it rules out is a port that returns to BASIC and expects its far
 data to survive.
+
+## THE MEASUREMENT SESSION PLAN (written 2026-08-24, NOT YET RUN)
+
+Jamie's sequencing, and it is the right one: **take every remaining
+measurement off the original first, then implement them all, then size the
+result, then decide what goes in bank 1, then fix the bugs.** Measuring last
+is what produces a port that fits and then does not.
+
+Do not start this until the whole plan is read. The sessions below are
+ordered so that each one leaves the game in a state the next one wants.
+
+### Setup, every time
+
+    cd ~/claude-code/dosbox-automation      # resources resolve from HERE
+    DOSBOX_API_TOKEN=$(openssl rand -hex 32) \
+      ./build/rel-arm64/dosbox --noprimaryconf \
+      --conf ~/claude-code/egatrek/reference/trek-auto.conf
+
+Verified working again 2026-08-24: comes up in mode 10h with the API live on
+the first poll.
+
+**Re-locate every structure at the start of every session.** Addresses move
+between runs and they do NOT all move together -- the ship record shifted +16
+bytes once while the twelve system percentages did not shift at all.
+`tools/probe_original.py` has `find_ship_record()` for the anchor and
+`enemies()` for the table; `A_*` in that file are one launch's numbers kept as
+a worked example, not constants.
+
+**Check for game-over before trusting any read.** A destroyed ship restarts
+the program and the old addresses keep returning plausible, stale numbers.
+
+### Run 1 -- the free ones, no combat, one game
+
+Everything here is a screenshot or a subtraction and none of it needs the ship
+to be in danger. Do it first because it is cheap and it clears four items.
+
+1. **The two focused repair rows.** Damage one system, `F)ix` to concentrate
+   on it, open `REPAIR`. The STATE OF REPAIR dialog prints Docked and Undocked
+   estimated times side by side; it is what settled 20 and 47 a stardate, and
+   it has never been read with a focus set. Read it undocked and again docked
+   at a StarBase. Feeds `REPAIR_PER_STARDATE_FOCUS` (60, currently the
+   manual's relative) and `_FOCUS_DOCKED` (100, likewise).
+2. **The turn-cost table.** The stardate is a Turbo Pascal real in the ship
+   record. Read it, issue a command, read it again -- for all twenty-five.
+   One session produces the whole table, and nothing in this port has ever
+   had one.
+3. **The panel-versus-log stardate discrepancy.** There are THREE stardate
+   copies in the ship record (offsets 181910/181922/181928 in the launch that
+   was mapped). Watch which one the panel prints and which the message log
+   prints. That is the whole question.
+4. **Docking quantities per base type.** Dock at a StarBase, a Supply base and
+   a Research station in turn, diffing energy, shields and torpedoes across
+   each. The manual gives the *what* (l.356-361): StarBase everything, Supply
+   life support plus energy and torpedoes, Research life support only. Only
+   the quantities are missing.
+
+### Run 2 -- laser effectiveness, and a target that has never been looked for
+
+The heat band has beaten two sessions. **The value was searched for and is not
+stored as a Turbo Pascal real or a 16-bit integer of the fired amount anywhere
+in the 338KB** -- that is a settled negative, do not re-run it.
+
+The new target is different: the manual describes **two** gauges (l.326-331),
+temperature *and* effectiveness, and says effectiveness falls from heat and
+from battle damage. **Effectiveness is a percentage on screen and is the
+quantity that actually feeds damage.** It has never been searched for. Fire
+volleys of known size in one quadrant, watch for a real or a word that tracks
+the effectiveness gauge, and if it turns up the heat band follows from it.
+
+Fall back to the gauge with a settle loop only if that fails. Heat **rises
+gradually after a volley and resets on changing quadrant**, so a screenshot
+taken at an arbitrary moment catches it mid-climb -- that is what made the
+same 400-unit volley read 26 pixels once and 6 another time.
+
+### Run 3 -- damage, with the systems array pinned
+
+`SYSTEM_DAMAGE_THRESHOLD` has two samples that disagree: two hits took a
+system straight to 0% with casualties, one hit did nothing. Pin energy,
+shields and the twelve percentages between turns (`restore()` and
+`/memory/freeze`), take fire repeatedly, and read the systems array directly
+rather than the console.
+
+Read the **damage-report text**, not the pools, when attributing a hit: a
+Vandal Death Pod hits our ship and the enemy in the same turn, so a fall in
+the pools is not necessarily enemy fire. This is the documented case where
+the screen is the better instrument.
+
+Same run, same rig: **`HP_SCOUT`**, still 100 and still unmeasured. Read the
+enemy table at spawn and look, per class.
+
+### Run 4 -- the expensive ones, several games
+
+- **`RAY`'s four outcomes and their odds.** The manual (l.572-577) confirms
+  the shape: destroys every enemy in the quadrant, "if it works", and if it
+  does not there is no telling what happens. One sample so far. `write()`
+  makes a sample cost a restore rather than a game, which is the only reason
+  this is affordable. Capture the **Top Secret loss report** on the fatal
+  outcome -- as a specification of what it covers, never its words.
+- **Boarding-party frequency and duration.** The manual is silent; the string
+  table has the mechanic. This one genuinely needs elapsed play.
+- **`SELFDESTRUCT_FACTOR`**, the last ancestor-derived number inside an
+  implemented command. Self-destruct with enemies at known distances and read
+  their hit points falling out of the enemy table.
+- **`HAIL` with a base actually in range.** Both captured outcomes are the
+  no-base case. Write the ship next to a base rather than sailing to one.
+
+### Run 5 -- screens to specify, not to copy
+
+The planet chain is fully specified in the manual -- `ORBIT` scans for
+energium crystals, `LAND` offers transporter or shuttle at 0.2 stardays,
+`USE` consumes what was found -- but no screen of it has been captured.
+Same for the **five unbuilt loss endings**, including the surrender, and the
+events named in the strings and never seen: Union wreckage, distress signals,
+Mongol reinforcement warnings. The feature list at l.158-164 adds that
+**successful rescues increase score**, which is the scoring end of the
+distress-signal mechanic.
+
+Capture what each screen COVERS. Anderson's prose is not ours to copy, and
+that rule has held for the briefing and the message table already.
+
+### NOT for the emulator
+
+- **Item 5's four FITTED constants** want `tools/dis16.py` on the routine.
+  A constant that never varies should not be observed at all.
+- Anything the manual states. That cost two items off this list on the day it
+  was written, and one of them was hiding a live bug -- see MEASURED.md,
+  "The repair table is a table, not a product". `reference/manual.txt` is
+  ISO-8859 and invisible to grep; decode it as latin1 first.
+
+### After the measurements, in order
+
+1. **Implement everything measured**, in `core/` where it is arithmetic and
+   behind the existing seams where it is not. `RAY`, the planet model, the
+   function keys, the loss endings, reserve life support, the briefing.
+2. **Then size it.** The C128 image is 41,410 bytes against a region of
+   0xA3BF, so roughly 510 bytes free. Nothing on that list fits in 510 bytes;
+   the question is how far over it goes, and that is not answerable until it
+   is written.
+3. **Then place it.** `core/farmem.h` is the seam and bank 1 is its C128
+   backing, with prose and music already resident. Candidates in the order
+   they were considered: the briefing text, the loss endings, the `USE`
+   inventory, the planet tables. Decide with a measured number rather than a
+   guess, which is the whole reason step 2 comes first.
+4. **Then the bugs.** The sound regression is top of that list and it is
+   mine. `make sound-check` has not been run since the bank-1 move.
+
+The one ordering risk worth naming: step 4 last means the port stays silent
+through all of step 1. That is Jamie's call and it is a reasonable one -- the
+measurements need the DOS original and the sound bug needs VICE, and mixing
+the two instruments in one session is how the last three confident wrong
+numbers happened.
