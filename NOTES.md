@@ -470,9 +470,10 @@ Read this first; the numbered items below are the historical record of how each
 one got here.
 
 **The plan for clearing the measurement items is at the end of this file** --
-"THE MEASUREMENT SESSION PLAN", five runs, written 2026-08-24 and not yet run.
-Measure everything, then implement, then size, then place in bank 1, then fix
-the bugs. In that order, and for the reason given there.
+"THE MEASUREMENT SESSION PLAN", five runs. **Run 1 is DONE (2026-08-24);
+runs 2 to 5 are not.** Measure everything, then implement, then size, then
+place in bank 1, then fix the bugs. In that order, and for the reason given
+there.
 
 **Before adding anything to this list, search for it.** Three settled questions
 were written up as open in two days. `reference/manual.txt` is ISO-8859 and
@@ -485,7 +486,7 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 |---|---|
 | ~~`Shift-F1` boss mode~~ | **NOT DOING IT -- Jamie's call, 2026-08-24.** See below |
 | `RAY` | fully specified, and bigger than it looks: four outcomes, the fourth destroys the ship and prints a **Top Secret loss report** this port has no equivalent of |
-| `O)rbit` / `LAND` / `USE` | needs a core planet model. Gates known: `USE` wants shields under 50% AND energy under 20%; `LAND` needs transporter or shuttle at 100%, shuttle costs 0.2 stardays |
+| `O)rbit` / `LAND` / `USE` | needs a core planet model. **Fully captured in run 1** -- every screen, both gates and the payoff. Nothing left to measure; this is now implementation work. See MEASURED.md, "The planet chain, captured end to end" |
 
 ### Corrections to commands already marked done
 
@@ -533,11 +534,13 @@ memory rather than another survey.
 ### Measurement -- only NUMBERS remain
 
 Everything about *what a thing does* has been on disk. What is left needs the
-emulator: the **laser heat band**, **docking quantities per base type**,
-**`RAY`'s outcome odds** (about one game per sample), **boarding-party
-frequency and duration** (the mechanic itself is in the string table), and
-**`SYSTEM_DAMAGE_THRESHOLD`** -- two samples so far, both taking a system
-straight to 0% with casualties, one hit doing nothing.
+emulator: **laser effectiveness** (run 2 -- the heat band itself is a settled
+negative, see the plan), **Supply and Research docking quantities** (the
+StarBase answer is a full restock of energy and shields in one 0.1-stardate
+turn; the other two types were never found), **`RAY`'s outcome odds**,
+**boarding-party frequency and duration** (the mechanic itself is in the string
+table), and **`SYSTEM_DAMAGE_THRESHOLD`** -- two samples so far, both taking a
+system straight to 0% with casualties, one hit doing nothing.
 
 ~~Also open: `HAIL` with a base actually in range, the panel-versus-log
 stardate discrepancy, the two focused repair rows~~ -- **ALL THREE DONE in run
@@ -602,9 +605,24 @@ data arrived, not that anything plays.
 
 ### Named in the strings, never built
 
-Union wreckage in a quadrant, distress signals, Mongol reinforcement warnings,
-reserve life support, the item inventory `USE` draws on, and **five of the
-eight loss endings** -- including a surrender.
+Union wreckage in a quadrant, Mongol reinforcement warnings, reserve life
+support, and **five of the eight loss endings** -- including a surrender.
+
+Two came off this list in run 1 and are now specified rather than merely named:
+**distress signals and base-under-attack events** (a named planet or base, a
+quadrant, and a DEADLINE STARDATE that is enforced -- the StarBase in 4-2 was
+destroyed when its own ran out), and **the `USE` inventory** (a numbered list
+with quantities, and raw energium takes energy ABOVE its maximum).
+
+### Behaviour run 1 found that this port gets WRONG
+
+Not missing features -- implemented things that do not match the original.
+
+- **Movement teleports.** The original walks a straight line and is blocked by
+  objects on it, for quadrant changes as well as in-quadrant hops, including
+  objects in the quadrant being LEFT.
+- **Turn costs.** Time advances only on movement and docking; combat is free.
+  Worth an audit of what this port bills.
 
 ---
 
