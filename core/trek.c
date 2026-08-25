@@ -310,23 +310,26 @@ static void advance_time(uint16_t tenths) {
     /* MEASURED: floor(20 * stardates), applied to every damaged system at
        the full rate rather than divided between them.
      *
-     * That measurement is what makes F)ix awkward to model. If every system
-     * already repairs at the full rate, "concentrate repairs on" cannot mean
-     * dividing a budget -- there is no budget. So the focused system simply
-     * runs at a different rate, and the manual prints all four of them. What
-     * is still unmeasured is whether the original's own points-per-stardate
-     * match the manual's relatives: 47 docked against a stated 2.5x of 20
-     * says the manual rounds somewhere. The two focused rows have never been
-     * read off the STATE OF REPAIR dialog, which is where they would be. */
-    if (mend || fmend) {
-        for (i = 0; i < SYS_COUNT; i++) {
-            uint16_t m = mend;
-            if (ship.sys[i] >= 100) continue;
-            if (ship.repair_focus == (uint8_t)(i + 1))
-                m = fmend;
-            if (ship.sys[i] + m >= 100) ship.sys[i] = 100;
-            else ship.sys[i] = (uint8_t)(ship.sys[i] + m);
+     * MEASURED 2026-08-24, and "concentrate repairs on" turned out to mean
+     * exactly what the manual says: the chosen system runs at its own rate
+     * and the others get NOTHING. All four rates are the manual's relatives
+     * on a base of 20, confirmed against actual repair rather than against
+     * the STATE OF REPAIR dialog's rounded estimate. See trek.h. */
+    for (i = 0; i < SYS_COUNT; i++) {
+        uint16_t m;
+        if (ship.sys[i] >= 100) continue;
+        if (ship.repair_focus) {
+            /* MEASURED: a focus STARVES everything else. Shields sat at 0%
+               for eleven consecutive turns while the focused lasers climbed
+               0 to 100. Not a reduced rate -- nothing. */
+            if (ship.repair_focus != (uint8_t)(i + 1)) continue;
+            m = fmend;
+        } else {
+            m = mend;
         }
+        if (!m) continue;
+        if (ship.sys[i] + m >= 100) ship.sys[i] = 100;
+        else ship.sys[i] = (uint8_t)(ship.sys[i] + m);
     }
 }
 

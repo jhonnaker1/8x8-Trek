@@ -334,11 +334,25 @@ extern uint8_t sector[QUAD_CELLS];
  * original is free to price the combined case at less than the product --
  * which it plainly does.
  *
- * In points per stardate, anchored on the two rates measured off the original
- * (REPAIR_PER_STARDATE 20 and _DOCKED 47 below -- 2.35x against the manual's
- * 2.5x, within the resolution of the dialog they were read from), the
- * manual's relatives give 3 x 20 = 60 focused and 5 x 20 = 100 focused while
- * docked. */
+ * MEASURED 2026-08-24 on ACTUAL repair -- a system written to 0%, known time
+ * passed, the percentage read back -- not on the STATE OF REPAIR dialog, whose
+ * estimate rounds in a way that does not invert (100 points to go prints 5.1
+ * days at a rate that is exactly 20). Every earlier figure here came from that
+ * dialog, and one of them was wrong for it.
+ *
+ * In points per stardate the manual's relatives are EXACT on a base of 20:
+ *
+ *     20   undocked, no focus     every damaged system, floor'd
+ *     50   docked,   no focus     2.5x -- NOT the 47 solved off the dialog
+ *     60   undocked, focused      3x, focused system ONLY
+ *    100   docked,   focused      5x, focused system ONLY
+ *
+ * "Focused system only" is the other half of the measurement and it is a
+ * different mechanic from a multiplier: while a focus is set, EVERY OTHER
+ * DAMAGED SYSTEM REPAIRS AT ZERO. Shields sat at 0% for eleven consecutive
+ * turns while the focused lasers climbed 0 to 100. That is the manual's "at
+ * the expense of other systems" read literally, and it is why there is no
+ * budget to divide -- there are four rates and a rule about who gets one. */
 #define REPAIR_PER_STARDATE_FOCUS         60
 #define REPAIR_PER_STARDATE_FOCUS_DOCKED 100
 
@@ -663,7 +677,16 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * 1/docfac = 4x while docked. EGA Trek's own STATE OF REPAIR dialog prints
  * Docked and Undocked columns side by side, so a single screenshot with any
  * system damaged settles it. */
-/* MEASURED 2026-08-21 off the STATE OF REPAIR dialog, which prints Docked and
+/* SUPERSEDED 2026-08-24: this is 50, not 47, and the reasoning below is the
+ * cautionary part. Every figure in it came from the STATE OF REPAIR dialog,
+ * whose printed times are ESTIMATES with their own rounding -- 100 points to
+ * repair prints 5.1 days at a rate that is exactly 20 a day, so solving across
+ * those readings measures the display, not the mechanic. Writing a system to
+ * 0%, passing known time and reading the percentage back gives 50 exactly,
+ * which is the manual's 2.5x on a base of 20. Kept because the method is the
+ * lesson. Original note follows.
+ *
+ * MEASURED 2026-08-21 off the STATE OF REPAIR dialog, which prints Docked and
  * Undocked times side by side, so one screenshot with a system damaged reads
  * both rates at once. Six readings at 0%, 10%, 40%, 55%, 65% and 95%:
  *
@@ -681,7 +704,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * The undocked figure confirms REPAIR_PER_STARDATE 20 to within the display's
  * rounding, and the rate was identical with one system damaged and with three,
  * which independently confirms that repair does not divide between them. */
-#define REPAIR_PER_STARDATE_DOCKED  47
+#define REPAIR_PER_STARDATE_DOCKED  50
 
 #define DOCK_OK              0
 #define DOCK_NO_BASE         1   /* no base adjacent */

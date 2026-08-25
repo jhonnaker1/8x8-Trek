@@ -661,11 +661,16 @@ static void test_repair_report(void) {
     screen_reset();
     ui_repair_report();
 
-    /* MEASURED off the original at these very percentages: 40% took 1.3
-       docked and 3.0 adrift. Ours is computed from REPAIR_PER_STARDATE and
-       its docked twin, so this asserts the two agree. */
+    /* Ours is points/rate: 60 points at the docked 50 a stardate is 1.2.
+       The ORIGINAL prints 1.3 here, and 2026-08-24 established that this is
+       not a rate error -- the four rates are measured exactly, on real repair,
+       and the dialog is a separate ESTIMATE running about a tenth high.
+       ceil((points + 1) / rate) fits all ten docked samples and eight of ten
+       undocked: close enough to be suspicious, not close enough to ship.
+       Until it is pinned we print the honest quotient. See MEASURED.md,
+       "Run 1 of the measurement plan". */
     row_text((unsigned char)(REP_Y + 4), (unsigned char)(REP_X + 25), 3, buf);
-    check(strcmp(buf, "1.3") == 0, "40% mends in 1.3 stardates docked");
+    check(strcmp(buf, "1.2") == 0, "40% mends in 1.2 stardates docked");
     row_text((unsigned char)(REP_Y + 4), (unsigned char)(REP_X + 34), 3, buf);
     check(strcmp(buf, "3.0") == 0, "and 3.0 adrift, as the original printed");
 

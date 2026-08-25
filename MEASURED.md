@@ -3196,3 +3196,102 @@ and Undocked times side by side and is what settled the first two rates; it has
 never been read with a system concentrated on. That is a one-screenshot
 measurement and it belongs on the emulator list -- unlike the focus factor
 itself, which was on that list this morning and should not have been.
+
+## Run 1 of the measurement plan (2026-08-24)
+
+Four items, and the first one overturned two constants and a rule.
+
+### The stardate is not what the message log prints
+
+**`3500:34` in the message panel is `stardate : message number`, not a
+stardate with a colon for a point.** Jamie caught this while a run was in
+flight -- I had a counter at 182060 incrementing once per HAIL and read it as
+elapsed tenths. It is the message counter, which is also what `A#` (acknowledge
+message) numbers.
+
+That closes the "panel-versus-log stardate discrepancy" as an open item:
+**there is no discrepancy.** The panel and the log agree; the log was being
+misread. `MSGS` prints each entry headed `Stardate: 3500.0` in full, which is
+the check that settles it.
+
+It also means an earlier note here -- "HAIL costs a turn, the stardate moved
+3500.1 to 3500.2" -- was the same misreading. **HAIL costs no time at all.**
+
+### The repair table, measured on actual repair
+
+The STATE OF REPAIR dialog is an ESTIMATE and its rounding does not invert
+cleanly -- 100 points to go displays 5.1 days at a rate that is exactly 20 a
+day. Every earlier repair figure in this file came from that dialog. These come
+from writing a system to 0%, letting known time pass, and reading the
+percentage back.
+
+    condition              points per stardate
+    undocked, no focus      20      (every damaged system, floor'd)
+    docked,   no focus      50
+    undocked, focused       60      focused system only
+    docked,   focused      100      focused system only
+
+Sample: docked with no focus, fourteen consecutive DOCK turns of 0.1 stardates
+each, two systems damaged, both climbing 0,5,10,...,70 in lockstep. Focused and
+docked, eleven turns, the focused system climbing by 10 a turn and the other
+sitting at 0 the whole way.
+
+**So the manual's 1x / 2.5x / 3x / 5x is exact on a base of 20**, and
+`REPAIR_PER_STARDATE_DOCKED 47` is REFUTED -- it is 50. The 47 came from
+solving across the dialog's rounded estimates, which is measuring the display
+instead of the mechanic.
+
+### F)ix starves everything else
+
+**While a repair focus is set, every other damaged system repairs at ZERO.**
+Not at a reduced rate -- at nothing. Shields sat at 0% for eleven consecutive
+turns while the focused lasers climbed 0 to 100.
+
+That is the manual's "at the expense of other systems" read literally, and it
+is a different mechanic from the one this port implements (every system at the
+base rate, focused system faster). It also explains why the rates compose the
+way they do: there is no budget being divided, there are four rates and a rule
+about who gets one.
+
+Note the dialog does NOT show this. With lasers focused it still prints a
+finite Repair Time for the warp engines -- which will never arrive while the
+focus stands.
+
+### Docking
+
+`DOCK` costs **0.1 stardates**, and it can be issued while already docked,
+which is a convenient way to pass time in fixed steps.
+
+A StarBase **restores energy and shields to full in a single turn** -- 1200 to
+5000 and 400 to 2500 -- not a fixed quantity per visit. Supply and Research
+stations were not reached this run.
+
+### Turn costs, as far as run 1 got
+
+    HELP  MSGS  SND  REPAIR  FIX  INFO  W<n>   0.0
+    HAIL                                       0.0
+    DOCK                                       0.1
+    M (quadrant change)          measured 1.2222 and 2.5972 at warp 3
+
+### Incidental, and all of it new
+
+- **HAIL with a base in range**, which run 4 was going to go looking for:
+  `COMMUNICATIONS: The StarBase in 5-5 is responding to our hail.`
+- **A distress signal, with its full shape**: `Planet Xevious-8, quad 8-8,
+  requests evacuation. They can only hold out until 3508.7.` So the mechanic
+  carries a named planet, a quadrant and a DEADLINE STARDATE.
+- **A base under attack**, same shape: `StarBase in 6-6 ... under attack` with
+  a stardate.
+- **A long range tractor beam**: `Lexington caught in long range tractor beam.
+  Pulled to quadrant 5-3.`
+- **Progressive damage**: `EnergyConverter failing. Now at 87%` -- systems
+  degrade in steps and announce it, rather than only taking hits.
+- **In-quadrant movement travels a straight line and is BLOCKED by objects on
+  the path**: `Blocked by object at 5-4` for a move from 4-4 to 6-3 with a star
+  at 5-4. This port teleports.
+- `F)ix`'s numbering is 1..12 in exactly our `SYS_*` order, confirmed off its
+  own list screen.
+- Max warp = 1 + 0.09 x percentage, confirmed twice by refusals at 0%:
+  `engines cannot take over warp 1.0`.
+- The `DOCK` refusal with no base adjacent is `NAVIGATION: Not adjacent to
+  planet.` -- the original's own wording, planet and all.

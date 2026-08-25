@@ -890,13 +890,13 @@ static void test_docking(void) {
            both columns: 47 a stardate docked against 20 adrift, about 2.35x.
            The ancestor's 4x was DERIVED and is refuted. */
         ok(docked_pct == REPAIR_PER_STARDATE_DOCKED,
-           "docked, it mends 47 -- about 2.35x, not the ancestor's four");
+           "docked, it mends 50 -- the manual's 2.5x, measured on real repair");
     }
 
     /* All four rows of the manual's repair table (trek.h), taken at half a
-       stardate so no row saturates and each lands on its own figure.
-       The fourth row is the point: composing docked with focused gives 69,
-       which is what this port did until 2026-08-24. */
+       stardate so no row saturates and each lands on its own figure. All four
+       are MEASURED off the original on actual repair, not on its estimate
+       dialog -- 10, 25, 30, 50 points in half a stardate. */
     {
         uint8_t adrift, docked, focus, both;
 
@@ -935,9 +935,22 @@ static void test_docking(void) {
         both = ship.sys[SYS_LASERS];
 
         ok(adrift == 10, "half a stardate adrift mends 10");
-        ok(docked == 23, "docked, 23");
+        ok(docked == 25, "docked, 25 -- the manual's 2.5x");
         ok(focus  == 30, "focused, 30 -- the manual's 3x");
-        ok(both   == 50, "focused and docked, 50 -- the manual's 5x, NOT 69");
+        ok(both   == 50, "focused and docked, 50 -- the manual's 5x");
+    }
+
+    /* A focus STARVES the rest. MEASURED: shields sat at 0% for eleven
+       consecutive turns while the focused lasers climbed 0 to 100. */
+    {
+        trek_new_game(3, 4242);
+        ship.sys[SYS_LASERS]  = 0;
+        ship.sys[SYS_SHIELDS] = 0;
+        ship.repair_focus = SYS_LASERS + 1;
+        trek_advance(5, ev, 16);
+        ok(ship.sys[SYS_LASERS] == 30, "the focused system mends");
+        ok(ship.sys[SYS_SHIELDS] == 0,
+           "and every other damaged system mends NOTHING while it does");
     }
 
     /* A StarBase's shields absorb enemy fire outright. */
@@ -1602,8 +1615,9 @@ static void test_star_and_focus(void) {
         focused = ship.sys[SYS_LASERS];
         ok(focused > ship.sys[SYS_SHIELDS],
               "the focused system mends faster than the rest");
-        ok(ship.sys[SYS_SHIELDS] == plain,
-              "and the others mend exactly as they would have");
+        ok(ship.sys[SYS_SHIELDS] == 50,
+              "and the others do not mend at all -- MEASURED, see trek.h");
+        (void)plain;
     }
 }
 

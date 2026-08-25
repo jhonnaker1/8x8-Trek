@@ -508,6 +508,15 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 - **`SELFDESTRUCT_FACTOR`** is still the last ancestor-derived number inside an
   implemented command.
 
+### Run 1 is DONE (2026-08-24) -- see MEASURED.md
+
+Four items in, six out. The repair rates were wrong in two ways at once (47
+should be 50, and a focus starves every other system rather than merely
+outpacing it), the stardate discrepancy was never real, and HAIL in range,
+distress signals, base-under-attack, the tractor beam and progressive damage
+messages all turned up on the way past. What run 1 did NOT reach: Supply and
+Research docking quantities, and the full turn-cost table.
+
 ### Measurement -- only NUMBERS remain
 
 Everything about *what a thing does* has been on disk. What is left needs the
@@ -517,11 +526,15 @@ frequency and duration** (the mechanic itself is in the string table), and
 **`SYSTEM_DAMAGE_THRESHOLD`** -- two samples so far, both taking a system
 straight to 0% with casualties, one hit doing nothing.
 
-Also open: `HAIL` with a base actually in range, the panel-versus-log stardate
-discrepancy, the **two focused repair rows** off the STATE OF REPAIR dialog
-(one screenshot with a system concentrated on -- the dialog prints Docked and
-Undocked side by side and is what settled the other two rates), and item 5's
-four FITTED constants, which want `dis16.py` rather than more play.
+~~Also open: `HAIL` with a base actually in range, the panel-versus-log
+stardate discrepancy, the two focused repair rows~~ -- **ALL THREE DONE in run
+1, 2026-08-24.** HAIL in range answers `The StarBase in 5-5 is responding to
+our hail`; the stardate "discrepancy" was a misreading of the log's
+`stardate:message-number` format and does not exist; and all four repair rates
+are measured on real repair. Still open here: item 5's four FITTED constants,
+which want `dis16.py` rather than more play, and **the STATE OF REPAIR
+dialog's estimate formula**, which runs about a tenth above points/rate and is
+not yet pinned.
 
 **Search the manual before adding anything here.** The list above briefly
 carried the repair rates and `REPAIR_FOCUS_FACTOR`, which the manual states
