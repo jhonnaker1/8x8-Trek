@@ -2953,7 +2953,26 @@ a time out of far more; MEGA65 and the Amiga have no pressure worth the name.
 
 ## What the later ports should do BETTER (2026-08-24)
 
-Jamie's call, and it needs to be concrete or it will quietly become "match the
+**FIRST, THE PRIORITY THIS SITS UNDER (Jamie, 2026-08-24): get all the game
+logic and features working on the C128 before any other port starts.** This
+list is about PRESENTATION -- pixel art, panel geometry, wrapping, fill. It is
+NOT a licence to defer a feature to a roomier machine. Nothing in the rules,
+the commands or the events gets postponed on the grounds that the Amiga will
+have more room.
+
+The two things dropped so far are consistent with that: boss mode is a DOS
+shell with no C128 equivalent, and the charset is glyph shapes. Neither is game
+logic, and neither changes what the game does.
+
+**The consequence is that the memory work is now mandatory rather than
+optional.** If features cannot be dropped to fit, then space has to be made:
+the music data out of MAIN, and after that the string literals to bank 1. Those
+stop being clever optimisations and become prerequisites for `RAY`, the planet
+subsystem and the five missing loss endings.
+
+---
+
+The rest of this list needs to be concrete or it will quietly become "match the
 C128 everywhere". **The C128's compromises are C128 compromises, not the
 project's.** Every one below was forced by an 80x25 character grid or by ~42K of
 address space, and every one is something a roomier target can simply do
