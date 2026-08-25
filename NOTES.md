@@ -464,6 +464,61 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
+## THE OPEN LIST (rewritten 2026-08-24)
+
+Read this first; the numbered items below are the historical record of how each
+one got here.
+
+**Before adding anything to this list, search for it.** Three settled questions
+were written up as open in two days. `reference/manual.txt` is ISO-8859 and
+**invisible to grep** until converted; `reference/strings.txt` is plain ASCII
+and answers mechanics; MEASURED.md has its own back catalogue.
+
+### Commands -- twenty of twenty-five
+
+| | what is left |
+|---|---|
+| `Shift-F1` boss mode | fully specified. The original shells to `COMMAND.COM`; no C128 equivalent, so blank the VDC and wait for a key |
+| `RAY` | fully specified, and bigger than it looks: four outcomes, the fourth destroys the ship and prints a **Top Secret loss report** this port has no equivalent of |
+| `O)rbit` / `LAND` / `USE` | needs a core planet model. Gates known: `USE` wants shields under 50% AND energy under 20%; `LAND` needs transporter or shuttle at 100%, shuttle costs 0.2 stardays |
+
+### Corrections to commands already marked done
+
+- **`M)ove` manual mode.** DeltaX/DeltaY, signed, digit-before-the-point is
+  quadrants and after it is sectors. Not a convenience: below 100% computer it
+  is the ONLY way to move, so a port without it strands the player.
+- **`M)ove` and `W)arp` shorthands** -- `6235`, `m6235`, `w5.2`.
+- **`SELFDESTRUCT_FACTOR`** is still the last ancestor-derived number inside an
+  implemented command.
+
+### Measurement -- only NUMBERS remain
+
+Everything about *what a thing does* has been on disk. What is left needs the
+emulator: the **laser heat band**, **docking quantities per base type**,
+**`RAY`'s outcome odds** (about one game per sample), **boarding-party
+frequency and duration** (the mechanic itself is in the string table), and
+**`SYSTEM_DAMAGE_THRESHOLD`** -- two samples so far, both taking a system
+straight to 0% with casualties, one hit doing nothing.
+
+Also open: `HAIL` with a base actually in range, the panel-versus-log stardate
+discrepancy, and item 5's four FITTED constants, which want `dis16.py` rather
+than more play.
+
+### Infrastructure
+
+- **The briefing.** The last thing the disk seam was built for; needs
+  `plat_open`/`plat_read`, the one part of the seam never exercised.
+- **The CP437 charset.** Both font halves dump on demand; what is left is the
+  VDC upload path and the game symbols.
+
+### Named in the strings, never built
+
+Union wreckage in a quadrant, distress signals, Mongol reinforcement warnings,
+reserve life support, the item inventory `USE` draws on, and **five of the
+eight loss endings** -- including a surrender.
+
+---
+
 ## Open questions / next steps
 
 1. ~~**Close the encoding-mismatch class with `make verify`.**~~ DONE --
