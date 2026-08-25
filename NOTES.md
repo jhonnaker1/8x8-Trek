@@ -470,10 +470,10 @@ Read this first; the numbered items below are the historical record of how each
 one got here.
 
 **The plan for clearing the measurement items is at the end of this file** --
-"THE MEASUREMENT SESSION PLAN", five runs. **Run 1 is DONE (2026-08-24);
-runs 2 to 5 are not.** Measure everything, then implement, then size, then
-place in bank 1, then fix the bugs. In that order, and for the reason given
-there.
+"THE MEASUREMENT SESSION PLAN", five runs. **Runs 1, 2 and 3 are DONE
+(2026-08-24); runs 4 and 5 are not.** Measure everything, then implement, then
+size, then place in bank 1, then fix the bugs. In that order, and for the
+reason given there.
 
 **Before adding anything to this list, search for it.** Three settled questions
 were written up as open in two days. `reference/manual.txt` is ISO-8859 and
@@ -531,40 +531,43 @@ The only run-1 item left is **Supply and Research docking quantities**: every
 base encountered was a StarBase. That wants the base-type array located in
 memory rather than another survey.
 
-### Measurement -- only NUMBERS remain
+### Measurement -- what runs 4 and 5 still owe
 
-Everything about *what a thing does* has been on disk. ~~laser effectiveness (run 2)~~ **DONE 2026-08-24.** Effectiveness is EXACTLY
-the Lasers repair percentage, measured at four points, and heat turns out to be
-a gauge rather than a mechanic -- the word is in memory after all, the game
-caps it at 100, and no value of it changes the damage by a point. The
-PROVISIONAL 1240..1500 overheat band is retired. See MEASURED.md, "Run 2".
+Everything about *what a thing does* has been on disk; these are numbers.
 
-What is left needs the
-emulator: **the shield absorption law** (run 3 established the shape and left
-the formula open -- the instrument poisoned its own shield pool, see
-MEASURED.md), **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge**, **`HP_SCOUT`** (the
-Supply class maximum is now 150, from `INFO` showing 120 as 80%), **Supply and
-Research docking quantities** (the
-StarBase answer is a full restock of energy and shields in one 0.1-stardate
-turn; the other two types were never found), **`RAY`'s outcome odds**,
-**boarding-party frequency and duration** (the mechanic itself is in the string
-table), and **`SYSTEM_DAMAGE_THRESHOLD`** -- two samples so far, both taking a
-system straight to 0% with casualties, one hit doing nothing.
+**From the plan's own runs 4 and 5:**
 
-~~Also open: `HAIL` with a base actually in range, the panel-versus-log
-stardate discrepancy, the two focused repair rows~~ -- **ALL THREE DONE in run
-1, 2026-08-24.** HAIL in range answers `The StarBase in 5-5 is responding to
-our hail`; the stardate "discrepancy" was a misreading of the log's
-`stardate:message-number` format and does not exist; and all four repair rates
-are measured on real repair. Still open here: item 5's four FITTED constants,
-which want `dis16.py` rather than more play, and **the STATE OF REPAIR
-dialog's estimate formula**, which runs about a tenth above points/rate and is
-not yet pinned.
+- **`RAY`'s four outcome odds**, and the Top Secret loss report on the fatal
+  one.
+- **Boarding-party frequency and duration.** The mechanic is in the string
+  table; the numbers need elapsed play.
+- **`SELFDESTRUCT_FACTOR`** -- the last ancestor-derived number inside an
+  implemented command.
+- **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
+  warnings. Specification only, never prose.
 
-**Search the manual before adding anything here.** The list above briefly
-carried the repair rates and `REPAIR_FOCUS_FACTOR`, which the manual states
-outright at l.464-469, and the reserve life support duration, which it states
-at l.402. Reading it instead cost nothing and found a live bug -- see below.
+**Opened by runs 1 to 3, and all cheap next time the rig is up:**
+
+- **The shield absorption law.** Run 3 got the shape and not the formula --
+  the instrument poisoned its own shield pool partway through. See MEASURED.md,
+  "Run 3".
+- **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
+  turns in five once a few hundred units reached energy, and never while the
+  shields absorbed everything. No clean edge yet.
+- **`HP_SCOUT`.** Two classes are now pinned -- Supply maxes at 150 (`INFO`
+  showed 120 as 80%) and a Battleship reads 355. A scout has not been met.
+- **Supply and Research docking quantities.** A StarBase restocks energy and
+  shields to full in one 0.1-stardate turn; the other two types were never
+  found. Wants the base-type array located in memory, not another survey.
+- **The STATE OF REPAIR estimate formula**, which runs about a tenth above
+  points/rate.
+
+**Not for the emulator:** item 5's four FITTED constants want `dis16.py`.
+
+**Search the manual before adding anything here.** This list briefly carried
+the repair rates and `REPAIR_FOCUS_FACTOR`, which the manual states outright at
+l.464-469, and the reserve life support duration, at l.402. Reading it cost
+nothing and found a live bug.
 
 ### Infrastructure
 
@@ -623,7 +626,7 @@ quadrant, and a DEADLINE STARDATE that is enforced -- the StarBase in 4-2 was
 destroyed when its own ran out), and **the `USE` inventory** (a numbered list
 with quantities, and raw energium takes energy ABOVE its maximum).
 
-### Behaviour run 1 found that this port gets WRONG
+### Behaviour the runs found that this port gets WRONG
 
 Not missing features -- implemented things that do not match the original.
 
