@@ -316,18 +316,31 @@ extern uint8_t sector[QUAD_CELLS];
 #define SYS_SHUTTLE     11
 #define SYS_COUNT       12
 
-/* MEASURED from the manual 2026-08-24, which gives the whole table:
+/* Repair rates, MEASURED from the manual 2026-08-24, which gives the whole
+ * table (l.464-469):
  *
  *     1x    normal repairs, divided evenly among damaged systems
  *     2.5x  normal repairs while docked at a starbase
  *     3x    repairing only a selected system
  *     5x    repairing a selected system while docked at a starbase
  *
- * So focusing is worth 3x, not the 2 this was DERIVED at. The docked figures
- * are consistent with REPAIR_PER_STARDATE 20 and _DOCKED 47 already measured
- * off the original (2.35x against the manual's 2.5x, within the display's
- * resolution), and 3 x 20 = 60 against 5 x 20 = 100 docked-and-focused. */
-#define REPAIR_FOCUS_FACTOR  3
+ * FOUR ENTRIES, AND THEY ARE NOT A PRODUCT. 2.5 x 3 is 7.5, not 5. This port
+ * shipped the product for a day: it multiplied the docked rate by a
+ * REPAIR_FOCUS_FACTOR of 3 and repaired at about 7x when both applied. The
+ * table was already quoted right here and the fourth entry was derived by
+ * multiplying anyway, which is the whole mistake in one line.
+ *
+ * Read it as a table. Each row is a RATE, not a multiplier to stack, and the
+ * original is free to price the combined case at less than the product --
+ * which it plainly does.
+ *
+ * In points per stardate, anchored on the two rates measured off the original
+ * (REPAIR_PER_STARDATE 20 and _DOCKED 47 below -- 2.35x against the manual's
+ * 2.5x, within the resolution of the dialog they were read from), the
+ * manual's relatives give 3 x 20 = 60 focused and 5 x 20 = 100 focused while
+ * docked. */
+#define REPAIR_PER_STARDATE_FOCUS         60
+#define REPAIR_PER_STARDATE_FOCUS_DOCKED 100
 
 typedef struct {
     uint8_t  quad_y, quad_x;

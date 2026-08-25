@@ -273,22 +273,30 @@ void trek_new_game(uint8_t level, uint16_t seed) {
    not modelled yet -- there is no damage system. */
 static void advance_time(uint16_t tenths) {
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
-    uint16_t mend = (uint16_t)((REPAIR_PER_STARDATE * tenths) / 10);
 
-    uint8_t i;
-
-    /* DERIVED: the ancestor divides the repair period by docfac = 0.25 while
-       docked, which is four times the rate. Applied before the clamp below,
-       so a long docked rest still stops at 100.
+    /* Repair is a FOUR-ENTRY RATE TABLE, not a stack of multipliers. Pick the
+       row -- docked or not, focused or not -- and apply it. Composing the two
+       instead shipped a combined rate near 7x against the manual's 5x; the
+       table and the arithmetic that refutes the product are in trek.h.
 
        Declarations first: cc65 is C89 and rejects a statement before one,
        while the native build is C99 and does not. `make test` passing is not
        evidence that the port compiles. */
-    /* MEASURED: the docked rate is 47 points a stardate against 20, not the
-       ancestor's 4x. See trek.h. */
-    if (ship.docked != BASE_NONE)
-        mend = (uint16_t)((mend * REPAIR_PER_STARDATE_DOCKED)
-                          / REPAIR_PER_STARDATE);
+    uint8_t  docked = (uint8_t)(ship.docked != BASE_NONE);
+    uint16_t rate   = docked ? REPAIR_PER_STARDATE_DOCKED
+                             : REPAIR_PER_STARDATE;
+    uint16_t frate  = docked ? REPAIR_PER_STARDATE_FOCUS_DOCKED
+                             : REPAIR_PER_STARDATE_FOCUS;
+
+    /* Ten stardates already mends a wrecked system twice over, so clamping
+       the multiplier here changes no outcome and keeps 100 * tenths inside
+       sixteen bits. The composed version had no such bound: it multiplied an
+       already-scaled `mend` by 47 and overflowed near a hundred stardates. */
+    uint16_t rt    = tenths > 100 ? 100 : tenths;
+    uint16_t mend  = (uint16_t)((rate  * rt) / 10);
+    uint16_t fmend = (uint16_t)((frate * rt) / 10);
+
+    uint8_t i;
 
     ship.stardate = (uint16_t)(ship.stardate + tenths);
 
@@ -304,17 +312,18 @@ static void advance_time(uint16_t tenths) {
      *
      * That measurement is what makes F)ix awkward to model. If every system
      * already repairs at the full rate, "concentrate repairs on" cannot mean
-     * dividing a budget -- there is no budget. It has to be a multiplier on
-     * the chosen system, and REPAIR_FOCUS_FACTOR is DERIVED, not measured.
-     * The experiment that would settle it: damage two systems to the same
-     * percentage, concentrate on one, let several stardates pass undocked and
-     * compare how far each recovered. */
-    if (mend) {
+     * dividing a budget -- there is no budget. So the focused system simply
+     * runs at a different rate, and the manual prints all four of them. What
+     * is still unmeasured is whether the original's own points-per-stardate
+     * match the manual's relatives: 47 docked against a stated 2.5x of 20
+     * says the manual rounds somewhere. The two focused rows have never been
+     * read off the STATE OF REPAIR dialog, which is where they would be. */
+    if (mend || fmend) {
         for (i = 0; i < SYS_COUNT; i++) {
             uint16_t m = mend;
             if (ship.sys[i] >= 100) continue;
             if (ship.repair_focus == (uint8_t)(i + 1))
-                m = (uint16_t)(m * REPAIR_FOCUS_FACTOR);
+                m = fmend;
             if (ship.sys[i] + m >= 100) ship.sys[i] = 100;
             else ship.sys[i] = (uint8_t)(ship.sys[i] + m);
         }

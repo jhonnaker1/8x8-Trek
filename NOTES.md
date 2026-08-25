@@ -494,6 +494,12 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 - ~~**`M)ove` and `W)arp` shorthands.**~~ Already worked -- `grab_digits`
   ignores separators, so `6235`, `m6235` and `w5.2` all parsed before anyone
   checked.
+- ~~**Repair composed docked with focused.**~~ **FIXED 2026-08-24.** The
+  manual's four repair rates are a TABLE, not a product -- 2.5x docked times
+  3x focused is 7.5, and the manual says 5x. `advance_time()` multiplied them
+  and repaired a focused system at a StarBase about 40% too fast. Now four
+  rate constants with all four asserted in `test_trek.c`. See MEASURED.md,
+  "The repair table is a table, not a product".
 - **`SELFDESTRUCT_FACTOR`** is still the last ancestor-derived number inside an
   implemented command.
 
@@ -507,8 +513,15 @@ frequency and duration** (the mechanic itself is in the string table), and
 straight to 0% with casualties, one hit doing nothing.
 
 Also open: `HAIL` with a base actually in range, the panel-versus-log stardate
-discrepancy, and item 5's four FITTED constants, which want `dis16.py` rather
-than more play.
+discrepancy, the **two focused repair rows** off the STATE OF REPAIR dialog
+(one screenshot with a system concentrated on -- the dialog prints Docked and
+Undocked side by side and is what settled the other two rates), and item 5's
+four FITTED constants, which want `dis16.py` rather than more play.
+
+**Search the manual before adding anything here.** The list above briefly
+carried the repair rates and `REPAIR_FOCUS_FACTOR`, which the manual states
+outright at l.464-469, and the reserve life support duration, which it states
+at l.402. Reading it instead cost nothing and found a live bug -- see below.
 
 ### Infrastructure
 

@@ -3149,3 +3149,50 @@ The laser heat band and the docking quantities per base type were not reached.
   "Commander...", "Mongol...", "Supply ship..." -- and reports "destroyed!".
 - A long-range tractor beam pulled the ship a quadrant and the move drew fire
   from three ships in the same turn.
+
+## The repair table is a table, not a product (2026-08-24)
+
+Found while auditing what still needs the emulator against what the manual
+already says -- an audit that should have run before the emulator list was
+written, and which cost two items off it.
+
+The manual prints all four repair rates (l.464-469):
+
+    1x    normal repairs, work evenly divided among systems
+    2.5x  normal repairs while docked at a starbase
+    3x    repairing only a selected system
+    5x    repairing a selected system while docked at a starbase
+
+**Those four numbers are not a product.** 2.5 x 3 is 7.5, and the manual says
+5. So the original does not compose the two conditions; it prices the combined
+case separately, and cheaper than multiplying would make it.
+
+`core/trek.c` composed them. It scaled the base rate by 47/20 when docked and
+then multiplied by a `REPAIR_FOCUS_FACTOR` of 3, which is **about 7x** for a
+focused system at a StarBase against the manual's 5x -- 69 points a stardate
+where the table says 50 at half a stardate, a 38% overshoot on the one repair
+case a player in trouble actually uses.
+
+The table was quoted verbatim in `trek.h` directly above the constant, and the
+note there had already done the arithmetic: "3 x 20 = 60 against 5 x 20 = 100
+docked-and-focused". The rates were written down and then not used. Nothing
+here needed measuring; it needed reading what was already on the page.
+
+Now four constants rather than a multiplier, in points per stardate:
+
+    REPAIR_PER_STARDATE                20   MEASURED off the original
+    REPAIR_PER_STARDATE_DOCKED         47   MEASURED off the original
+    REPAIR_PER_STARDATE_FOCUS          60   manual, 3 x 20
+    REPAIR_PER_STARDATE_FOCUS_DOCKED  100   manual, 5 x 20
+
+`core/test/test_trek.c` asserts all four at half a stardate, where no row
+saturates and each lands on its own figure: 10, 23, 30, 50. The fourth is the
+regression test -- composing gives 69.
+
+**What is still open:** the two focused rows come from the manual's relatives,
+not from the original. The measured docked rate is 47 against a stated 2.5x of
+20, so the manual rounds somewhere. The STATE OF REPAIR dialog prints Docked
+and Undocked times side by side and is what settled the first two rates; it has
+never been read with a system concentrated on. That is a one-screenshot
+measurement and it belongs on the emulator list -- unlike the focus factor
+itself, which was on that list this morning and should not have been.

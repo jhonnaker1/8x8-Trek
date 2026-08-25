@@ -613,8 +613,9 @@ static void do_self(void) {
 
    NOT a repair-priority list, which is what the command table assumed for
    weeks -- one system, by number, with L listing the numbering. The effect is
-   REPAIR_FOCUS_FACTOR in trek.h and is DERIVED, not measured; see the note
-   there for the experiment that would settle it. */
+   a different repair RATE for the chosen system, 60 points a stardate adrift
+   and 100 docked, straight off the manual's own table. See trek.h, including
+   why those two are not the undocked rates multiplied by anything. */
 static void do_fix(void) {
     char buf[8];
     /* Its own buffer, NOT the shared linebuf, which is 32 bytes -- the

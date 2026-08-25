@@ -866,8 +866,8 @@ static void test_docking(void) {
     ok(ship.torps == 1,           "but restocks nothing this core models");
     ok(ship.energy == 100,        "including fuel");
 
-    /* Repair runs four times faster docked. DERIVED -- the number to check
-       against the original's own Docked/Undocked columns. */
+    /* MEASURED off the original's Docked/Undocked columns: 47 a stardate
+       against 20. The ancestor's 4x was DERIVED and is refuted. */
     {
         uint8_t docked_pct, adrift_pct;
         trek_new_game(3, 4242);
@@ -891,6 +891,53 @@ static void test_docking(void) {
            The ancestor's 4x was DERIVED and is refuted. */
         ok(docked_pct == REPAIR_PER_STARDATE_DOCKED,
            "docked, it mends 47 -- about 2.35x, not the ancestor's four");
+    }
+
+    /* All four rows of the manual's repair table (trek.h), taken at half a
+       stardate so no row saturates and each lands on its own figure.
+       The fourth row is the point: composing docked with focused gives 69,
+       which is what this port did until 2026-08-24. */
+    {
+        uint8_t adrift, docked, focus, both;
+
+        trek_new_game(3, 4242);
+        ship.sys[SYS_LASERS] = 0;
+        trek_advance(5, ev, 16);
+        adrift = ship.sys[SYS_LASERS];
+
+        trek_new_game(3, 4242);
+        ship.sys[SYS_LASERS] = 0;
+        ship.repair_focus = SYS_LASERS + 1;
+        trek_advance(5, ev, 16);
+        focus = ship.sys[SYS_LASERS];
+
+        trek_new_game(3, 4242);
+        ship.sec_y = 4; ship.sec_x = 4;
+        for (i = 0; i < QUAD_CELLS; i++)
+            if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+        sector[(4 << 3) | 5] = SEC_BASE;
+        gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+        trek_dock();
+        ship.sys[SYS_LASERS] = 0;
+        trek_advance(5, ev, 16);
+        docked = ship.sys[SYS_LASERS];
+
+        trek_new_game(3, 4242);
+        ship.sec_y = 4; ship.sec_x = 4;
+        for (i = 0; i < QUAD_CELLS; i++)
+            if (sector[i] == SEC_BASE) sector[i] = SEC_EMPTY;
+        sector[(4 << 3) | 5] = SEC_BASE;
+        gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+        trek_dock();
+        ship.sys[SYS_LASERS] = 0;
+        ship.repair_focus = SYS_LASERS + 1;
+        trek_advance(5, ev, 16);
+        both = ship.sys[SYS_LASERS];
+
+        ok(adrift == 10, "half a stardate adrift mends 10");
+        ok(docked == 23, "docked, 23");
+        ok(focus  == 30, "focused, 30 -- the manual's 3x");
+        ok(both   == 50, "focused and docked, 50 -- the manual's 5x, NOT 69");
     }
 
     /* A StarBase's shields absorb enemy fire outright. */
