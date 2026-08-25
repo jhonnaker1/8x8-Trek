@@ -3038,3 +3038,95 @@ MEGA65 has 384K and the Amiga is flat; neither has this problem.
 tested.** It is easy to treat what fits there as what the game is. It is not.
 Where a later target can do better, it should -- and where it does, note it
 here so the difference is deliberate rather than accidental.
+
+## Bank 1: the far-memory seam and the string pool (2026-08-24)
+
+The port had 170 bytes of MAIN left and five features to build. This moves the
+bulk read-only data out of the address space and into RAM bank 1.
+
+### The seam
+
+`core/farmem.h` is the contract, `c128/src/farmem.c` the C128 backing, and the
+shape is deliberately the same as the disk seam: contract beside the core,
+mechanism per platform, `core/` never calls it. **Four of the six remaining
+targets bank memory anyway** -- X16, Atari 130XE, CoCo 3 and F256 -- and the
+two that do not (MEGA65, Amiga) implement it as a plain array. This is not a
+C128 trick; it is the majority case, learned where it is cheapest.
+
+The store is loaded FROM DISK, because initialised data cannot come from the
+binary when the whole point is to get it out of the binary. That means
+`far_load` finally exercises `plat_open`/`plat_read` -- the one part of the
+disk seam nothing had used.
+
+**It has more than one tenant**, so `far_load` appends and returns the base
+offset it used. The first version loaded at offset 0 every time and the music
+silently overwrote the prose.
+
+### What moved
+
+    strings   2,267 bytes of text  ->  194 bytes of index
+    music     1,092 bytes of notes ->   14 bytes of offsets
+
+`.rodata` went from 5,396 to 2,328. Free MAIN went from **170 to 561**.
+
+That is less than the arithmetic suggests because the seam and the
+newly-live streaming path cost about 2,700 bytes of code between them. The
+real payoff is not the 391 bytes: **every future string now costs two bytes of
+index instead of its length**, and everything left to build -- `RAY`'s outcomes
+and loss report, five more loss endings, the planet dialogs, the boarding and
+event messages -- is string-heavy.
+
+### The pool
+
+`tools/gen_strings.py` rewrites literals into `S(id)`, but ONLY where they are
+a direct argument to a known drawing function. A literal in a static
+initialiser cannot become a function call, and a script that rewrote those
+would produce code that either fails to compile or, worse, compiles and
+returns the wrong buffer.
+
+`c128/src/strings.txt` is the source of truth and **is committed** -- unlike
+the music, this prose is the port's own wording, so a clone with no
+`reference/` still gets a game with words in it. Ids are permanent. The first
+version rebuilt the list from the sources every run and wiped the pool the
+second time, because by then the sources held `S(n)` and there was nothing
+left to extract.
+
+`S()` rotates through four buffers, because `ui_message(S(a), S(b))` wants two
+pooled strings alive in one expression.
+
+### Three bugs, all the same bug
+
+Channel lifetime, in `storage.c`, three times:
+
+1. `plat_open` called `cmd_status()` without opening channel 15, so chkin
+   failed, the status read 255, and every open reported an error.
+2. Fixed that, then closed channel 15 after reading the status -- which closes
+   every file on the drive, so the data channel died as it was opened.
+3. Fixed that, and `plat_read` still closed the data channel itself at EOF and
+   cleared the flag, so `plat_close()` did nothing and channel 15 leaked. The
+   strings loaded and the music did not.
+
+None of these looked like an I/O fault. The symptom each time was a **title
+screen with no words on it**. The rule is now one line: plat_open opens both
+channels, plat_close closes both, nothing else touches either.
+
+### Two llvm-mos traps worth keeping
+
+- **An `__asm__` block with no `"memory"` clobber may be reordered** past the
+  stores that set up its pointers. The first bank-1 probe read back the loop
+  index instead of the data.
+- **`lda (ptr),y` needs a ZERO PAGE pointer.** A `.bss` pointer gives
+  "relocation R_MOS_ADDR8 out of range". `$FB/$FC` and `$FD/$FE` are free on
+  the C128 and sit outside llvm-mos's imaginary registers at `$0A..$8F`.
+
+### Where bank 1 is, and why $4000
+
+`$D506` bits 1..0 set the common-RAM size -- 1K, 4K, 8K or 16K, shared between
+both banks from the bottom. The default is 1K, so an earlier draft using
+`$2000` worked on a default machine and would have silently aliased to bank 0
+if anything selected 16K. `$4000` is above every setting.
+
+Bank 1 is BASIC's variable storage, which is safe here because the game is
+started with RUN (which clears variables) and BASIC is not running while it
+plays. What it rules out is a port that returns to BASIC and expects its far
+data to survive.

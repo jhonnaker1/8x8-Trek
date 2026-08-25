@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "../src/vdc.h"
 #include "../src/layout.h"
@@ -69,6 +70,47 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
                unsigned char ch, unsigned char color) {
     while (h--) scr_put(x, y++, ch, color);
 }
+
+/* The string pool, natively.
+ *
+ * ui.c draws with S(id) now -- the prose lives in bank 1 on the real machine
+ * (core/strpool.h). The tests must still be able to assert what a panel
+ * actually printed, so this reads the SAME committed list the generator uses
+ * and hands back the real text. A stub returning "" would turn every string
+ * assertion below into a tautology. */
+#include "../../core/strpool.h"
+
+static char  pool_buf[16384];
+static char *pool[512];
+static int   pool_n = 0;
+
+static void pool_init(void) {
+    FILE *f = fopen("src/strings.txt", "r");
+    char line[256];
+    size_t used = 0;
+
+    if (!f) { printf("FAIL: cannot open src/strings.txt\n"); exit(1); }
+    while (fgets(line, sizeof line, f)) {
+        char *tab;
+        size_t n;
+        if (line[0] == '#' || line[0] == '\n') continue;
+        tab = strchr(line, '\t');
+        if (!tab) continue;
+        n = strlen(tab + 1);
+        while (n && (tab[n] == '\n' || tab[n] == '\r')) n--;
+        memcpy(pool_buf + used, tab + 1, n);
+        pool_buf[used + n] = 0;
+        pool[atoi(line)] = pool_buf + used;
+        used += n + 1;
+        if (atoi(line) + 1 > pool_n) pool_n = atoi(line) + 1;
+    }
+    fclose(f);
+}
+
+const char *S(uint8_t id) {
+    return (id < pool_n && pool[id]) ? pool[id] : "";
+}
+uint8_t str_load(void) { return 1; }
 
 /* A fake disk.
  *
@@ -1003,6 +1045,7 @@ static void test_hall_of_fame_persists(void) {
 }
 
 int main(void) {
+    pool_init();
     trek_new_game(3, 12345);
 
     test_panels_disjoint();

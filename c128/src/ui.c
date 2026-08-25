@@ -3,6 +3,8 @@
 #include "vdc.h"
 #include "layout.h"
 #include "ui.h"
+#include "../../core/strpool.h"
+#include "strdata.h"
 #include "input.h"
 #include "egavdc.h"
 #include "../../core/trek.h"
@@ -117,7 +119,7 @@ void ui_draw_scan(void) {
         scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 4),
                  "SCANNERS", EGA_TO_VDC(EGA_LTRED));
         scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 5),
-                 "INOPERATIVE", EGA_TO_VDC(EGA_LTRED));
+                 S(S_43), EGA_TO_VDC(EGA_LTRED));
         return;
     }
 
@@ -168,7 +170,7 @@ void ui_draw_chart(void) {
     /* Below 50% they are not functional at all. */
     if (lr == SCAN_DEAD) {
         scr_puts((unsigned char)(p->x + 2), (unsigned char)(p->y + 4),
-                 "LONG RANGE SCANNERS INOPERATIVE", EGA_TO_VDC(EGA_LTRED));
+                 S(S_47), EGA_TO_VDC(EGA_LTRED));
         return;
     }
 
@@ -222,7 +224,7 @@ void ui_draw_chart(void) {
         /* Trailing space matters: this line is written INTO the bottom
            border, so a gap left between words shows the border rule through
            it and reads as a stray dash. */
-        scr_puts(bx, by, "LEXINGTON IN QUAD ", COL_LABEL);
+        scr_puts(bx, by, S(S_46), COL_LABEL);
         put_num((unsigned char)(bx + 18), by, (uint16_t)(ship.quad_y + 1), 1, COL_VALUE);
         scr_put((unsigned char)(bx + 19), by, 44 /* ',' */, COL_VALUE);
         put_num((unsigned char)(bx + 20), by, (uint16_t)(ship.quad_x + 1), 1, COL_VALUE);
@@ -297,7 +299,7 @@ void ui_draw_badge(void) {
 
     clear_panel(P_BADGE);
 
-    scr_puts((unsigned char)(p->x + 2), y, "U.S.S. LEXINGTON", COL_VALUE);
+    scr_puts((unsigned char)(p->x + 2), y, S(S_89), COL_VALUE);
     y++;
     scr_puts((unsigned char)(cx - 3), y, "RCB-92", COL_VALUE);
     y++;
@@ -321,7 +323,7 @@ void ui_draw_badge(void) {
         scr_put((unsigned char)(cx - 2 + i), y, BADGE_DISC_BOTTOM, disc);
     y++;
 
-    scr_puts((unsigned char)(p->x + 3), y, "DEPT. OF SPACE", COL_LABEL);
+    scr_puts((unsigned char)(p->x + 3), y, S(S_20), COL_LABEL);
 }
 
 /* ------------------------------------------------------- systems status */
@@ -1069,7 +1071,7 @@ void ui_dialog_close(void) {
 
     dlg_room();
     scr_puts((unsigned char)(DLG_X + 2), (unsigned char)(DLG_Y + dlg_row),
-             "HIT RETURN TO CONTINUE", COL_DEPT);
+             S(S_40), COL_DEPT);
     for (;;) if (kb_waitkey() == KB_RETURN) break;
 
     /* Blank the box before repainting. ui_draw_all() redraws the frame and
@@ -1171,11 +1173,11 @@ void ui_repair_report(void) {
     unsigned char y, i, pct, color;
 
     box(REP_X, REP_Y, REP_W, REP_H, COL_LABEL);
-    scr_puts((unsigned char)(REP_X + 14), REP_Y, "STATE OF REPAIR", COL_VALUE);
+    scr_puts((unsigned char)(REP_X + 14), REP_Y, S(S_75), COL_VALUE);
 
     scr_puts((unsigned char)(REP_X + 2),  (unsigned char)(REP_Y + 1), "SYSTEM", COL_LABEL);
-    scr_puts((unsigned char)(REP_X + 26), (unsigned char)(REP_Y + 1), "REPAIR TIME", COL_LABEL);
-    scr_puts((unsigned char)(REP_X + 24), (unsigned char)(REP_Y + 2), "DOCKED UNDOCKED", COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 26), (unsigned char)(REP_Y + 1), S(S_66), COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 24), (unsigned char)(REP_Y + 2), S(S_22), COL_LABEL);
 
     for (i = 0; i < SYS_COUNT; i++) {
         y   = (unsigned char)(REP_Y + 4 + i);
@@ -1199,7 +1201,7 @@ void ui_repair_report(void) {
     }
 
     scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
-             "HIT RETURN TO CONTINUE", COL_DEPT);
+             S(S_40), COL_DEPT);
 }
 
 /* ------------------------------------------------------------- MSGS */
@@ -1286,13 +1288,13 @@ void ui_messages_view(void) {
     char c;
 
     box(MSGV_X, MSGV_Y, MSGV_W, MSGV_H, COL_MSGV_TITLE);
-    scr_puts((unsigned char)(MSGV_X + 12), MSGV_Y, "PREVIOUS MESSAGES",
+    scr_puts((unsigned char)(MSGV_X + 12), MSGV_Y, S(S_63),
              COL_MSGV_TITLE);
     /* 30 characters centred in a 41-wide box. The wording is this port's:
        the original draws real up and down arrow glyphs, which the C128's
        stock character set has no equivalent of at these screen codes. */
     scr_puts((unsigned char)(MSGV_X + 5), (unsigned char)(MSGV_Y + MSGV_H - 1),
-             "UP/DOWN TO SCROLL, ESC TO EXIT", COL_MSGV_FOOT);
+             S(S_90), COL_MSGV_FOOT);
 
     /* Opens at the bottom. Measured, and it is the opposite of what a
        from-the-top viewer would do. */
@@ -1416,8 +1418,8 @@ void ui_save_game(const Setup *s) {
     char name[18];
 
     ui_dialog_open("SAVE GAME");
-    ui_dialog_line("<RETURN> FOR DEFAULT");
-    ui_dialog_ask("FILE NAME:", name, sizeof name);
+    ui_dialog_line(S(S_3));
+    ui_dialog_ask(S(S_34), name, sizeof name);
     if (!name[0]) strcpy(name, SAVE_DEFAULT);
 
     /* MEASURED: on success the original just CLOSES -- no confirmation, no
@@ -1431,8 +1433,8 @@ void ui_save_game(const Setup *s) {
     }
 
     ui_dialog_line("");
-    ui_dialog_line("COULD NOT SAVE.");
-    ui_dialog_ask("HIT RETURN TO CONTINUE", name, 2);
+    ui_dialog_line(S(S_19));
+    ui_dialog_ask(S(S_40), name, 2);
     ui_dialog_close();
 }
 
@@ -1461,9 +1463,9 @@ void ui_setup(Setup *s) {
     s->restored = 0;
 
     scr_clear();
-    scr_puts(31, 1, "U.S.S. LEXINGTON", COL_VALUE);
+    scr_puts(31, 1, S(S_89), COL_VALUE);
     scr_puts(36, 2, "RCB-92",           COL_VALUE);
-    scr_puts(2,  5, "WELCOME ABOARD CAPTAIN!", COL_MSG);
+    scr_puts(2,  5, S(S_96), COL_MSG);
 
     s->briefing = ask_yes(7, "WILL YOU REQUIRE A BRIEFING (Y/N)?");
 
@@ -1474,7 +1476,7 @@ void ui_setup(Setup *s) {
            because the save already holds them. */
         char fname[18];
 
-        scr_puts(2, 10, "FILE NAME, <RETURN> FOR DEFAULT, <ESC> TO ABORT:",
+        scr_puts(2, 10, S(S_33),
                  COL_LABEL);
         if (read_field(51, 10, fname, sizeof fname)) {
             if (!fname[0]) strcpy(fname, SAVE_DEFAULT);
@@ -1482,21 +1484,21 @@ void ui_setup(Setup *s) {
                 s->restored = 1;
                 return;                 /* nothing else to ask */
             }
-            scr_puts(4, 11, "NO SAVED GAME FOUND.", EGA_TO_VDC(EGA_LTRED));
+            scr_puts(4, 11, S(S_56), EGA_TO_VDC(EGA_LTRED));
         }
         y = 12;
     } else {
         y = 10;
     }
 
-    scr_puts(2, y, "PLEASE ENTER YOUR NAME:", COL_LABEL);
+    scr_puts(2, y, S(S_61), COL_LABEL);
     read_field(26, y, s->name, sizeof s->name);
     y++;
 
     /* Looped rather than clamped: the original asks again, and silently
        turning a typo into a different difficulty is worse than re-asking. */
     for (;;) {
-        scr_puts(2, y, "FOR VERIFICATION, ENTER YOUR COMMAND LEVEL (1-5):", COL_LABEL);
+        scr_puts(2, y, S(S_36), COL_LABEL);
         buf[0] = '\0';
         read_field(51, y, buf, 3);
         if (buf[0] >= '1' && buf[0] <= '5' && buf[1] == '\0') break;
@@ -1505,7 +1507,7 @@ void ui_setup(Setup *s) {
     s->level = (uint8_t)(buf[0] - '0');
     y++;
 
-    scr_puts(2, y, "CAPTAIN, PLEASE ENTER SELF-DESTRUCT PASSWORD:", COL_LABEL);
+    scr_puts(2, y, S(S_13), COL_LABEL);
     read_field(47, y, s->password, sizeof s->password);
 
     /* The whole point of the screen, mechanically: kb_entropy has been counting
@@ -1564,9 +1566,9 @@ void ui_evaluation(void) {
 
     trek_score_sheet(&sh);
     scr_clear();
-    scr_puts(32, 1, "DEPT. OF SPACE",      COL_VALUE);
-    scr_puts(31, 2, "EARTH HEADQUARTERS",  COL_LABEL);
-    scr_puts(31, 3, "DETAILED EVALUATION", COL_VALUE);
+    scr_puts(32, 1, S(S_20),      COL_VALUE);
+    scr_puts(31, 2, S(S_26),  COL_LABEL);
+    scr_puts(31, 3, S(S_21), COL_VALUE);
     scr_puts(EV_ITEM,    5, "ITEM",  COL_LABEL);
     scr_puts(EV_DOTS_TO, 5, "SCORE", COL_LABEL);
 
@@ -1604,7 +1606,7 @@ void ui_evaluation(void) {
     y++;
     ev_row(y, NULL, "TOTAL", sh.total, COL_VALUE);
 
-    scr_puts(29, 22, "HIT RETURN TO CONTINUE", COL_DEPT);
+    scr_puts(29, 22, S(S_40), COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
 
@@ -1651,10 +1653,10 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     }
 
     scr_clear();
-    scr_puts(33, 1, "DEPT. OF SPACE", COL_VALUE);
-    scr_puts(34, 2, "HALL OF FAME",   COL_VALUE);
-    scr_puts(14, 4, "FOR OUTSTANDING PERFORMANCE, THE FOLLOWING DEPT. OF SPACE", COL_MSG);
-    scr_puts(19, 5, "OFFICERS HAVE BEEN INDUCTED INTO THE HALL OF FAME:", COL_MSG);
+    scr_puts(33, 1, S(S_20), COL_VALUE);
+    scr_puts(34, 2, S(S_38),   COL_VALUE);
+    scr_puts(14, 4, S(S_35), COL_MSG);
+    scr_puts(19, 5, S(S_59), COL_MSG);
 
     scr_puts(16, 8, "NAME", COL_LABEL);
     scr_puts(46, 8, "RANK", COL_LABEL);
@@ -1677,7 +1679,7 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
         }
     }
 
-    scr_puts(29, 22, "HIT RETURN TO CONTINUE", COL_DEPT);
+    scr_puts(29, 22, S(S_40), COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
 
@@ -1717,7 +1719,7 @@ void ui_title(void) {
     /* Version bar, where the original puts its "Revision 3.0". Ours names the
        port, because claiming the original's revision number would be a lie
        about what this program is. */
-    scr_puts(1, 0, " C128-VDC PORT ", EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(1, 0, S(S_0), EGA_TO_VDC(EGA_LTCYAN));
 
     /* "EGA" then a gap then "TREK": 3*6 + gap + 4*6 - 1 columns wide. */
     x = 15;
@@ -1736,7 +1738,7 @@ void ui_title(void) {
         x = (unsigned char)(x + 6);
     }
 
-    scr_puts(30, 9, "THE MONGOL INVASION", EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(30, 9, S(S_80), EGA_TO_VDC(EGA_LTCYAN));
 
     /* The Lexington, drawn in solid cells rather than punctuation. An earlier
        version used "/", "\\" and "_" and lost half of them: cc65 translates
@@ -1761,20 +1763,20 @@ void ui_title(void) {
 
     /* Ship plate, bottom left, matching the console's own badge panel. */
     box(4, 16, 24, 7, COL_LABEL);
-    scr_puts(9,  17, "U.S.S. LEXINGTON", COL_VALUE);
+    scr_puts(9,  17, S(S_89), COL_VALUE);
     scr_puts(13, 18, "RCB-92",           COL_VALUE);
-    scr_puts(9,  20, "DEPT. OF SPACE",   EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(9,  20, S(S_20),   EGA_TO_VDC(EGA_LTCYAN));
 
     /* And the credit. The original earns this panel -- EGA Trek was shareware
        and Nels Anderson wrote it; this port exists because of his game, so his
        name goes on the front of it and not in a comment somewhere. */
     box(32, 16, 44, 7, COL_LABEL);
-    scr_puts(34, 17, "EGA TREK WAS WRITTEN BY NELS ANDERSON",   COL_MSG);
-    scr_puts(34, 18, "AND RELEASED AS SHAREWARE IN 1992.",      COL_MSG);
-    scr_puts(34, 20, "THIS IS AN INDEPENDENT PORT OF HIS GAME", EGA_TO_VDC(EGA_LTCYAN));
-    scr_puts(34, 21, "TO THE COMMODORE 128.",                   EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(34, 17, S(S_27),   COL_MSG);
+    scr_puts(34, 18, S(S_8),      COL_MSG);
+    scr_puts(34, 20, S(S_81), EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(34, 21, S(S_82),                   EGA_TO_VDC(EGA_LTCYAN));
 
-    scr_puts(28, 24, "PRESS RETURN TO BEGIN", COL_DEPT);
+    scr_puts(28, 24, S(S_62), COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
 
@@ -1809,7 +1811,7 @@ uint8_t ui_play_again(void) {
     scr_fill_rect(29, 22, 22, 1, SC_SPACE, COL_DEPT);
 
     box(PA_X, PA_Y, PA_W, PA_H, EGA_TO_VDC(EGA_LTMAGENTA));
-    scr_puts(PA_X + 3, PA_Y + 1, "PLAY AGAIN?", COL_VALUE);
+    scr_puts(PA_X + 3, PA_Y + 1, S(S_60), COL_VALUE);
     scr_puts(PA_X + 2, PA_Y + 3, "[YES]",       EGA_TO_VDC(EGA_LTRED));
     scr_puts(PA_X + 10, PA_Y + 3, "[NO]",       EGA_TO_VDC(EGA_LTRED));
 
@@ -1848,9 +1850,9 @@ void ui_info_panel(void) {
 
         if (n == 0) {
             scr_puts((unsigned char)(INF_X + 10), (unsigned char)(INF_Y + 5),
-                     "NO CONTACT", COL_GRID);
+                     S(S_54), COL_GRID);
             scr_puts((unsigned char)(INF_X + 6), (unsigned char)(INF_Y + INF_H - 2),
-                     "RETURN TO CLOSE", COL_DEPT);
+                     S(S_67), COL_DEPT);
             while (kb_waitkey() != KB_RETURN) { }
             return;
         }
@@ -1904,10 +1906,10 @@ void ui_info_panel(void) {
 
         if (n > 1)
             scr_puts((unsigned char)(INF_X + 4), (unsigned char)(INF_Y + INF_H - 2),
-                     "SPACE=NEXT  RETURN=CLOSE", COL_DEPT);
+                     S(S_73), COL_DEPT);
         else
             scr_puts((unsigned char)(INF_X + 10), (unsigned char)(INF_Y + INF_H - 2),
-                     "RETURN TO CLOSE", COL_DEPT);
+                     S(S_67), COL_DEPT);
 
         c = kb_waitkey();
         if (c == KB_RETURN) return;

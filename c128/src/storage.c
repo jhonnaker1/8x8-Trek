@@ -293,10 +293,22 @@ uint8_t plat_open(const char *name) {
     unsigned char st;
 
     plat_close();
-    if (open_file(name, 'R')) { close_file(); return STOR_ERROR; }
+
+    /* The command channel opens FIRST and stays open for the life of the data
+       channel, exactly as plat_read_all does it. Two ways to get this wrong,
+       and this function has had both:
+         - calling cmd_status() without opening channel 15 at all, so chkin
+           fails, the status reads 255, and every open reports an error;
+         - opening it, reading the status, then closing it -- which closes the
+           data channel too, because closing 15 closes every file on the drive.
+       Either way the symptom is not obviously an I/O fault: the string pool
+       loads nothing and the game draws a title screen with no words on it. */
+    if (cmd_open()) { cmd_close(); return STOR_ERROR; }
+    if (open_file(name, 'R')) { close_file(); cmd_close(); return STOR_ERROR; }
 
     st = cmd_status();
-    if (st) { close_file(); return classify(st); }
+    if (st) { close_file(); cmd_close(); return classify(st); }
+
     streaming = 1;
     return STOR_OK;
 }
@@ -305,19 +317,33 @@ uint16_t plat_read(void *buf, uint16_t len) {
     unsigned char *p = (unsigned char *)buf;
     uint16_t n = 0;
 
-    if (!streaming) return 0;
-    if (cbm_k_chkin(LFN_DATA)) { return 0; }
+    /* streaming: 0 closed, 1 open, 2 open but at end of file.
+     *
+     * THIS FUNCTION DOES NOT CLOSE ANYTHING. An earlier version closed the
+     * data channel itself at EOF and cleared the flag, so the plat_close()
+     * that followed did nothing and CHANNEL 15 WAS LEFT OPEN -- after which
+     * the next plat_open() could not reopen it and every load but the first
+     * failed. The strings loaded and the music did not.
+     *
+     * That is the third bug in this file with the same root cause: who owns a
+     * channel's lifetime. The rule is now one line long -- plat_open opens
+     * both, plat_close closes both, and nothing else touches either. */
+    if (streaming != 1) return 0;
+    if (cbm_k_chkin(LFN_DATA)) return 0;
     while (n < len) {
         unsigned char c = cbm_k_chrin();
         if (cbm_k_readst()) { p[n++] = c; streaming = 2; break; }
         p[n++] = c;
     }
     cbm_k_clrch();
-    if (streaming == 2) { streaming = 0; cbm_k_close(LFN_DATA); }
     return n;
 }
 
 void plat_close(void) {
-    if (streaming) { cbm_k_clrch(); cbm_k_close(LFN_DATA);
-                     streaming = 0; }
+    if (streaming) {
+        cbm_k_clrch();
+        cbm_k_close(LFN_DATA);
+        cmd_close();               /* opened alongside it in plat_open */
+        streaming = 0;
+    }
 }

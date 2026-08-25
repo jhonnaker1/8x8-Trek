@@ -21,6 +21,10 @@
 void snd_init(void);        /* silence the SID, detect PAL/NTSC */
 void snd_off(void);         /* full stop, for the way out */
 
+/* Tells the driver where MUSIC.DAT landed in far memory, and whether it
+   loaded at all. Without it every track is refused and the game is silent. */
+void snd_music_data(unsigned int base, unsigned char ok);
+
 void snd_music(uint8_t track);   /* start a looping track, or MUS_NONE */
 void snd_effect(uint8_t track);  /* fire a one-shot on the effects voice */
 

@@ -10,7 +10,8 @@ MOSCC = $(HOME)/llvm-mos/bin/mos-c128-clang
 CFLAGS = -Oz -I src -I ../core -Wall -T trek128.ld
 
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
-      src/music_data.c src/storage.c \
+      src/music_data.c src/storage.c src/farmem.c \
+      src/strpool.c src/strdata.c \
       ../core/trek.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
@@ -25,6 +26,12 @@ all: $(OUT)
 # material being present.
 music src/music_data.h src/music_data.c:
 	cd .. && python3 tools/gen_music.py
+
+# The prose. Unlike the music this list IS committed -- it is the port's own
+# wording, not Anderson's -- so a clone with no reference/ still gets a game
+# with words in it.
+strings src/strdata.h src/strdata.c:
+	cd .. && python3 tools/gen_strings.py
 
 # The EGA->VDC colour mapping is pure arithmetic, so it is proven natively on
 # the build machine rather than by squinting at an emulator. Getting it wrong
@@ -49,6 +56,7 @@ verify: $(OUT)
 HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
       src/sid.h src/sidfreq.h src/music_data.h \
       ../core/ega.h ../core/trek.h ../core/hof.h ../core/storage.h \
+      ../core/farmem.h ../core/strpool.h src/strdata.h \
       ../core/serial.h
 
 # -m emits a map file. That is not housekeeping: tools/vice_mon.py can write
@@ -109,6 +117,13 @@ $(D64): $(OUT)
 	@# exactly what a fresh install should have anyway.
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
 	c1541 -attach $(D64) -write build/trek.scr trek.scr,s >/dev/null
+	@# Bulk data, streamed into bank 1 at startup. STRINGS.DAT always
+	@# exists; MUSIC.DAT only on a tree that has reference/, and without it
+	@# the game simply plays silently.
+	c1541 -attach $(D64) -write build/strings.dat strings.dat,s >/dev/null
+	@if [ -f build/music.dat ]; then \
+	    c1541 -attach $(D64) -write build/music.dat music.dat,s >/dev/null; \
+	fi
 	@echo "d64: $(D64)"
 	@c1541 -attach $(D64) -dir
 

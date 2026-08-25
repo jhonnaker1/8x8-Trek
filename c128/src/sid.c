@@ -1,4 +1,5 @@
 #include "sid.h"
+#include "../../core/farmem.h"
 #include "sidfreq.h"
 
 #define SID       ((volatile unsigned char *)0xD400)
@@ -27,13 +28,20 @@ static uint8_t enabled = 1;
 static uint8_t last_raster;
 
 /* Music voice state. */
-static const unsigned char *mus;      /* NULL when nothing is playing */
-static const unsigned char *mus_head; /* for the loop back */
+/* Offsets into far memory, not pointers: the notes live in bank 1 (see
+   core/farmem.h) and are not addressable. A separate flag says whether a
+   track is playing, because offset 0 is a fine place for one to start. */
+static unsigned int  mus;             /* far offset of the next note pair */
+static unsigned int  mus_head;        /* for the loop back */
+static unsigned char mus_on;
+static unsigned int  mus_base;        /* where MUSIC.DAT landed */
+static unsigned char mus_ok;
 static unsigned int  acc;             /* tempo accumulator, see sidfreq.h */
 static unsigned char note_left;       /* original ticks left on this note */
 
 /* Effects voice state -- same shape, no looping. */
-static const unsigned char *sfx;
+static unsigned int  sfx;
+static unsigned char sfx_on;
 static unsigned char sfx_left;
 
 static void voice_off(unsigned char v) {
@@ -108,16 +116,16 @@ void snd_init(void) {
     SID[V2 + 5] = AD_FLAT; SID[V2 + 6] = SR_FLAT;
 
     snd_region = detect_region();
-    mus = 0;
-    sfx = 0;
+    mus_on = 0;
+    sfx_on = 0;
     acc = 0;
     last_raster = raster_line();
 }
 
 void snd_off(void) {
     unsigned char i;
-    mus = 0;
-    sfx = 0;
+    mus_on = 0;
+    sfx_on = 0;
     for (i = 0; i < 25; i++) SID[i] = 0;
 }
 
@@ -131,21 +139,28 @@ void snd_toggle(void) {
     }
 }
 
+void snd_music_data(unsigned int base, unsigned char ok) {
+    mus_base = base;
+    mus_ok = ok;
+}
+
 void snd_music(uint8_t track) {
-    if (track == MUS_NONE || track >= MUS_COUNT) {
-        mus = 0;
+    if (!mus_ok || track == MUS_NONE || track >= MUS_COUNT) {
+        mus_on = 0;
         voice_off(V1);
         return;
     }
-    mus_head = mus_tracks[track];
+    mus_head = (unsigned int)(mus_base + mus_offset[track]);
     mus = mus_head;
+    mus_on = 1;
     note_left = 0;               /* zero forces the first note on next tick */
     acc = 0;
 }
 
 void snd_effect(uint8_t track) {
-    if (!enabled || track >= MUS_COUNT) return;
-    sfx = mus_tracks[track];
+    if (!enabled || !mus_ok || track >= MUS_COUNT) return;
+    sfx = (unsigned int)(mus_base + mus_offset[track]);
+    sfx_on = 1;
     sfx_left = 0;
 }
 
@@ -181,7 +196,7 @@ static void wait_frames(unsigned char n) {
 
 void snd_beep(void) {
     if (!enabled) return;
-    sfx = 0;                   /* a refusal cancels whatever else was playing */
+    sfx_on = 0;                /* a refusal cancels whatever else was playing */
     voice_note(V2, BEEP_TENTHS);
     wait_frames(snd_region == REGION_PAL ? BEEP_FRAMES_PAL : BEEP_FRAMES_NTSC);
     voice_off(V2);
@@ -189,29 +204,37 @@ void snd_beep(void) {
 
 /* One original 18.2065Hz tick. */
 static void music_tick(void) {
-    if (mus) {
+    if (mus_on) {
         if (note_left) note_left--;
         if (!note_left) {
-            unsigned char dur = mus[0];
-            if (dur == 0) {                 /* zero duration ends the track */
+            /* Two bytes out of far memory, and ONLY when a note ends -- a
+               handful of times a second, not once per tick. That is what
+               makes the notes affordable in bank 1: each read is a pair of
+               KERNAL calls, ruinous in a loop and nothing at this rate. */
+            unsigned char note[2];
+
+            far_read(mus, note, 2);
+            if (note[0] == 0) {             /* zero duration ends the track */
                 mus = mus_head;             /* the original loops 99 times;
                                                this loops until told to stop */
-                dur = mus[0];
-                if (dur == 0) { mus = 0; voice_off(V1); return; }
+                far_read(mus, note, 2);
+                if (note[0] == 0) { mus_on = 0; voice_off(V1); return; }
             }
-            note_left = dur;
-            voice_note(V1, mus[1]);
+            note_left = note[0];
+            voice_note(V1, note[1]);
             mus += 2;
         }
     }
 
-    if (sfx) {
+    if (sfx_on) {
         if (sfx_left) sfx_left--;
         if (!sfx_left) {
-            unsigned char dur = sfx[0];
-            if (dur == 0) { sfx = 0; voice_off(V2); return; }
-            sfx_left = dur;
-            voice_note(V2, sfx[1]);
+            unsigned char note[2];
+
+            far_read(sfx, note, 2);
+            if (note[0] == 0) { sfx_on = 0; voice_off(V2); return; }
+            sfx_left = note[0];
+            voice_note(V2, note[1]);
             sfx += 2;
         }
     }

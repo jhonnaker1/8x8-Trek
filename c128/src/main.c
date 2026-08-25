@@ -5,8 +5,11 @@
 #include "egavdc.h"
 #include "layout.h"
 #include "ui.h"
+#include "../../core/strpool.h"
+#include "strdata.h"
 #include "input.h"
 #include "sid.h"
+#include "../../core/farmem.h"
 #include "../../core/trek.h"
 
 /* 8x8 Trek -- C128 VDC port, milestone 2.
@@ -148,19 +151,19 @@ static char linebuf[32];
    the card gives S to self destruct and spells shields out. */
 static void do_shields_down(void) {
     trek_shields_down();
-    ui_message("ENGINEERING: ", "SHIELDS DOWN.");
+    ui_message(S(S_31), S(S_71));
 }
 
 static void do_shields_up(void) {
     switch (trek_shields_up()) {
         case SHIELD_OK:
-            ui_message("ENGINEERING: ", "SHIELDS UP.");
+            ui_message(S(S_31), S(S_72));
             break;
         case SHIELD_ALREADY:
-            ui_message("ENGINEERING: ", "ALREADY UP, CAPTAIN.");
+            ui_message(S(S_31), S(S_7));
             break;
         default:
-            ui_message("ENGINEERING: ", "TOO LITTLE ENERGY.");
+            ui_message(S(S_31), S(S_84));
             break;
     }
 }
@@ -195,16 +198,16 @@ static void report_divert(uint8_t r, uint16_t lost) {
                 k += put_u16(linebuf + k, lost);
                 k += put_str(linebuf + k, " UNITS LOST");
                 linebuf[k] = 0;
-                ui_message("ENGINEERING: ", linebuf);
+                ui_message(S(S_31), linebuf);
             } else {
-                ui_message("ENGINEERING: ", "TRANSFER COMPLETE.");
+                ui_message(S(S_31), S(S_87));
             }
             break;
         case DIVERT_SHORT:
-            ui_message("ENGINEERING: ", "WE HAVE NOT GOT IT.");
+            ui_message(S(S_31), S(S_94));
             break;
         default:
-            ui_message("ENGINEERING: ", "ILLOGICAL, CAPTAIN.");
+            ui_message(S(S_31), S(S_41));
             break;
     }
 }
@@ -213,10 +216,10 @@ static void do_energy(void) {
     char line[8];
     uint16_t from, to, amount, lost = 0;
 
-    ui_dialog_open("ENERGY TRANSFER");
-    ui_dialog_line("1 MAIN  2 IMPULSE  3 SHIELDS");
+    ui_dialog_open(S(S_29));
+    ui_dialog_line(S(S_2));
 
-    ui_dialog_ask("FROM (1-3):", line, sizeof line);
+    ui_dialog_ask(S(S_37), line, sizeof line);
     from = grab_num(line);
     ui_dialog_ask("TO (1-3):", line, sizeof line);
     to = grab_num(line);
@@ -244,7 +247,7 @@ static void do_max_energy(void) {
     uint16_t amount = ship.energy < room ? ship.energy : room;
 
     if (amount == 0) {
-        ui_message("ENGINEERING: ", "SHIELDS ALREADY FULL.");
+        ui_message(S(S_31), S(S_70));
         return;
     }
     report_divert(trek_divert(POOL_MAIN, POOL_SHIELDS, amount, &lost), lost);
@@ -259,21 +262,21 @@ static void do_dock(void) {
                empty. */
             switch (ship.docked) {
                 case BASE_STARBASE:
-                    ui_message("HELM: ", "DOCKED. ALL STORES FULL.");
+                    ui_message("HELM: ", S(S_23));
                     break;
                 case BASE_SUPPLY:
-                    ui_message("HELM: ", "DOCKED. TORPEDOS ONLY.");
+                    ui_message("HELM: ", S(S_25));
                     break;
                 default:
-                    ui_message("HELM: ", "DOCKED. NO STORES HERE.");
+                    ui_message("HELM: ", S(S_24));
                     break;
             }
             break;
         case DOCK_ALREADY:
-            ui_message("HELM: ", "WE ARE ALREADY DOCKED.");
+            ui_message("HELM: ", S(S_92));
             break;
         default:
-            ui_message("HELM: ", "NO BASE ALONGSIDE.");
+            ui_message("HELM: ", S(S_53));
             break;
     }
 }
@@ -294,7 +297,7 @@ static void do_lasers(void) {
 
     if (!found) {
         snd_beep();
-        ui_message("SCIENCE: ", "NO ENEMY SHIPS HERE");
+        ui_message("SCIENCE: ", S(S_55));
         return;
     }
 
@@ -302,7 +305,7 @@ static void do_lasers(void) {
        core cannot see a volley boundary; only this can. */
     trek_laser_begin_volley();
 
-    ui_dialog_open("WEAPONS CONTROL");
+    ui_dialog_open(S(S_95));
 
     for (cell = 0; cell < QUAD_CELLS; cell++) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
@@ -334,12 +337,12 @@ static void do_lasers(void) {
                 n += put_str(linebuf + n, enemy_name(what));
                 linebuf[n] = 0;
                 ui_dialog_line(linebuf);
-                if (killed) ui_dialog_line("MONGOL DESTROYED!");
+                if (killed) ui_dialog_line(S(S_50));
                 break;
             }
             case FIRE_NO_ENERGY:
                 snd_beep();
-                ui_dialog_line("INSUFFICIENT ENERGY, CAPTAIN!");
+                ui_dialog_line(S(S_44));
                 ui_dialog_close();
                 return;
             default:
@@ -355,23 +358,23 @@ static void report_move(uint8_t r) {
         case MOVE_OK:
             break;
         case MOVE_BLOCKED:
-            ui_message("NAVIGATION: ", "BLOCKED BY OBJECT");
+            ui_message(S(S_52), S(S_11));
             break;
         case MOVE_NO_ENERGY:
-            ui_message("ENGINEERING: ", "TOO LITTLE ENERGY");
+            ui_message(S(S_31), S(S_83));
             break;
         case MOVE_SAME_PLACE:
             /* MEASURED: "Captain, that is our current location!" */
-            ui_message("NAVIGATION: ", "THAT IS OUR LOCATION");
+            ui_message(S(S_52), S(S_78));
             break;
         case MOVE_NO_IMPULSE:
             /* MEASURED wording, from the string table: the original says
                "Move aborted; impulse engines are too damaged to use" -- a
                hard refusal, not a slower move. */
-            ui_message("ENGINEERING: ", "IMPULSE ENGINES TOO DAMAGED");
+            ui_message(S(S_31), S(S_42));
             break;
         default:
-            ui_message("NAVIGATION: ", "NO SUCH LOCATION");
+            ui_message(S(S_52), S(S_57));
             break;
     }
 }
@@ -432,7 +435,7 @@ static void move_absolute(const uint8_t *d, uint8_t n) {
     uint8_t i;
 
     for (i = 0; i < n; i++)
-        if (d[i] < 1 || d[i] > 8) { ui_message("NAVIGATION: ", "NO SUCH LOCATION"); return; }
+        if (d[i] < 1 || d[i] > 8) { ui_message(S(S_52), S(S_57)); return; }
 
     if (n == 2)
         report_move(trek_move_impulse((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1)));
@@ -440,7 +443,7 @@ static void move_absolute(const uint8_t *d, uint8_t n) {
         report_move(trek_move_warp((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
                                    (uint8_t)(d[2] - 1), (uint8_t)(d[3] - 1)));
     else
-        ui_message("NAVIGATION: ", "NO SUCH LOCATION");
+        ui_message(S(S_52), S(S_57));
 }
 
 static void do_move_manual(void) {
@@ -459,16 +462,16 @@ static void do_move_prompt(void) {
     char buf[16];
     uint8_t d[8], n;
 
-    ui_dialog_open("NAVIGATION");
+    ui_dialog_open(S(S_51));
 
     /* A damaged computer gives no choice -- straight to manual. */
     if (!trek_autonav_ok()) {
-        ui_dialog_line("COMPUTER DAMAGED");
+        ui_dialog_line(S(S_17));
         do_move_manual();
         return;
     }
 
-    if (!ui_dialog_ask_esc("QUAD, SECTOR:", buf, sizeof buf)) {
+    if (!ui_dialog_ask_esc(S(S_64), buf, sizeof buf)) {
         ui_dialog_close();
         return;
     }
@@ -504,14 +507,14 @@ static void do_warp(const char *line) {
     uint8_t tenths;
 
     if (n == 0) {
-        ui_message("ENGINEERING: ", "SPEED CAPTAIN?");
+        ui_message(S(S_31), S(S_74));
         return;
     }
     /* "w5" is warp 5.0, "w5.2" is warp 5.2 (manual l.632). */
     tenths = (uint8_t)(n == 1 ? d[0] * 10 : d[0] * 10 + d[1]);
 
-    if (trek_set_warp(tenths)) ui_message("ENGINEERING: ", "WARP SPEED SET");
-    else ui_message("ENGINEERING: ", "INVALID WARP FACTOR");
+    if (trek_set_warp(tenths)) ui_message(S(S_31), S(S_91));
+    else ui_message(S(S_31), S(S_45));
 }
 
 static const char *sys_name(uint8_t i) {
@@ -576,22 +579,22 @@ static void do_self(void) {
     char buf[9];
     uint8_t n;
 
-    ui_dialog_open("SELF DESTRUCT");
-    ui_dialog_line("HIT ESC TO ABORT");
+    ui_dialog_open(S(S_69));
+    ui_dialog_line(S(S_39));
 
-    if (!ui_dialog_ask_esc("ENTER SELF-DESTRUCT PASSWORD:", buf, sizeof buf)) {
-        ui_dialog_line(">>DESTRUCT ABORTED<<");
+    if (!ui_dialog_ask_esc(S(S_32), buf, sizeof buf)) {
+        ui_dialog_line(S(S_4));
         ui_dialog_close();
         return;
     }
 
     if (strcmp(buf, setup.password) != 0) {
-        ui_dialog_line(">>WRONG PASSWORD, DESTRUCT ABORTED<<");
+        ui_dialog_line(S(S_6));
         ui_dialog_close();
         return;
     }
 
-    ui_dialog_line(">>SELF-DESTRUCT SEQUENCE COMMENCING<<");
+    ui_dialog_line(S(S_5));
     n = trek_self_destruct();
     /* "Mongol ship(s) destroyed" is EGA Trek's own phrasing, from the death
        pod's damage report. */
@@ -621,16 +624,16 @@ static void do_fix(void) {
     char row[48];
     uint8_t i;
 
-    ui_dialog_open("ENGINEERING");
+    ui_dialog_open(S(S_30));
     for (;;) {
-        ui_dialog_line("SYSTEM TO CONCENTRATE REPAIRS ON:");
-        ui_dialog_ask("0 TO ABORT, L FOR LIST:", buf, sizeof buf);
+        ui_dialog_line(S(S_76));
+        ui_dialog_ask(S(S_1), buf, sizeof buf);
 
         if (buf[0] == KB_L || buf[0] == 'l') {
             /* TWO COLUMNS, on a fresh page. Twelve systems one per line
                overflows the dialog's eleven rows, and the scroll is a redraw
                -- so the player asked for the list and got its last five. */
-            ui_dialog_open("ENGINEERING");
+            ui_dialog_open(S(S_30));
             for (i = 0; i < SYS_COUNT / 2; i++) {
                 uint8_t k = put_u16(row, (uint16_t)(i + 1));
                 k += put_str(row + k, ") ");
@@ -673,7 +676,7 @@ static void do_chart(void) {
    captured, so nothing is invented here: the turn is spent and the department
    answers with nothing, which is what was seen. */
 static void do_hail(void) {
-    ui_message("COMMUNICATIONS: ", "");
+    ui_message(S(S_16), "");
 }
 
 /* SND, from the reference card. The original keeps a sound on/off byte that
@@ -682,7 +685,7 @@ static void do_hail(void) {
    invention. */
 static void do_sound(void) {
     snd_toggle();
-    ui_message("COMPUTER: ", snd_enabled() ? "SOUND ON" : "SOUND OFF");
+    ui_message(S(S_18), snd_enabled() ? "SOUND ON" : "SOUND OFF");
 }
 
 static void do_info(void) {
@@ -787,7 +790,7 @@ static void enemy_turn(uint8_t player_fired) {
                 ui_message("DAMAGE: ", linebuf);
                 continue;
             case EV_SHIP_LOST:
-                ui_message("HELM: ", "WE ARE LOST, CAPTAIN.");
+                ui_message("HELM: ", S(S_93));
                 continue;
             default:
                 continue;
@@ -808,12 +811,12 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
     uint16_t dmg = 0;
     uint8_t  r;
 
-    ui_dialog_line("TRACKING...");
+    ui_dialog_line(S(S_86));
     snd_effect(SFX_B);
     r = trek_fire_torpedo(sy, sx, &dmg);
     switch (r) {
         case TORP_KILL:
-            ui_dialog_line("MONGOL DESTROYED!");
+            ui_dialog_line(S(S_50));
             break;
         /* MEASURED 2026-08-23: aiming at a star spends the torpedo and does
            nothing -- the star survives, and the original says so rather than
@@ -821,7 +824,7 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
            supernova that takes the quadrant, and this port does not ray-march
            yet, so that one is still unmodelled. */
         case TORP_ABSORBED:
-            ui_dialog_line("TORPEDO ABSORBED BY STAR.");
+            ui_dialog_line(S(S_85));
             break;
         case TORP_OK: {
             uint8_t k = put_str(linebuf, "MONGOL DAMAGED -- ");
@@ -833,10 +836,10 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
         }
         case TORP_MISS:
             /* The original's own wording, read off its screen. */
-            ui_dialog_line("CLEAN MISS, SIR!");
+            ui_dialog_line(S(S_15));
             break;
         default:
-            ui_dialog_line("TUBES CANNOT FIRE.");
+            ui_dialog_line(S(S_88));
             break;
     }
 }
@@ -855,16 +858,16 @@ static void do_torpedo(const char *line) {
 
     if (ship.torps == 0) {
         snd_beep();
-        ui_message("WEAPONS: ", "CAPTAIN, WE HAVE NO TORPEDOS!");
+        ui_message("WEAPONS: ", S(S_14));
         return;
     }
 
-    ui_dialog_open("ENERGY TORPEDO CONTROL");
+    ui_dialog_open(S(S_28));
 
     if (n == 2) {                      /* the "t35" shortcut: one, right now */
         if (d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
             snd_beep();
-            ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+            ui_dialog_line(S(S_77));
             ui_dialog_close();
             return;
         }
@@ -873,7 +876,7 @@ static void do_torpedo(const char *line) {
         return;
     }
 
-    ui_dialog_ask("NUMBER TO FIRE:", buf, sizeof buf);
+    ui_dialog_ask(S(S_58), buf, sizeof buf);
     salvo = (uint8_t)grab_num(buf);
     if (salvo == 0) { ui_dialog_close(); return; }
     {
@@ -884,7 +887,7 @@ static void do_torpedo(const char *line) {
 
         if (tubes == 0) {
             snd_beep();
-            ui_dialog_line("CAPTAIN, ALL TUBES ARE DAMAGED!");
+            ui_dialog_line(S(S_12));
             ui_dialog_close();
             return;
         }
@@ -917,7 +920,7 @@ static void do_torpedo(const char *line) {
         n = grab_digits(buf, d, 8);
         if (n != 2 || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
             snd_beep();
-            ui_dialog_line("THAT IS NOT A SECTOR, CAPTAIN.");
+            ui_dialog_line(S(S_77));
             continue;
         }
         fire_one_torpedo((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1));
@@ -942,7 +945,18 @@ int main(void) {
 #endif
 
     vdc_init();
+    /* Bulk data lives on the disk, not in the binary -- see core/farmem.h.
+       The prose goes first because everything draws with it; the music is a
+       luxury by comparison. Neither is fatal if missing: a disk without
+       STRINGS.DAT plays with blank labels, one without MUSIC.DAT plays
+       silently, and both beat refusing to start. */
+    str_load();
+
     snd_init();
+    {
+        uint16_t mb = far_load("MUSIC.DAT");
+        snd_music_data(mb, (unsigned char)(mb != FAR_NONE));
+    }
 
     /* One pass per game. The original loops the whole cycle -- title, setup,
        game, evaluation, hall of fame, "Play Again?" -- and answering YES puts
@@ -979,7 +993,7 @@ int main(void) {
         alert_quad = 0xFF;      /* a new galaxy alerts on its first quadrant */
 
         ui_draw_all();
-        ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
+        ui_message("HELM: ", S(S_9));
 
         for (;;) {
             ui_read_command(cmd, sizeof cmd);
@@ -1024,14 +1038,14 @@ int main(void) {
             else if (c == KB_A) ui_ack(ack_arg(cmd));
             /* MEASURED: the original answers Q with "Quit <Y/N>?" in the
                COMMAND panel rather than quitting on the keystroke. */
-            else if (c == KB_Q) { if (ui_confirm("QUIT <Y/N>?")) break; }
+            else if (c == KB_Q) { if (ui_confirm(S(S_65))) break; }
             /* DERIVED, not measured: the original beeps at a field its
                parser refuses, not at an unknown command. A refused order is
                near enough the same thing, but the distinction is real and
                belongs in the comment rather than being quietly lost. */
             else if (c) {
                 snd_beep();
-                ui_message("COMPUTER: ", "M W L T D R S E Q C F A SND MSGS SAVE INFO HAIL SHUP SHDN MAX");
+                ui_message(S(S_18), S(S_48));
             }
 
             /* After the enemy turn, not just after a move: a tractor beam
@@ -1054,8 +1068,8 @@ int main(void) {
            Detailed Evaluation and then the Hall of Fame. Both layouts are MEASURED
            -- see MEASURED.md -- and the evaluation is filled straight from the
            core's own score sheet, so what it prints is what was scored. */
-        if (trek_game_state() == GAME_WON)       ui_message("HQ: ", "SECTOR SECURED. WELL DONE.");
-        else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", "THE LEXINGTON IS LOST.");
+        if (trek_game_state() == GAME_WON)       ui_message("HQ: ", S(S_68));
+        else if (trek_game_state() == GAME_LOST) ui_message("HQ: ", S(S_79));
 
         /* And 0x071A at the end, read the same way at the evaluation screen. */
         snd_music(MUS_END);
@@ -1073,8 +1087,8 @@ int main(void) {
     snd_music(MUS_NONE);
 
     scr_clear();
-    scr_puts(28, 10, "MISSION ENDED, CAPTAIN.", EGA_TO_VDC(EGA_LTGREEN));
-    scr_puts(23, 12, "BASIC IS ON THE 40-COLUMN SCREEN.", EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(28, 10, S(S_49), EGA_TO_VDC(EGA_LTGREEN));
+    scr_puts(23, 12, S(S_10), EGA_TO_VDC(EGA_LTCYAN));
 
     /* Drop back to 1MHz first, so the VIC-IIe screen is live again and the
        machine does not look dead on the other window. */
