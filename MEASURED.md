@@ -3497,3 +3497,94 @@ record still holds the coordinates it was written with.
 
 Also worth knowing: **the S.R. Scanner below 50% draws an empty quadrant**,
 which looks exactly like a quadrant with nothing in it. Confirms SRSCAN_BLIND.
+
+## Run 3 (2026-08-24): shields do not subtract, and a hit usually kills a system outright
+
+Rig: one enemy, its coordinates and hit points rewritten before every turn, our
+sector pinned, all twelve system percentages written to 100, energy and the
+shield pool written to chosen values, then a turn taken by firing ZERO at the
+enemy -- which costs no stardate time and still draws return fire.
+
+### Raised shields are a different mechanic from a shield pool that subtracts
+
+Three states, and they behave qualitatively differently:
+
+**Shields DOWN.** The hit comes out of MAIN ENERGY. The shield pool is not
+touched at all. Systems get wrecked.
+
+    shields 2500 (down)  hit 472.7  shields unchanged  energy -472.7  EnergyConverter -> 0%
+    shields 2500 (down)  hit 514.2  shields unchanged  energy -514.2  Life Support -> 0%, Transporter -> 0%
+    shields 1200 (down)  hit 511.4  shields unchanged  energy -511.4  nothing
+    shields  400 (down)  hit 500.0  shields unchanged  energy -500.0  Lasers -> 38%
+
+**Shields UP and full.** The hit comes out of the SHIELD pool, energy is
+untouched, and NO system is damaged. Six landed hits of 385 to 518 across two
+blocks, every one absorbed whole, not one system touched.
+
+    hit 409.7  shields 2500 -> 2090.3  energy unchanged  nothing
+    hit 518.0  shields 2500 -> 1982.0  energy unchanged  nothing
+    hit 385.2  shields 2500 -> 2114.8  energy unchanged  nothing
+
+**Shields UP but nearly flat (200 of 2500).** The shields absorb only a small
+part and the rest reaches energy, and systems start dying:
+
+    hit 495.5  shields absorbed 32.2  energy -463.3  nothing
+    hit 465.5  shields absorbed 30.3  energy -435.2  L.R. Scanner -> 0%
+    hit 520.6  shields absorbed 33.9  energy -486.7  nothing
+    hit 475.2  shields absorbed 30.9  energy -444.3  EnergyConverter -> 0%, Warp Engines -> 0%
+    hit 482.1  shields absorbed 31.4  energy -450.7  Life Support -> 0%
+
+The absorbed fraction across those five is 0.0650, 0.0651, 0.0651, 0.0650,
+0.0651 -- tight enough to be a formula, not a roll. At a charge of 800 two
+hits absorbed 136.4 and 212.3, which is NOT a constant fraction, so whatever
+the law is it is not simply proportional to charge. **Unresolved.**
+
+What is settled is the shape, and it is not ours: `through = amount - shields`
+is wrong. The shields are a proportional absorber whose share falls with
+charge, not a bucket that subtracts.
+
+### A hit that gets through usually destroys a system outright
+
+Eleven system hits observed. The resulting percentage was **0** eight times.
+The non-zero results were 5%, 22%, 38% and 42%. And **two systems can go in a
+single turn** -- seen twice, Life Support with Transporter, and
+EnergyConverter with Warp Engines.
+
+`trek.c` takes 20 to 59 points off exactly one random system. Both halves are
+wrong: the count is not always one, and the severity is not a modest bite --
+it is usually annihilation.
+
+The trigger is consistent with our `through >= SYSTEM_DAMAGE_THRESHOLD` shape:
+no system was ever damaged while the shields absorbed the whole hit, and
+systems were damaged on roughly three hits in five once a few hundred units
+were reaching energy. The threshold itself is still not pinned.
+
+### Class hit points
+
+`INFO` on a 120-hit-point ship reads:
+
+    Mongol Supply
+      Sector:   3-1
+      Range:    3.00
+      Bearing:  180.00
+      Shields:  80%
+
+120 shown as 80% makes the **Mongol Supply class maximum 150**. Combined with
+run 2, where the viewer named a 355-hit-point ship a MONGOL BATTLESHIP: the
+enemy table holds current hit points and `INFO` renders them against the class
+maximum. `HP_SCOUT` still wants a scout.
+
+Reconfirmed again: **enemies hold fire on about half their turns.** Fourteen of
+roughly thirty pinned turns produced no hit at all.
+
+### Instrument trap: writing the shield pair low poisons it
+
+`probe_original.restore()` writes BOTH words of the shield pair. After a sample
+that wrote 150.0 there, every later write of a larger value came back as 150 --
+three sweep rows read "absorbed 2350 of a 2350 hit" with the pool landing
+exactly on 150 from three different starting values, which is a clamp and not a
+hit. The earlier blocks, taken before any low write, show no such behaviour.
+
+So a session that writes the shield pair must not write a small value into it
+and then expect large ones to stick. This invalidated the absorption sweep and
+is why the law above is unresolved rather than measured.

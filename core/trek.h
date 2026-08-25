@@ -561,10 +561,31 @@ uint8_t trek_shields_down(void);
    surviving figures were tight with no doubles. */
 #define ENEMY_FIRE_ONE_IN        2
 
-/* PROVISIONAL: a hit that gets past the shields can wreck a system. The
-   original clearly does this -- a single ambush took out the scanner, life
-   support and the shield generators -- but neither the chance nor the
-   severity has been measured. */
+/* A hit that gets past the shields can wreck a system.
+ *
+ * MEASURED 2026-08-24 (run 3), thirty pinned turns against one enemy. Three
+ * things came out of it, and two of them say this port's model is wrong:
+ *
+ *   - **Raised, full shields absorb the hit whole and NO system is touched.**
+ *     Six landed hits of 385 to 518 units, every one taken out of the shield
+ *     pool with energy untouched and not one system damaged. With the shields
+ *     DOWN the same hits come out of MAIN ENERGY and wreck things. So the
+ *     trigger is real and the shape here -- something has to get through --
+ *     is right.
+ *   - **The severity is wrong.** Eleven observed system hits left the system
+ *     at 0% eight times; the others were 5%, 22%, 38% and 42%. Taking 20 to
+ *     59 points off is far too gentle: a hit that lands usually annihilates.
+ *   - **The count is wrong.** TWO systems went in a single turn, twice --
+ *     Life Support with Transporter, EnergyConverter with Warp Engines.
+ *
+ * STILL PROVISIONAL: the threshold value itself. Systems were hit on roughly
+ * three turns in five once a few hundred units were reaching energy, and never
+ * while the shields absorbed everything, but no clean edge was found.
+ *
+ * Also NOT what this port implements: `through = amount - shields`. The
+ * original's shields are a PROPORTIONAL absorber -- at a charge of 200 out of
+ * 2500 they took a steady 6.5% of five separate hits -- not a bucket that
+ * subtracts. The law is unresolved; see MEASURED.md, "Run 3". */
 #define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */
 
 /* What happened during a turn. The core never formats text, so it hands the

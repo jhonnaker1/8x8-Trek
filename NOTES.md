@@ -540,7 +540,11 @@ caps it at 100, and no value of it changes the damage by a point. The
 PROVISIONAL 1240..1500 overheat band is retired. See MEASURED.md, "Run 2".
 
 What is left needs the
-emulator: **Supply and Research docking quantities** (the
+emulator: **the shield absorption law** (run 3 established the shape and left
+the formula open -- the instrument poisoned its own shield pool, see
+MEASURED.md), **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge**, **`HP_SCOUT`** (the
+Supply class maximum is now 150, from `INFO` showing 120 as 80%), **Supply and
+Research docking quantities** (the
 StarBase answer is a full restock of energy and shields in one 0.1-stardate
 turn; the other two types were never found), **`RAY`'s outcome odds**,
 **boarding-party frequency and duration** (the mechanic itself is in the string
@@ -628,6 +632,13 @@ Not missing features -- implemented things that do not match the original.
   objects in the quadrant being LEFT.
 - **Turn costs.** Time advances only on movement and docking; combat is free.
   Worth an audit of what this port bills.
+- **Shields subtract; they should absorb a share.** `through = amount -
+  shields` is not the original. Raised full shields take a hit WHOLE with
+  energy untouched; shields down and the hit comes out of main energy instead;
+  a nearly flat shield takes a steady small fraction. Run 3.
+- **A system hit is far too gentle.** We take 20-59 points off one random
+  system. The original leaves it at 0% eight times in eleven, and can take TWO
+  systems in one turn. Run 3.
 
 ---
 
