@@ -72,7 +72,7 @@ static void test_generation(void) {
     puts("galaxy generation");
 
     trek_new_game(3, 12345);
-    expect = 3 * ENEMY_PER_LEVEL;   /* lower bound; the rest is random */
+    expect = ENEMY_BASE + 3 * ENEMY_PER_LEVEL;  /* lower bound; rest is random */
 
     for (i = 0; i < GAL_CELLS; i++) {
         enemies += gal_enemies[i];
@@ -98,12 +98,34 @@ static void test_generation(void) {
         for (lvl = 1; lvl <= 5; lvl++) {
             for (seed = 1; seed < 200; seed++) {
                 trek_new_game(lvl, seed);
-                if (ship.enemies_left < (uint16_t)(lvl * ENEMY_PER_LEVEL) ||
-                    ship.enemies_left >= (uint16_t)(lvl * ENEMY_PER_LEVEL + ENEMY_SPREAD))
+                if (ship.enemies_left <
+                        (uint16_t)(ENEMY_BASE + lvl * ENEMY_PER_LEVEL) ||
+                    ship.enemies_left >=
+                        (uint16_t)(ENEMY_BASE + lvl * ENEMY_PER_LEVEL + ENEMY_SPREAD))
                     bad++;
             }
         }
         ok(bad == 0, "all five levels stay in band across 199 seeds");
+    }
+
+    /* The MEASURED ranges, written out rather than derived from the same
+       constants the code uses -- so a change to ENEMY_BASE or
+       ENEMY_PER_LEVEL fails here instead of silently moving the band with
+       the test. Nineteen readings off the original sit inside these, and
+       level 3's ten samples hit both ends. See core/trek.h. */
+    {
+        static const uint16_t lo[6] = { 0, 18, 26, 34, 42, 50 };
+        static const uint16_t hi[6] = { 0, 26, 34, 42, 50, 58 };
+        uint8_t lvl;
+        uint16_t seed;
+        int bad = 0;
+        for (lvl = 1; lvl <= 5; lvl++)
+            for (seed = 1; seed < 200; seed++) {
+                trek_new_game(lvl, seed);
+                if (ship.enemies_left < lo[lvl] || ship.enemies_left > hi[lvl])
+                    bad++;
+            }
+        ok(bad == 0, "every level matches the ranges measured off the original");
     }
 
     trek_new_game(3, 12345);   /* restore the state the rest of this test uses */

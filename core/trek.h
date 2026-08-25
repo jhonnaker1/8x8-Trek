@@ -73,18 +73,32 @@
    wrong. Whether the count varies by level is untested. */
 #define TORPS_START      9
 
-/* Enemy count, FITTED from five readings of the original (one per command
-   level): 18, 32, 40, 42, 53. Those are not a straight line -- level 4 only
-   just exceeds level 3 -- so the count is random within a level-dependent
-   range. Subtracting a level*10 base leaves 8, 12, 10, 2, 3: small,
-   non-negative, and uncorrelated with level.
-
-   Fitted, not confirmed. Five samples fix the base convincingly (every
-   reading is at or above level*10) but only bound the spread from below --
-   the true upper limit could exceed the 12 we happened to see. More new
-   games at a single level would tighten it. */
-#define ENEMY_PER_LEVEL   10
-#define ENEMY_SPREAD      13     /* trek_rand_n(13) gives the observed 0..12 */
+/* Enemy count -- MEASURED 2026-08-24, and the formula is
+ *
+ *     enemies = 10 + 8 * level + rand(0..8)
+ *
+ * NINETEEN samples, all inside the predicted range, and the endpoints are hit
+ * at three different levels:
+ *
+ *     level 1   18, 21          predicted 18..26   (18 is the exact minimum)
+ *     level 2   30, 32          predicted 26..34
+ *     level 3   34 37 37 38 38 38 40 42 42 42   predicted 34..42
+ *     level 4   42, 47          predicted 42..50   (42 is the exact minimum)
+ *     level 5   53, 55          predicted 50..58
+ *
+ * Level 3's ten samples span 34..42 exactly -- the whole range, both ends.
+ *
+ * This REPLACES the earlier fit of `level*10 + rand(0..12)`, which the same
+ * data also satisfies but which predicts level 3 could roll 30..33. Ten
+ * samples never did, and the chance of missing four of thirteen values ten
+ * times running is about one in forty. The level-1 and level-4 readings
+ * landing exactly on this model's minima is the other reason to prefer it.
+ *
+ * The old note called it "fitted, not confirmed ... more new games at a
+ * single level would tighten it". That is what happened. */
+#define ENEMY_BASE        10
+#define ENEMY_PER_LEVEL    8
+#define ENEMY_SPREAD       9     /* trek_rand_n(9) gives the observed 0..8 */
 #define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */
 
 /* Stardates are carried in tenths, so these exceed cc65's 16-bit signed int

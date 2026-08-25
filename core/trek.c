@@ -190,7 +190,8 @@ void trek_new_game(uint8_t level, uint16_t seed) {
        see the note in trek.h. Higher levels face more ships (manual
        l.229-232), but the count is random within a level's range rather
        than fixed. */
-    total = (uint16_t)(level * ENEMY_PER_LEVEL + trek_rand_n(ENEMY_SPREAD));
+    total = (uint16_t)(ENEMY_BASE + level * ENEMY_PER_LEVEL
+                       + trek_rand_n(ENEMY_SPREAD));
     ship.enemies_left = total;
 
     while (total) {

@@ -3077,3 +3077,75 @@ capture session. Between this, the manual's encoding, and MEASURED.md's own
 back catalogue, **the answer to "is this measured?" has been yes far more often
 than I assumed.** Search what is already on disk before proposing to go and
 find out.
+
+## Five-item capture session: two closed, three not (2026-08-24)
+
+Ran to close the numeric gaps the manual and the string table do not fill. One
+item closed outright, one made real progress, three not reached. Recording what
+was and was not done rather than implying a clean sweep.
+
+### 1. Enemy count per level -- CLOSED
+
+New readings: **level 1 = 21, level 4 = 47, level 5 = 55.** With the ten level-3
+samples and the earlier five, that is nineteen readings, and they fix the
+formula:
+
+    enemies = 10 + 8 * level + rand(0..8)
+
+    level 1   18, 21                            predicted 18..26
+    level 2   30, 32                            predicted 26..34
+    level 3   34 37 37 38 38 38 40 42 42 42     predicted 34..42
+    level 4   42, 47                            predicted 42..50
+    level 5   53, 55                            predicted 50..58
+
+Level 3's ten samples span **exactly 34..42**, both endpoints. The level-1 and
+level-4 readings land exactly on this model's minima.
+
+This replaces `level*10 + rand(0..12)`, which the same data also satisfies but
+which allows level 3 to roll 30..33 -- ten samples never did, and missing four
+of thirteen values ten times running is about one chance in forty.
+`core/trek.h` and `core/trek.c` are updated and `core/test/test_trek.c` now
+asserts the per-level ranges as literals, so changing the constants fails the
+test instead of moving the band with it.
+
+### 2. SYSTEM_DAMAGE_THRESHOLD -- PARTIAL, two samples
+
+    860 units across 3 hits  ->  Shields 100% -> 0%   (3 casualties)
+                                 Transporter 100% -> 0% (8 casualties)
+    495 units across 2 hits  ->  nothing damaged
+
+So: **damage takes a system to ZERO, not to a reduced percentage** -- both
+events did -- **each damage event carries casualties**, and **not every
+penetrating hit damages anything**. Two samples fix neither the probability nor
+whether 0% is always the result. Still open.
+
+### A panel swap found by getting it wrong
+
+The bar reader written for this returned nonsense for several turns because
+**when Life Support is damaged the SYSTEMS STATUS panel is REPLACED by a LIFE
+SUPPORT / RESERVE, DAYS gauge**, and the ten percentages move to the MAIN
+VIEWER as text. The manual explains the two-day reserve; nothing recorded that
+the console rearranges itself to show it. Any future bar-reading tool has to
+check which panel is present first.
+
+### 4. HAIL -- two outcomes captured, the one that was wanted was not
+
+    COMMUNICATIONS: Hailing frequencies open...  No response.
+    COMMUNICATIONS: Hailing frequencies blocked by subspace interference.
+
+Both are the no-base-in-range case. What a StarBase actually says is still
+uncaptured.
+
+### 3 and 5 -- NOT DONE
+
+The laser heat band and the docking quantities per base type were not reached.
+
+### Incidental confirmations
+
+- Enemy ship colours are the manual's: light blue battleship, red command,
+  green supply ship, all three seen together in one quadrant.
+- `w5` and `m8544` inline forms both work, as the manual documents.
+- The laser dialog asks for an amount **per enemy ship**, naming each --
+  "Commander...", "Mongol...", "Supply ship..." -- and reports "destroyed!".
+- A long-range tractor beam pulled the ship a quadrant and the move drew fire
+  from three ships in the same turn.
