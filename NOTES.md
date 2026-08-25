@@ -478,7 +478,7 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 
 | | what is left |
 |---|---|
-| `Shift-F1` boss mode | fully specified. The original shells to `COMMAND.COM`; no C128 equivalent, so blank the VDC and wait for a key |
+| ~~`Shift-F1` boss mode~~ | **NOT DOING IT -- Jamie's call, 2026-08-24.** See below |
 | `RAY` | fully specified, and bigger than it looks: four outcomes, the fourth destroys the ship and prints a **Top Secret loss report** this port has no equivalent of |
 | `O)rbit` / `LAND` / `USE` | needs a core planet model. Gates known: `USE` wants shields under 50% AND energy under 20%; `LAND` needs transporter or shuttle at 100%, shuttle costs 0.2 stardays |
 
@@ -516,6 +516,13 @@ than more play.
   `plat_open`/`plat_read`, the one part of the seam never exercised.
 - **The CP437 charset.** Both font halves dump on demand; what is left is the
   VDC upload path and the game symbols.
+
+### Wanted on their own merits
+
+- **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
+  F5 Max Energy, F6 Fix Systems, F7 Xfer Energy, F8 Repair Status, F9 Set
+  Speed, F10 Dock. They were going to arrive with boss mode; that is dropped
+  and these are not.
 
 ### Named in the strings, never built
 
@@ -1318,7 +1325,7 @@ and it is short enough to reproduce whole.
 | `O)rbit`, `LAND`, `USE` | planets, landing, crystals | MEASURED 2026-08-23: `O` needs adjacency like docking and names the planet and its Type; `LAND` offers Shuttle Craft or Transporter, which is why both are repair entries. The rescue path works end to end and scores +200 |
 | `SAVE` | save game | **done** 2026-08-24 -- `SAVE GAME` box with `EGATREK.SAV` as the default, closes on one keypress as the original's does, costs no turn. Restore is on the setup screen and skips the rest of it. Verified end to end: save, destroy the ship, play again, restore, identical galaxy |
 | `SND` | toggle sound | **done** -- toggles the same flag the original keeps at DGROUP+0x1cc8 |
-| `Shift-F1` | boss mode | **fully specified** 2026-08-24, and it is NOT a screen blanker -- it shells out to `COMMAND.COM` via `GetEnv('COMSPEC')` and `EXIT` returns. No C128 equivalent; the port should blank the VDC and wait for a key |
+| `Shift-F1` | boss mode | **NOT PORTED -- Jamie's call 2026-08-24.** Fully specified: it shells out to `COMMAND.COM` via `GetEnv('COMSPEC')` and `EXIT` returns. There is no C128 equivalent and the approximation is not worth having; see "Boss mode is not being ported" |
 
 Plus the function keys, which are shortcuts rather than new commands:
 F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship, F5 Max Energy, F6 Fix
@@ -2859,3 +2866,40 @@ alloca, neither of which this code uses. It is a tripwire, not an allocation.
 **It caught something immediately**: the release build fitted and the debug
 build, which is ~76 bytes larger, did not. Factoring the duplicated coordinate
 dispatch out of `do_move` and `do_move_prompt` paid for both.
+
+## Boss mode is not being ported (Jamie's call, 2026-08-24)
+
+Dropped deliberately, with the mechanic fully understood rather than for want
+of knowing what it does.
+
+**What the original does.** `Shift-F1` shells out to DOS. You get a real
+`COMMAND.COM` prompt -- the graphics screen is replaced by whatever text was on
+screen before the game launched, so it looks as though you were never playing.
+`DIR` works. `EXIT` returns to the game with stardate, position and damage
+intact. Confirmed three ways: the prompt is live and echoes typing, `COMSPEC`
+sits in the string table exactly as `GetEnv('COMSPEC')` compiles to with no
+fake-prompt text anywhere in the binary, and `EXIT` came straight back. The
+manual then says so outright, and warns against running anything that changes
+the screen mode.
+
+**Why it is not being ported.** A shell-out has no C128 equivalent. The nearest
+thing is dropping to BASIC, which throws the game away, so the honest
+approximation was going to be: blank the VDC, wait for a key, restore. That is
+a different feature wearing the same name -- and the thing boss mode is FOR is
+an office PC with a manager walking past, which is not what a C128 sitting at
+home is doing.
+
+Against that, it is not free. It needs function keys in the CIA1 matrix, which
+this port has never had, and MAIN is currently ~100 bytes clear of the linker
+guard.
+
+**What it takes with it.** The function keys would have brought F1-F10 as
+command shortcuts, which the reference card documents (F1 Help, F2 Lasers, F3
+Fire Torpedo, F4 Move Ship, F5 Max Energy, F6 Fix Systems, F7 Xfer Energy, F8
+Repair Status, F9 Set Speed, F10 Dock). Those are still worth having on their
+own merits and are NOT cancelled by this -- they are just no longer carried in
+on boss mode's back. Nothing else depends on it.
+
+Also worth keeping recorded: **boss mode is absent from the in-game F1 help**
+and appears only on the reference card, so the help screen is not the authority
+on what commands exist.
