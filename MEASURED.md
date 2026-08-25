@@ -3001,3 +3001,79 @@ and none of it needs an emulator to settle.
 - Enemy colours: battleship light blue, command red, scout purple, **supply
   green**.
 - Directions are measured with **0 degrees directly to the right**.
+
+## What the string table already answers (2026-08-24)
+
+Asked what else is worth capturing from DOSBox. Checking `reference/strings.txt`
+first turned out to answer more than a capture session would, and one of the
+answers had been carried as "no lead at all" for weeks.
+
+### Boarding parties: SPECIFIED, and they were never a mystery
+
+The open item said there was no lead. The strings describe the whole mechanic:
+
+    SECURITY: A Mongol boarding party has transported into
+        Engineering.  |  Laser control.  |  EnTorp control.
+
+and the consequence of each:
+
+    Mongol boarding party controls the lasers.
+    EnTorp control is held by the Mongol boarding party.
+    Cannot raise shields; Mongol boarding party controls engineering.
+
+and how it ends:
+
+    SECURITY: The Mongol boarding party has been eliminated.
+
+So a boarding party **seizes one of three stations and blocks the commands that
+use it** until security clears them. Related, and separate:
+
+    SECURITY: A spy has been captured aboard the Lexington, but he has
+    damaged the <system>
+
+**What is still unmeasured is only the numbers** -- how often they arrive, how
+long they hold, whether the station is chosen evenly. The mechanic itself needs
+no capture.
+
+### Eight ways to lose, of which this port implements three
+
+    lost in battle with Mongols
+    crew lost due to failure of life support systems; the ship has been salvaged
+    destroyed by Vandal death pod
+    destroyed per order of captain            (self destruct)
+    destroyed by explosion of star
+    pulled into black hole & destroyed
+    destroyed by death ray explosion          (RAY's fourth outcome)
+    the cowardly captain ... surrendered his ship, with all aboard captured
+
+**There is a SURRENDER ending**, which nothing in this project had noticed.
+Black holes and star explosions are separate endings too -- NOTES has recorded
+since 2026-08-20 that black holes exist and that item 14 never mentioned them.
+
+### The scoring line items, confirming the evaluation screen
+
+    Mongols killed @ 10 each        Commanders killed @ 20 each
+    Enemy bases destroyed @ 50 each Kill/day ratio @ 500 per day
+    Casualties on board Lexington   Stars destroyed @ -5 each
+    Bases hit @ -200 each           penalties for loss of ship and for
+                                    not completing mission
+
+### Other mechanics named in the strings and not yet in the port
+
+    SCANNER REPORT: Wreckage of Union ship present in quadrant.
+    A distress signal is being received from a Union ship in quadrant
+    COMMUNICATIONS: Mongol reinforcements are reported in quadrant
+    Replenishing reserve life support. / Not on reserve life support.
+    USE AN ITEM / Which item do you wish to use? / No items in inventory
+    Landing party beaming up. / Landing aborted.
+    NAVIGATION: Not orbitting a planet
+    Captain, only <n> tubes ...        (the damaged-tube bands, in words)
+
+### The lesson, and it is the same one three times this week
+
+`strings.txt` has been in `reference/` since 2026-08-14 and is plain ASCII --
+`grep` reads it perfectly. Nothing here needed an emulator, a debugger or a
+capture session. Between this, the manual's encoding, and MEASURED.md's own
+back catalogue, **the answer to "is this measured?" has been yes far more often
+than I assumed.** Search what is already on disk before proposing to go and
+find out.
