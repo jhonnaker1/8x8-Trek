@@ -2950,3 +2950,72 @@ Against the rest of the lineup that is mid-table, not last: the X16 has about
 38K of contiguous low RAM, slightly LESS than this; a 130XE with VBXE has
 roughly 40-48K below the OS ROM plus four 16K banks; CoCo 3 and F256 page 8K at
 a time out of far more; MEGA65 and the Amiga have no pressure worth the name.
+
+## What the later ports should do BETTER (2026-08-24)
+
+Jamie's call, and it needs to be concrete or it will quietly become "match the
+C128 everywhere". **The C128's compromises are C128 compromises, not the
+project's.** Every one below was forced by an 80x25 character grid or by ~42K of
+address space, and every one is something a roomier target can simply do
+properly.
+
+`core/` still never varies -- rules, constants, save format. This is all
+presentation, which has been per-platform by design since the first note.
+
+### Forced by the CHARACTER GRID (bitmap targets should ignore these)
+
+The Amiga and Atari VBXE draw into a 640x200 bitmap and have no character
+generator to reuse, so they pay nothing to match the original exactly.
+
+- **Panel geometry.** The C128's top band is ELEVEN rows where the original
+  uses ten, because EGA Trek draws text at whatever pitch it likes inside a
+  frame -- the short range scan fits a header and eight rows into eight
+  character rows' worth of height. MAIN VIEWER pays for it: six interior rows
+  in the original, five here. A bitmap port can use the measured pixel table
+  in MEASURED.md directly.
+- **The MSGS overlay.** Its content lines sit on a **10-pixel pitch**, so
+  eleven of them fit in about ten character rows. The C128 needs fifteen rows
+  for what the original does in ten.
+- **Message wrapping.** The original wraps each message to three lines; the
+  C128 holds ONE line of 36 characters, which is what fourteen rows and a
+  38-cell interior will take.
+- **SYSTEMS STATUS.** The original lists ten systems with full names; the C128
+  shows twelve as two columns of three-letter abbreviations to fit 40x14.
+- **Filled dialogs.** The original's boxes are filled dark grey. The VDC has no
+  per-cell background short of reverse video, so this port's boxes show the
+  screen through them.
+- **The MAIN VIEWER.** The original alternates pixel art -- an external ship
+  view, graphical function readouts -- with the C128 showing text. This is the
+  single biggest visual gap and the one a bitmap port should attack first.
+- **Ship glyphs.** Lettered ships (`K` `C` `S` `P`) are a C128 answer. See
+  "The charset is dropped".
+
+### Forced by ADDRESS SPACE (roomier targets should ignore these)
+
+MEGA65 has 384K and the Amiga is flat; neither has this problem.
+
+- **The briefing.** 7,574 bytes of prose that cannot be linked into a 42K
+  binary at any compression, which is why the disk seam exists. A roomier
+  target can hold it resident and stop worrying.
+- **The message log's depth**, and the fact that it lives in VDC RAM at all.
+- **Anything else that ends up streamed from disk** to buy code space.
+
+### Genuinely platform-specific opportunities
+
+- **Boss mode is dropped on the C128 because the machine has no shell. The
+  AMIGA HAS ONE.** AmigaDOS can spawn a shell and return, so the Amiga leg can
+  implement boss mode properly rather than approximating it. It is the one
+  dropped feature that is not dropped everywhere.
+- **Sound.** The C128 has the SID, which already flatters the PC speaker
+  original. The Amiga has four channels of sampled audio and could do
+  considerably more than either.
+- **Colour.** The C128 VDC and EGA share sixteen colours, so that leg is exact.
+  The CoCo 3 has eight at 80 columns and must choose; its palette is
+  programmable, so pick the closest eight to EGA's set.
+
+### The standing risk
+
+**The C128 is the first port, so its ceiling is the only one anyone has
+tested.** It is easy to treat what fits there as what the game is. It is not.
+Where a later target can do better, it should -- and where it does, note it
+here so the difference is deliberate rather than accidental.
