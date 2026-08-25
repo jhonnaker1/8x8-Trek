@@ -361,7 +361,14 @@ static void report_move(uint8_t r) {
             ui_message("ENGINEERING: ", "TOO LITTLE ENERGY");
             break;
         case MOVE_SAME_PLACE:
+            /* MEASURED: "Captain, that is our current location!" */
             ui_message("NAVIGATION: ", "THAT IS OUR LOCATION");
+            break;
+        case MOVE_NO_IMPULSE:
+            /* MEASURED wording, from the string table: the original says
+               "Move aborted; impulse engines are too damaged to use" -- a
+               hard refusal, not a slower move. */
+            ui_message("ENGINEERING: ", "IMPULSE ENGINES TOO DAMAGED");
             break;
         default:
             ui_message("NAVIGATION: ", "NO SUCH LOCATION");
@@ -772,10 +779,27 @@ static void do_torpedo(const char *line) {
     ui_dialog_ask("NUMBER TO FIRE:", buf, sizeof buf);
     salvo = (uint8_t)grab_num(buf);
     if (salvo == 0) { ui_dialog_close(); return; }
-    if (salvo > TORP_TUBES) {
-        snd_beep();
-        ui_dialog_line("CAPTAIN, WE HAVE ONLY THREE TUBES.");
-        salvo = TORP_TUBES;
+    {
+        /* MEASURED from the manual: 100% gives three tubes, 67-99% two,
+           34-66% one. The original says "Captain, all tubes are damaged!"
+           when none work and "Captain, only N tubes..." otherwise. */
+        uint8_t tubes = trek_tubes_available();
+
+        if (tubes == 0) {
+            snd_beep();
+            ui_dialog_line("CAPTAIN, ALL TUBES ARE DAMAGED!");
+            ui_dialog_close();
+            return;
+        }
+        if (salvo > tubes) {
+            uint8_t k = put_str(linebuf, "CAPTAIN, ONLY ");
+            k += put_u16(linebuf + k, (uint16_t)tubes);
+            k += put_str(linebuf + k, tubes == 1 ? " TUBE WORKS." : " TUBES WORK.");
+            linebuf[k] = 0;
+            snd_beep();
+            ui_dialog_line(linebuf);
+            salvo = tubes;
+        }
     }
     if (salvo > ship.torps) {
         uint8_t k = put_str(linebuf, "CAPTAIN, THERE ARE ONLY ");
@@ -885,6 +909,12 @@ int main(void) {
             else if (c == KB_E) { do_energy();     enemy_turn(0); }
             else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
+            /* MEASURED 2026-08-24: the arrows are the ORIGINAL's primary
+               binding for shields -- EGATREK.REF says "Shields Up (use up
+               arrow)" and the in-game F1 help lists only the arrows. SHUP
+               and SHDN stay as the spoken names, as the card gives both. */
+            else if (c == KB_UP)   { do_shields_up();   enemy_turn(0); }
+            else if (c == KB_DOWN) { do_shields_down(); enemy_turn(0); }
             else if (c == KB_C) do_chart();    /* MEASURED: costs no turn */
             else if (c == KB_F) do_fix();      /* choosing does not cost one either */
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */

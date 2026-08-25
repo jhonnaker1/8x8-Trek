@@ -2720,3 +2720,41 @@ from 8 bytes to **1,657**.
 
 The original binds shields to the **up and down arrow keys**; this port has
 only `SHUP`/`SHDN` as words. The arrows are in the matrix now.
+
+## Damage finally does something (2026-08-24)
+
+Before this the port modelled all twelve repair percentages, drew them,
+repaired them, and consulted exactly ONE of them. A ship at 10% on everything
+played identically to a ship at 100%. The manual specifies an effect for every
+system; these are now in `core/trek.c` as queries, so every port gets the same
+answer and the manual's wording sits beside the number it produced.
+
+| system | rule, and where it bites |
+|---|---|
+| Warp Engines | max warp = 1 + 0.09 x pct, clamped to the emergency 8. `trek_set_warp` refuses above it |
+| Impulse | below 50% they stop. `trek_move_impulse` returns the new `MOVE_NO_IMPULSE` -- a hard refusal, matching the original's "Move aborted; impulse engines are too damaged to use" |
+| Lasers | pct is the fraction of energy that becomes damage. `trek_laser_eff()` multiplies heat by battle damage, so half-repaired lasers do half the damage at any temperature |
+| EnTorp Tubes | 100% = 3, 67-99% = 2, 34-66% = 1, below = none. The salvo cap follows it and the refusals are the original's words |
+| Short Range Scanners | below 90% the scan shows stars and our own ship only; below 50% the panel says INOPERATIVE |
+| Long Range Scanners | below 100% the chart's enemy digit becomes a DASH, not a zero -- a zero is a lie the player acts on; below 50% the panel says INOPERATIVE |
+| Computer / Transporter / Shuttlecraft | `trek_autonav_ok()`, `trek_transporter_ok()`, `trek_shuttle_ok()`, all needing a full 100%. Nothing calls the last two yet; they wait on `LAND` |
+
+`REPAIR_FOCUS_FACTOR` is **3**, not the DERIVED 2 -- the manual gives the whole
+table (1x, 2.5x docked, 3x focused, 5x both), and the docked figures agree with
+`REPAIR_PER_STARDATE` 20 and `_DOCKED` 47 already measured off the original.
+
+**Shields are on the arrow keys**, which is the original's primary binding --
+`EGATREK.REF` says "Shields Up (use up arrow)" and the in-game F1 help lists
+only the arrows. `SHUP`/`SHDN` stay as the spoken names, as the card gives both.
+
+Twenty-six new assertions in `core/test/test_trek.c` pin every threshold, and
+each one is the manual's number rather than a value read back out of the code.
+Verified on the machine as well: poking the scanners to 70% and 80% through
+VICE's monitor produced a chart reading `-07 -03 -04` and a scan showing stars
+and the Lexington alone.
+
+**Not changed, deliberately.** The original's SYSTEMS STATUS panel lists ten and
+omits Transporter and Shuttlecraft, which appear only in its `REPAIR` dialog.
+This port's panel is already a departure -- two columns of abbreviations, to fit
+a 40x14 region -- and dropping two systems would lose information the player can
+otherwise only get by opening a dialog. Twelve stays.

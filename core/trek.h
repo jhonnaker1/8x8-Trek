@@ -316,12 +316,18 @@ extern uint8_t sector[QUAD_CELLS];
 #define SYS_SHUTTLE     11
 #define SYS_COUNT       12
 
-/* F)ix -- "System to concentrate repairs on". MEASURED 2026-08-23 that the
- * command exists and takes ONE system by number, with L for a list and 0 to
- * abort; it is not a priority ordering. The FACTOR is DERIVED: since every
- * damaged system already mends at the full rate (see trek.c), concentrating
- * can only be a multiplier, and its size is unmeasured. */
-#define REPAIR_FOCUS_FACTOR  2
+/* MEASURED from the manual 2026-08-24, which gives the whole table:
+ *
+ *     1x    normal repairs, divided evenly among damaged systems
+ *     2.5x  normal repairs while docked at a starbase
+ *     3x    repairing only a selected system
+ *     5x    repairing a selected system while docked at a starbase
+ *
+ * So focusing is worth 3x, not the 2 this was DERIVED at. The docked figures
+ * are consistent with REPAIR_PER_STARDATE 20 and _DOCKED 47 already measured
+ * off the original (2.35x against the manual's 2.5x, within the display's
+ * resolution), and 3 x 20 = 60 against 5 x 20 = 100 docked-and-focused. */
+#define REPAIR_FOCUS_FACTOR  3
 
 typedef struct {
     uint8_t  quad_y, quad_x;
@@ -364,6 +370,10 @@ extern Ship ship;
 #define MOVE_SAME_PLACE     3
 #define MOVE_BAD_COORDS     4
 #define MOVE_WARP_TOO_LOW   5   /* distance needs a higher warp factor */
+/* Manual: impulse engines below 50% "simply stop functioning", and the
+   original refuses with "ENGINEERING: Move aborted; impulse engines are too
+   damaged to use" -- a hard no, not a slower move. */
+#define MOVE_NO_IMPULSE     6
 
 /* Deterministic PRNG. Owned here rather than taken from libc so that a seed
    reproduces the same galaxy on every platform -- which is what makes a
@@ -838,6 +848,57 @@ void trek_score_sheet(ScoreSheet *s);
 /* Union bases lost to enemy sieges. Scored, and worth having separately
    because it is the one number that says whether the deadlines were met. */
 extern uint8_t bases_lost;
+
+/* ------------------------------------------------- damage has consequences
+ *
+ * MEASURED from the manual 2026-08-24, which specifies an effect for every
+ * system. Until then this port modelled all twelve repair percentages, drew
+ * them, repaired them -- and consulted exactly ONE of them, the converter. A
+ * ship at 10% on everything played identically to a ship at 100%.
+ *
+ * These are queries rather than rules scattered through the commands, so that
+ * every platform gets the same answer and the manual's wording lives in one
+ * place next to the number it produced.
+ */
+
+/* Maximum warp in tenths. Manual: "the maximum warp speed is approximately
+   warp 1 plus 0.09 times percentage of repair" -- so 100% gives warp 10,
+   which WARP_MAX then clamps to the emergency ceiling of 8. */
+uint8_t trek_max_warp(void);
+
+/* Manual: impulse engines "either work or they don't. When they are at less
+   than 50% they simply stop functioning." */
+uint8_t trek_impulse_ok(void);
+
+/* Manual: "At 100% there are three functional tubes, 67-99% only two tubes
+   work and 34-66% only one." Below 34% none. */
+uint8_t trek_tubes_available(void);
+
+/* Scanner resolution. Manual, short range: "Above 90% they are fully
+   functional, but below 90% they are unable to detect anything smaller than
+   a star. Below 50% they do not function at all." Long range: "When less
+   than 100% repaired they can no longer detect enemy ships. Below 50% they
+   are not functional." */
+#define SCAN_DEAD    0
+#define SCAN_COARSE  1   /* stars only -- no ships */
+#define SCAN_FULL    2
+uint8_t trek_srscan_level(void);
+uint8_t trek_lrscan_level(void);
+
+/* Manual: "Automatic navigation requires the computer to be 100% repaired."
+   Below that the original falls back to manual DeltaX/DeltaY entry. */
+uint8_t trek_autonav_ok(void);
+
+/* Manual: transporter and shuttlecraft "must be at 100% to be used". */
+uint8_t trek_transporter_ok(void);
+uint8_t trek_shuttle_ok(void);
+
+/* Lasers, combining heat with battle damage. Manual: laser repair percentage
+   "is a direct indication of what percentage of energy is converted to
+   destructive force ... 100% working lasers will do twice the damage of 50%
+   working lasers", and the effectiveness gauge "goes down due to excess heat
+   AND due to damage from enemy fire". */
+uint8_t trek_laser_eff(void);
 
 uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);

@@ -1560,6 +1560,82 @@ static void test_star_and_focus(void) {
     }
 }
 
+/* Damage has consequences. Every threshold here is the manual's, quoted in
+ * trek.h beside the function it produced. Before 2026-08-24 this port
+ * modelled all twelve repair percentages and consulted exactly one of them,
+ * so a ship at 10% on everything played identically to a ship at 100%. */
+static void test_damage_effects(void) {
+    printf("damage has consequences\n");
+
+    trek_new_game(3, 42);
+
+    /* Warp: 1 + 0.09 * pct, clamped to the emergency ceiling. */
+    ship.sys[SYS_WARP] = 100;
+    ok(trek_max_warp() == WARP_MAX, "undamaged engines reach the warp ceiling");
+    ship.sys[SYS_WARP] = 50;
+    ok(trek_max_warp() == 55, "half-repaired engines cap at warp 5.5");
+    ship.sys[SYS_WARP] = 0;
+    ok(trek_max_warp() == WARP_MIN, "wrecked engines still manage warp 1");
+
+    ship.sys[SYS_WARP] = 50;
+    ok(trek_set_warp(80) == 0, "warp 8 is refused with damaged engines");
+    ok(trek_set_warp(50) != 0, "warp 5 is accepted");
+    ship.sys[SYS_WARP] = 100;
+
+    /* Impulse: a cliff at 50%, not a slope. */
+    ship.sys[SYS_IMPULSE] = 50;
+    ok(trek_impulse_ok(), "impulse works at exactly 50%");
+    ship.sys[SYS_IMPULSE] = 49;
+    ok(!trek_impulse_ok(), "and stops at 49%");
+    ok(trek_move_impulse(1, 1) == MOVE_NO_IMPULSE,
+       "an impulse move is refused outright, not slowed");
+    ship.sys[SYS_IMPULSE] = 100;
+
+    /* Torpedo tubes: 100 / 67-99 / 34-66 / below. */
+    ship.sys[SYS_TUBES] = 100; ok(trek_tubes_available() == 3, "100% = three tubes");
+    ship.sys[SYS_TUBES] =  99; ok(trek_tubes_available() == 2, "99% = two tubes");
+    ship.sys[SYS_TUBES] =  67; ok(trek_tubes_available() == 2, "67% = two tubes");
+    ship.sys[SYS_TUBES] =  66; ok(trek_tubes_available() == 1, "66% = one tube");
+    ship.sys[SYS_TUBES] =  34; ok(trek_tubes_available() == 1, "34% = one tube");
+    ship.sys[SYS_TUBES] =  33; ok(trek_tubes_available() == 0, "33% = no tubes");
+    ship.sys[SYS_TUBES] = 100;
+
+    /* Scanners degrade in steps, and the two have DIFFERENT thresholds --
+       short range keeps working to 90%, long range only at a full 100%. */
+    ship.sys[SYS_SRSCAN] =  90; ok(trek_srscan_level() == SCAN_FULL,   "SR full at 90%");
+    ship.sys[SYS_SRSCAN] =  89; ok(trek_srscan_level() == SCAN_COARSE, "SR coarse at 89%");
+    ship.sys[SYS_SRSCAN] =  50; ok(trek_srscan_level() == SCAN_COARSE, "SR coarse at 50%");
+    ship.sys[SYS_SRSCAN] =  49; ok(trek_srscan_level() == SCAN_DEAD,   "SR dead at 49%");
+    ship.sys[SYS_LRSCAN] = 100; ok(trek_lrscan_level() == SCAN_FULL,   "LR full only at 100%");
+    ship.sys[SYS_LRSCAN] =  99; ok(trek_lrscan_level() == SCAN_COARSE, "LR coarse at 99%");
+    ship.sys[SYS_LRSCAN] =  49; ok(trek_lrscan_level() == SCAN_DEAD,   "LR dead at 49%");
+    ship.sys[SYS_SRSCAN] = 100; ship.sys[SYS_LRSCAN] = 100;
+
+    /* Three systems that need a perfect 100%. */
+    ship.sys[SYS_COMPUTER] = 99;
+    ok(!trek_autonav_ok(), "automatic navigation needs a full 100%");
+    ship.sys[SYS_COMPUTER] = 100;
+    ok(trek_autonav_ok(), "and works at 100%");
+    ship.sys[SYS_TRANSPORTER] = 99; ok(!trek_transporter_ok(), "transporter needs 100%");
+    ship.sys[SYS_SHUTTLE]     = 99; ok(!trek_shuttle_ok(),     "shuttlecraft needs 100%");
+    ship.sys[SYS_TRANSPORTER] = 100; ship.sys[SYS_SHUTTLE] = 100;
+
+    /* Lasers: the manual's own example -- half-repaired lasers do half the
+       damage of fully repaired ones at the same energy and range. */
+    {
+        uint16_t full, half;
+        ship.laser_eff = 100;
+        ship.sys[SYS_LASERS] = 100;
+        full = trek_laser_damage(500, trek_laser_eff(), 100);
+        ship.sys[SYS_LASERS] = 50;
+        half = trek_laser_damage(500, trek_laser_eff(), 100);
+        ok(full > 0 && half > 0, "both volleys do damage");
+        ok(full / 2 == half || full / 2 == half + 1 || full / 2 + 1 == half,
+           "50% lasers do half the damage of 100% lasers");
+        ship.sys[SYS_LASERS] = 100;
+    }
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -1588,6 +1664,7 @@ int main(void) {
     test_self_destruct();
     test_game_state_and_score();
     test_star_and_focus();
+    test_damage_effects();
 
     puts("");
     if (failures) {

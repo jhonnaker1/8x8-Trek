@@ -18,6 +18,7 @@
 #define SC_STAR    42    /* '*' */
 #define SC_HASH    35    /* '#' */
 #define SC_DOT     46
+#define SC_DASH    45    /* '-' */
 #define SC_DIGIT0  48
 #define SC_A        1
 #define SC_LETTER(c) ((unsigned char)((c) - 'A' + 1))
@@ -106,8 +107,19 @@ void ui_draw_scan(void) {
     unsigned char row, col, glyph, color;
     unsigned char x0 = (unsigned char)(p->x + 4);
     unsigned char y0 = (unsigned char)(p->y + 2);
+    unsigned char level = trek_srscan_level();
 
     clear_panel(P_SCAN);
+
+    /* Dead scanners draw the grid and nothing in it, so the panel still
+       reads as a scanner rather than as a blank hole in the console. */
+    if (level == SCAN_DEAD) {
+        scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 4),
+                 "SCANNERS", EGA_TO_VDC(EGA_LTRED));
+        scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 5),
+                 "INOPERATIVE", EGA_TO_VDC(EGA_LTRED));
+        return;
+    }
 
     /* Column headers and row labels are 1-based, as the original presents
        them; the core is 0-based throughout. */
@@ -120,7 +132,17 @@ void ui_draw_scan(void) {
                 (unsigned char)(SC_DIGIT0 + row + 1), COL_LABEL);
 
         for (col = 0; col < QUAD_DIM; col++) {
-            glyph = cell_glyph(sector[(row << 3) | col], &color);
+            unsigned char cell = sector[(row << 3) | col];
+
+            /* MEASURED from the manual 2026-08-24: "Above 90% they are fully
+               functional, but below 90% they are unable to detect anything
+               smaller than a star. Below 50% they do not function at all."
+               Our own ship stays visible either way -- the scanner is not
+               how the captain knows where his ship is. */
+            if (level == SCAN_COARSE && cell != SEC_STAR && cell != SEC_SHIP)
+                cell = SEC_EMPTY;
+
+            glyph = cell_glyph(cell, &color);
             scr_put((unsigned char)(x0 + col * 2), (unsigned char)(y0 + row),
                     glyph, color);
         }
@@ -139,8 +161,16 @@ void ui_draw_chart(void) {
     unsigned char x, y;
     unsigned char x0 = (unsigned char)(p->x + 2);
     unsigned char y0 = (unsigned char)(p->y + 2);
+    unsigned char lr = trek_lrscan_level();
 
     clear_panel(P_CHART);
+
+    /* Below 50% they are not functional at all. */
+    if (lr == SCAN_DEAD) {
+        scr_puts((unsigned char)(p->x + 2), (unsigned char)(p->y + 4),
+                 "LONG RANGE SCANNERS INOPERATIVE", EGA_TO_VDC(EGA_LTRED));
+        return;
+    }
 
     for (col = 0; col < GAL_DIM; col++)
         scr_put((unsigned char)(x0 + col * 4 + 1), (unsigned char)(p->y + 1),
@@ -162,11 +192,19 @@ void ui_draw_chart(void) {
                 continue;
             }
 
+            /* MEASURED from the manual 2026-08-24: long range scanners
+               "when less than 100% repaired ... can no longer detect enemy
+               ships", so the first digit becomes a dash rather than a zero.
+               A zero would be a lie the player acts on; a dash says the
+               scanner cannot tell. Bases and stars still read. */
             color = COL_VALUE;
-            if (gal_enemies[q]) color = EGA_TO_VDC(EGA_CHART_MONGOL);
+            if (lr == SCAN_FULL && gal_enemies[q]) color = EGA_TO_VDC(EGA_CHART_MONGOL);
             else if (gal_base[q] != BASE_NONE) color = COL_BASE;
 
-            scr_put(x, y, (unsigned char)(SC_DIGIT0 + gal_enemies[q]), color);
+            if (lr == SCAN_FULL)
+                scr_put(x, y, (unsigned char)(SC_DIGIT0 + gal_enemies[q]), color);
+            else
+                scr_put(x, y, SC_DASH, COL_UNKNOWN);
             scr_put((unsigned char)(x + 1), y,
                     (unsigned char)(SC_DIGIT0 + gal_base[q]), color);
             scr_put((unsigned char)(x + 2), y,

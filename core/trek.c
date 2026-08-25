@@ -651,8 +651,58 @@ uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost) {
     return DIVERT_OK;
 }
 
+/* ------------------------------------------------- damage has consequences */
+
+/* See trek.h for the manual's wording behind each of these. */
+
+uint8_t trek_max_warp(void) {
+    /* warp 1 + 0.09 * pct, in tenths: 10 + (9 * pct) / 10. */
+    uint16_t tenths = (uint16_t)(10u + (9u * (uint16_t)ship.sys[SYS_WARP]) / 10u);
+    if (tenths > WARP_MAX) tenths = WARP_MAX;
+    if (tenths < WARP_MIN) tenths = WARP_MIN;
+    return (uint8_t)tenths;
+}
+
+uint8_t trek_impulse_ok(void) {
+    return (uint8_t)(ship.sys[SYS_IMPULSE] >= 50);
+}
+
+uint8_t trek_tubes_available(void) {
+    uint8_t pct = ship.sys[SYS_TUBES];
+    if (pct >= 100) return 3;
+    if (pct >= 67)  return 2;
+    if (pct >= 34)  return 1;
+    return 0;
+}
+
+uint8_t trek_srscan_level(void) {
+    uint8_t pct = ship.sys[SYS_SRSCAN];
+    if (pct < 50) return SCAN_DEAD;
+    if (pct < 90) return SCAN_COARSE;
+    return SCAN_FULL;
+}
+
+uint8_t trek_lrscan_level(void) {
+    uint8_t pct = ship.sys[SYS_LRSCAN];
+    if (pct < 50)  return SCAN_DEAD;
+    if (pct < 100) return SCAN_COARSE;
+    return SCAN_FULL;
+}
+
+uint8_t trek_autonav_ok(void)     { return (uint8_t)(ship.sys[SYS_COMPUTER] >= 100); }
+uint8_t trek_transporter_ok(void) { return (uint8_t)(ship.sys[SYS_TRANSPORTER] >= 100); }
+uint8_t trek_shuttle_ok(void)     { return (uint8_t)(ship.sys[SYS_SHUTTLE] >= 100); }
+
+uint8_t trek_laser_eff(void) {
+    /* Heat and battle damage both reduce it, so they multiply rather than one
+       masking the other: half-repaired lasers do half the damage at any heat. */
+    uint16_t v = ((uint16_t)ship.laser_eff * (uint16_t)ship.sys[SYS_LASERS]) / 100u;
+    return (uint8_t)v;
+}
+
 uint8_t trek_set_warp(uint8_t tenths) {
-    if (tenths < WARP_MIN || tenths > WARP_MAX) return 0;
+    /* Damaged warp engines lower the ceiling -- manual, and trek_max_warp(). */
+    if (tenths < WARP_MIN || tenths > trek_max_warp()) return 0;
     ship.warp = tenths;
     return 1;
 }
@@ -663,6 +713,10 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
 
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return MOVE_BAD_COORDS;
     if (sy == ship.sec_y && sx == ship.sec_x) return MOVE_SAME_PLACE;
+    /* Manual: below 50% the impulse engines simply stop. The original's
+       refusal is "ENGINEERING: Move aborted; impulse engines are too damaged
+       to use", a hard no rather than a slower move. */
+    if (!trek_impulse_ok()) return MOVE_NO_IMPULSE;
 
     target = (uint8_t)((sy << 3) | sx);
     if (sector[target] != SEC_EMPTY) return MOVE_BLOCKED;
@@ -881,7 +935,7 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     }
 
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
-    dealt = trek_laser_damage(energy, ship.laser_eff, d);
+    dealt = trek_laser_damage(energy, trek_laser_eff(), d);
     if (damage) *damage = dealt;
 
     if (dealt < enemy_hp[cell]) {
