@@ -3410,3 +3410,90 @@ announce themselves as StarBases. A StarBase restores energy and shields to
 full in one 0.1-stardate turn. The other two types were never found, and
 finding them wants either a base-type array located in memory or a longer
 survey than run 1 had left in it.
+
+## Run 2 (2026-08-24): laser heat IS in memory, and it does not do what we thought
+
+### The settled negative was wrong, and the reason is instructive
+
+`182124` is a **16-bit word that drives the Temp gauge**. Writing it moves the
+bar; firing raises it. Two earlier sessions concluded laser heat was "not
+stored as a Turbo Pascal real or a 16-bit integer of the fired amount anywhere
+in the 338KB", and this memory was recorded as a settled negative.
+
+Both halves of that search were wrong in the same way: it is not a real, and it
+is **not the fired amount**. It is a small integer on its own scale, and the
+game **caps it at 100**. Searching for 400 after firing 400 was never going to
+find a 6.
+
+The lesson stands as recorded -- a negative search result must say what
+encoding was searched for -- but the conclusion drawn from it does not.
+
+### The Temp gauge draws value x 10 against a 0..1500 scale
+
+Written value 100 fills 80 of the bar's 121 pixels, which is 66% of a scale
+labelled 0 / 1000 / 1500 -- so about 1000. Values above 100 saturate the bar.
+Since the game itself never lets the value exceed 100, **the Temp bar can never
+pass its own 1000 tick in normal play.**
+
+### Heat does not degrade laser effectiveness. At all.
+
+A fixed 400-unit volley at a fixed distance (4.1231 sectors, the enemy's
+position rewritten before every shot so nothing else varied), with the heat
+word written to a different value each time:
+
+    heat written    0   20   40   60   80  100  120  140  160  200  300
+    damage        263  263  263  263  263  263  263  263  263  263  263
+
+Expected at full effectiveness is `400 x (1 - 4.1231/12)` = 262.56. Every
+sample matched to the unit. Firing added +6 to the word each time up to the
+cap.
+
+So within everything the game can reach, **heat is a gauge and not a
+mechanic**. `trek.h`'s PROVISIONAL 1240..1500 overheat band has no support:
+the displayed value cannot get there.
+
+Not proven: that no threshold exists at all. What is proven is that no value of
+that word between 0 and 300 changes the damage by one point, and that the game
+caps the word at 100.
+
+### Effectiveness IS exactly the laser system's repair percentage
+
+Same rig, heat zero, varying only the Lasers entry in the systems array:
+
+    lasers    100%    75%    50%    25%
+    damage     263    197    131     66
+    ratio    1.0017 0.7503 0.4989 0.2514
+
+Linear to within the rounding of an integer hit point. `effectiveness =
+laser_pct / 100`, which is what this port already implements.
+
+Taken with the section above, the manual's "laser effectiveness goes down due
+to excess heat and due to damage from enemy fire" (l.330-331) is half
+observable: the damage half is exact, the heat half never fires.
+
+### The laser law, reconfirmed twice
+
+`damage = energy x (1 - distance/12)` matched to the unit at two distances in
+two different games: 500 units at 4.2426 gave 323 against 323.2 predicted, and
+400 units at 4.1231 gave 263 against 262.56.
+
+### Ship classes seen
+
+A quadrant holding five enemies read 355, 355, 355, 355 and 320 hit points, and
+the MAIN VIEWER named the one being fired at a **MONGOL BATTLESHIP** at 355.
+The 320 matches the commander figure already on file.
+
+### Two traps this run paid for twice
+
+**Firing at five enemies kills you in one turn even from full shields.** The
+return volley is per ship. The rig has to reduce the quadrant to one target, or
+restore between every shot and check for game over.
+
+**A destroyed ship restarts the program, and the restart eats your input.** Two
+sweeps ran to completion against the setup screen, typing volley amounts into
+"enter your command level" and reading plausible, entirely stale numbers out of
+the old addresses. Every loop needs a liveness check -- here, that the enemy
+record still holds the coordinates it was written with.
+
+Also worth knowing: **the S.R. Scanner below 50% draws an empty quadrant**,
+which looks exactly like a quadrant with nothing in it. Confirms SRSCAN_BLIND.

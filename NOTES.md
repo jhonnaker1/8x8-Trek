@@ -533,9 +533,14 @@ memory rather than another survey.
 
 ### Measurement -- only NUMBERS remain
 
-Everything about *what a thing does* has been on disk. What is left needs the
-emulator: **laser effectiveness** (run 2 -- the heat band itself is a settled
-negative, see the plan), **Supply and Research docking quantities** (the
+Everything about *what a thing does* has been on disk. ~~laser effectiveness (run 2)~~ **DONE 2026-08-24.** Effectiveness is EXACTLY
+the Lasers repair percentage, measured at four points, and heat turns out to be
+a gauge rather than a mechanic -- the word is in memory after all, the game
+caps it at 100, and no value of it changes the damage by a point. The
+PROVISIONAL 1240..1500 overheat band is retired. See MEASURED.md, "Run 2".
+
+What is left needs the
+emulator: **Supply and Research docking quantities** (the
 StarBase answer is a full restock of energy and shields in one 0.1-stardate
 turn; the other two types were never found), **`RAY`'s outcome odds**,
 **boarding-party frequency and duration** (the mechanic itself is in the string

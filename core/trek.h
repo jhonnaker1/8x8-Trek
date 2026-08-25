@@ -157,9 +157,11 @@
  * which falls as the ship takes damage. See MEASURED.md.
  *
  * `efficiency` is one number combining heat and battle damage, as the
- * original's single gauge does. Temperature alone costs nothing until some
- * threshold above 700 of the gauge's 1500 -- 1250 units of fire went out at
- * a flat 100% in the clean run.
+ * original's single gauge does. MEASURED 2026-08-24: the damage half is
+ * EXACTLY linear in the Lasers repair percentage -- 100/75/50/25 percent dealt
+ * 263/197/131/66 against the same target, ratios 1.0017/0.7503/0.4989/0.2514
+ * -- and the heat half never fires at all (see LASER_HEAT_MAX below). So
+ * effectiveness is the laser percentage, full stop.
  *
  * LASER_RANGE_ZERO is in whole sectors; distances are 8.8 fixed point, so
  * comparisons against it must shift. */
@@ -182,7 +184,22 @@
  * for EGA Trek, and adopting a gameplay rule from the ancestor unverified is
  * exactly what the laser falloff shows to be unsafe: Anderson rewrote that
  * one from exponential to linear. The gauge reports; nothing acts on it yet.
- * See MEASURED.md. */
+ *
+ * MEASURED 2026-08-24 (run 2), and the decision not to implement a burn is now
+ * evidence-backed rather than cautious. The original's heat IS in memory --
+ * a 16-bit word driving the Temp gauge, which two earlier searches missed
+ * because it is neither a real nor the fired amount. Two things follow:
+ *
+ *   - **The game caps that word at 100.** The gauge draws it against a 0..1500
+ *     scale at roughly ten to one, so the Temp bar can never pass its own 1000
+ *     tick in normal play. Nothing in EGA Trek can reach 1500.
+ *   - **No value of it changes the damage.** A fixed 400-unit volley at a fixed
+ *     distance, with the word written to 0, 20, 40, 60, 80, 100, 120, 140, 160,
+ *     200 and 300 in turn, dealt 263 every single time against 262.56
+ *     predicted at full effectiveness.
+ *
+ * So heat is a gauge and not a mechanic, and this constant is the scale of a
+ * readout rather than a threshold anything crosses. See MEASURED.md, "Run 2". */
 #define LASER_HEAT_MAX     1500
 
 /* A note on the provenance tags in this file, now that there is a fifth.
