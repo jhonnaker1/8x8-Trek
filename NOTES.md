@@ -470,8 +470,8 @@ Read this first; the numbered items below are the historical record of how each
 one got here.
 
 **The plan for clearing the measurement items is at the end of this file** --
-"THE MEASUREMENT SESSION PLAN", five runs. **Runs 1, 2 and 3 are DONE
-(2026-08-24); runs 4 and 5 are not.** Measure everything, then implement, then
+"THE MEASUREMENT SESSION PLAN", five runs. **ALL FIVE RAN 2026-08-24.** What
+survives them is listed below and is mostly small. Measure everything, then implement, then
 size, then place in bank 1, then fix the bugs. In that order, and for the
 reason given there.
 
@@ -506,8 +506,9 @@ and answers mechanics; MEASURED.md has its own back catalogue.
   and repaired a focused system at a StarBase about 40% too fast. Now four
   rate constants with all four asserted in `test_trek.c`. See MEASURED.md,
   "The repair table is a table, not a product".
-- **`SELFDESTRUCT_FACTOR`** is still the last ancestor-derived number inside an
-  implemented command.
+- ~~**`SELFDESTRUCT_FACTOR`**~~ **MEASURED 2026-08-24: it should be NOTHING.**
+  Self-destruct destroys no enemies at all. No longer a measurement item; it is
+  a line of code to delete.
 
 ### Run 1 is DONE (2026-08-24) -- see MEASURED.md
 
@@ -541,8 +542,7 @@ Everything about *what a thing does* has been on disk; these are numbers.
   From/To/Date/Re, one sentence naming the loss, then stardays, kills per
   stardate and score. It is the frame the other loss endings reuse.
 - ~~The Detailed Evaluation~~ **CAPTURED with every weight on screen**, and it
-  contradicts a recorded measurement: there IS a `Penalty for loss of ship` at
-  -200 that this port deleted. Contested, see trek.h.
+  found a penalty this port had deleted -- see the ship-loss entry below.
 - ~~`SELFDESTRUCT_FACTOR`~~ **It destroys NOTHING.** Four enemies present, the
   nearest at range 1.41, zero killed. Another ancestor rule Anderson dropped.
 - ~~`HP_SCOUT`~~ was never open. It was measured on 2026-08-21 and a stale note
