@@ -57,6 +57,7 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     put8(ship.laser_eff); put16(ship.laser_heat);
     put8(ship.warp);     put8(ship.shields_up);
     put16(ship.stardate); put16(ship.stardate_end);
+    put8(ship.time_frac);
     put8(ship.level);    put16(ship.enemies_left);
     put8(ship.repair_focus);
     put16(ship.killed);  put16(ship.killed_cmd);
@@ -104,6 +105,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     ship.laser_eff = get8(); ship.laser_heat = get16();
     ship.warp = get8();     ship.shields_up = get8();
     ship.stardate = get16(); ship.stardate_end = get16();
+    ship.time_frac = get8();
     ship.level = get8();    ship.enemies_left = get16();
     ship.repair_focus = get8();
     ship.killed = get16();  ship.killed_cmd = get16();

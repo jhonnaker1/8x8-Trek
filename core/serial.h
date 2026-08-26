@@ -37,12 +37,12 @@
 
 /* Exact size of a saved state. Callers size their buffer with this rather
    than guessing; trek_state_save() also refuses to write past `max`. */
-#define TREK_SAVE_SIZE  507
+#define TREK_SAVE_SIZE  508
 
 /* Bumped whenever the layout changes. A load of an older version is refused
    rather than misread -- there is no upgrade path and a half-read galaxy is
    worse than no galaxy. */
-#define TREK_SAVE_VERSION 1
+#define TREK_SAVE_VERSION 2
 
 /* Bytes written, or 0 if `max` was too small. */
 uint16_t trek_state_save(uint8_t *buf, uint16_t max);

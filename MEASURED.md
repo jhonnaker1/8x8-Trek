@@ -3906,3 +3906,149 @@ This is why `RAY`'s outcome odds are STILL one sample after three attempts.
 They need many samples, each needing a restore, which is exactly the pattern
 that destabilises the thing. The next attempt should restart the emulator per
 sample rather than per block.
+
+## The movement model, entire (2026-08-25)
+
+Taken for the correction pass, because "movement is a straight line and objects
+block it" was not enough to implement from: it says nothing about where the
+ship ENDS UP, and nothing about what the clock is charged. Both turned out to
+be measurable in one short session, and one of them contradicted a fitted
+constant this port has been carrying.
+
+Level 3 game, quadrant 7-4, warp 1.0 unless stated. Stars at sectors 1-6, 2-5,
+2-6, 6-5, 7-6 -- read off the short range scan and used as the obstacles.
+
+### The path: round half AWAY FROM ZERO, over max(|dy|,|dx|) steps
+
+`n = max(|dy|, |dx|)`. Step `i` sits at the real position
+`(y0 + dy*i/n, x0 + dx*i/n)`, and the cell tested is that position with each
+coordinate ROUNDED -- Turbo Pascal's `Round`, which breaks a half away from
+zero.
+
+The rounding rule is not assumed; it was DISCRIMINATED. From 5-2 to 7-6 the
+two candidate rules predict different outcomes:
+
+    round half up    step 3 = (6.5, 5.0) -> 7-5 clear, step 4 -> 7-6 STAR
+    round half down  step 3 = (6.5, 5.0) -> 6-5 STAR
+
+The ship finished at 7-5 and the log read `Move blocked by object at 7-6`, so
+it is half-up. Reproduced twice from the same start.
+
+Three earlier observations fit the same model and were what suggested it: the
+4-4 to 6-3 block at 5-4, the 8-6 westward block at 4-3, and RAY passing from
+5-3 through a star at 4-4 on the way to 2-7 -- a different command walking the
+same path.
+
+### A blocked move is a PARTIAL move, not a refusal
+
+This is the part that could not be guessed, and it decides the implementation.
+
+    from 1-3, m18   -> ship ends 1-5, log "blocked by object at 1-6"
+    from 5-2, m76   -> ship ends 7-5, log "blocked by object at 7-6"
+    from 8-3, m47   -> ship ends 7-4, log "blocked by object at 6-5"
+
+The ship travels the path and stops in the last clear cell. The message names
+the OCCUPIED cell, which is one step further on than where the ship is.
+
+**Quadrant changes behave the same way, and the ship stays in the quadrant it
+started in.** From quad 7-4 sector 7-1, a move to quad 7-5 sector 7-1 walks
+east along row 7, hits the star at 7-6, and leaves the ship at quad 7-4 sector
+7-5. The departure path is checked in the quadrant being LEFT. A move blocked
+on its first step goes nowhere at all: from 2-4, a move to quad 7-5 gave
+`blocked by object at 2-5` with the stardate unmoved.
+
+### Impulse time: distance / 24, on the TRUNCATED endpoint
+
+Time for an in-quadrant move is the Euclidean distance actually travelled,
+divided by 24 stardates -- and it is **warp-independent** (4 sectors cost
+0.1667 at warp 1.0 and 0.1666 at warp 3.0).
+
+Ten samples, every one landing on d/24:
+
+    d 2.000  (1-3 -> 1-5, blocked)   0.0833
+    d 5.000  (1-5 -> 5-2)            0.2084
+    d 4.000  (7-5 -> 7-1)            0.1667
+    d 4.000  (7-1 -> 7-5, blocked)   0.1667
+    d 4.123  (7-5 -> 8-1)            0.1718
+    d 2.000  (8-1 -> 8-3)            0.0833
+    d 1.414  (8-3 -> 7-4, blocked)   0.0589
+    d 2.828  (7-4 -> 5-2)            0.1179
+    d 4.000  (7-5 -> 7-1, warp 3)    0.1666
+
+**The endpoint is TRUNCATED, not rounded**, and that is a real distinction on
+a blocked move whose stopping step has a fractional coordinate. Two samples
+show it, and both were reproduced:
+
+    5-2 -> blocked at 7-6, ship at 7-5.  Step 3's real position is (6.5, 5.0).
+      charged 3.1608   trunc (6,5) -> sqrt(10) = 3.1623   MATCH
+                       round (7,5) -> sqrt(13) = 3.6056
+                       real  (6.5,5) -> sqrt(11.25) = 3.3541
+
+    8-1 -> blocked at 2-5, ship at 3-5.  Step 5's real position is (3, 4.571).
+      charged 5.8320   trunc (3,4) -> sqrt(34) = 5.8310   MATCH
+                       round (3,5) -> sqrt(41) = 6.4031
+                       real  (3,4.571) -> sqrt(37.75) = 6.1441
+
+The second was designed as a discriminator -- three hypotheses, three distinct
+predictions -- rather than fitted after the fact. So the ship is PLACED at the
+rounded cell and BILLED for the truncated one. On a clear move the two are the
+same, because it ends on its integer target.
+
+### Warp time: 11 * distance_in_quadrants / warp squared
+
+**The port's fitted constant is about 9.98 and it is wrong by 10%.** The
+correct constant is 11, and it is exact.
+
+The new sample is the clean one: a quadrant-change move blocked after four
+sectors -- half a quadrant -- at warp 1.0 cost **5.5000** stardates. That is
+`11 * 0.5 / 1`, and it also confirms that a blocked move bills for the distance
+TRAVELLED and not the distance asked for.
+
+Then the five warp-3 samples already recorded in run 1 were re-read against it,
+and every one resolves to an exact lattice distance:
+
+    0.8227  ->  5.3849 sectors  =  sqrt(29)
+    0.9663  ->  6.3249 sectors  =  sqrt(40)
+    1.2222  ->  8.0000 sectors  =  8
+    2.5972  -> 16.9999 sectors  =  17
+    2.7330  -> 17.8887 sectors  =  sqrt(320)
+
+Five arbitrary fractions collapsing onto integer-difference distances is not
+something a wrong constant does. With the warp-2 reading (4 quadrants, 11.0)
+that is **seven samples across four warp factors**, against the two that the
+9.98 was fitted from.
+
+### What this leaves open
+
+- Whether the destination quadrant's contents can block an ARRIVING ship. The
+  original does not generate a quadrant until entry, so probably not, but it
+  was not tested.
+- The warp ENERGY model is untouched by this and is still fitted from two
+  points.
+- The 0.2 energy charged by the move that went nowhere.
+
+### The corrected time law also fixes the warp ENERGY fit
+
+Not looked for, and worth more than the thing it was found under. All three
+warp-energy readings were computed as `spent + 400 * elapsed`, with the
+elapsed time read off the Date display -- which shows one decimal. Recomputing
+each against the measured law instead of the displayed figure:
+
+| reading | elapsed used | cost then | true elapsed | cost now | model | error |
+|---|---|---|---|---|---|---|
+| warp 5, 1 quad | 0.5 | 194.3 | 0.4400 | 170.3 | 171.9 | +0.9% |
+| warp 8, 1 quad | 0.2 | 709.7 | 0.1719 | 698.5 | 704.0 | +0.8% |
+| warp 8, 2 quad | 0.4 | 1174.5 | 0.3438 | 1152.0 | 1152.0 | 0.0% |
+
+The energy model was called "fitted from two points, the warp-5 point the
+weakest of the three at -12%". It is not: it was right, and the TIME it was
+being judged against was 10% short. Nothing in `warp_energy()` changed.
+
+**And it settles a test this port had asserting the wrong thing.** The warp-5
+line reads `+5.7 = 400 * 0.5 - cost`: main energy went UP by 5.7 over an
+interval containing the jump. So the original does NOT make a net energy loss
+at warp 5, and `core/test/test_trek.c` asserted that it must. Break-even sits
+just above warp 5 -- cost goes as warp^3 and the refill as 1/warp^2 -- so the
+manual's "faster than you can regenerate it" starts at cruising speed. Below
+it, energy is cheap and TIME is the price: one quadrant at warp 1.0 costs 11
+stardates out of a 30-stardate mission.

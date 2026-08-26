@@ -700,6 +700,52 @@ data arrived, not that anything plays -- and when every piece of state is
 right and the thing still does not work, the next suspect is whether the code
 you are reading is the code that ran.
 
+### THE C128 LINK OVERFLOWS BY 1,118 BYTES -- the bank-1 phase is now due
+
+**As of 2026-08-25 the C128 image does not link.** The movement correction is
+finished, measured and tested, and it costs 1,424 bytes against 303 bytes of
+headroom. `make -C c128` fails with `section '.rodata' will not fit in region
+'ram'`. Nothing is hidden and nothing is half-done: `make test` passes, the
+c128 native tests pass, and the core is correct. The image is simply full.
+
+This is the phase the plan named -- implement, then SIZE, then place in bank 1
+-- arriving on schedule rather than as a surprise. What it needs is not more
+shaving.
+
+**Where the 1,424 went**, from the link map:
+
+        460  walk_path            the straight-line walk
+        329  path_dist            distance at galaxy scale
+        201  report_move          "BLOCKED BY OBJECT AT 7-6"
+        163  warp_hundredths      11 * d / warp^2, staged for 16 bits
+        156  warp_energy          factored out; now called twice
+         71  trek_move_impulse
+         36  advance_hundredths   the sub-tenth clock carry
+         8   trek_move_warp
+
+Already shaved, and recorded so it is not attempted twice: the walk was 631
+bytes when it computed `round(delta * i / n)` per step per axis, because each
+of those is a 16-bit divide. Accumulators dropped it to 460 and the whole walk
+now runs in eight-bit adds. `path_dist`'s fraction was tried three ways --
+divide (271), sixteen subtractions (329), four-step binary long division (302
+in place, and the smallest of the three once the surrounding code settled).
+`report_move` came down 71 bytes by writing two single digits instead of
+calling the 16-bit formatter twice. There is no third round of this worth
+having; the remaining functions are all doing measured arithmetic.
+
+**The target is already identified and already tooled.** `.rodata.str1.1` is
+**1,564 bytes of string literals still compiled into the binary** -- 187
+distinct strings across `c128/src/*.c` that never went through the string
+pool. The top forty alone are 1,259 bytes. `core/strpool.h`, `S(id)`,
+`tools/gen_strings.py` and `c128/src/strings.txt` are the machinery for
+exactly this and are already carrying 2,267 bytes in bank 1. Moving the large
+literals across is mechanical, and it is what closes this.
+
+Two other things the map says, for when that is being planned:
+`.text.main` is **14,798 bytes** -- almost everything is inlined into it, so it
+is not one function's fault and not one function's fix -- and `enemy_turn` is
+4,223.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
@@ -722,11 +768,19 @@ with quantities, and raw energium takes energy ABOVE its maximum).
 
 Not missing features -- implemented things that do not match the original.
 
-- **Movement teleports.** The original walks a straight line and is blocked by
-  objects on it, for quadrant changes as well as in-quadrant hops, including
-  objects in the quadrant being LEFT.
-- **Turn costs.** Time advances only on movement and docking; combat is free.
-  Worth an audit of what this port bills.
+- ~~**Movement teleports.**~~ **FIXED 2026-08-25**, with the whole model
+  measured rather than just the blocking: the path, the round-half-away-from-
+  zero rule, stopping in the last clear cell, billing on the TRUNCATED
+  endpoint, `distance/24` for impulse and `11 * quadrants / warp^2` for warp,
+  and the departure path through the quadrant being left. See MEASURED.md,
+  "The movement model, entire". Four samples and two discriminators are
+  replayed in `core/test/test_trek.c`.
+- ~~**Turn costs.**~~ **Movement's half is done**, and the corrected warp time
+  law also fixed the warp ENERGY fit without touching an energy constant: the
+  three readings were all computed against an elapsed time taken from the
+  one-decimal Date display, and recomputing them properly moves the model from
+  +12%/-1%/-2% to +0.9%/+0.8%/0.0%. Still to audit: whether anything else in
+  this port bills a turn that the original gives away. Combat is free.
 - **Shields subtract; they should absorb a share.** `through = amount -
   shields` is not the original. Raised full shields take a hit WHOLE with
   energy untouched; shields down and the hit comes out of main energy instead;

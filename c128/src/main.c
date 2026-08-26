@@ -357,9 +357,23 @@ static void report_move(uint8_t r) {
     switch (r) {
         case MOVE_OK:
             break;
-        case MOVE_BLOCKED:
-            ui_message(S(S_52), S(S_11));
+        case MOVE_BLOCKED: {
+            /* MEASURED: the original names the cell, and the ship has already
+               moved -- it is standing in the sector before this one. Its
+               wording is "NAVIGATION: Move blocked by object at 7-6.", so the
+               coordinates are 1-based and joined by a hyphen. */
+            uint8_t k = put_str(linebuf, S(S_11));
+            k += put_str(linebuf + k, " AT ");
+            /* Sectors are 0..7, so the digits are written straight rather
+               than through put_u16 -- two calls to a general 16-bit
+               formatter cost a couple of hundred bytes here. */
+            linebuf[k++] = (char)('1' + trek_block_y);
+            linebuf[k++] = '-';
+            linebuf[k++] = (char)('1' + trek_block_x);
+            linebuf[k] = 0;
+            ui_message(S(S_52), linebuf);
             break;
+        }
         case MOVE_NO_ENERGY:
             ui_message(S(S_31), S(S_83));
             break;

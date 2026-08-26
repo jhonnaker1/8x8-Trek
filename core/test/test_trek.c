@@ -49,19 +49,36 @@ static void test_distance(void) {
    int would hide it, so the check is written against the 16-bit bound
    directly rather than against the result. */
 static void test_no_16bit_overflow(void) {
-    unsigned long d_max = 2534, w_max = WARP_MAX;
+    /* d16_max is the longest path the walk can produce: corner to corner of
+       the galaxy, sqrt(63^2 + 63^2) sectors, in sixteenths. d88_max is the
+       same distance handed to warp_energy() in 8.8 quadrants, which is twice
+       it. Both are bigger than the old bound of 2534, because the distance is
+       now taken over ABSOLUTE sector positions rather than quadrant indices
+       -- so these numbers moved when the model was corrected and every one
+       below is a fresh check, not a survivor. */
+    unsigned long d16_max = 1426, d88_max = 2852, w_max = WARP_MAX;
 
     puts("16-bit overflow bounds");
 
-    ok((d_max >> 4) * w_max <= 65535UL,
-       "warp cost intermediate (d>>4)*warp fits uint16");
-    ok((d_max >> 4) * 39UL <= 65535UL,
-       "warp time numerator (d>>4)*39 fits uint16");
+    ok((d88_max >> 4) * 14UL + 128UL <= 65535UL,
+       "warp cost distance factor 128+d44*14 fits uint16");
+    ok(((w_max * w_max) / 10UL) * w_max <= 65535UL,
+       "warp cubed, staged, fits uint16");
+    ok(43UL * d16_max <= 65535UL,
+       "warp time numerator 43*d16 fits uint16");
+    ok(((43UL * d16_max) / ((w_max * w_max) / 2UL)) * 10UL <= 65535UL,
+       "...and scaling its quotient to hundredths still fits");
+    ok((((w_max * w_max) / 2UL) - 1UL) * 10UL <= 65535UL,
+       "...and scaling its remainder to hundredths still fits");
+    ok(25UL * 158UL <= 65535UL,
+       "impulse time numerator 25*d16 fits uint16 (d16 <= 158 in a quadrant)");
+    ok(2UL * 63UL * 63UL + 63UL <= 65535UL,
+       "path_round's 2*|d|*i+n fits uint16 at galaxy scale");
     ok(w_max * w_max <= 65535UL,
        "squared warp fits uint16 before scaling");
-    ok((d_max >> 4) * 20UL <= 65535UL,
-       "impulse cost intermediate (d>>4)*20 fits uint16");
-    ok(d_max * w_max > 65535UL,
+    ok(d16_max * IMPULSE_ENERGY_UNIT <= 65535UL,
+       "impulse cost intermediate d16*IMPULSE_ENERGY_UNIT fits uint16");
+    ok(d88_max * w_max > 65535UL,
        "...and the naive d*warp really would have overflowed");
 }
 
@@ -271,11 +288,30 @@ static void test_warp(void) {
     ok(ship.quad_y == qy && ship.quad_x == qx, "quadrant updated");
     ok(ship.sec_y == 3 && ship.sec_x == 3,     "sector updated");
     ok(ship.stardate > t0, "stardate advanced");
-    /* Net loss, not merely "changed". The converter refills while you fly, so
-       an under-priced jump shows up as no change at all once the total is
-       clamped at ENERGY_MAX -- which is exactly how the first draft's
-       profitable warp hid itself. Assert the direction the manual states. */
-    ok(ship.energy < e0,   "warping cost more than the converter replaced");
+    /* THIS USED TO ASSERT A NET LOSS AT WARP 5, AND THE ORIGINAL DOES NOT
+       MAKE ONE. The warp-5 reading in MEASURED.md is `+5.7 = 400 * 0.5 -
+       cost`: main energy went UP by 5.7 over an interval containing the jump.
+       The old time law was 10% short and truncated a 0.44-stardate jump to
+       0.3, which hid the refill and made the assertion pass for the wrong
+       reason.
+
+       What is true, and what the manual actually says, is that travel at
+       CRUISING speed and above outruns the converter. Break-even sits just
+       above warp 5 -- cost goes as warp^3 and the refill as 1/warp^2 -- so
+       warp 6 is where the manual's "faster than you can regenerate it"
+       starts. Below it, energy is cheap and TIME is the price: a one-quadrant
+       hop at warp 1 costs 11 stardates out of a 30-stardate mission. */
+    ok(ship.energy <= e0, "warp 5 does not turn a profit");
+
+    {
+        uint16_t e1;
+        trek_set_warp(WARP_CRUISE);
+        e1 = ship.energy;
+        qy = (uint8_t)((ship.quad_y + 1) & 7);
+        if (qy == ship.quad_y) qy = (uint8_t)((qy + 1) & 7);
+        trek_move_warp(qy, ship.quad_x, 3, 3);
+        ok(ship.energy < e1, "warping at cruise costs more than the converter replaces");
+    }
     ok(sector[(3 << 3) | 3] == SEC_SHIP, "ship placed in the new quadrant");
 
     /* Shields up doubles the cost -- the one figure the manual states
@@ -1700,6 +1736,223 @@ static void test_damage_effects(void) {
     }
 }
 
+/* Movement now WALKS THE SECTOR MAP, so a test that teleports the ship by
+   assigning ship.quad_* and ship.sec_* has to make the map agree -- otherwise
+   the walk starts from a cell the map says is empty and runs into whatever
+   the previous quadrant left lying around. Clearing the quadrant is also what
+   makes the arithmetic below the subject of the test rather than the galaxy
+   the seed happened to generate. */
+static void place_ship(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
+    int i;
+    ship.quad_y = qy; ship.quad_x = qx;
+    ship.sec_y  = sy; ship.sec_x  = sx;
+    for (i = 0; i < QUAD_CELLS; i++) sector[i] = SEC_EMPTY;
+    sector[(sy << 3) | sx] = SEC_SHIP;
+}
+
+/* THE MEASURED MOVEMENT MODEL, replayed sample by sample.
+ *
+ * Every case below is a reading taken off the original in DOSBox on
+ * 2026-08-25 -- see MEASURED.md, "The movement model, entire". They are
+ * written in the core's 0-based coordinates; the original's 1-based figures
+ * are in the comments so the two can be checked against each other.
+ *
+ * Two of them are DISCRIMINATORS rather than confirmations: case B separates
+ * round-half-up from round-half-down, and cases B and D separate a clock
+ * billed on the truncated endpoint from one billed on the rounded cell. If
+ * someone "simplifies" path_round or path_floor, those are what notice.
+ */
+
+/* Hundredths of a stardate elapsed since the game began. The clock itself is
+   carried in tenths; movement is finer than that, so the sub-tenth remainder
+   lives in ship.time_frac and both halves have to be read to see a move. */
+static uint16_t elapsed_hundredths(void) {
+    return (uint16_t)((uint16_t)(ship.stardate - STARDATE_START) * 10u
+                      + ship.time_frac);
+}
+
+static void test_blocked_movement(void) {
+    uint8_t r;
+    uint16_t t0;
+
+    puts("movement blocks on a straight line (MEASURED)");
+
+    /* A: 1-based 1-3 to 1-8 with a star at 1-6. Straight along a row, so no
+       rounding is involved: this one only pins "stops in the last clear
+       cell", and that the message names the cell one step further on. */
+    trek_new_game(3, 11);
+    place_ship(3, 3, 0, 2);
+    sector[(0 << 3) | 5] = SEC_STAR;
+    t0 = elapsed_hundredths();
+    r = trek_move_impulse(0, 7);
+    ok(r == MOVE_BLOCKED, "A: a move across a star is blocked");
+    ok(ship.sec_y == 0 && ship.sec_x == 4, "A: ship stops in the last clear cell");
+    ok(trek_block_y == 0 && trek_block_x == 5, "A: the star's cell is reported");
+    ok(sector[(0 << 3) | 4] == SEC_SHIP, "A: the map shows the ship where it stopped");
+    ok(elapsed_hundredths() - t0 == 8,
+       "A: billed 2 sectors, 0.08 stardates (original: 0.0833)");
+
+    /* B: 1-based 5-2 to 7-6, stars at 6-5 and 7-6. THE ROUNDING
+       DISCRIMINATOR. Step 3 lands on exactly (5.5, 4.0) in 0-based terms:
+       half-up puts it at 6-4 and the block at 6-5, half-down puts the step
+       itself on the star at 5-4. The original blocked at 1-based 7-6, which
+       is 0-based 6-5, so it is half-up. */
+    trek_new_game(3, 12);
+    place_ship(3, 3, 4, 1);
+    sector[(5 << 3) | 4] = SEC_STAR;
+    sector[(6 << 3) | 5] = SEC_STAR;
+    t0 = elapsed_hundredths();
+    r = trek_move_impulse(6, 5);
+    ok(r == MOVE_BLOCKED, "B: blocked");
+    ok(ship.sec_y == 6 && ship.sec_x == 4,
+       "B: halves round AWAY FROM ZERO -- the path passes 6-4, not 5-4");
+    ok(trek_block_y == 6 && trek_block_x == 5, "B: blocked by the far star");
+    /* Billed on the TRUNCATED endpoint (1,3) -> sqrt(10), not the rounded
+       cell (2,3) -> sqrt(13). 13 hundredths against the rounded model's 14,
+       and the original charged 0.1317. */
+    ok(elapsed_hundredths() - t0 == 13,
+       "B: billed on the truncated endpoint, 0.13 (original: 0.1317)");
+
+    /* C: 1-based 8-3 to 4-7 with a star at 6-5. A diagonal blocked on its
+       second step, both coordinates whole, so trunc and round agree. */
+    trek_new_game(3, 13);
+    place_ship(3, 3, 7, 2);
+    sector[(5 << 3) | 4] = SEC_STAR;
+    t0 = elapsed_hundredths();
+    r = trek_move_impulse(3, 6);
+    ok(r == MOVE_BLOCKED, "C: blocked");
+    ok(ship.sec_y == 6 && ship.sec_x == 3, "C: stopped after one diagonal step");
+    ok(trek_block_y == 5 && trek_block_x == 4, "C: the star's cell is reported");
+    ok(elapsed_hundredths() - t0 == 5,
+       "C: billed sqrt(2), 0.05 (original: 0.0589)");
+
+    /* D: 1-based 8-1 to 1-6 with a star at 2-5. THE SECOND TRUNCATION
+       DISCRIMINATOR, and the one that was designed as a three-way test
+       before the answer was known: step 5 sits at (2, 3.571) in 0-based
+       terms, so trunc gives sqrt(34), round gives sqrt(41) and the real
+       position gives sqrt(37.75). The original billed 5.8320. */
+    trek_new_game(3, 14);
+    place_ship(3, 3, 7, 0);
+    sector[(1 << 3) | 4] = SEC_STAR;
+    t0 = elapsed_hundredths();
+    r = trek_move_impulse(0, 5);
+    ok(r == MOVE_BLOCKED, "D: blocked");
+    ok(ship.sec_y == 2 && ship.sec_x == 4, "D: stopped at 0-based 2-4");
+    ok(trek_block_y == 1 && trek_block_x == 4, "D: the star's cell is reported");
+    ok(elapsed_hundredths() - t0 == 24,
+       "D: billed sqrt(34), 0.24 (original: 0.2430; rounded would be 0.26)");
+
+    /* A clear move is charged the whole distance, and the clock carries the
+       sub-tenth remainder rather than dropping it. Five sectors is 0.2084 in
+       the original; the port bills 20 hundredths, which is two tenths and a
+       remainder that the NEXT move gets to keep. */
+    trek_new_game(3, 15);
+    place_ship(3, 3, 0, 4);
+    t0 = elapsed_hundredths();
+    r = trek_move_impulse(4, 1);
+    ok(r == MOVE_OK, "clear diagonal succeeds");
+    ok(ship.sec_y == 4 && ship.sec_x == 1, "and arrives where it was sent");
+    ok(elapsed_hundredths() - t0 == 20,
+       "billed 5 sectors, 0.20 (original: 0.2084)");
+
+    /* Impulse time does not depend on the warp factor -- measured at warp 1.0
+       and warp 3.0 on the same four-sector hop. */
+    {
+        uint16_t at_warp_1, at_warp_3;
+        trek_new_game(3, 16);
+        place_ship(3, 3, 6, 4);
+        ship.warp = WARP_MIN;
+        t0 = elapsed_hundredths();
+        trek_move_impulse(6, 0);
+        at_warp_1 = (uint16_t)(elapsed_hundredths() - t0);
+
+        trek_new_game(3, 16);
+        place_ship(3, 3, 6, 4);
+        ship.warp = 30;
+        t0 = elapsed_hundredths();
+        trek_move_impulse(6, 0);
+        at_warp_3 = (uint16_t)(elapsed_hundredths() - t0);
+        ok(at_warp_1 == at_warp_3 && at_warp_1 == 16,
+           "impulse time ignores the warp factor (original: 0.1667 and 0.1666)");
+    }
+}
+
+/* The warp clock, and the departure path.
+ *
+ * MEASURED: 11 * distance_in_quadrants / warp^2, with the distance taken over
+ * ABSOLUTE sector positions. Both facts are checked here because both were
+ * wrong: the port used ~9.98 and measured the distance between quadrant
+ * INDICES. */
+static void test_warp_timing(void) {
+    uint16_t t0;
+    uint8_t r;
+
+    puts("warp timing (MEASURED)");
+
+    trek_new_game(3, 21);
+    place_ship(3, 3, 4, 4);
+    ship.energy = ENERGY_MAX;
+    ship.warp = WARP_MIN;                      /* warp 1.0 */
+    t0 = elapsed_hundredths();
+    r = trek_move_warp(3, 4, 4, 4);            /* one quadrant east, same sector */
+    ok(r == MOVE_OK, "a clear one-quadrant jump succeeds");
+    ok(elapsed_hundredths() - t0 == 1100,
+       "one quadrant at warp 1.0 costs 11.00 stardates");
+
+    /* Quartering with warp squared: the same jump at warp 2.0 is a quarter of
+       the time. Run 1 read four quadrants at warp 2 as 11.0, which is this. */
+    trek_new_game(3, 21);
+    place_ship(3, 3, 4, 4);
+    ship.energy = ENERGY_MAX;
+    ship.warp = 20;
+    t0 = elapsed_hundredths();
+    trek_move_warp(3, 4, 4, 4);
+    ok(elapsed_hundredths() - t0 == 275,
+       "and 2.75 at warp 2.0 -- time goes as 1/warp^2");
+
+    /* The distance is ABSOLUTE, not a quadrant count. Jumping one quadrant
+       east but seven sectors back lands 1 sector away, not 8, so it costs an
+       eighth of the time. A model built on quadrant indices cannot tell these
+       two jumps apart -- and could not produce run 1's 17-sector reading. */
+    trek_new_game(3, 21);
+    place_ship(3, 3, 4, 7);
+    ship.energy = ENERGY_MAX;
+    ship.warp = WARP_MIN;
+    t0 = elapsed_hundredths();
+    trek_move_warp(3, 4, 4, 0);
+    ok(elapsed_hundredths() - t0 == 137,
+       "distance is over absolute sectors, not quadrant indices");
+
+    /* MEASURED: the departure path is walked through the quadrant being LEFT,
+       the ship stays in it, and it is billed for the distance it covered --
+       four sectors at warp 1.0 cost 5.5000, which is 11 * 0.5 and not 11. */
+    trek_new_game(3, 22);
+    place_ship(3, 3, 6, 0);
+    sector[(6 << 3) | 5] = SEC_STAR;
+    ship.energy = ENERGY_MAX;
+    ship.warp = WARP_MIN;
+    t0 = elapsed_hundredths();
+    r = trek_move_warp(3, 4, 6, 0);
+    ok(r == MOVE_BLOCKED, "a quadrant change is blocked by the quadrant it leaves");
+    ok(ship.quad_y == 3 && ship.quad_x == 3, "and the ship stays in that quadrant");
+    ok(ship.sec_y == 6 && ship.sec_x == 4, "in the last clear sector");
+    ok(trek_block_y == 6 && trek_block_x == 5, "with the blocking cell reported");
+    ok(elapsed_hundredths() - t0 == 550,
+       "billed half a quadrant, 5.50 (original: 5.5000)");
+
+    /* Blocked on the very first step: nothing moves and nothing is charged. */
+    trek_new_game(3, 23);
+    place_ship(3, 3, 1, 3);
+    sector[(1 << 3) | 4] = SEC_STAR;
+    ship.energy = ENERGY_MAX;
+    ship.warp = WARP_MIN;
+    t0 = elapsed_hundredths();
+    r = trek_move_warp(3, 4, 1, 3);
+    ok(r == MOVE_BLOCKED, "blocked on the first step");
+    ok(ship.sec_y == 1 && ship.sec_x == 3, "the ship has not moved");
+    ok(elapsed_hundredths() == t0, "and the clock has not moved either");
+}
+
 /* Manual movement, the manual's own worked example.
  *
  * "if you want to move one quadrant down and two quadrants plus two sectors
@@ -1712,8 +1965,7 @@ static void test_manual_movement(void) {
     printf("manual movement (DeltaX/DeltaY)\n");
 
     trek_new_game(3, 7);
-    ship.quad_y = 0; ship.quad_x = 7;
-    ship.sec_y  = 0; ship.sec_x  = 7;
+    place_ship(0, 7, 0, 7);
     ship.energy = ENERGY_MAX;
     ship.warp   = WARP_MAX;
 
@@ -1786,6 +2038,8 @@ int main(void) {
     test_game_state_and_score();
     test_star_and_focus();
     test_damage_effects();
+    test_blocked_movement();
+    test_warp_timing();
     test_manual_movement();
 
     puts("");

@@ -133,6 +133,37 @@
    value of 60 was ten times too expensive. */
 #define IMPULSE_ENERGY_UNIT   6  /* per sector -- measured, see above */
 
+/* ------------------------------------------------------- movement timing */
+
+/* MEASURED 2026-08-25, ten samples, and it is the whole in-quadrant law:
+   time = distance_travelled / 24 stardates, INDEPENDENT of the warp factor
+   (4 sectors cost 0.1667 at warp 1.0 and 0.1666 at warp 3.0).
+
+   That is well under a tenth of a stardate per sector -- 0.0417 -- which is
+   why ship.time_frac exists: the clock is carried in tenths and a one-sector
+   hop does not reach one. The previous value was 0.1 per sector, PROVISIONAL
+   and 2.4x too dear. */
+#define IMPULSE_STARDATE_DIV  24
+
+/* MEASURED 2026-08-25: time = 11 * distance_in_quadrants / warp^2 stardates,
+   with the distance taken over ABSOLUTE sector positions and divided by 8 --
+   not over quadrant indices, which is what this port used to do and which
+   cannot produce the 17-sector reading below.
+
+   Seven samples across four warp factors, and the fit is exact rather than
+   close. The new one is the cleanest: a quadrant change blocked after four
+   sectors -- half a quadrant -- at warp 1.0 cost 5.5000, which is 11 * 0.5.
+   Re-reading run 1's five warp-3 readings against it resolves every one to an
+   exact lattice distance:
+
+       0.8227 -> sqrt(29) sectors   0.9663 -> sqrt(40)   1.2222 -> 8
+       2.5972 -> 17                 2.7330 -> sqrt(320)
+
+   Five arbitrary fractions landing on integer-difference distances is not
+   something a wrong constant does. The constant this replaces was ~9.98,
+   fitted from two readings. */
+#define WARP_STARDATE_NUM     11
+
 /* Weapons.
  *
  * Laser damage is CONFIRMED exactly, by writing four predictions down before
@@ -394,6 +425,12 @@ typedef struct {
     uint8_t  warp;          /* tenths, 10..80 */
     uint8_t  shields_up;
     uint16_t stardate;      /* tenths */
+    /* Hundredths of a stardate travelled but not yet worth a tenth.
+       MEASURED movement costs distance/24 stardates, so a one-sector
+       hop is 0.0417 -- below the clock's own resolution. Without a
+       carry, short moves would be free forever. See advance_hundredths
+       in trek.c. */
+    uint8_t  time_frac;
     uint16_t stardate_end;  /* tenths -- mission deadline */
     uint8_t  level;         /* 1..5, the command level / rank */
     uint16_t enemies_left;
@@ -413,7 +450,14 @@ extern Ship ship;
 /* Outcomes of a move request. The UI turns these into messages; the core
    never formats text, so it stays free of any platform's character set. */
 #define MOVE_OK             0
-#define MOVE_BLOCKED        1   /* an object is in the way */
+/* MEASURED 2026-08-25: this is a PARTIAL MOVE, not a refusal. The original
+   walks the straight line and leaves the ship in the last clear cell, having
+   charged it for the distance it actually covered; the message names the cell
+   that stopped it, which is one step further on than where the ship now is.
+   trek_block_y/x carry that cell. True of quadrant changes too -- the
+   departure path is walked through the quadrant being LEFT, and a move
+   blocked there leaves the ship in it. */
+#define MOVE_BLOCKED        1   /* stopped short: see trek_block_y/x */
 #define MOVE_NO_ENERGY      2
 #define MOVE_SAME_PLACE     3
 #define MOVE_BAD_COORDS     4
@@ -1012,6 +1056,10 @@ uint8_t trek_shuttle_ok(void);
 uint8_t trek_laser_eff(void);
 
 uint8_t trek_set_warp(uint8_t tenths);  /* 0 if rejected */
+/* The occupied sector that stopped the last move, 0-based, valid only after
+   a call that returned MOVE_BLOCKED. Always in the quadrant the ship is in. */
+extern uint8_t trek_block_y, trek_block_x;
+
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx);
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx);
 

@@ -231,6 +231,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.warp         = WARP_START;
     ship.shields_up   = 0;
     ship.stardate     = STARDATE_START;
+    ship.time_frac    = 0;
     ship.stardate_end = (uint16_t)(STARDATE_START + MISSION_TENTHS);
     ship.level        = level;
 
@@ -719,9 +720,175 @@ uint8_t trek_set_warp(uint8_t tenths) {
     return 1;
 }
 
+/* Charge the clock in HUNDREDTHS, promoting whole tenths as they accumulate.
+ *
+ * The clock is carried in tenths and MEASURED movement is finer than that: a
+ * one-sector hop costs 0.0417 stardates. Truncating each move to a tenth
+ * would make short hops free forever, which is a mechanic, not a rounding
+ * error. The remainder lives in ship.time_frac and is saved with the game. */
+static void advance_hundredths(uint16_t h) {
+    h = (uint16_t)(h + ship.time_frac);
+    ship.time_frac = (uint8_t)(h % 10u);
+    advance_time((uint16_t)(h / 10u));
+}
+
+/* --------------------------------------------------------- movement paths */
+
+/* THE ORIGINAL WALKS A STRAIGHT LINE AND STOPS AT THE FIRST OCCUPIED CELL.
+ * MEASURED 2026-08-25; the write-up with every sample is in MEASURED.md,
+ * "The movement model, entire".
+ *
+ * Three things this port had wrong, and all three are here:
+ *
+ *   1. It TELEPORTED. Only the destination cell was tested, so a move across
+ *      a star arrived as if the star were not there.
+ *   2. A blocked move is a PARTIAL MOVE. The ship ends in the last clear
+ *      cell and is billed for the distance it covered -- it is not refused.
+ *   3. Quadrant changes walk the same path, through the quadrant being LEFT,
+ *      and a move blocked there leaves the ship in that quadrant.
+ *
+ * The path: n = max(|dy|,|dx|) steps, step i at the real position
+ * (y0 + dy*i/n, x0 + dx*i/n), and the cell tested is that position with each
+ * coordinate ROUNDED. Halves break AWAY FROM ZERO -- Turbo Pascal's Round.
+ * That was not assumed: a move from 5-2 to 7-6 puts step 3 at exactly
+ * (6.5, 5.0), where half-up predicts a block at 7-6 and half-down a block at
+ * 6-5. The machine said 7-6, twice.
+ */
+
+/* NO DIVISION ANYWHERE BELOW, AND THAT IS THE POINT.
+ *
+ * The obvious way to write the walk is round(delta * i / n) per step per
+ * axis. It is also 631 bytes on this target, because every one of those is a
+ * 16-bit divide and the walk does two per step. Both quantities the walk
+ * needs are monotone in i and advance by at most one per step, so an
+ * accumulator and a compare replace the divide entirely and the whole thing
+ * fits in eight-bit arithmetic:
+ *
+ *   ROUNDED, halves away from zero:  round(a*i/n) = floor((2*a*i + n) / 2n).
+ *     Seed the accumulator at n -- that is the +n rounding term -- and add
+ *     2a each step; the offset ticks up whenever it reaches 2n.
+ *   TRUNCATED:  floor(a*i/n). Seed at 0, add a each step, tick at n.
+ *
+ * Because a <= n, each accumulator gains at most its modulus per step, so the
+ * carry is an `if` rather than a loop. The widest intermediate is n + 2a,
+ * which is 189 at galaxy scale and stays inside a byte.
+ */
+
+/* Euclidean distance in SIXTEENTHS of a sector, over the whole galaxy grid.
+ *
+ * The 64-entry table is exact and covers everything inside one quadrant, so
+ * it still answers every impulse move and every quadrant-index distance. Only
+ * an absolute galaxy displacement can exceed 7, and there the integer square
+ * root below takes over -- by which point r is at least 8 and the chord
+ * between consecutive squares is within 1/(8r) of the curve, under a
+ * hundredth of a sector. Using it for the short diagonals instead would be
+ * 6% low on sqrt(2), which is why the table is still consulted first.
+ *
+ * The fraction is found by ADDING, for the same reason as the walk: there are
+ * only seventeen possible answers, and sixteen subtractions cost less code
+ * than one 16-bit divide. */
+static uint16_t path_dist(uint8_t dy, uint8_t dx) {
+    uint16_t v, r, sq, d, t;
+    uint8_t frac;
+
+    if (dy <= 7 && dx <= 7) return (uint16_t)(trek_dist(dy, dx) >> 4);
+
+    v = (uint16_t)((uint16_t)dy * dy + (uint16_t)dx * dx);
+    r = 0; sq = 1;
+    while (v >= sq) { v -= sq; sq += 2; r++; }   /* r = isqrt, v = remainder */
+
+    /* Four bits of fraction by binary long division: v is already the
+       remainder and is strictly less than d, so four doublings give the
+       sixteenths directly. Cheaper in code than either a 16-bit divide or
+       sixteen subtractions, and it was measured against both. */
+    d = (uint16_t)(2u * r + 1u);
+    for (frac = 0, t = 0; t < 4; t++) {
+        v <<= 1; frac = (uint8_t)(frac << 1);
+        if (v >= d) { v -= d; frac++; }
+    }
+    return (uint16_t)((r << 4) + frac);
+}
+
+/* What the last walk produced. File statics rather than a returned struct:
+   both movers want all of it, and a by-value struct return is not something
+   to spend bytes on here. */
+static uint8_t walk_y, walk_x;      /* absolute cell the ship reaches, 0..63 */
+static uint8_t walk_dy, walk_dx;    /* truncated displacement, for billing */
+
+uint8_t trek_block_y, trek_block_x;
+
+/* Walks from the ship toward the absolute cell (ay1, ax1), testing every step
+   that falls inside the CURRENT quadrant -- the only one with a sector map;
+   the destination is not generated until arrival. Returns 1 if an object
+   stopped it, in which case trek_block_y/x name that object's sector. */
+static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
+    uint8_t ay0 = (uint8_t)((ship.quad_y << 3) | ship.sec_y);
+    uint8_t ax0 = (uint8_t)((ship.quad_x << 3) | ship.sec_x);
+    uint8_t upy = (uint8_t)(ay1 >= ay0), upx = (uint8_t)(ax1 >= ax0);
+    uint8_t ady = (uint8_t)(upy ? ay1 - ay0 : ay0 - ay1);
+    uint8_t adx = (uint8_t)(upx ? ax1 - ax0 : ax0 - ax1);
+    uint8_t n   = (uint8_t)(ady > adx ? ady : adx);
+    uint8_t n2  = (uint8_t)(n << 1);
+    uint8_t ry = 0, rx = 0, ty = 0, tx = 0;   /* rounded and truncated offsets */
+    uint8_t rya, rxa;                         /* rounding accumulators */
+    uint8_t tya = 0, txa = 0;                 /* truncating accumulators */
+    uint8_t i;
+
+    walk_y = ay0; walk_x = ax0;
+    walk_dy = 0;  walk_dx = 0;
+    if (n == 0) return 0;
+    rya = n; rxa = n;                         /* seeded with the +n of a round */
+
+    for (i = 1; i <= n; i++) {
+        uint8_t sy, sx;
+
+        rya = (uint8_t)(rya + (ady << 1));
+        if (rya >= n2) { rya = (uint8_t)(rya - n2); ry++; }
+        rxa = (uint8_t)(rxa + (adx << 1));
+        if (rxa >= n2) { rxa = (uint8_t)(rxa - n2); rx++; }
+
+        sy = (uint8_t)(upy ? ay0 + ry : ay0 - ry);
+        sx = (uint8_t)(upx ? ax0 + rx : ax0 - rx);
+
+        /* Only the quadrant we are in has a sector map, so once the path
+           leaves it the rest is the destination's business and the jump
+           completes. */
+        if ((uint8_t)(sy >> 3) != ship.quad_y ||
+            (uint8_t)(sx >> 3) != ship.quad_x)
+            break;
+
+        if (sector[((sy & 7) << 3) | (sx & 7)] != SEC_EMPTY) {
+            trek_block_y = (uint8_t)(sy & 7);
+            trek_block_x = (uint8_t)(sx & 7);
+            /* Billed on the PREVIOUS step's truncated position. Travelling
+               the other way the position is ay0 - a*i/n, whose floor is
+               ay0 - ceil(a*i/n), so a non-zero accumulator costs one more --
+               that is what the `!= 0` terms are. No sample exercised a
+               fractional step in the negative direction; the positive ones
+               are the two discriminators in MEASURED.md. */
+            walk_dy = (uint8_t)(upy ? ty : ty + (tya != 0));
+            walk_dx = (uint8_t)(upx ? tx : tx + (txa != 0));
+            return 1;
+        }
+
+        walk_y = sy;
+        walk_x = sx;
+        tya = (uint8_t)(tya + ady);
+        if (tya >= n) { tya = (uint8_t)(tya - n); ty++; }
+        txa = (uint8_t)(txa + adx);
+        if (txa >= n) { txa = (uint8_t)(txa - n); tx++; }
+    }
+
+    /* Nothing stopped it, so it goes the whole way and the truncated endpoint
+       is the target itself. */
+    walk_dy = ady;
+    walk_dx = adx;
+    return 0;
+}
+
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
-    uint16_t d, cost;
-    uint8_t target;
+    uint16_t d16, cost;
+    uint8_t blocked;
 
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return MOVE_BAD_COORDS;
     if (sy == ship.sec_y && sx == ship.sec_x) return MOVE_SAME_PLACE;
@@ -730,31 +897,41 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
        to use", a hard no rather than a slower move. */
     if (!trek_impulse_ok()) return MOVE_NO_IMPULSE;
 
-    target = (uint8_t)((sy << 3) | sx);
-    if (sector[target] != SEC_EMPTY) return MOVE_BLOCKED;
+    /* The energy refusal is a PRE-CHECK on the move that was asked for. The
+       original's wording -- "Move aborted; we have too little energy to get
+       there" -- is a judgement about the destination, made before anything
+       moves. What is BILLED, below, is the distance actually covered. That
+       split is read off the message rather than measured. */
+    d16 = path_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
+    if ((uint16_t)((d16 * IMPULSE_ENERGY_UNIT) >> 4) > ship.impulse)
+        return MOVE_NO_ENERGY;
 
-    /* Any movement breaks the dock. Placed after every rejection above, so a
-       move the game refuses does not silently cast off. */
-    trek_undock();
+    blocked = walk_path((uint8_t)((ship.quad_y << 3) | sy),
+                        (uint8_t)((ship.quad_x << 3) | sx));
 
-    d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
-
-    /* PROVISIONAL: IMPULSE_ENERGY_UNIT per sector of distance. Nothing in
-       the manual fixes impulse cost; it is set above the converter's output
-       over the same interval so crossing a quadrant is a net loss. */
-    /* Drawn from the impulse engines' own pool, not the main banks --
-       confirmed on screen: the original tracks them separately. */
-    cost = (uint16_t)(((d >> 4) * IMPULSE_ENERGY_UNIT) >> 4);
-    if (cost > ship.impulse) return MOVE_NO_ENERGY;
+    /* A move stopped on its very first step has not moved the ship, so it
+       does not cast off either. Every other outcome breaks the dock. */
+    if (walk_dy || walk_dx) trek_undock();
 
     sector[(ship.sec_y << 3) | ship.sec_x] = SEC_EMPTY;
-    ship.sec_y = sy;
-    ship.sec_x = sx;
-    sector[target] = SEC_SHIP;
+    ship.sec_y = (uint8_t)(walk_y & 7);
+    ship.sec_x = (uint8_t)(walk_x & 7);
+    sector[(ship.sec_y << 3) | ship.sec_x] = SEC_SHIP;
 
+    /* Billed on the TRUNCATED endpoint -- see path_floor. */
+    d16 = path_dist(walk_dy, walk_dx);
+
+    /* Drawn from the impulse engines' own pool, not the main banks --
+       confirmed on screen: the original tracks them separately. */
+    cost = (uint16_t)((d16 * IMPULSE_ENERGY_UNIT) >> 4);
     ship.impulse = (uint16_t)(ship.impulse - cost);
-    advance_time((uint16_t)(d >> 8));   /* PROVISIONAL: 0.1 stardate/sector */
-    return MOVE_OK;
+
+    /* MEASURED: distance / IMPULSE_STARDATE_DIV stardates, and independent
+       of the warp factor. In hundredths that is 100*d/24 = 25*d/6, and d16
+       counts sixteenths of a sector, so the whole charge is 25*d16/96. The
+       widest case is 25 * 158, well inside sixteen bits. */
+    advance_hundredths((uint16_t)((25u * d16) / (6u * 16u)));
+    return blocked ? MOVE_BLOCKED : MOVE_OK;
 }
 
 uint8_t trek_move_delta(int16_t dy, int16_t dx) {
@@ -778,8 +955,57 @@ uint8_t trek_move_delta(int16_t dy, int16_t dx) {
     return trek_move_warp(qy, qx, sy, sx);
 }
 
+/* Energy for a warp jump of `d88` quadrants, 8.8 fixed point.
+ *
+ * MEASURED at two points -- about 194 units for one quadrant at warp 5 and
+ * 710 at warp 8 -- giving cost = 1.5 * distance * warp^3. Warp rose x1.6 and
+ * cost x3.66, which puts the exponent at 2.76; the cube reproduces both
+ * within 8%, while the linear model this replaced predicted 320 at warp 8.
+ * FITTED from two points, so the exponent is well supported and the 1.5 is
+ * not precise. UNTOUCHED by the 2026-08-25 movement work, which corrected the
+ * TIME law and the distance it is taken over, not this.
+ *
+ * Cost is SUBLINEAR in distance: two quadrants at warp 8 cost 1174, only
+ * 1.65x the 710 that one cost, where a linear model demanded 2x. A fixed
+ * overhead plus a per-distance term fits -- roughly (0.5 + 0.9 * distance) *
+ * warp^3, in 1/256ths below.
+ *
+ * Staged to stay in sixteen bits: warp^3 is built in two steps from tenths
+ * (max 512), and the distance factor is divided down before the multiply
+ * rather than after, which a single expression could not do without
+ * overflowing. */
+static uint16_t warp_energy(uint16_t d88) {
+    uint16_t d44 = (uint16_t)(d88 >> 4);                      /* max 178 */
+    uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
+                               (uint16_t)ship.warp) / 10);    /* max 640 */
+    uint16_t f;
+    wc = (uint16_t)((wc * (uint16_t)ship.warp) / 100);        /* warp^3 */
+    f = (uint16_t)(128 + d44 * 14);
+    return (uint16_t)((wc * (f >> 5)) >> 3);
+}
+
+/* Stardate cost of a warp jump of `d16` sixteenths of a SECTOR, in hundredths.
+ *
+ * MEASURED: 11 * distance_in_quadrants / warp^2 -- see WARP_STARDATE_NUM in
+ * trek.h for the seven samples. In tenths that is 1375 * d_sectors / warp^2
+ * where warp is in tenths, and d16 counts sixteenths, so the numerator is
+ * 1375/32 = 42.97 per d16 against a denominator of warp_tenths^2/2. Rounding
+ * that to 43 costs 0.07%, which is a fourteenth of a tenth at the very worst
+ * case and nothing at any real distance.
+ *
+ * Staged because 43 * d16 reaches 61,318 and multiplying THAT by ten to reach
+ * hundredths would not fit: the quotient and the remainder are scaled
+ * separately, and neither exceeds 32,000. */
+static uint16_t warp_hundredths(uint16_t d16) {
+    uint16_t den = (uint16_t)(((uint16_t)ship.warp * (uint16_t)ship.warp) >> 1);
+    uint16_t num = (uint16_t)(43u * d16);
+    if (den == 0) den = 1;
+    return (uint16_t)((num / den) * 10u + ((num % den) * 10u) / den);
+}
+
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
-    uint16_t d, cost, tenths;
+    uint16_t d16, cost;
+    uint8_t ay1, ax1;
 
     if (qy >= GAL_DIM || qx >= GAL_DIM ||
         sy >= QUAD_DIM || sx >= QUAD_DIM) return MOVE_BAD_COORDS;
@@ -787,73 +1013,55 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
     if (qy == ship.quad_y && qx == ship.quad_x)
         return trek_move_impulse(sy, sx);
 
-    d = trek_dist(abs_diff(qy, ship.quad_y), abs_diff(qx, ship.quad_x));
+    ay1 = (uint8_t)((qy << 3) | sy);
+    ax1 = (uint8_t)((qx << 3) | sx);
 
-    /* PROVISIONAL cost model: distance * warp factor, doubled with shields
-       raised -- the doubling is the one part the manual states outright
-       (l.255). Shifted in two stages rather than one so the intermediate
-       stays inside 16 bits: d maxes at 2534 and warp at 80, whose product
-       would overflow. */
-    /* MEASURED: cost = 1.5 * distance * warp^3, from two readings off the
-       original -- ~194 for one quadrant at warp 5, ~710 at warp 8. Warp rose
-       x1.6 and cost x3.66, which puts the exponent at 2.76; cube reproduces
-       both within 8%, while the linear model this replaces predicted 320 at
-       warp 8. Fitted from two points, so the exponent is well supported but
-       the 1.5 is not precise.
+    /* MEASURED 2026-08-25: the distance is taken over ABSOLUTE sector
+       positions and divided by eight. This port used to take it over quadrant
+       INDICES, which cannot produce run 1's 2.5972 at warp 3 -- that reading
+       is 17 sectors, or 2.125 quadrants, and no pair of quadrant indices is
+       2.125 apart. */
+    d16 = path_dist(abs_diff(ay1, (uint8_t)((ship.quad_y << 3) | ship.sec_y)),
+                    abs_diff(ax1, (uint8_t)((ship.quad_x << 3) | ship.sec_x)));
 
-       Staged to stay in 16 bits: warp^3 is built in two steps from tenths
-       (max 512), and the distance factor is divided down before the multiply
-       rather than after, which a single expression could not do without
-       overflowing. */
-    {
-        uint16_t d44 = (uint16_t)(d >> 4);                      /* max 158 */
-        uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
-                                   (uint16_t)ship.warp) / 10);  /* max 640 */
-        uint16_t f;
-        wc = (uint16_t)((wc * (uint16_t)ship.warp) / 100);      /* warp^3 */
-
-        /* Cost is SUBLINEAR in distance: two quadrants at warp 8 cost 1174,
-           only 1.65x the 710 that one quadrant cost, where a linear model
-           demanded 2x. A fixed overhead per jump plus a per-distance term
-           fits -- roughly (0.5 + 0.9 * distance) * warp^3, in 1/256ths
-           below. Time, by contrast, IS linear in distance (0.2 -> 0.4
-           stardates over the same pair), so only the cost needed changing. */
-        f = (uint16_t)(128 + d44 * 14);                         /* max 2340 */
-        cost = (uint16_t)((wc * (f >> 5)) >> 3);                /* max 4672 */
-    }
+    /* The refusal is judged on the jump asked for, as for impulse. Doubled
+       with shields raised -- the one part of the cost the manual states
+       outright (l.255). */
+    cost = warp_energy((uint16_t)(d16 * 2u));
     if (ship.shields_up) cost = (uint16_t)(cost * 2);
     if (cost > ship.energy) return MOVE_NO_ENERGY;
 
-    /* MEASURED: time goes as distance / warp SQUARED, not distance / warp.
-       Three readings off the original -- 1 quadrant at warp 8 in 0.2
-       stardates, 1 at warp 5 in ~0.4, and 4 at warp 2 in 11.0. Warp 2 to 8
-       is four times the speed but 13.75 times the time per quadrant; 1/warp
-       predicts 4, 1/warp^2 predicts 16. The fitted constant is 10, giving
-       0.16 / 0.4 / 10.0 against those observations.
+    /* MEASURED: the departure path is walked through the quadrant being LEFT,
+       and an object in it stops the jump there. The ship stays in this
+       quadrant, in the last clear sector, and is billed for what it covered:
+       four sectors of a westward jump at warp 1.0 cost 5.5000 stardates,
+       which is 11 * 0.5 and not 11 * 1. */
+    if (walk_path(ay1, ax1)) {
+        if (walk_dy || walk_dx) trek_undock();
 
-       The previous distance/warp model was five times too fast at warp 2,
-       which is what let a 4-quadrant trip look like 2 stardates instead of
-       11 -- and that error is why the energy reading for that trip clipped
-       against the 5000 ceiling and was lost.
+        sector[(ship.sec_y << 3) | ship.sec_x] = SEC_EMPTY;
+        ship.sec_y = (uint8_t)(walk_y & 7);
+        ship.sec_x = (uint8_t)(walk_x & 7);
+        sector[(ship.sec_y << 3) | ship.sec_x] = SEC_SHIP;
 
-       Held in 16 bits by scaling distance down to 4.4 fixed point and the
-       squared warp down by the same 16, rather than by a single multiply
-       that would overflow. */
-    {
-        uint16_t d44 = (uint16_t)(d >> 4);                       /* max 158 */
-        uint16_t wsq = (uint16_t)(((uint16_t)ship.warp *
-                                   (uint16_t)ship.warp) >> 4);   /* max 400 */
-        if (wsq == 0) wsq = 1;
-        tenths = (uint16_t)((d44 * 39u) / wsq);                  /* max 6162 */
+        d16 = path_dist(walk_dy, walk_dx);
+        cost = warp_energy((uint16_t)(d16 * 2u));
+        if (ship.shields_up) cost = (uint16_t)(cost * 2);
+        if (cost > ship.energy) cost = ship.energy;
+        ship.energy = (uint16_t)(ship.energy - cost);
+        advance_hundredths(warp_hundredths(d16));
+        return MOVE_BLOCKED;
     }
 
+    /* No trek_undock() here: trek_enter_quadrant() clears the dock as part
+       of arriving anywhere, and calling it twice would only cost bytes. */
     ship.quad_y = qy;
     ship.quad_x = qx;
     ship.sec_y  = sy;
     ship.sec_x  = sx;
 
     ship.energy = (uint16_t)(ship.energy - cost);
-    advance_time(tenths);
+    advance_hundredths(warp_hundredths(d16));
 
     trek_enter_quadrant();
     return MOVE_OK;
