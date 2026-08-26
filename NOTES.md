@@ -578,6 +578,20 @@ Still open from those runs:
 - **The STATE OF REPAIR estimate formula**, which runs about a tenth above
   points/rate.
 
+**Seen repeatedly across runs 1 to 5 and never measured** -- added 2026-08-24,
+because all three are mechanics this port has no part of:
+
+- **The long-range tractor beam.** It seized the ship at least four times in
+  five runs and MEASURED.md calls it "a hazard to measurement", but what
+  triggers it, how often, and whether it is a commander ability are all
+  unknown.
+- **Reinforcements arriving.** Quadrant 7-2 went from two enemies to four
+  between visits and the Mongol counter went back UP. That is the mechanic
+  behind the "reinforcement warnings" string, and it is distinct from the
+  message.
+- **The Vandal Death Pod's numbers.** One 87-unit hit observed, and it is known
+  to hit enemies too. Frequency and damage law unmeasured.
+
 **Not for the emulator:** item 5's four FITTED constants want `dis16.py`.
 
 **Search the manual before adding anything here.** This list briefly carried
