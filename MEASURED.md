@@ -3477,6 +3477,40 @@ Undocked"), and `fn 0x22773` is the viewer's system page.
 stride 16, is the twelve SYSTEM NAMES -- "EnergyConverter" is fifteen
 characters and fits exactly. Not planets, and not a population.
 
+### THE SETTLED PLANET: there is exactly ONE (2026-08-26)
+
+Found where it should have been looked for -- in ORBIT, which prints the
+settlement line. `fn 0x0E092` at 0x0E195, before it decodes the per-quadrant
+byte at all:
+
+    if ([0x1E1C] != ship.quad_y) skip
+    if ([0x1E1E] != ship.quad_x) skip
+    "SCIENCE: Scanners show a "
+    if ([0x1D42] > [0x1DA2]) "destroyed "      ; stardate past a deadline
+    "settlement on the planet."
+
+**A SINGLE PAIR OF GLOBALS holds the settled planet's quadrant**, so a galaxy
+has exactly one. And generation writes that pair INSIDE THE ENERGIUM BRANCH of
+the planet loop (0x05363), so every energium world overwrites it and the last
+one wins -- which finally explains the "remembered quadrant" recorded as
+unexplained when that loop was decoded. **The settled planet is always an
+energium planet.**
+
+The test runs BEFORE the byte is decoded and falls through afterwards, so the
+settled world gets BOTH scan lines: the settlement and then the energium.
+
+The same globals are read by `fn 0x15105` ("A distress signal is being
+received...") and `fn 0x151D0` (", requests evacuation. They can only hold out
+until "). That is the whole evacuation mechanic and the source of the +200
+rescue line, and it hangs off one planet.
+
+This retires two wrong readings recorded earlier the same day: settlers as a
+fourth per-planet find (this port's invention) and a twelve-entry table at
+DS:0x1188 (which holds the SYSTEM names). Both are struck.
+
+Not modelled yet: the DEADLINE at [0x1DA2], so a settlement in this port is
+never "destroyed". That wants fn 0x151D0.
+
 ### THE SPY, read out of the binary (2026-08-26)
 
 `fn 0x15C07`, and the strings just before `fn 0x15D6E` name it: "SECURITY:

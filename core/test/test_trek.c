@@ -106,7 +106,7 @@ static void test_no_16bit_overflow(void) {
 }
 
 static void test_generation(void) {
-    int i, enemies = 0, bases = 0, starless = 0;
+    int i, enemies = 0, starless = 0;
     int expect;
 
     puts("galaxy generation");
@@ -116,7 +116,6 @@ static void test_generation(void) {
 
     for (i = 0; i < GAL_CELLS; i++) {
         enemies += gal_enemies[i];
-        if (gal_base[i] != BASE_NONE) bases++;
         if (gal_stars[i] > 8) starless++;
     }
 
@@ -2279,7 +2278,7 @@ static void one_planet(uint8_t find, uint8_t dy, uint8_t dx) {
 }
 
 static void test_planet_generation(void) {
-    uint16_t seed, energium = 0, total = 0, doubled_up = 0;
+    uint16_t seed, doubled_up = 0;
     uint8_t  lo = 255, hi = 0, i, j, bad_name = 0, bad_class = 0;
     uint16_t en_cls[3] = {0,0,0}, en_hit[3] = {0,0,0};
 
@@ -2291,8 +2290,6 @@ static void test_planet_generation(void) {
         if (planet_count > hi) hi = planet_count;
 
         for (i = 0; i < planet_count; i++) {
-            total++;
-            if (planets[i].find == PFIND_ENERGIUM) energium++;
             en_cls[planets[i].cls]++;
             if (planets[i].find == PFIND_ENERGIUM) en_hit[planets[i].cls]++;
             if (planets[i].name >= PLANET_NAMES)  bad_name++;
@@ -2321,8 +2318,27 @@ static void test_planet_generation(void) {
     ok(100u * en_hit[0] / en_cls[0] > 100u * en_hit[1] / en_cls[1] &&
        100u * en_hit[1] / en_cls[1] > 100u * en_hit[2] / en_cls[2],
        "energium is likelier on M than N, and on N than O");
-    ok(100u * en_hit[0] / en_cls[0] >= 66 && 100u * en_hit[0] / en_cls[0] <= 76,
+    ok(100u * en_hit[0] / en_cls[0] >= 76 && 100u * en_hit[0] / en_cls[0] <= 84,
        "class M carries energium about four times in five");
+
+    /* EXACTLY ONE settled planet per galaxy, and it is always an energium
+       one -- the original overwrites a single pair of globals inside the
+       energium branch, so the last such planet wins. */
+    {
+        uint16_t sd; uint8_t bad_count = 0, bad_kind = 0;
+        for (sd = 1; sd < 200; sd++) {
+            uint8_t k, c = 0;
+            trek_new_game(3, sd);
+            for (k = 0; k < planet_count; k++)
+                if (planets[k].flags & PF_SETTLED) {
+                    c++;
+                    if (planets[k].find != PFIND_ENERGIUM) bad_kind++;
+                }
+            if (c != 1) bad_count++;
+        }
+        ok(bad_count == 0, "every galaxy has exactly one settled planet");
+        ok(bad_kind == 0,  "and it always carries energium");
+    }
 
     /* MEASURED: the generator retries an occupied quadrant, so two planets
        never share one. This port allowed collisions until 2026-08-26. */
@@ -2410,7 +2426,8 @@ static void test_landing(void) {
     /* Settlers, which is what makes the +200 line on the score sheet real. */
     trek_new_game(3, 911);
     ship.sec_y = 4; ship.sec_x = 4;
-    one_planet(PFIND_SETTLERS, 0, 1);
+    one_planet(PFIND_ENERGIUM, 0, 1);
+    planets[0].flags |= PF_SETTLED;   /* settlers are a FLAG, not a find */
     trek_orbit();
     ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_SETTLERS, "settlers are found");
     ok(ship.rescues == 1, "and evacuating them counts as a rescue");
@@ -2418,8 +2435,8 @@ static void test_landing(void) {
     /* A ruined settlement scans the same and rescues nobody. */
     trek_new_game(3, 912);
     ship.sec_y = 4; ship.sec_x = 4;
-    one_planet(PFIND_SETTLERS, 0, 1);
-    planets[0].flags |= PF_RUINED;
+    one_planet(PFIND_NOTHING, 0, 1);
+    planets[0].flags |= PF_SETTLED | PF_RUINED;
     trek_orbit();
     ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_NOTHING,
        "a destroyed settlement has nobody left to take off");

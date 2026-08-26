@@ -24,6 +24,7 @@ const char *const item_name[ITEM_COUNT] = {
 
 void planet_new(void) {
     uint8_t i;
+    uint8_t settled = PLANET_MAX;   /* none, until an energium world lands */
 
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = 0;
     ship.orbiting = PLANET_NONE;
@@ -53,15 +54,18 @@ void planet_new(void) {
         /* THE FIND DEPENDS ON THE CLASS -- see planet.h. `cls1` is the
            original's 1-based class, which is what its comparison uses. */
         cls1 = (uint8_t)(planets[i].cls + 1);
-        if (trek_rand_n(PFIND_SETTLERS_OF_N) == 0)
-            planets[i].find = PFIND_SETTLERS;      /* invented; see planet.h */
-        else if (cls1 <= trek_rand_n(PFIND_ENERGIUM_OF_N))
+        if (cls1 <= trek_rand_n(PFIND_ENERGIUM_OF_N)) {
             planets[i].find = PFIND_ENERGIUM;
-        else if (trek_rand_n(PFIND_MONGOL_OF_N) == 0)
+            /* THE LAST ENERGIUM PLANET IS THE SETTLED ONE. The original writes
+               its quadrant into a single pair of globals here, so each new
+               energium world overwrites the last and exactly one survives. */
+            settled = i;
+        } else if (trek_rand_n(PFIND_MONGOL_OF_N) == 0)
             planets[i].find = PFIND_MONGOL;
         else
             planets[i].find = PFIND_NOTHING;
     }
+    if (settled < planet_count) planets[settled].flags |= PF_SETTLED;
     for (; i < PLANET_MAX; i++) {
         /* Slots past the count are cleared rather than left as whatever the
            last galaxy put there. The serialiser writes the whole array, so a
@@ -157,6 +161,16 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
     p = &planets[ship.orbiting];
     if (p->flags & PF_TAKEN) return LAND_ALREADY;
 
+    /* SETTLERS FIRST, and they are a property of the planet rather than of
+       its find -- exactly one world in a galaxy carries them. A ruined
+       settlement has nobody left to take off; the scan still shows it, which
+       is what the "destroyed " insert is for. */
+    if ((p->flags & PF_SETTLED) && !(p->flags & PF_RUINED)) {
+        p->flags = (uint8_t)(p->flags & ~PF_SETTLED);
+        ship.rescues++;
+        return LAND_SETTLERS;
+    }
+
     /* The shuttlecraft's round trip, per the manual: 0.2 stardates against
        the transporter's nothing. Charged BEFORE the outcome, since the trip
        happens whatever the landing party finds -- and charged even on a
@@ -172,17 +186,6 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
         if (inventory[ITEM_RAW_ENERGIUM] < 255) inventory[ITEM_RAW_ENERGIUM]++;
         return LAND_ENERGIUM;
 
-    case PFIND_SETTLERS:
-        /* A ruined settlement has nobody left to take off. The scan still
-           shows it -- that is what the "destroyed " insert is for -- so the
-           landing is allowed and finds nothing, rather than being refused. */
-        if (p->flags & PF_RUINED) {
-            p->flags |= PF_TAKEN;
-            return LAND_NOTHING;
-        }
-        p->flags |= PF_TAKEN;
-        ship.rescues++;
-        return LAND_SETTLERS;
 
     case PFIND_MONGOL:
         /* The station is not cleared by being walked into: PF_TAKEN is NOT

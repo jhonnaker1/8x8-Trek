@@ -164,28 +164,33 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * the ancestor, with the rest invented -- wrong twice over, and it had no
  * class dependence at all.
  *
- * SETTLERS ARE NOT IN THIS BYTE, and the second structure is STILL NOT
- * FOUND. Only three values fit one decimal digit here, and the original
- * plainly has settled planets -- ORBIT prints "[destroyed ]settlement on the
- * planet" and LAND prints "Planet settlers found...".
+ * SETTLERS ARE NOT IN THIS BYTE, AND NOW WE KNOW WHY: THERE IS EXACTLY ONE
+ * SETTLED PLANET IN A GALAXY, and it is not stored per-quadrant at all.
  *
- * A 2026-08-26 entry claimed to have found them in a twelve-entry table at
- * DS:0x1188/DS:0x235A. THAT WAS WRONG and is retracted: 0x235A is the twelve
- * SYSTEM REPAIR PERCENTAGES and 0x1188 the twelve SYSTEM NAMES, which the
- * STATE OF REPAIR display uses. The routine that reads them is the SPY event,
- * not a distress signal. See MEASURED.md.
+ * Generation keeps its quadrant in a pair of globals, DS:0x1E1C and 0x1E1E,
+ * written inside the ENERGIUM branch of the planet loop -- so every energium
+ * planet overwrites it and THE LAST ONE WINS. The settled planet is therefore
+ * always an energium planet.
  *
- * So PFIND_SETTLERS stays at an invented frequency -- still the only invented
- * number in this file -- because dropping it makes the rescue scoring line
- * unreachable. Finding the real structure is still open.
+ * ORBIT tests the ship's quadrant against that pair BEFORE it decodes the
+ * per-quadrant byte, so the settled world gets BOTH scan lines: "Scanners
+ * show a settlement on the planet." and then the energium line. And
+ * "destroyed " is inserted when a stardate at [0x1D42] has passed a deadline
+ * at [0x1DA2].
  *
- *  */
+ * The same globals are read by fn 0x15105 ("A distress signal is being
+ * received...") and fn 0x151D0 (", requests evacuation. They can only hold
+ * out until "), which is the whole evacuation mechanic and the source of the
+ * +200 rescue line.
+ *
+ * Two earlier readings of this are retracted in MEASURED.md: settlers as a
+ * fourth per-planet find (this file's invention) and a twelve-entry table at
+ * DS:0x1188 (which is the SYSTEM names). One planet, one pair of globals.
+ *
+ * PF_SETTLED below carries it. The DEADLINE is not modelled yet -- that wants
+ * fn 0x151D0 read -- so a settlement here is never "destroyed". */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */
-/* PROVISIONAL, invented, and the only invented number left in this file:
-   how often a planet is settled. One in eight, rolled before the measured
-   rule so it does not disturb the measured proportions among the rest. */
-#define PFIND_SETTLERS_OF_N   8
 
 #define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */
 #define PF_TAKEN       0x02      /* the find has been collected or evacuated */
@@ -195,6 +200,10 @@ extern const char planet_class_letter[PCLASS_COUNT];
    twin of SCHED_BASE_ATTACK. The flag and the ruined-settlement scan line
    exist so that job is a schedule slot and a message, not a model change. */
 #define PF_RUINED      0x04
+/* THE settled planet -- exactly one per galaxy, and always an energium one.
+   Set on the LAST planet generated with energium, which is what the original's
+   [0x1E1C]/[0x1E1E] pair ends up holding. */
+#define PF_SETTLED     0x08
 
 typedef struct {
     uint8_t quad;      /* galaxy cell, 0..63 -- fixed for the game */
