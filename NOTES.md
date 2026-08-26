@@ -553,12 +553,10 @@ Everything about *what a thing does* has been on disk; these are numbers.
 
 Still open from those runs:
 
-- **`RAY`'s outcome ODDS** -- still not measured after FOUR attempts, though
-  the fatal outcome itself is now captured along with its loss report. This
-  bullet used to blame emulator instability; that was wrong, or at least not
-  the main cause. Four harness bugs and one confound are written up under
-  "Run 6" below, with the specific fix the fifth attempt needs. Do not start
-  a fifth without reading it.
+- ~~**`RAY`'s outcome ODDS**~~ **ANSWERED 2026-08-26, and not by the
+  emulator.** Four DOSBox sessions failed to estimate them; one afternoon
+  with `tools/dis16.py` read them off exactly. There is no fifth sampling
+  attempt to make. See "Read the constants, do not sample them" below.
 - ~~One sample of dying in COMBAT~~ **DONE 2026-08-24 and the constant is
   restored.** The sheet prints `Penalty for loss of ship .... -200` and totals
   -930 with nothing killed. The 2026-08-20 reading that gave -730 and got the
@@ -1134,9 +1132,12 @@ corrected time law vindicated.
      O)rbit, LAND, USE and a PLANET LIST report, all driven end to end on the
      machine. See "The planet chain, built" and "The planet chain reaches the
      screen" below.
-  7. **RAY** -- dialog, success sequence, refusal AND the fatal outcome all
-     captured (the last on 2026-08-26). Nothing left to capture; only its
-     ODDS are open, and those have resisted four attempts.
+  7. **RAY** -- FULLY SPECIFIED 2026-08-26, odds included. Dialog, success,
+     refusal and the fatal outcome captured on screen; the odds READ OUT OF
+     THE BINARY, exactly, after four DOSBox sessions failed to estimate them.
+     `Random(6)`: works 1/6, misfires 2/6, mutants 1/6, **destroys the ship
+     2/6**. See MEASURED.md, "RAY's ODDS, read out of the binary". Nothing
+     about this command is unmeasured any more; it only has to be built.
   8. **The Top Secret loss report** -- **CAPTURED 2026-08-26**, see
      MEASURED.md. Still unbuilt. It is the frame five more loss endings reuse,
      and its cause line is what varies between them.
@@ -1159,6 +1160,70 @@ Four and five WERE one job and are done. The shield absorption constant is
 still open in the sense that its system term is a hypothesis that fits rather
 than a measurement; a one-enemy quadrant would settle it, and the shape is
 right either way.
+
+### Read the constants, do not sample them (2026-08-26)
+
+**The most useful thing learned this week, and it should change the plan.**
+
+RAY's odds resisted four DOSBox sessions. They took one afternoon of static
+analysis, and the answer is not an estimate with an interval on it -- it is
+Anderson's own `Random(6)` and the five `cmp ax, n` that follow it. The
+numbers are in MEASURED.md.
+
+The route was already written down here and had not been used for this:
+`tools/dis16.py` with capstone, raw file offsets, `LOAD_BASE = 1248*16`, and
+the Turbo Pascal runtime band mapped in `tp_labels.csv` so runtime calls
+resolve to names. The one technique that was missing is small and general:
+
+**Solving for a routine's segment base.** Strings are pushed as `push cs;
+push di`, so `di` is relative to whatever segment the routine lives in, and
+that is not `LOAD_BASE`. Take every `mov di, imm16` in the routine, assume
+each in turn addresses ONE string whose file offset you know, and keep the
+base under which the OTHER immediates also land on plausible length-prefixed
+strings. For RAY, nine of eleven resolved under base 24512 and the routine
+identified itself.
+
+A first attempt got this wrong in the most flattering way: I computed the
+string's offset as `file - LOAD_BASE` and then decoded it with `LOAD_BASE`,
+which of course resolved perfectly and proved nothing. **A check that uses the
+same assumption on both sides is not a check.**
+
+#### What else this should be pointed at
+
+Every remaining PROBABILITY is a constant in that binary, and sampling any of
+them costs sessions and carries a confound (black holes contaminate anything
+measured by playing). The queue:
+
+  * the find distribution -- the weakest number in `core/planet.h`
+  * the exact planet count, which is a LOOP BOUND, so no page 601 is needed
+  * the planet class distribution
+  * black hole placement and behaviour
+  * the reinforcement rate
+  * `SYSTEM_DAMAGE_THRESHOLD` and the shield law's system term
+  * and the four already queued: the enemy-count formula, `TORP_BASE`/
+    `TORP_SPREAD`, the long-range falloff slope, the score kill-rate term
+
+The emulator keeps its job: confirming that a constant read statically
+produces the behaviour seen on screen. One run to confirm beats a hundred to
+estimate.
+
+#### Two addresses the RAY routine gave away
+
+`DS:0x2560` is the galaxy array, `qy*16 + qx*2`, each word holding
+**enemies*100 + bases*10 + stars** -- the chart's three digits are one
+number. And `[0x1DE4]`/`[0x1DE6]` are the ship's quadrant, which is the
+address that disagreed with the screen in run 6 and was never resolved.
+
+The galaxy array's location is also the best lead yet on the planet array,
+which no pattern search could find.
+
+#### "The apparatus is going unstable" is a GAME MESSAGE
+
+It is RAY's fatal outcome, string 0x1266. MEASURED.md also has a section
+called "The apparatus goes unstable under long automated runs", about the
+EMULATOR. When Jamie said "apparatus went unstable" mid-run I read it as the
+rig; he may well have been reading the game's own outcome off the screen.
+Worth knowing before the phrase confuses a third session.
 
 ### Run 6 (2026-08-26): the RAY rig, finally diagnosed
 

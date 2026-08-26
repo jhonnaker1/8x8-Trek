@@ -3402,6 +3402,70 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### RAY's ODDS, read out of the binary (2026-08-26) -- EXACT
+
+Not sampled. Read from the code, so these are Anderson's own constants and
+carry no confidence interval. Four DOSBox sessions failed to estimate this;
+one disassembly settled it.
+
+The routine is at file offset 0x7375, immediately after its own strings, and
+its segment base is 24512 -- solved by taking each `mov di, imm16` in the
+routine as though it addressed "Preparing death ray..." and keeping the base
+under which the other eight also resolve. All nine do:
+
+    0x12AD  SCIENCE: Scanners show no enemy ships in this quadrant.
+    0x12E5  WEAPONS CONTROL
+    0x12F5  Captain, I wish to remind you that
+    0x1318  the death ray is experimental in
+    0x1339  nature and has been highly prone
+    0x135A  to failures. Are you sure that you
+    0x137D  wish to continue <Y/N>?
+    0x1396  Preparing death ray...
+    0x13AD  Firing!
+
+Then, at 0x750E:
+
+    mov ax, 6
+    lcall 0x2692:0x1150        ; Random(6)
+    cmp ax,0  -> call 0x7026
+    cmp ax,1  -> push 0; call 0x70c0
+    cmp ax,2  -> call 0x71f5
+    cmp ax,3  -> push 1; call 0x70c0
+              -> call 0x7247   ; ax = 4 or 5
+
+**Random(6), and SIX rolls over FOUR handlers.** Two handlers take two rolls
+each, so the outcomes are not equiprobable even though the roll is:
+
+| roll | handler | outcome                                            | odds |
+|------|---------|----------------------------------------------------|------|
+| 0    | 0x7026  | `It worked!` -- every enemy in the quadrant dies    | 1/6  |
+| 1, 3 | 0x70c0  | `Death ray misfires.` (two variants)               | 2/6  |
+| 2    | 0x71f5  | `Nothing happens...` half the crew become mutants  | 1/6  |
+| 4, 5 | 0x7247  | `The apparatus is going unstable!` -- SHIP LOST    | 2/6  |
+
+So a death ray **works one time in six and destroys the ship one time in
+three**. The note that called it "four outcomes" was counting handlers.
+
+The fatal one is certain rather than inferred: 0x7247 is the ONLY handler that
+writes the ending-code byte, `mov byte ptr [0x26c6], 9`, and the caller tests
+`cmp byte ptr [0x26c6], 0` immediately after the roll. Code 9 is the death ray
+explosion, which matches the loss report captured the same day.
+
+The two misfire variants really are different -- 0x70c0 branches on its
+argument at `cmp byte ptr [bp+4], 1` and only the arg-1 path runs a nested
+loop over a grid. What each does is NOT yet read.
+
+#### Addresses this fixed, for free
+
+  * **The galaxy array is at DS:0x2560**, indexed `qy*16 + qx*2`, and each
+    word packs **enemies*100 + bases*10 + stars** -- the chart's three digits
+    are one number, and RAY tests for enemies with `idiv 100`.
+  * **The ship's quadrant is [0x1DE4] (y) and [0x1DE6] (x)**, which is what
+    the RAY routine indexes that array with. The address used for this in
+    earlier sessions disagreed with the screen and was never resolved.
+  * **[0x26C6] is the ending code**, 9 = destroyed by death ray.
+  * **[0x1CC8] is the sound flag**, confirming what the music extraction found.
+
 ### RAY's fatal outcome, and its loss report (2026-08-26)
 
 Captured at last, on the fourth attempt at sampling RAY. The death ray failed
