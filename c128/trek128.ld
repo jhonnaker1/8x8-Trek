@@ -60,7 +60,7 @@ MEMORY {
      * the linker: it gives each overlay a distinct place in the ELF so their
      * file ranges do not collide, while their RUN addresses all coincide at
      * the window. That overlap is why the link needs --no-check-sections. */
-    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x0880, LENGTH = 0x0880
+    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x0D00, LENGTH = 0x0D00
 
     /* ONE STAGING REGION PER OVERLAY, and they must not be merged back into
      * one. A single `AT>ovlimg` shared by every overlay does NOT advance the
@@ -74,8 +74,12 @@ MEMORY {
      * the window is a link error here as well as there. Adding an overlay
      * means adding a region; `make verify` fails the build if two of them
      * ever share a load address again. */
-    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x0880
-    ovlimg1 (rw) : ORIGIN = 0x10880, LENGTH = 0x0880
+    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x0E00
+    ovlimg1 (rw) : ORIGIN = 0x10E00, LENGTH = 0x0E00
+    ovlimg2 (rw) : ORIGIN = 0x11C00, LENGTH = 0x0E00
+    ovlimg3 (rw) : ORIGIN = 0x12A00, LENGTH = 0x0E00
+    ovlimg4 (rw) : ORIGIN = 0x13800, LENGTH = 0x0E00
+    ovlimg5 (rw) : ORIGIN = 0x14600, LENGTH = 0x0E00
 
     /* SHORT OF $C000 ON PURPOSE.
      *
@@ -92,7 +96,7 @@ MEMORY {
      *
      * If that assumption ever breaks -- recursion, a function pointer table,
      * alloca -- raise this and expect to have to free space for it. */
-    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x0880
+    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x0D00
 }
 
 __rc0 = __basic_zp_start;
@@ -119,8 +123,12 @@ SECTIONS {
        ORIGIN(window) is written out rather than left implicit because a
        section with no address takes the current dot, which after c.ld is the
        end of .bss. */
-    .ovl_eval ORIGIN(window) : { *(.ovl.eval) } >window AT>ovlimg0
-    .ovl_hof  ORIGIN(window) : { *(.ovl.hof)  } >window AT>ovlimg1
+    .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
+    .ovl_hof    ORIGIN(window) : { *(.ovl.hof)    } >window AT>ovlimg1
+    .ovl_front  ORIGIN(window) : { *(.ovl.front)  } >window AT>ovlimg2
+    .ovl_info   ORIGIN(window) : { *(.ovl.info)   } >window AT>ovlimg3
+    .ovl_repair ORIGIN(window) : { *(.ovl.repair) } >window AT>ovlimg4
+    .ovl_msgs   ORIGIN(window) : { *(.ovl.msgs)   } >window AT>ovlimg5
 }
 
 /* c128/src/overlay.c takes the window's address from here rather than

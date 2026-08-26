@@ -51,7 +51,7 @@ DEBUG_OUT = build/trek128-debug.prg
 # That is the whole idea, and without this lld refuses the link.
 OBJCOPY = $(HOME)/llvm-mos/bin/llvm-objcopy
 LDFLAGS = -Wl,--no-check-sections
-OVERLAYS = eval hof
+OVERLAYS = eval hof front info repair msgs
 
 # Each overlay ships as a PRG. The two-byte header is the load address, which
 # ovl_load() discards by using secondary address 0 -- the window is where it
@@ -64,7 +64,7 @@ define OVL_IMAGE
 	$(OBJCOPY) --dump-section=.ovl_$(1)=build/ovl_$(1).raw $(2) /dev/null
 	@python3 -c "d = open('build/ovl_$(1).raw','rb').read(); \
 	    open('build/ovl$(1).prg','wb').write(bytes([0x00,0x40]) + d); \
-	    print('  overlay $(1): %d bytes, window is %d' % (len(d), 0x880))"
+	    print('  overlay $(1): %d bytes, window is %d' % (len(d), 0xD00))"
 endef
 
 .PHONY: all run rund d64 monitor test verify music loadbench clean
@@ -128,6 +128,10 @@ $(OUT): build/trek128.elf
 	    open('$(OUT)','wb').write(bytes([0x01,0x1C]) + d)"
 	$(call OVL_IMAGE,eval,build/trek128.elf)
 	$(call OVL_IMAGE,hof,build/trek128.elf)
+	$(call OVL_IMAGE,front,build/trek128.elf)
+	$(call OVL_IMAGE,info,build/trek128.elf)
+	$(call OVL_IMAGE,repair,build/trek128.elf)
+	$(call OVL_IMAGE,msgs,build/trek128.elf)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
@@ -144,6 +148,10 @@ $(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 	@# they are cut from its own ELF. A debug disk needs these, not those.
 	$(call OVL_IMAGE,eval,build/trek128-debug.elf)
 	$(call OVL_IMAGE,hof,build/trek128-debug.elf)
+	$(call OVL_IMAGE,front,build/trek128-debug.elf)
+	$(call OVL_IMAGE,info,build/trek128-debug.elf)
+	$(call OVL_IMAGE,repair,build/trek128-debug.elf)
+	$(call OVL_IMAGE,msgs,build/trek128-debug.elf)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows

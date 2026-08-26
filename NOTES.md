@@ -1000,22 +1000,39 @@ compiler folds it in. That is how `trek_score_sheet` and the whole of
 `core/hof.c` left the resident image without a single platform attribute in
 `core/`.
 
-#### What is left to move
+#### All six overlays are in (2026-08-26)
 
-The remaining candidates, measured, with the window they would need:
+    resident   33,234
+    window      3,328   (largest overlay 3,243, so 85 bytes of slack)
+    FREE        5,357   -- against 309 before any of this
 
-    ui_save_game + serialiser + ui_setup + ui_title   3,230   > window, would
-                                                              grow it to 3,328
-    ui_info_panel                                     1,245
-    ui_repair_report                                    575
-    ui_messages_view                                    545
+    ovlfront    3,243   ui_title, ui_setup, ui_save_game, the serialiser
+    ovlhof      2,084   ui_hall_of_fame and all of core/hof.c
+    ovleval     1,726   ui_evaluation and the score sheet
+    ovlinfo     1,183   ui_info_panel
+    ovlrepair     545   ui_repair_report
+    ovlmsgs       542   ui_messages_view
+                -----
+                9,323   on the disk instead of in the image
 
-Taking all four adds 5,595 of overlaid code for 1,152 more window, so about
-**4,400 further bytes**. The front end has to travel with the serialiser
-because `ui_setup`'s restore path and `ui_save_game` both reach it.
+The front end travels with the save machinery because `ui_setup`'s restore
+path and `ui_save_game` both reach `core/serial.c`; splitting them would leave
+the serialiser resident and save nothing. Neither `core/serial.c` nor
+`core/hof.c` carries a platform attribute -- each is called from exactly one
+overlay function, so the compiler folds it in and it leaves the resident image
+by itself.
 
-Worth doing in that order, largest first, and re-running the two-game swap
-test each time -- it is the one that catches a stale window.
+**Verified on the machine, eight loads and seven swaps in two games**, with
+the window compared byte for byte against the extracted image at every step:
+title and setup from OVL_FRONT, then INFO, REPAIR, MSGS, then SAVE swapping
+FRONT back in mid-game, then self-destruct into EVAL, then HOF, then PLAY
+AGAIN returning to FRONT. Every one correct, and every screen rendered.
+
+**What is still resident and could move if it is ever needed:** the modal
+command handlers inside `main`. Nothing there is written yet, so there is no
+measurement to quote -- but the seam is built and adding an overlay is now
+three lines (an id, a filename, a section in the link script) plus the
+`OVL_CODE` and the stub.
 
 ### Wanted on their own merits
 

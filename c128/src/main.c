@@ -547,6 +547,7 @@ static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
    permanently visible panels, and the command card calls it a "state of Repair
    report". Blocks on Return, then repaints the console it drew over. */
 static void do_repair(void) {
+    ovl_load(OVL_REPAIR);
     ui_repair_report();
     while (kb_waitkey() != KB_RETURN) { }
     ui_draw_all();
@@ -688,6 +689,7 @@ static void do_sound(void) {
 }
 
 static void do_info(void) {
+    ovl_load(OVL_INFO);
     ui_info_panel();
     ui_draw_all();
 }
@@ -975,8 +977,10 @@ int main(void) {
            setup screen is up. An earlier version of this let it run through
            setup, which was a guess this file admitted to at the time. */
         snd_music(MUS_TITLE);
+        ovl_load(OVL_FRONT);
         ui_title();
         snd_music(MUS_NONE);
+        ovl_load(OVL_FRONT);
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two
            sittings get the same galaxy. Before this, GAME_SEED was a constant
@@ -1008,8 +1012,8 @@ int main(void) {
                merely when a turn passes. MEASURED -- see trek.h. */
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
-            if      (word_is(cmd, "SAVE")) ui_save_game(&setup);
-            else if (word_is(cmd, "MSGS")) ui_messages_view();
+            if      (word_is(cmd, "SAVE")) { ovl_load(OVL_FRONT); ui_save_game(&setup); }
+            else if (word_is(cmd, "MSGS")) { ovl_load(OVL_MSGS); ui_messages_view(); }
             else if (word_is(cmd, "SND"))  do_sound();
             else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();

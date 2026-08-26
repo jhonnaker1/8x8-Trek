@@ -1175,6 +1175,7 @@ static void box(unsigned char bx, unsigned char by, unsigned char w,
     scr_put(right, bottom, G_BR, color);
 }
 
+OVL_CODE("repair")   /* Modal */
 void ui_repair_report(void) {
     unsigned char y, i, pct, color;
 
@@ -1288,6 +1289,7 @@ static void msgv_draw(unsigned char top) {
     }
 }
 
+OVL_CODE("msgs")   /* Modal; ui_draw_all() it calls to restore the console is resident */
 void ui_messages_view(void) {
     unsigned char total = (unsigned char)(log_count * MSGV_PER_ENTRY);
     unsigned char top;
@@ -1420,6 +1422,7 @@ static uint8_t save_read(Setup *s, const char *name) {
 
 /* SAVE. MEASURED 2026-08-24: the original opens a SAVE GAME box asking for a
    file name and offering Enter for the default, and it COSTS NO TURN. */
+OVL_CODE("front")   /* In OVL_FRONT for the serialiser, not for the front end */
 void ui_save_game(const Setup *s) {
     char name[18];
 
@@ -1462,6 +1465,7 @@ uint16_t setup_seed(uint16_t entropy, uint8_t level) {
     return v ? v : 1u;
 }
 
+OVL_CODE("front")   /* Shares OVL_FRONT with the title and the serialiser it restores through */
 void ui_setup(Setup *s) {
     char buf[8];
     unsigned char y;
@@ -1734,6 +1738,7 @@ static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
     }
 }
 
+OVL_CODE("front")   /* Runs once before the game and never again until PLAY AGAIN */
 void ui_title(void) {
     unsigned char i, x;
 
@@ -1857,6 +1862,7 @@ uint8_t ui_play_again(void) {
 #define INF_W   36
 #define INF_H   12
 
+OVL_CODE("info")   /* Modal, and gone the moment it is dismissed */
 void ui_info_panel(void) {
     unsigned char cells[QUAD_CELLS];
     unsigned char n = 0, i, sel = 0;

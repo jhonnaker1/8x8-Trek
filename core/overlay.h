@@ -49,7 +49,14 @@
    with room ignores it entirely. Ids are indices; keep them contiguous. */
 #define OVL_EVAL   0    /* ui_evaluation, and the score sheet it draws from */
 #define OVL_HOF    1    /* ui_hall_of_fame, and all of core/hof.c with it */
-#define OVL_COUNT  2
+/* The front end AND the save machinery, together and not by choice: setup's
+   restore path and SAVE both reach core/serial.c, so splitting them would
+   leave the serialiser resident and save nothing. */
+#define OVL_FRONT  2    /* ui_title, ui_setup, ui_save_game, the serialiser */
+#define OVL_INFO   3    /* ui_info_panel */
+#define OVL_REPAIR 4    /* ui_repair_report */
+#define OVL_MSGS   5    /* ui_messages_view */
+#define OVL_COUNT  6
 
 #define OVL_NONE   0xFF
 

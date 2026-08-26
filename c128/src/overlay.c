@@ -38,7 +38,11 @@ extern char __ovl_start[];
    one short name is cheaper than the id and the fetch it would take. */
 static const char *const ovl_name[OVL_COUNT] = {
     "0:OVLEVAL",
-    "0:OVLHOF"
+    "0:OVLHOF",
+    "0:OVLFRONT",
+    "0:OVLINFO",
+    "0:OVLREPAIR",
+    "0:OVLMSGS"
 };
 
 static uint8_t live = OVL_NONE;
