@@ -801,6 +801,141 @@ may go, and roughly 30-60ms to copy a window. Design it as a SEAM like
 `core/farmem.h`: C128, X16, F256 and CoCo 3 all want one, and MEGA65 and the
 Amiga implement it as a direct call.
 
+### SCOPE: the overlay seam (written 2026-08-26, NOT BUILT)
+
+Read this before starting it. The mechanism is proven, the arithmetic is
+measured, and there is one open risk that should be measured FIRST because it
+changes the design.
+
+#### What it is
+
+A fourth seam, the same shape as `core/storage.h`, `core/farmem.h` and
+`core/strpool.h`: contract beside the core, mechanism per platform, `core/`
+never calls it. Code that runs in PHASES is stored in bank 1 and copied into a
+fixed window in bank 0 when it is needed.
+
+    core/overlay.h      the contract
+    c128/src/overlay.c  copies from bank 1 through FETCH
+    MEGA65, Amiga       an empty function -- they have the room
+
+The portable call is two lines and reads the same everywhere:
+
+    ovl_load(OVL_END);      /* nothing at all on a flat target */
+    ui_evaluation();
+
+#### The mechanism, and it is PROVEN not assumed
+
+Two experiments, both run against this toolchain on 2026-08-26:
+
+**lld will place sections at the same address, with `--no-check-sections`.**
+Without it the link fails with "virtual address range overlaps"; with it, it
+links silently. Each overlay gets its own `>window AT>ovlimg` where `ovlimg`
+is a staging region that never exists on the machine -- that gives every
+overlay a DISTINCT load address, so their file ranges do not collide while
+their run addresses all coincide at the window.
+
+**The images come out with `llvm-objcopy --dump-section`.** Linking the same
+objects to an ELF and dumping `.ovl.a` and `.ovl.b` produced two files of
+exactly the section sizes in the map.
+
+The window goes at the TOP of `ram`, so the region shrinks by the window size
+and the resident links below it. `TRIM(ram)` in the existing OUTPUT_FORMAT
+then excludes the overlays from the PRG automatically -- they are in a
+different region.
+
+#### The build
+
+One link to ELF, everything else derived from it, so there is no possibility
+of two links disagreeing about layout:
+
+    1. compile + link -> trek128.elf   (--no-check-sections)
+    2. llvm-objcopy --dump-section=.ovl.N=build/OVLN.DAT   per overlay
+    3. a Python step reads the ELF's PT_LOAD segments in the `ram` range and
+       writes the PRG: SHORT($1C01) followed by the resident bytes
+    4. c1541 writes OVLN.DAT to the disk beside STRINGS.DAT
+
+Step 3 is about thirty lines and this repo already builds data with Python.
+
+#### The rules, and they are not optional
+
+  * **Every overlay function is `__attribute__((noinline, section(".ovl.N")))`.**
+    Without noinline, LTO inlines it into a resident caller and the overlay is
+    silently empty -- which is exactly what it already does: every one of these
+    functions was inlined into `main`, which is why `main` measured 14,846.
+  * **An overlay calls RESIDENT code only.** Never another overlay: the window
+    would be overwritten under it.
+  * **One entry point per overlay, reached through a resident stub** that does
+    the load and the call together. Nothing else may call in. That is what
+    makes "forgot to load it" impossible rather than merely unlikely.
+  * An overlay's statics do not survive a swap.
+
+#### The grouping, and the arithmetic
+
+Sizes are MEASURED, by forcing each function out of `main` with `noinline`.
+The call graph was checked: none of these calls another except
+`ui_evaluation -> trek_score_sheet`, and `ui_setup`'s restore path and
+`ui_save_game` both reach the serialiser -- which is what puts the front end
+and the save machinery in one overlay rather than two.
+
+    OVL_FRONT   ui_title 647 + ui_setup 749 + serialiser 1,592
+                + ui_save_game 242                              3,230
+    OVL_EVAL    ui_evaluation 1,696 + trek_score_sheet 1,270    2,966
+    OVL_HOF     ui_hall_of_fame                                 2,111
+    OVL_INFO    ui_info_panel                                   1,245
+    OVL_REPAIR  ui_repair_report                                  575
+    OVL_MSGS    ui_messages_view                                  545
+                                                       total   10,672
+
+    window = the largest = 3,230
+    freed  = 10,672 - 3,230 = 7,442, less ~250 for the loader and stubs
+           = about 7,200 bytes
+
+Against 169 free today and a remaining feature list estimated at 5,000-6,000.
+It fits, with room, and there is a second tranche available later if it is
+ever needed: the modal command handlers inside `main`.
+
+Sizing the window at exactly the largest overlay is deliberate. Growing past
+it becomes a LINK ERROR, which is the same tripwire trek128.ld already uses
+for the stack guard.
+
+#### The one open risk, and it should be measured FIRST
+
+**Startup load time.** 10,672 bytes more off an emulated 1541 at roughly a
+kilobyte a second is about ten seconds added to every launch, on top of the
+41K PRG. That is not obviously acceptable and it changes the design:
+
+  * If loading is fast enough, preload every overlay into bank 1 at startup
+    (there is room -- 15,299 bytes of 32K with the overlays added) and each
+    swap is then a bank-1 copy, about 45ms for 3,230 bytes through FETCH.
+  * If it is not, the phase overlays that run once (FRONT, EVAL, HOF) can be
+    read straight off the disk at the moment they are needed, and only the
+    mid-game ones (INFO, REPAIR, MSGS -- 2,365 bytes together) preloaded.
+
+**Measure the rate before choosing.** Time `far_load("STRINGS.DAT")` for its
+3,535 bytes with the jiffy clock and multiply. Guessing here would design the
+whole thing around a number nobody has read.
+
+#### Smaller things that will come up
+
+  * `far_read()` takes a `uint8_t` length. The overlay loader needs a chunked
+    loop; `core/farmem.h` need not change.
+  * `ovl_load` must be idempotent -- a no-op when the requested overlay is
+    already resident -- or every INFO panel costs a copy.
+  * A copy through FETCH is roughly 30 cycles a byte. A loop in common RAM
+    with the MMU mapping bank 1 in would be about three times faster. Not
+    needed at 45ms; worth knowing it exists.
+  * Debugging gets harder: a symbol in the map has the window address, and
+    which code is actually there depends on what was loaded last.
+
+#### Suggested first slice
+
+**OVL_EVAL alone**, and not because it is the biggest. It is already written,
+self-contained, runs once at the end of a game, and cannot corrupt a game in
+progress if the mechanism is wrong. Build the seam, the loader, the build
+step and one overlay; play a game to the end; confirm the evaluation screen
+still renders and the image shrank by about 2,700 bytes. Then the remaining
+five are repetition.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
