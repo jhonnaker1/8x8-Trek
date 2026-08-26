@@ -43,31 +43,26 @@
  * an option flag, and EGA Trek shows no sign of it: seven names in the whole
  * binary, a list page that fits on two lines, and a settlement that is a
  * per-planet find rather than a category of planet. */
-/* REFUTED 2026-08-26, the same evening it was written, by a photograph of the
- * original's PLANET LIST page:
+/* READ OUT OF THE BINARY 2026-08-26, fn 0x04FD1 at 0x052B3:
  *
- *     5-1N Andromeda-5     6-5M Gamma Regula-6   7-4N Gallista-7
- *     5-4N Gallista-5      6-7N Vega-6           7-8N Xevious-7
- *     5-5M Gamma Regula-5  7-2N Ceti Alpha-7     8-1M Andromeda-8
- *     5-6O Sigma-5         6-2O Ceti Alpha-6
- *     PLANET LIST 602
+ *     count = 10 + Random(10)                         ; 10..19 planets
+ *     qy,qx = Random(8)+1; retry while ARRAY[q] != 0   ; ONE PER QUADRANT
  *
- * ELEVEN PLANETS ON ONE PAGE, and that is page 602 of two -- the binary
- * carries PLANET LIST 601 as well, holding the quadrants below 5-1, since the
- * list is sorted by quadrant. So the galaxy holds at least twelve and at most
- * twenty-two, against a model that said five to ten. The ancestor's
- * uninhabited-planet count was the wrong population to derive from.
+ * Two guesses died here. The ancestor's five-to-ten was the wrong population
+ * to derive from, and a photograph of the original's PLANET LIST then pushed
+ * this port to a provisional twelve-to-twenty-two. The answer is TEN TO
+ * NINETEEN, and the photograph is consistent with it -- eleven planets on
+ * page 602 with the rest on 601.
  *
- * PROVISIONAL and deliberately generous: twelve to twenty-two spans what the
- * evidence allows, and PLANET_MAX covers the top of it. Page 601 has not been
- * captured -- the viewer cycles its pages on its own and 601 did not come
- * round -- and one photograph of it would settle the count exactly. That is
- * on the open list in NOTES.md.
- *
- * Cost of being generous: six bytes of RAM and six of save file per slot. */
-#define PLANET_MIN       12
-#define PLANET_SPREAD    11      /* trek_rand_n(11) gives 0..10, so 12..22 */
-#define PLANET_MAX       22
+ * And planets are ONE PER QUADRANT: the generator retries the roll while the
+ * quadrant is occupied. This port modelled a LIST because a 2026-08-21 note
+ * transcribed the PLANET LIST page as three columns and showed quadrant 6-4
+ * twice; the photograph shows one column and every quadrant distinct. The
+ * list survives here only because it also carries the sector and the scan
+ * flags, which the original keeps elsewhere. */
+#define PLANET_MIN       10
+#define PLANET_SPREAD    10      /* trek_rand_n(10) gives 0..9, so 10..19 */
+#define PLANET_MAX       19
 
 #define PLANET_NONE    0xFF      /* "no planet" / "not orbiting one" */
 
@@ -111,19 +106,14 @@ extern const char *const planet_name[PLANET_NAMES];
 /* Planet class, the Star Trek convention, printed as a letter with no space
  * between the quadrant and the name: "6-4M Gallista-6".
  *
- * MEASURED: M, N and O all appear in the lists we have. DERIVED for the
- * distribution -- the ancestor rolls `Rand()*3.0`, a flat third each.
+ * CONFIRMED from the binary: `Random(3) + 1`, a flat third, and the ORBIT
+ * routine maps 1 to "M.", 2 to "N.", 3 to "O." The eleven-planet photograph
+ * that read six N to three M and two O was noise, as eleven samples of a flat
+ * third can be. Kept flat, and now for a reason.
  *
- * CONTESTED 2026-08-26: the eleven planets of PLANET LIST 602 read six N,
- * three M and two O. A flat third would expect 3.7 each, and six N against
- * that is not damning on eleven samples -- but it leans, and it leans the way
- * a weighted roll would. Page 601 doubles the sample for free once captured.
- * Left flat until then rather than fitted to eleven planets.
- *
- * The class is DISPLAY ONLY here. Whether EGA Trek gives it a mechanical
- * meaning is UNMEASURED: the one class-O planet we watched had energium on
- * it, which is one sample of a correlation that may not exist. If it turns
- * out class gates the find, this is where that would go. */
+ * THE CLASS IS NOT DISPLAY ONLY -- see PFIND_* below. It decides how likely
+ * the planet is to be worth landing on, and this port had a note here saying
+ * that was unmeasured. It is measured now. */
 #define PCLASS_M          0
 #define PCLASS_N          1
 #define PCLASS_O          2
@@ -148,27 +138,46 @@ extern const char planet_class_letter[PCLASS_COUNT];
 #define PFIND_ENERGIUM    2
 #define PFIND_NOTHING     3
 
-/* Energium on ONE PLANET IN THREE, DERIVED from the ancestor: its setup rolls
- * `crystals = Rand()*1.5`, which floors to present exactly a third of the
- * time, and its own comment says so. The other three finds split the
- * remaining two thirds, and THAT SPLIT IS PROVISIONAL -- invented to give
- * each of the binary's four SCIENCE lines something to print. Nine outcomes
- * so the measured third stays exact:
+/* READ OUT OF THE BINARY 2026-08-26, and it replaced an invented split.
  *
- *     0,1,2  energium     DERIVED, one in three
- *     3,4    settlers     PROVISIONAL
- *     5      Mongol       PROVISIONAL -- the rarest, since it is the one
- *                         that costs a landing party
- *     6,7,8  nothing      PROVISIONAL
+ * The original keeps ONE BYTE per quadrant at DS:0x24A9 holding
+ * **find * 10 + class**, and ORBIT decodes it by dividing by ten:
  *
- * A single PLANET LIST page cannot settle this; the finds are not on it. What
- * would is one survey orbiting every planet in a galaxy and reading the four
- * SCIENCE lines off, which is a cheap DOSBox session and is now on the list
- * in NOTES.md. */
-#define PFIND_ROLL_OF_N   9
-#define PFIND_ENERGIUM_TO 2      /* rolls 0..2 */
-#define PFIND_SETTLERS_TO 4      /* rolls 3..4 */
-#define PFIND_MONGOL_TO   5      /* roll  5    */
+ *     > 20   Mongol supply station
+ *     > 10   energium
+ *     else   nothing of interest
+ *
+ * Generation, at 0x0531A:
+ *
+ *     if (class <= Random(5))      byte += 10     ; energium
+ *     else if (Random(2) == 0)     byte += 20     ; Mongol supply station
+ *
+ * **THE FIND DEPENDS ON THE CLASS**, with class as 1=M, 2=N, 3=O:
+ *
+ *     class M   energium 4/5   Mongol 1/10   nothing 1/10
+ *     class N   energium 3/5   Mongol 2/10   nothing 2/10
+ *     class O   energium 2/5   Mongol 3/10   nothing 3/10
+ *
+ * so a class-M world is worth landing on four times in five and a class-O
+ * world two times in five. Overall, with class flat: energium 60%, Mongol
+ * 20%, nothing 20%. This port shipped energium at one in three, derived from
+ * the ancestor, with the rest invented -- wrong twice over, and it had no
+ * class dependence at all.
+ *
+ * SETTLERS ARE NOT IN THIS BYTE. The original plainly has settled planets --
+ * ORBIT prints "Scanners show a [destroyed ]settlement on the planet." and
+ * LAND prints "Planet settlers found... / Evacuating settlers..." -- but that
+ * comes from a second structure this pass did not locate, and only three
+ * values fit one decimal digit here. So PFIND_SETTLERS stays, at a frequency
+ * that is THIS PORT'S INVENTION and nothing else, because dropping it would
+ * make the rescue scoring line unreachable again a day after it went live.
+ * Finding that second array is the next job on this routine. */
+#define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */
+#define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */
+/* PROVISIONAL, invented, and the only invented number left in this file:
+   how often a planet is settled. One in eight, rolled before the measured
+   rule so it does not disturb the measured proportions among the rest. */
+#define PFIND_SETTLERS_OF_N   8
 
 #define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */
 #define PF_TAKEN       0x02      /* the find has been collected or evacuated */

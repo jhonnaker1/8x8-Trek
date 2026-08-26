@@ -22,6 +22,24 @@ static void ok(int cond, const char *what) {
 
 /* ---------------------------------------------------------------------- */
 
+
+/* Empty the quadrant of everything except the ship.
+
+   Movement and enemy-motion tests are about the ENGINE, not about what the
+   galaxy happened to roll into the way. Planets went from five-to-ten spread
+   over a list to ten-to-nineteen one per quadrant on 2026-08-26, and six
+   tests that had passed for months started failing because a planet now sat
+   on a path -- for a reason none of them is about. Same lesson as the torpedo
+   test that asserted a miss at sector 7,7. */
+static void clear_quadrant(void) {
+    uint8_t i;
+    for (i = 0; i < QUAD_CELLS; i++) {
+        if (sector[i] == SEC_SHIP) continue;
+        sector[i]   = SEC_EMPTY;
+        enemy_hp[i] = 0;
+    }
+}
+
 static void test_distance(void) {
     puts("distance table");
 
@@ -275,6 +293,7 @@ static void test_warp(void) {
     puts("warp movement");
 
     trek_new_game(3, 5150);
+    clear_quadrant();
     ok(trek_set_warp(5) == 0,   "warp 0.5 rejected (below minimum)");
     ok(trek_set_warp(90) == 0,  "warp 9.0 rejected (above maximum)");
     ok(trek_set_warp(50) == 1,  "warp 5.0 accepted");
@@ -834,6 +853,10 @@ static void test_shields(void) {
         trek_new_game(3, 31337);
         ship.sec_y = 6; ship.sec_x = 6;
         ship.shields_up = 1;
+        /* The Commander must have a clear run at us: this asserts that it
+           closes EVERY turn, and a planet standing in its way makes it hold
+           for a reason the test is not about. */
+        clear_quadrant();
         sector[mid] = SEC_COMMAND; enemy_hp[mid] = HP_COMMAND;
         last = 0xFFFF;
         for (steps = 0; steps < 12; steps++) {
@@ -2218,6 +2241,7 @@ static void one_planet(uint8_t find, uint8_t dy, uint8_t dx) {
 static void test_planet_generation(void) {
     uint16_t seed, energium = 0, total = 0, doubled_up = 0;
     uint8_t  lo = 255, hi = 0, i, j, bad_name = 0, bad_class = 0;
+    uint16_t en_cls[3] = {0,0,0}, en_hit[3] = {0,0,0};
 
     puts("planet generation");
 
@@ -2229,6 +2253,8 @@ static void test_planet_generation(void) {
         for (i = 0; i < planet_count; i++) {
             total++;
             if (planets[i].find == PFIND_ENERGIUM) energium++;
+            en_cls[planets[i].cls]++;
+            if (planets[i].find == PFIND_ENERGIUM) en_hit[planets[i].cls]++;
             if (planets[i].name >= PLANET_NAMES)  bad_name++;
             if (planets[i].cls  >= PCLASS_COUNT)  bad_class++;
             for (j = (uint8_t)(i + 1); j < planet_count; j++)
@@ -2240,23 +2266,27 @@ static void test_planet_generation(void) {
        held five. Both ends have to be reachable or the model is not this one. */
     ok(lo == PLANET_MIN, "the smallest galaxy holds PLANET_MIN planets");
     ok(hi == PLANET_MIN + PLANET_SPREAD - 1,
-       "and the largest holds PLANET_MIN+SPREAD-1");
+       "and the largest holds nineteen");
 
     ok(bad_name == 0,  "every planet's name is in the table");
     ok(bad_class == 0, "every planet's class is M, N or O");
 
-    /* One in three, and this is the only DERIVED probability in the file that
-       is worth asserting -- the ancestor's own comment says one in three, so a
-       drift here means the roll was rewritten, not that a constant moved. */
-    printf("  energium on %u of %u planets (%u%%), want 33\n",
-           energium, total, (unsigned)(100u * energium / total));
-    ok(energium * 100u / total >= 30 && energium * 100u / total <= 36,
-       "energium falls on one planet in three");
+    /* THE FIND DEPENDS ON THE CLASS, and that is the assertion worth making
+       -- a flat distribution passes an aggregate test and would be wrong.
+       Class M should carry energium four times in five and class O twice. */
+    printf("  energium by class M/N/O: %u%% %u%% %u%%  (want 80/60/40)\n",
+           (unsigned)(en_cls[0] ? 100u * en_hit[0] / en_cls[0] : 0),
+           (unsigned)(en_cls[1] ? 100u * en_hit[1] / en_cls[1] : 0),
+           (unsigned)(en_cls[2] ? 100u * en_hit[2] / en_cls[2] : 0));
+    ok(100u * en_hit[0] / en_cls[0] > 100u * en_hit[1] / en_cls[1] &&
+       100u * en_hit[1] / en_cls[1] > 100u * en_hit[2] / en_cls[2],
+       "energium is likelier on M than N, and on N than O");
+    ok(100u * en_hit[0] / en_cls[0] >= 66 && 100u * en_hit[0] / en_cls[0] <= 76,
+       "class M carries energium about four times in five");
 
-    /* MEASURED: quadrant 6-4 held two of them. A generator that refused
-       collisions would pass every other test in this file and silently
-       contradict the only PLANET LIST page we have. */
-    ok(doubled_up > 0, "two planets can share a quadrant, as 6-4 did");
+    /* MEASURED: the generator retries an occupied quadrant, so two planets
+       never share one. This port allowed collisions until 2026-08-26. */
+    ok(doubled_up == 0, "no two planets share a quadrant");
 }
 
 static void test_orbit(void) {

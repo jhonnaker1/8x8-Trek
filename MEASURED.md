@@ -3402,6 +3402,55 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### THE PLANET MODEL, read out of the binary (2026-08-26) -- EXACT
+
+`fn 0x04FD1` at 0x052B3, decoded from raw bytes:
+
+    count = 10 + Random(10)                         ; 10..19 planets
+    qy,qx = Random(8)+1;  retry while ARRAY[q] != 0 ; ONE PER QUADRANT
+    ARRAY[q] = Random(3) + 1                        ; class: 1=M 2=N 3=O
+    if (class <= Random(5))   ARRAY[q] += 10        ; energium
+    else if (Random(2) == 0)  ARRAY[q] += 20        ; Mongol supply station
+
+The store is **one byte per quadrant at DS:0x24A9 holding `find*10 + class`**,
+and ORBIT decodes it by dividing by ten -- `cmp byte [q], 20 / jbe` then
+`cmp byte [q], 10 / jbe`, mapping to the Mongol, energium and nothing scan
+lines, with the remainder printed as "M." / "N." / "O."
+
+**THE FIND DEPENDS ON THE CLASS**, which this port's notes had recorded as
+unmeasured:
+
+    class M   energium 4/5   Mongol 1/10   nothing 1/10
+    class N   energium 3/5   Mongol 2/10   nothing 2/10
+    class O   energium 2/5   Mongol 3/10   nothing 3/10
+
+A class-M world is worth landing on four times in five; a class-O world twice
+in five. Overall, class being flat: energium 60%, Mongol 20%, nothing 20% --
+against this port's shipped one-in-three for energium and an invented split
+for the rest.
+
+Three other things fall out:
+
+  * **Ten to nineteen planets.** The ancestor's five-to-ten was the wrong
+    population; the provisional twelve-to-twenty-two taken from the PLANET
+    LIST photograph was close and is now exact. Eleven on page 602 with the
+    rest on 601 is consistent.
+  * **One planet per quadrant.** The generator retries an occupied quadrant.
+    The port modelled a LIST because a 2026-08-21 note transcribed the page as
+    three columns showing 6-4 twice; the photograph shows one column and all
+    quadrants distinct.
+  * **The class is flat**, `Random(3)+1`. The photograph's six N to three M
+    and two O was noise, as eleven samples can be.
+
+**SETTLERS ARE NOT IN THIS BYTE.** Only three values fit one decimal digit,
+and the original plainly has settled planets -- ORBIT prints "[destroyed
+]settlement on the planet" and LAND prints "Planet settlers found...". That
+comes from a second structure this pass did not locate, and finding it is the
+next job on this routine.
+
+The generator also REMEMBERS the last energium planet's quadrant in
+[0x1E1C]/[0x1E1E], which is unexplained and probably feeds an event.
+
 ### The landing party's casualties, read out of the binary (2026-08-26)
 
 `fn 0x0E3A1`, decoded from raw bytes at 0x0E435:

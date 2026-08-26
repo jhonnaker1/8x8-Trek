@@ -23,7 +23,7 @@ const char *const item_name[ITEM_COUNT] = {
 /* -------------------------------------------------------------- new game */
 
 void planet_new(void) {
-    uint8_t i, roll;
+    uint8_t i;
 
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = 0;
     ship.orbiting = PLANET_NONE;
@@ -32,21 +32,35 @@ void planet_new(void) {
     planet_count = (uint8_t)(PLANET_MIN + trek_rand_n(PLANET_SPREAD));
 
     for (i = 0; i < planet_count; i++) {
-        /* No uniqueness test on the quadrant, deliberately: the measured
-           PLANET LIST had two planets in 6-4, so collisions are the original's
-           behaviour rather than a bug to design out. Nor on the name -- the
-           same list carried Gallista twice. */
-        planets[i].quad  = trek_rand_n(GAL_CELLS);
+        uint8_t q, dup, j, cls1;
+
+        /* ONE PLANET PER QUADRANT. The generator retries the roll while the
+           quadrant is occupied, which this port did NOT do -- it allowed
+           collisions on the strength of a note that transcribed the PLANET
+           LIST page as showing quadrant 6-4 twice. It does not. */
+        for (dup = 1; dup;) {
+            q = trek_rand_n(GAL_CELLS);
+            dup = 0;
+            for (j = 0; j < i; j++)
+                if (planets[j].quad == q) { dup = 1; break; }
+        }
+        planets[i].quad  = q;
         planets[i].sec   = 0;
         planets[i].name  = trek_rand_n(PLANET_NAMES);
         planets[i].cls   = trek_rand_n(PCLASS_COUNT);
         planets[i].flags = 0;
 
-        roll = trek_rand_n(PFIND_ROLL_OF_N);
-        if      (roll <= PFIND_ENERGIUM_TO) planets[i].find = PFIND_ENERGIUM;
-        else if (roll <= PFIND_SETTLERS_TO) planets[i].find = PFIND_SETTLERS;
-        else if (roll <= PFIND_MONGOL_TO)   planets[i].find = PFIND_MONGOL;
-        else                                planets[i].find = PFIND_NOTHING;
+        /* THE FIND DEPENDS ON THE CLASS -- see planet.h. `cls1` is the
+           original's 1-based class, which is what its comparison uses. */
+        cls1 = (uint8_t)(planets[i].cls + 1);
+        if (trek_rand_n(PFIND_SETTLERS_OF_N) == 0)
+            planets[i].find = PFIND_SETTLERS;      /* invented; see planet.h */
+        else if (cls1 <= trek_rand_n(PFIND_ENERGIUM_OF_N))
+            planets[i].find = PFIND_ENERGIUM;
+        else if (trek_rand_n(PFIND_MONGOL_OF_N) == 0)
+            planets[i].find = PFIND_MONGOL;
+        else
+            planets[i].find = PFIND_NOTHING;
     }
     for (; i < PLANET_MAX; i++) {
         /* Slots past the count are cleared rather than left as whatever the
