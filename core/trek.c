@@ -419,7 +419,7 @@ uint8_t trek_docked_safe(void) {
 
 /* take_damage lives with the combat code further down; events need it for the
    death pod, which damages the ship exactly as enemy fire does. */
-static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max);
+/* Now public as trek_take_hit -- see trek.h. */
 
 /* A base to put under attack, or GAL_CELLS if the galaxy has none left. Walks
    from a random start so the choice is uniform without needing a count first. */
@@ -604,7 +604,7 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                         ev[*n].amount = hit;
                         (*n)++;
                     }
-                    take_damage(hit, ev, n, max);
+                    trek_take_hit(hit, ev, n, max);
                 }
                 trek_schedule(SCHED_DEATH_POD, trek_expran(500));
                 break;
@@ -1246,16 +1246,54 @@ static uint16_t enemy_fire_energy(uint16_t hp) {
 /* Damage lands on the shields first and on the main banks once those are
    gone. MEASURED: with shields up and sufficient, the printed figure comes
    out of the shield pool entirely and main energy is untouched. */
-static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
-    uint16_t through;
+/* Wrecks one system, and reports it. MEASURED severity: the resulting
+   percentage was ZERO eight times in eleven, and the four survivors read 5%,
+   22%, 38% and 42%. This port used to take 20 to 59 points off a system,
+   which is a modest bite where the original usually annihilates. */
+static void wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max) {
+    ship.sys[which] = (trek_rand_n(SYS_WRECK_OF_N) < SYS_WRECK_IN_N)
+        ? 0
+        : (uint8_t)(SYS_RESIDUAL_MIN + trek_rand_n(SYS_RESIDUAL_SPAN));
 
-    if (amount <= ship.shields) {
-        ship.shields = (uint16_t)(ship.shields - amount);
-        return;
+    ship.casualties = (uint16_t)(ship.casualties + trek_rand_n(10));
+    if (*n < max) {
+        ev[*n].kind   = EV_SYSTEM_HIT;
+        ev[*n].y      = which;
+        ev[*n].amount = ship.sys[which];
+        (*n)++;
+    }
+}
+
+void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t absorbed = 0, through;
+
+    /* SHIELDS ARE A PROPORTIONAL ABSORBER -- see the law and its evidence in
+       trek.h. Three things changed here at once, and this port had all three
+       wrong: the pool used to be drained whether the shields were UP or DOWN;
+       it used to subtract rather than absorb a share; and the shield system's
+       own state did not enter into it at all. */
+    if (ship.shields_up && ship.shields) {
+        /* SHIELD_MAX is 2500, so the charge as a percentage is a divide by
+           25 and needs no wider arithmetic. scale_pct rounds to nearest and
+           is exact at 100, which is what makes full shields with an
+           undamaged system absorb the hit WHOLE, as measured. */
+        uint8_t charge_pct = (uint8_t)(ship.shields / (SHIELD_MAX / 100));
+        absorbed = scale_pct(scale_pct(amount, charge_pct),
+                             ship.sys[SYS_SHIELDS]);
+        if (absorbed > ship.shields) absorbed = ship.shields;
+        ship.shields = (uint16_t)(ship.shields - absorbed);
     }
 
-    through = (uint16_t)(amount - ship.shields);
-    ship.shields = 0;
+    through = (uint16_t)(amount - absorbed);
+
+    /* MEASURED: the shield SYSTEM takes damage when the POOL absorbs a big
+       hit, and it does NOT need anything to get through -- one turn damaged
+       it with nothing reaching energy at all. That is why this sits here,
+       above the penetration test, rather than inside it. */
+    if (absorbed >= SHIELD_SYS_HIT_MIN)
+        wreck_system(SYS_SHIELDS, ev, n, max);
+
+    if (!through) return;
 
     if (through >= ship.energy) {
         ship.energy = 0;
@@ -1269,19 +1307,22 @@ static void take_damage(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max)
     }
     ship.energy = (uint16_t)(ship.energy - through);
 
-    /* PROVISIONAL: a hit heavy enough to get through can wreck something.
-       The original does this -- one ambush took out three systems at once --
-       but neither the chance nor the severity is measured. */
-    if (through >= SYSTEM_DAMAGE_THRESHOLD) {
-        uint8_t which = trek_rand_n(SYS_COUNT);
-        uint8_t hurt  = (uint8_t)(20 + trek_rand_n(40));
-        ship.sys[which] = (uint8_t)(ship.sys[which] > hurt ? ship.sys[which] - hurt : 0);
-        ship.casualties = (uint16_t)(ship.casualties + trek_rand_n(10));
-        if (*n < max) {
-            ev[*n].kind = EV_SYSTEM_HIT;
-            ev[*n].y = which;
-            ev[*n].amount = ship.sys[which];
-            (*n)++;
+    /* MEASURED: a penetrating hit wrecks something about three times in five,
+       and TWO systems can go in one turn. The threshold itself is still not
+       pinned -- no system was ever damaged while the shields took the whole
+       hit, and they died on roughly three hits in five once a few hundred
+       units were reaching energy. */
+    if (through >= SYSTEM_DAMAGE_THRESHOLD &&
+        trek_rand_n(SYS_DAMAGE_OF_N) < SYS_DAMAGE_IN_N) {
+        uint8_t first = trek_rand_n(SYS_COUNT);
+        wreck_system(first, ev, n, max);
+
+        if (trek_rand_n(SYS_SECOND_OF_N) < SYS_SECOND_IN_N) {
+            uint8_t second = trek_rand_n(SYS_COUNT);
+            /* Never the same one twice in a turn: the original's pairs were
+               two DIFFERENT systems, and re-wrecking one already at 0 would
+               print a second message saying nothing happened. */
+            if (second != first) wreck_system(second, ev, n, max);
         }
     }
 }
@@ -1444,7 +1485,7 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
         ev[n].amount = dmg;
         n++;
 
-        take_damage(dmg, ev, &n, max);
+        trek_take_hit(dmg, ev, &n, max);
     }
     return n;
 }

@@ -1258,11 +1258,27 @@ static void test_enemy_turn(void) {
     sector[(2 << 3) | 4] = SEC_BATTLESHIP;
     enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
 
+    /* SHIELDS UP FIRST. A new game starts with them DOWN, and MEASURED
+       2026-08-24 that means the pool is not touched at all and the whole hit
+       reaches main energy -- which is what these two used to assert the
+       opposite of, because take_damage() drained the pool either way. */
     before = ship.shields;
     n = fire_turn(ev, 16);
     ok(n >= 1, "an enemy in the quadrant fires");
-    ok(ship.shields < before, "shields absorb it");
-    ok(ship.energy == ENERGY_START, "main energy is untouched while shields hold");
+    ok(ship.shields == before, "shields DOWN: the pool is not touched");
+    ok(ship.energy < ENERGY_START, "and the whole hit reaches main energy");
+
+    trek_new_game(3, 31337);
+    ship.sec_y = 4; ship.sec_x = 4;
+    sector[(2 << 3) | 4] = SEC_BATTLESHIP;
+    enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+    ship.shields_up = 1;
+    before = ship.shields;
+    n = fire_turn(ev, 16);
+    ok(n >= 1, "an enemy fires again");
+    ok(ship.shields < before, "shields UP and full: the pool absorbs it");
+    ok(ship.energy == ENERGY_START,
+       "and main energy is untouched -- full shields absorb the hit WHOLE");
 
     /* MEASURED on the original: a ship at 41 of 355 hit points hit for 16
        where undamaged companions hit for 27 and 48.
@@ -1330,9 +1346,16 @@ static void test_enemy_turn(void) {
         wall_in(2, 4);
         sector[(2 << 3) | 4]   = SEC_BATTLESHIP;
         enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+        ship.shields_up = 1;
         for (i = 0; i < 200; i++) {
             uint8_t n2;
-            ship.shields = 30000;      /* keep the ship alive for the count */
+            /* Keep the ship alive for the count. Topping the POOL up is no
+               longer enough on its own: the shields absorb a share now rather
+               than the whole hit, so energy drains too and the ship would die
+               part way through and stop being shot at. */
+            ship.shields = SHIELD_MAX;
+            ship.energy  = ENERGY_MAX;
+            ship.sys[SYS_SHIELDS] = 100;
             n2 = trek_enemy_turn(ev, 16, 1);
             /* Scan only this turn's events. Passing the array size instead
                would re-read last turn's shot out of the untouched tail. */
@@ -1979,6 +2002,140 @@ static void test_warp_timing(void) {
  * core is 0-based, so 1,8,1,8 is quad (0,7) sector (0,7).
  *
  * The offsets arrive in SECTORS: 1.0 is +8, -2.2 is -(2*8+2) = -18. */
+/* THE SHIELD LAW, and the system damage that comes with it.
+ *
+ * All MEASURED 2026-08-24 (run 3) -- see the block above SHIELD_SYS_HIT_MIN
+ * in trek.h. take_damage() is reached through the enemy turn, so these drive
+ * it directly through the same path the events use.
+ */
+static void test_shield_absorption(void) {
+    TrekEvent ev[16];
+    uint8_t n;
+
+    puts("shields absorb a share (MEASURED)");
+
+    /* Shields DOWN: the pool is untouched and the whole hit reaches energy.
+       This port used to drain the pool whether they were up or down. */
+    trek_new_game(3, 900);
+    ship.shields_up = 0;
+    ship.shields = SHIELD_MAX;
+    ship.energy  = ENERGY_MAX;
+    n = 0; trek_take_hit(400, ev, &n, 16);
+    ok(ship.shields == SHIELD_MAX,          "down: the pool is not touched");
+    ok(ship.energy == ENERGY_MAX - 400,     "down: the whole hit reaches energy");
+
+    /* Shields UP and FULL with an undamaged shield system: absorbed WHOLE,
+       energy untouched. Six hits of 385 to 518 did exactly this. */
+    trek_new_game(3, 901);
+    ship.shields_up = 1;
+    ship.shields = SHIELD_MAX;
+    ship.energy  = ENERGY_MAX;
+    ship.sys[SYS_SHIELDS] = 100;
+    n = 0; trek_take_hit(409, ev, &n, 16);
+    ok(ship.shields == SHIELD_MAX - 409,    "up and full: the pool takes it all");
+    ok(ship.energy == ENERGY_MAX,           "up and full: energy is untouched");
+
+    /* Shields UP but nearly flat: a small PROPORTIONAL share, the rest
+       through. At 200 of 2500 the charge term is 8%, and the original's five
+       hits sat at 6.5% -- which the shield system term accounts for. The
+       assertion is the SHAPE: a small share absorbed, most of it through, and
+       the absorbed amount scaling with the hit rather than being fixed. */
+    {
+        uint16_t a1, a2;
+        trek_new_game(3, 902);
+        ship.shields_up = 1;
+        ship.sys[SYS_SHIELDS] = 100;
+
+        ship.shields = 200; ship.energy = ENERGY_MAX;
+        n = 0; trek_take_hit(500, ev, &n, 16);
+        a1 = (uint16_t)(200 - ship.shields);
+
+        ship.shields = 200; ship.energy = ENERGY_MAX;
+        n = 0; trek_take_hit(1000, ev, &n, 16);
+        a2 = (uint16_t)(200 - ship.shields);
+
+        ok(a1 > 0 && a1 < 100, "flat: a small share of a 500 hit is absorbed");
+        ok(a2 > a1, "flat: absorbed scales with the hit, it is not a fixed bite");
+        ok(a2 >= (uint16_t)(2 * a1 - 2) && a2 <= (uint16_t)(2 * a1 + 2),
+           "flat: and scales LINEARLY -- double the hit, double the absorbed");
+    }
+
+    /* The shield SYSTEM degrades the absorption, which is what makes the two
+       clean readings agree. Half a shield system absorbs half as much. */
+    {
+        uint16_t full, half;
+        trek_new_game(3, 903);
+        ship.shields_up = 1;
+        ship.shields = SHIELD_MAX / 2; ship.energy = ENERGY_MAX;
+        ship.sys[SYS_SHIELDS] = 100;
+        n = 0; trek_take_hit(400, ev, &n, 16);
+        full = (uint16_t)(SHIELD_MAX / 2 - ship.shields);
+
+        ship.shields = SHIELD_MAX / 2; ship.energy = ENERGY_MAX;
+        ship.sys[SYS_SHIELDS] = 50;
+        n = 0; trek_take_hit(400, ev, &n, 16);
+        half = (uint16_t)(SHIELD_MAX / 2 - ship.shields);
+
+        ok(half * 2 >= full - 2 && half * 2 <= full + 2,
+           "a shield system at 50% absorbs half as much");
+    }
+
+    /* The pool can never go negative, and never absorbs more than it holds. */
+    trek_new_game(3, 904);
+    ship.shields_up = 1;
+    ship.shields = 50; ship.energy = ENERGY_MAX;
+    ship.sys[SYS_SHIELDS] = 100;
+    n = 0; trek_take_hit(5000, ev, &n, 16);
+    ok(ship.shields == 0, "a hit bigger than the pool empties it");
+    ok(ship.energy < ENERGY_MAX, "and the rest gets through");
+}
+
+/* MEASURED: a penetrating hit usually ANNIHILATES a system rather than
+   denting it -- zero eight times in eleven -- and two can go in one turn.
+   Statistical, so these run the turn many times and check the shape. */
+static void test_system_damage_severity(void) {
+    TrekEvent ev[16];
+    uint8_t n, i, j;
+    int wrecked = 0, dented = 0, turns_with_two = 0, turns_damaged = 0;
+
+    puts("a system hit is usually annihilation (MEASURED)");
+
+    /* ONE game and one RNG stream, sampled 400 times. An earlier version
+       called trek_new_game() inside the loop with sequential seeds and read
+       the first few draws of each -- which correlates, and read a wreck share
+       of 0.646 against the 0.727 the generator actually produces. The
+       generator was checked and is uniform to within a rounding error for
+       every n from 2 to 12; the test was what was biased. */
+    trek_new_game(3, 4242);
+    ship.shields_up = 0;              /* let it all through */
+    for (i = 0; i < 200; i++) {
+        uint8_t hits = 0;
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX;
+        ship.lost = 0;
+        n = 0;
+        trek_take_hit(600, ev, &n, 16);
+        for (j = 0; j < n; j++)
+            if (ev[j].kind == EV_SYSTEM_HIT) {
+                hits++;
+                if (ev[j].amount == 0) wrecked++; else dented++;
+            }
+        if (hits) turns_damaged++;
+        if (hits >= 2) turns_with_two++;
+    }
+
+    /* Roughly three turns in five do any damage at all. */
+    ok(turns_damaged > 200 * 2 / 5 && turns_damaged < 200 * 4 / 5,
+       "a penetrating hit damages something about three times in five");
+    /* And when it does it is usually a wreck: MEASURED 8 of 11, which is
+       0.727, so the assertion is a clear majority rather than that figure to
+       the decimal -- eleven observations do not pin it that finely. */
+    ok(wrecked * 3 > dented * 5,
+       "the result is 0% far more often than not (measured 8 in 11)");
+    ok(turns_with_two > 0 && turns_with_two < turns_damaged / 2,
+       "two systems go in one turn sometimes, and not usually");
+}
+
 static void test_manual_movement(void) {
     printf("manual movement (DeltaX/DeltaY)\n");
 
@@ -2056,6 +2213,8 @@ int main(void) {
     test_game_state_and_score();
     test_star_and_focus();
     test_damage_effects();
+    test_shield_absorption();
+    test_system_damage_severity();
     test_blocked_movement();
     test_warp_timing();
     test_manual_movement();

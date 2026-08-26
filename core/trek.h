@@ -649,6 +649,68 @@ uint8_t trek_shields_down(void);
  * subtracts. The law is unresolved; see MEASURED.md, "Run 3". */
 #define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */
 
+/* ------------------------------------------- shields, and what a hit does
+ *
+ * MEASURED 2026-08-24 (run 3), and it replaced `through = amount - shields`
+ * outright. THE SHIELDS ARE A PROPORTIONAL ABSORBER, NOT A BUCKET. Three
+ * behaviours, each seen repeatedly:
+ *
+ *   shields DOWN         the pool is untouched and the whole hit reaches
+ *                        main energy. Five hits, pool unchanged every time.
+ *   shields UP and FULL  the hit comes out of the POOL, energy untouched, and
+ *                        no system is damaged. Six hits of 385 to 518.
+ *   shields UP and FLAT  (200 of 2500) a small, TIGHTLY CONSTANT share is
+ *                        absorbed and the rest reaches energy. Five hits gave
+ *                        0.0650, 0.0651, 0.0651, 0.0650, 0.0651 -- a formula,
+ *                        not a roll.
+ *
+ * THE LAW, and it is a hypothesis that fits rather than a measurement:
+ *
+ *     absorbed = hit * (charge / SHIELD_MAX) * (shield system % / 100)
+ *
+ * The charge term is the obvious one. The SYSTEM term is what makes the two
+ * clean readings agree: full charge with an undamaged system absorbs the
+ * whole hit, which is exactly what was seen, and 0.065 at a charge of 200
+ * needs the shield system to have been at about 81% -- plausible for a ship
+ * that had been under fire, and not verified.
+ *
+ * It also explains why the mid-range sweep could not be fitted. Those turns
+ * had TWO enemies firing, and MEASURED.md names the confound: the first hit
+ * damages the shield SYSTEM before the second arrives, so every reading comes
+ * out low. They do: 0.327, 0.466 and 0.647 against 0.40, 0.60 and 0.80 from
+ * the charge term alone. The law needs a one-enemy quadrant to settle.
+ *
+ * A damaged system working worse is also how every other system in this port
+ * behaves, so this is the house rule rather than a special case. */
+
+/* MEASURED: the shield SYSTEM takes damage when the POOL absorbs a big hit,
+   which is a mechanic separate from the pool draining and one this port had
+   no part of. 795 absorbed took it to 71%; 385 to 518 absorbed left it alone.
+   PROVISIONAL: the threshold is somewhere in 519..795 and 600 is the middle
+   of that bracket, not a reading. */
+#define SHIELD_SYS_HIT_MIN       600
+
+/* MEASURED: a hit that gets through does NOT always wreck something --
+   "systems were damaged on roughly three hits in five once a few hundred
+   units were reaching energy". */
+#define SYS_DAMAGE_IN_N          3
+#define SYS_DAMAGE_OF_N          5
+
+/* MEASURED, and this is the half this port had most wrong. Eleven system hits
+   were observed and the resulting percentage was ZERO eight times. The four
+   that survived read 5%, 22%, 38% and 42%. `trek.c` used to take 20 to 59
+   points off, which is a modest bite where the original usually annihilates. */
+#define SYS_WRECK_IN_N           8
+#define SYS_WRECK_OF_N          11
+#define SYS_RESIDUAL_MIN         5
+#define SYS_RESIDUAL_SPAN       38    /* 5..42 inclusive */
+
+/* MEASURED: TWO systems can go in a single turn -- seen twice, Life Support
+   with Transporter and EnergyConverter with Warp Engines. Two of the nine
+   damaging turns, which is where these come from. */
+#define SYS_SECOND_IN_N          2
+#define SYS_SECOND_OF_N          9
+
 /* What happened during a turn. The core never formats text, so it hands the
    UI a list of facts and lets each platform word them. */
 #define EV_NONE          0
@@ -671,6 +733,15 @@ typedef struct {
     uint8_t  y, x;
     uint16_t amount;
 } TrekEvent;
+
+/* THE ONE ENTRY POINT FOR INCOMING DAMAGE, whoever it comes from -- enemy
+   fire, a death pod, and whatever the unbuilt hazards turn out to be. It was
+   static until 2026-08-26; making it public is what lets the shield law below
+   be tested at a chosen hit size instead of whatever an enemy happened to
+   fire, which is the only way to assert a proportion. Appends its events to
+   `ev` in the usual way. */
+void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max);
+
 
 /* ------------------------------------------------------- scheduled events
  *

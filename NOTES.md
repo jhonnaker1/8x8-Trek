@@ -1137,6 +1137,66 @@ Items 4 and 5 are one job, not two: both are combat damage from run 3 and both
 need the shield absorption constant, which is still open. Items 7 and 8 are
 also one job -- RAY's fourth outcome is what needs the report screen.
 
+### The shield law, and what a hit does now (2026-08-26)
+
+Run 3's two biggest corrections, done together because they are one piece of
+code. `take_damage()` is `trek_take_hit()` now -- made public so a test can
+choose the hit size, which is the only way to assert a proportion.
+
+**Shields were wrong in three ways at once, not one.**
+
+  1. The pool was drained whether the shields were UP or DOWN. Raising them
+     changed nothing about incoming damage. MEASURED: shields down means the
+     pool is untouched and the whole hit reaches main energy.
+  2. `through = amount - shields` is a bucket. MEASURED: they are a
+     PROPORTIONAL absorber.
+  3. The shield SYSTEM's repair percentage did not enter into it.
+
+**The law, and it is a hypothesis that FITS rather than a measurement:**
+
+    absorbed = hit * (charge / SHIELD_MAX) * (shield system % / 100)
+
+The charge term is obvious. The SYSTEM term is what makes the two clean
+readings agree: full charge with an undamaged system absorbs the hit whole,
+which is what six hits of 385 to 518 did, and the tight 0.065 at a charge of
+200 needs the shield system to have been near 81% -- plausible for a ship that
+had been under fire, and NOT verified. It also explains why the mid-range
+sweep would not fit: those turns had two enemies, the first hit damages the
+shield system before the second arrives, and every reading came out low
+(0.327, 0.466, 0.647 against 0.40, 0.60, 0.80 from charge alone). A one-enemy
+quadrant would settle it. A damaged system working worse is the house rule
+here anyway.
+
+**System damage now matches all three of the measured statistics.** Sampled
+2,000 penetrating hits against what run 3 saw:
+
+    damaged something          60.6%   measured "about three in five"
+    the system read 0%         0.716   measured 8 of 11 = 0.727
+    two systems in one turn    20.0%   measured 2 of 9 = 0.22
+
+**And the shield SYSTEM takes damage when the POOL absorbs a big hit**, which
+needs nothing to get through -- one measured turn damaged it with `to_energy`
+at zero. That is why the test sits above the penetration branch rather than
+inside it. `SHIELD_SYS_HIT_MIN` is PROVISIONAL: 795 absorbed took the system
+to 71% and 385 to 518 left it alone, so the threshold is in 519..795 and 600
+is the middle of that bracket.
+
+**Verified on the machine as well as in the tests.** Shields down: energy
+-230, -368, pool untouched. Shields up and full: pool -354, energy untouched.
+Shields down under repeated fire: SYSTEMS STATUS with SRS wiped to 0% and the
+EnergyConverter at 11% -- two systems, one annihilated, one a residual
+survivor in the measured 5..42 band.
+
+**Two traps paid for on the way.** The first severity test re-seeded inside
+its loop and read the first few draws of 200 sequential seeds, which
+correlates: it reported a wreck share of 0.646 against the 0.727 the generator
+actually produces. `trek_rand_n()` was checked and is uniform to a rounding
+error for every n from 2 to 12 -- **the test was biased, not the RNG**. And a
+long emulator sweep silently measured a DEAD game: the ship had been destroyed
+several commands earlier and the keystrokes were going into the end screens.
+Checking `quad != (0,0)` does not catch that, because the ship record still
+holds a quadrant while the evaluation is up.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
@@ -1172,13 +1232,14 @@ Not missing features -- implemented things that do not match the original.
   one-decimal Date display, and recomputing them properly moves the model from
   +12%/-1%/-2% to +0.9%/+0.8%/0.0%. Still to audit: whether anything else in
   this port bills a turn that the original gives away. Combat is free.
-- **Shields subtract; they should absorb a share.** `through = amount -
-  shields` is not the original. Raised full shields take a hit WHOLE with
-  energy untouched; shields down and the hit comes out of main energy instead;
-  a nearly flat shield takes a steady small fraction. Run 3.
-- **A system hit is far too gentle.** We take 20-59 points off one random
-  system. The original leaves it at 0% eight times in eleven, and can take TWO
-  systems in one turn. Run 3.
+- ~~**Shields subtract; they should absorb a share.**~~ **FIXED 2026-08-26**,
+  and it was THREE things: the pool was drained whether the shields were up or
+  DOWN, it subtracted instead of absorbing a share, and the shield system's own
+  state did not enter into it. See "The shield law" below.
+- ~~**A system hit is far too gentle.**~~ **FIXED 2026-08-26.** It wrecks
+  rather than dents -- 0% about seven times in ten -- damages something on
+  roughly three penetrating hits in five rather than every one, and can take
+  TWO systems in a turn.
 
 ---
 
