@@ -645,8 +645,29 @@ Where to look next, roughly in order of suspicion:
 - `snd_poll()` is not reaching `music_tick()` -- the region detector and the
   tick accumulator are untouched by this work, but a far read per note change
   is new and could be starving the poll loop.
-- `sid_check` / `make sound-check` records VICE and measures pitches; it has
-  caught silent failures before and has not been run since the move.
+- ~~`make sound-check` has not been run since the move.~~ **RUN 2026-08-24 and
+  it REPRODUCES THE BUG HEADLESSLY**: `PAL -- never found the first note
+  (290 Hz)` and the same for NTSC. So the loop no longer needs Jamie's ears --
+  edit, `make sound-check`, read the answer.
+
+**What is now ruled out**, by reading the code rather than guessing:
+
+- The init ORDER is right: `str_load()`, `snd_init()`, `far_load("MUSIC.DAT")`,
+  `snd_music_data()`, then `snd_music(MUS_TITLE)` before `ui_title()`.
+- `snd_poll()` IS reached: it is called from inside `scan()`, which
+  `kb_waitkey()` spins on, so it runs thousands of times a second on the title
+  screen.
+- `far_read()` works in general -- the string pool goes through the same call
+  at runtime and the title screen has words on it.
+
+**The remaining signature points one way.** `music_tick()` reads two bytes at
+`mus`, and if `note[0]` is zero it rewinds to `mus_head`, reads again, and on a
+second zero sets `mus_on = 0` and gates the voice off. **A far read that
+returns zeros for the music region produces exactly what we see**: instant
+silence, with `far_len`, `mus_base` and `mus_ok` all correct because the file
+did load. So the next thing to check is what is actually AT `mus_base` in bank
+1 -- dump it and compare against `c128/build/music.dat` -- rather than anything
+in the driver.
 
 **The lesson to carry:** sound fails silently in the most literal way, which is
 exactly why `make sound-check` exists. Verifying the loader's state proves the
