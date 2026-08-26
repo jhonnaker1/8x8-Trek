@@ -1165,6 +1165,51 @@ still open in the sense that its system term is a hypothesis that fits rather
 than a measurement; a one-enemy quadrant would settle it, and the shape is
 right either way.
 
+### The routine map (2026-08-26)
+
+Every `Random()` call site in the binary is one far call, `9a 50 11 92 26`.
+There are **157 of them in 53 routines**, and grouping them by the nearest
+preceding `55 89 e5` prologue gives a map of every random decision in EGA
+Trek. Naming each routine is then free, because CODE FOLLOWS ITS OWN STRINGS
+-- the Pascal strings immediately before a prologue identify it.
+
+DECODED so far, with what each gave:
+
+    0x04FD1  27  galaxy generation  planets, bases, enemy placement
+    0x07375   1  RAY               Random(6): 1/6 works, 2/6 destroys us
+    0x070C0   1  RAY misfire
+    0x0934E   2  crystal success   energy/shields += V*(700|300 + Random)
+    0x0C609   8  MOVE              black holes, tractor beam, warp damage
+    0x0E3A1   2  LAND              attacked 1/5, casualties Random(5)+2
+    0x0ED3B   2  USE               Random(6): 3/6 good, 2/6 dud, 1/6 defective
+
+STILL TO READ, and all of it is on the open list:
+
+    0x16844   2  SHIELD ABSORPTION   "Shields absorb / unit hit from"
+    0x20DCE   7  DAMAGE REPORTS      "on R Deck", "failing. Now at"
+    0x15D6E   2  department damage   "Engineering / Laser control"
+    0x0A8C8   4  TORPEDO damage      "absorbed by star", "triggers nova"
+    0x09563   2  torpedo firing      "unit hit from plasma bolt"
+    0x15C07   3  EVENT SCHEDULER     distress signal, REINFORCEMENTS, spy
+    0x1ED00   3  supernova events    "a star having gone nova"
+    0x15F51   4  Union wreckage      "Wreckage of Union ship present"
+    0x181E8   2  capture             "Mongol supplies captured..."
+    0x1DD4F   2  death pod + score
+    0x0F022   -  DOCKING             what each base type gives
+
+Two corrections this map forced on earlier notes in this file:
+
+  * `Random(600)` is in the TORPEDO routine, not the shield routine. The
+    remark that it might confirm our fitted `SHIELD_SYS_HIT_MIN` of 600 was
+    based on a string search for "absorb" landing in the wrong function. The
+    real shield routine is 0x16844 and rolls `Random(2)` and `Random(100)`.
+  * The torpedo routine has **"Torpedo triggers nova..."**, a mechanic this
+    port has never heard of, sitting beside the two black hole interactions.
+
+**The event scheduler at 0x15C07 is the one to read next**, and not only for
+item 10. It holds the DISTRESS SIGNAL -- which is where settled planets come
+from, and settlers are the last invented number in `core/planet.h`.
+
 ### Read the constants, do not sample them (2026-08-26)
 
 **The most useful thing learned this week, and it should change the plan.**
