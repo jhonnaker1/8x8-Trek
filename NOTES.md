@@ -1090,20 +1090,33 @@ the player fires) and the enemy-count formula; max warp = 1 + 0.09 x
 percentage; the long range tractor beam; and the warp energy model, which the
 corrected time law vindicated.
 
-#### MEASURED AND MISSING -- the three small ones
+#### ~~MEASURED AND MISSING -- the three small ones~~ ALL DONE 2026-08-26
 
-  1. **DOCK costs 0.1 stardates and this port charges nothing.**
-     `trek_dock()` never touches the clock, and `enemy_turn()` does not
-     advance it either, so docking is free here. Measured twice, in the run-1
-     turn-cost table. It is one call.
-  2. **Laser heat should cap at 100.** The original caps that word at 100 and
-     draws it against a 0..1500 scale at roughly ten to one, so its Temp bar
-     never passes 1000. This port accumulates the raw fired energy up to
-     65535 against the same scale, so the gauge pegs red after one serious
-     volley. Cosmetic, but it is a measured number we have and do not use.
-  3. **The DOCK refusal wording.** Measured: `NAVIGATION: Not adjacent to
-     planet.` -- the original's own words, planet and all. This port says
-     `NO BASE ALONGSIDE.` under a different department.
+  1. ~~**DOCK costs 0.1 stardates**~~ **FIXED.** `trek_dock()` charges exactly
+     one tenth on success and nothing on a refusal, verified on the machine:
+     3500.0 to 3500.1 alongside a base, unmoved when there is none.
+  2. ~~**Laser heat should cap at 100**~~ **FIXED, and it was three things.**
+     The word caps at LASER_HEAT_CAP now and the gauge draws it TIMES TEN
+     against the 0..1500 scale, as the original's does -- a fully heated bank
+     fills five of eight cells and the bar can never reach its own 1500.
+     Heat also accumulates ACROSS volleys and is cleared by LEAVING the
+     quadrant; this port cleared it per volley, which is the wrong half of
+     what Jamie watched the original do. HEAT_PER_UNIT is FITTED from one
+     eyeballed reading (1,250 units fired left the gauge "around 700") and is
+     the weakest number in trek.h -- nothing but the gauge reads it.
+  3. ~~**The DOCK refusal wording**~~ **FIXED.** `NAVIGATION: NOT ADJACENT TO
+     PLANET.` -- the original's own words, planet and all, and its department
+     rather than HELM.
+  4. **A fourth found while fixing those: the EFF gauge was a lie.** It drew
+     `ship.laser_eff`, which is set to 100 at the start of a game and altered
+     by nothing, so it read a full green bar on a wrecked laser bank. It draws
+     `trek_laser_eff()` now -- the Lasers repair percentage, which is what the
+     damage actually uses. Verified: half-repaired lasers draw a half amber
+     bar where they used to draw a full green one.
+
+  The core test caught a real bug in the cap on the way: testing
+  `heat >= CAP - add` underflows when one shot alone exceeds the cap, so the
+  heat sailed past the cap meant to enforce it. Sum first, clamp after.
 
 #### MEASURED AND MISSING -- the real work
 

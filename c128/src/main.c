@@ -277,7 +277,12 @@ static void do_dock(void) {
             ui_message(S(S_170), S(S_92));
             break;
         default:
-            ui_message(S(S_170), S(S_53));
+            /* MEASURED, and it is the ORIGINAL'S OWN WORDING, planet and all:
+               "NAVIGATION: Not adjacent to planet." -- a base, in the game
+               that says it. This port used to answer HELM: NO BASE ALONGSIDE,
+               which is our prose for a line we had already read off the
+               screen. Department NAVIGATION, not HELM, for the same reason. */
+            ui_message(S(S_52), S(S_53));
             break;
     }
 }

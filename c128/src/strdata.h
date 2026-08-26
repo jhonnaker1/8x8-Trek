@@ -59,7 +59,7 @@
 #define S_50    50   /* MONGOL DESTROYED! */
 #define S_51    51   /* NAVIGATION */
 #define S_52    52   /* NAVIGATION:  */
-#define S_53    53   /* NO BASE ALONGSIDE. */
+#define S_53    53   /* NOT ADJACENT TO PLANET. */
 #define S_54    54   /* NO CONTACT */
 #define S_55    55   /* NO ENEMY SHIPS HERE */
 #define S_56    56   /* NO SAVED GAME FOUND. */

@@ -433,9 +433,14 @@ void ui_draw_systems(void) {
    original prints a tick at 1000 as well, which suggests it means something,
    but nothing has been measured there, so the amber band is a guess and is
    marked as one. Red means the ancestor would be rolling for a burn. */
-static unsigned char heat_color(uint16_t heat) {
-    if (heat > LASER_HEAT_MAX)  return EGA_TO_VDC(EGA_LTRED);
-    if (heat >= 1000)           return EGA_TO_VDC(EGA_YELLOW);
+/* Takes the drawn value, not the stored word -- see LASER_HEAT_SCALE. The
+   original prints a tick at 1000 as well, which suggests it means something,
+   but nothing has been measured there, so the amber band is a guess. Red is
+   now unreachable, and deliberately kept: the game caps the word at 100, so a
+   bar in the red would mean the cap had failed. */
+static unsigned char heat_color(uint16_t drawn) {
+    if (drawn > LASER_HEAT_MAX) return EGA_TO_VDC(EGA_LTRED);
+    if (drawn >= 1000)          return EGA_TO_VDC(EGA_YELLOW);
     return EGA_TO_VDC(EGA_LTGREEN);
 }
 
@@ -489,10 +494,20 @@ void ui_draw_lasers(void) {
     unsigned char y = (unsigned char)(p->y + 1);
 
     clear_panel(P_LASERS);
-    gauge_row(x, y, "EFF", (uint16_t)ship.laser_eff, 100,
-              sys_color(ship.laser_eff));
-    gauge_row(x, (unsigned char)(y + 1), "TEMP", ship.laser_heat,
-              LASER_HEAT_MAX, heat_color(ship.laser_heat));
+    {
+        /* EFF is what the lasers WOULD deal as a percentage, which is the
+           Lasers repair percentage -- MEASURED, exactly linear. It used to
+           draw ship.laser_eff, which is set to 100 at the start of a game and
+           never changed by anything, so the bar read full on a wrecked bank.
+           trek_laser_eff() is the figure the damage actually uses. */
+        unsigned char eff = trek_laser_eff();
+        /* And TEMP draws the word times ten, as the original's does. */
+        uint16_t drawn = (uint16_t)(ship.laser_heat * LASER_HEAT_SCALE);
+
+        gauge_row(x, y, "EFF", (uint16_t)eff, 100, sys_color(eff));
+        gauge_row(x, (unsigned char)(y + 1), "TEMP", drawn,
+                  LASER_HEAT_MAX, heat_color(drawn));
+    }
 }
 
 /* ---------------------------------------------------------- main viewer */

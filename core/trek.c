@@ -116,6 +116,9 @@ void trek_enter_quadrant(void) {
     }
 
     ship.docked = BASE_NONE;
+    /* MEASURED: laser heat is cleared by LEAVING a quadrant, not by starting
+       a volley -- it accumulates across volleys while you stay. */
+    ship.laser_heat = 0;
 
     for (i = 0; i < QUAD_CELLS; i++) {
         sector[i]   = SEC_EMPTY;
@@ -391,6 +394,15 @@ uint8_t trek_dock(void) {
     } else if (type == BASE_SUPPLY) {
         ship.torps = TORPS_START;
     }
+
+    /* MEASURED: docking costs 0.1 stardates, and it is the ONLY thing besides
+       movement that moves the clock at all -- the whole turn-cost table is in
+       MEASURED.md, "Time advances ONLY on movement and docking". This port
+       charged nothing for it until 2026-08-26. Exactly one tenth, so
+       advance_time() rather than the hundredths carry: there is no fraction
+       to keep. The dock is already recorded above, so the repair this buys is
+       at the docked rate, which is what spending the turn alongside means. */
+    advance_time(1);
 
     return DOCK_OK;
 }
@@ -1143,8 +1155,13 @@ uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
     return scale_pct(scale_256(energy, f), eff_pct);
 }
 
+/* Kept as a no-op rather than deleted, because the volley IS a real unit of
+   the game -- the dialog asks once per live enemy -- and the next thing to be
+   measured about it will want somewhere to go. It used to zero the heat, which
+   was wrong: MEASURED 2026-08-24, heat accumulates ACROSS volleys within a
+   quadrant visit and is cleared by LEAVING the quadrant. Jamie watched the
+   gauge do it. trek_enter_quadrant() clears it now. */
 void trek_laser_begin_volley(void) {
-    ship.laser_heat = 0;
 }
 
 uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
@@ -1165,14 +1182,33 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     if (energy > ship.energy) return FIRE_NO_ENERGY;
     ship.energy = (uint16_t)(ship.energy - energy);
 
-    /* Heat is the energy that went into the volley, whether or not it hit --
-       and this point is past every refusal, so a rejected shot adds none.
-       Saturates rather than wrapping: the gauge is already off its scale long
-       before 65535 and a wrap would read as cold. */
+    /* HEAT IS ON ITS OWN SMALL SCALE AND THE GAME CAPS IT AT 100.
+     *
+     * MEASURED 2026-08-24 (run 2): the original's Temp gauge is driven by a
+     * 16-bit word that is neither a real nor the fired amount -- which is why
+     * two searches for it failed -- and the game never lets it exceed 100.
+     * The gauge draws it times ten against a 0..1500 scale, so the bar cannot
+     * pass its own 1000 tick in normal play.
+     *
+     * This port stored the raw fired energy, up to 65535, against that same
+     * 1500 scale: the bar pegged red after one serious volley and the stored
+     * value bore no relation to the original's.
+     *
+     * HEAT_PER_UNIT is FITTED from a single reading and is the weakest thing
+     * here: 1,250 units fired left the gauge "around 700 of its 1500 scale",
+     * so a word near 70, giving about 18 units of energy per point. One
+     * eyeballed bar position, so treat the shape as measured and the constant
+     * as a placeholder. Nothing reads heat but the gauge, so being wrong
+     * costs a picture and not a mechanic. */
     {
-        uint16_t room = (uint16_t)(65535U - energy);
-        if (ship.laser_heat > room) ship.laser_heat = 65535U;
-        else ship.laser_heat = (uint16_t)(ship.laser_heat + energy);
+        /* Summed first and clamped after, deliberately. Testing
+           `heat >= CAP - add` UNDERFLOWS when one shot alone exceeds the cap:
+           100 - 277 wraps to 65359, the test reads false, and the heat sails
+           past the cap it was meant to enforce. The core test caught it.
+           Nothing can overflow here -- energy/18 is at most 3,640 and the
+           heat it is added to is at most 100. */
+        uint16_t h = (uint16_t)(ship.laser_heat + energy / HEAT_PER_UNIT);
+        ship.laser_heat = h > LASER_HEAT_CAP ? LASER_HEAT_CAP : h;
     }
 
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));

@@ -508,24 +508,29 @@ static void test_laser_heat(void) {
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
 
+    /* MEASURED 2026-08-24, and these used to assert the opposite of all
+       three: heat is on its own small scale, the game CAPS IT AT 100, and it
+       is cleared by LEAVING the quadrant rather than by starting a volley.
+       The old tests encoded heat = energy fired, reset per volley, and a
+       750-is-half-the-gauge assertion built on a scale that was never the
+       original's. See LASER_HEAT_CAP in trek.h. */
     trek_laser_begin_volley();
-    trek_fire_laser(4, 5, 300, &dealt);
-    ok(ship.laser_heat == 300, "one shot heats by what it fired");
+    trek_fire_laser(4, 5, 360, &dealt);
+    ok(ship.laser_heat == 360 / HEAT_PER_UNIT, "one shot heats by fired/18");
 
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
-    trek_fire_laser(4, 5, 450, &dealt);
-    ok(ship.laser_heat == 750, "shots in one volley accumulate");
-    ok(ship.laser_heat * 2 == LASER_HEAT_MAX,
-       "750 is half the gauge, which is the shot that would confirm the scale");
+    trek_fire_laser(4, 5, 360, &dealt);
+    ok(ship.laser_heat == 2 * (360 / HEAT_PER_UNIT),
+       "and shots accumulate");
 
     trek_laser_begin_volley();
-    ok(ship.laser_heat == 0, "a new volley starts cold again");
+    ok(ship.laser_heat == 2 * (360 / HEAT_PER_UNIT),
+       "a NEW VOLLEY does not clear it -- the original accumulates across them");
 
     /* A refused shot must not heat: the original does not spend the energy
        either, and heat is energy that actually went into the banks. */
-    before = 0;
-    trek_laser_begin_volley();
+    before = ship.laser_heat;
     trek_fire_laser(0, 0, 500, &dealt);
     ok(ship.laser_heat == before, "firing at empty space adds no heat");
     trek_fire_laser((uint8_t)9, (uint8_t)9, 500, &dealt);
@@ -535,14 +540,20 @@ static void test_laser_heat(void) {
     trek_fire_laser(4, 5, (uint16_t)(ship.energy + 1), &dealt);
     ok(ship.laser_heat == before, "a shot refused for energy adds no heat");
 
-    /* Saturation, not wraparound -- a wrapped gauge reads as cold, which is
-       the one failure mode that would be invisible on screen. */
-    ship.laser_heat = 65000U;
+    /* The cap is the whole point: it is what makes LASER_HEAT_MAX the scale
+       of a readout rather than a threshold anything crosses. */
+    ship.laser_heat = LASER_HEAT_CAP - 1;
     ship.energy = 60000U;
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
-    trek_fire_laser(4, 5, 1000, &dealt);
-    ok(ship.laser_heat == 65535U, "heat saturates rather than wrapping");
+    trek_fire_laser(4, 5, 5000, &dealt);
+    ok(ship.laser_heat == LASER_HEAT_CAP, "heat caps at 100, it does not wrap");
+    ok((uint16_t)(ship.laser_heat * LASER_HEAT_SCALE) <= LASER_HEAT_MAX,
+       "so the drawn bar can never leave its own scale");
+
+    /* Cleared by leaving the quadrant, which is what Jamie watched it do. */
+    trek_move_warp((uint8_t)((ship.quad_y + 1) & 7), ship.quad_x, 3, 3);
+    ok(ship.laser_heat == 0, "changing quadrant clears it");
 }
 
 static void test_fire_laser(void) {
@@ -889,7 +900,11 @@ static void test_docking(void) {
     ship.energy = 100; ship.torps = 1;
     ok(trek_dock() == DOCK_OK,      "a supply base can be docked with");
     ok(ship.torps == TORPS_START,   "a supply base restocks torpedoes");
-    ok(ship.energy == 100,          "but does not refuel");
+    /* NOT `== 100`. Docking costs 0.1 stardates (MEASURED) and the converter
+       runs for them, so a tenth's worth of energy arrives whatever the base
+       is. What is being asserted is that the BASE did not refuel us -- that
+       the pool is still near empty rather than back at ENERGY_START. */
+    ok(ship.energy < 200,           "but does not refuel");
     ok(!trek_docked_safe(),         "and its shields do not cover us");
 
     trek_new_game(3, 4242);
@@ -900,7 +915,7 @@ static void test_docking(void) {
     ship.energy = 100; ship.torps = 1;
     ok(trek_dock() == DOCK_OK,    "a research station can be docked with");
     ok(ship.torps == 1,           "but restocks nothing this core models");
-    ok(ship.energy == 100,        "including fuel");
+    ok(ship.energy < 200,         "including fuel");
 
     /* MEASURED off the original's Docked/Undocked columns: 47 a stardate
        against 20. The ancestor's 4x was DERIVED and is refuted. */

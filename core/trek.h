@@ -233,6 +233,19 @@
  * readout rather than a threshold anything crosses. See MEASURED.md, "Run 2". */
 #define LASER_HEAT_MAX     1500
 
+/* What the game itself never lets the heat word exceed -- MEASURED, and the
+   reason LASER_HEAT_MAX above is the scale of a READOUT rather than a
+   threshold anything crosses. The gauge draws heat x LASER_HEAT_SCALE against
+   LASER_HEAT_MAX, so a capped word fills two thirds of the bar. */
+#define LASER_HEAT_CAP      100
+#define LASER_HEAT_SCALE     10
+
+/* Energy per point of heat. FITTED from ONE eyeballed reading -- 1,250 units
+   fired left the gauge "around 700 of its 1500 scale", so a word near 70 --
+   and it is the weakest number in this file. Nothing but the gauge reads
+   heat, so an error here costs a picture and not a mechanic. */
+#define HEAT_PER_UNIT        18
+
 /* A note on the provenance tags in this file, now that there is a fifth.
  *
  *   CONFIRMED   -- predicted in advance, then seen to happen in the original.

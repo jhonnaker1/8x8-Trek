@@ -750,43 +750,58 @@ static unsigned char las_bar_len(unsigned char row) {
     return n;
 }
 
+/* BOTH GAUGES CHANGED 2026-08-26 and these tests changed with them.
+ *
+ * EFF used to draw ship.laser_eff, which is set to 100 at the start of a game
+ * and never altered by anything, so the bar read full on a wrecked laser
+ * bank. It draws trek_laser_eff() now -- the Lasers repair percentage, which
+ * is MEASURED to be exactly what the damage uses. So the test drives
+ * ship.sys[SYS_LASERS], not ship.laser_eff.
+ *
+ * TEMP used to draw the raw fired energy against a 0..1500 scale. The
+ * original's word is capped at 100 and drawn TIMES TEN against that scale, so
+ * a fully heated bank fills five of the eight cells and the bar can never
+ * reach its own 1500. The expectations below are that arithmetic. */
 static void test_laser_gauges(void) {
-    static const struct { uint16_t eff, heat; unsigned char ec, hc; } t[] = {
-        { 100,     0, 8, 0 },
-        {  50,   750, 4, 4 },
-        {   1,     1, 1, 1 },   /* alive at all must never draw empty */
-        {   0,     0, 0, 0 },
-        {   7,  1500, 1, 8 },
-        { 100, 65535U, 8, 8 },  /* saturated heat pins the bar, not wraps it */
+    static const struct { unsigned char las; uint16_t heat;
+                          unsigned char ec, hc; } t[] = {
+        { 100,   0, 8, 0 },
+        {  50,  50, 4, 3 },   /* heat 50 draws 500 of 1500 */
+        {   1,   1, 1, 1 },   /* alive at all must never draw empty */
+        {   0,   0, 0, 0 },
+        {   7, 100, 1, 5 },   /* the CAP fills five cells, not eight */
+        { 100, 200, 8, 8 },   /* past the cap only a poke can reach; pins */
     };
     unsigned char i;
-    char msg[72];
+    char msg[80];
 
+    ship.laser_eff = 100;
     for (i = 0; i < sizeof t / sizeof t[0]; i++) {
-        ship.laser_eff  = (unsigned char)t[i].eff;
+        ship.sys[SYS_LASERS] = t[i].las;
         ship.laser_heat = t[i].heat;
         screen_reset();
         ui_draw_lasers();
-        sprintf(msg, "eff %u draws %u of 8", t[i].eff, t[i].ec);
+        sprintf(msg, "lasers at %u%% draws %u of 8", t[i].las, t[i].ec);
         check(las_bar_len(0) == t[i].ec, msg);
-        sprintf(msg, "heat %u draws %u of 8", t[i].heat, t[i].hc);
+        sprintf(msg, "heat word %u draws %u of 8", t[i].heat, t[i].hc);
         check(las_bar_len(1) == t[i].hc, msg);
     }
+    ship.sys[SYS_LASERS] = 100;
 }
 
-/* 1500 is the only number here with evidence behind it, so the boundary that
-   matters is the one at 1500: at or below it the ancestor does nothing, above
-   it rolls for a burn. The amber band is a guess and is tested only so that
-   changing it is a deliberate act. */
+/* The colour bands are on the DRAWN value, so these are heat words times ten.
+   Red is unreachable in play now -- the game caps the word at 100, which
+   draws at 1000 -- and it is kept and tested anyway: a bar in the red would
+   mean the cap had failed, which is worth being able to see. */
 static void test_heat_colours(void) {
     const Panel *p = &panels[P_LASERS];
     unsigned char x = (unsigned char)(p->x + 1 + 5);
     unsigned char y = (unsigned char)(p->y + 2);
     static const struct { uint16_t heat; unsigned char ega; const char *what; } t[] = {
-        {  999, EGA_LTGREEN, "999 is green"       },
-        { 1000, EGA_YELLOW,  "1000 is amber"      },
-        { 1500, EGA_YELLOW,  "1500 is still amber -- the threshold is not yet crossed" },
-        { 1501, EGA_LTRED,   "1501 is red"        },
+        {  99, EGA_LTGREEN, "word 99 draws 990 and is green"  },
+        { 100, EGA_YELLOW,  "the cap draws 1000 and is amber" },
+        { 150, EGA_YELLOW,  "1500 is still amber -- the threshold is not crossed" },
+        { 151, EGA_LTRED,   "past 1500 is red, which only a broken cap reaches" },
     };
     unsigned char i;
 
@@ -797,6 +812,7 @@ static void test_heat_colours(void) {
         ui_draw_lasers();
         check(attr[y][x] == EGA_TO_VDC(t[i].ega), t[i].what);
     }
+    ship.laser_heat = 0;
 }
 
 /* ------------------------------------------------------------ messages */
