@@ -27,6 +27,21 @@ static uint16_t get16(void) {
     return (uint16_t)(lo | ((uint16_t)in[pos++] << 8));
 }
 
+/* TREK_SAVE_SIZE IS A FUNCTION OF PLANET_MAX, and this is the compile-time
+   check that says so. Raising the planet count from ten to twenty-two on
+   2026-08-26 left the constant at 578 while the writer produced 650, so
+   trek_state_save() wrote 72 bytes past a buffer that had been sized from the
+   constant -- and the only thing that caught it was test_serial ABORTING,
+   which is a crash rather than a failure.
+
+   A negative array size is the portable way to fail a build on a constant,
+   and it fails at the right moment: change PLANET_MAX and this stops
+   compiling until TREK_SAVE_SIZE is brought along. Everything else in the
+   record is fixed-size, so 518 is all of it. */
+#define SAVE_FIXED_BYTES 518
+typedef char save_size_tracks_planet_max[
+    (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 6 * PLANET_MAX) ? 1 : -1];
+
 /* The field list appears TWICE, once to save and once to load, and that is
    deliberate rather than lazy.
  *

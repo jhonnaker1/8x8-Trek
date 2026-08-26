@@ -36,8 +36,15 @@
  */
 
 /* Exact size of a saved state. Callers size their buffer with this rather
-   than guessing; trek_state_save() also refuses to write past `max`. */
-#define TREK_SAVE_SIZE  578
+   than guessing; trek_state_save() also refuses to write past `max`.
+
+   IT IS A FUNCTION OF PLANET_MAX, and forgetting that shipped a crash: the
+   planet count went from ten to twenty-two on 2026-08-26 and this stayed at
+   578, so trek_state_save() wrote 72 bytes past a buffer sized from it and
+   test_serial aborted. Six bytes per planet slot -- if PLANET_MAX moves, this
+   moves with it. See "when a constant changes, re-read everything derived
+   from it". */
+#define TREK_SAVE_SIZE  650
 
 /* Bumped whenever the layout changes. A load of an older version is refused
    rather than misread -- there is no upgrade path and a half-read galaxy is
