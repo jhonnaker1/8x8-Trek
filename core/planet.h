@@ -60,11 +60,11 @@
  * twice; the photograph shows one column and every quadrant distinct. The
  * list survives here only because it also carries the sector and the scan
  * flags, which the original keeps elsewhere. */
-#define PLANET_MIN       10
-#define PLANET_SPREAD    10      /* trek_rand_n(10) gives 0..9, so 10..19 */
-#define PLANET_MAX       19
+#define PLANET_MIN       10  /*@BINARY*/
+#define PLANET_SPREAD    10      /* trek_rand_n(10) gives 0..9, so 10..19 */  /*@BINARY*/
+#define PLANET_MAX       19  /*@BINARY*/
 
-#define PLANET_NONE    0xFF      /* "no planet" / "not orbiting one" */
+#define PLANET_NONE    0xFF      /* "no planet" / "not orbiting one" */  /*@ID*/
 
 /* A PLANET'S NAME IS ENTIRELY DETERMINED BY ITS QUADRANT. Nothing about it
  * is stored, which is why there are exactly EIGHT names for eight columns:
@@ -90,7 +90,7 @@
  *
  * So the Planet record carries no name field. An earlier one rolled a random
  * name index, which could put Xevious in column 1. */
-#define PLANET_NAMES      8
+#define PLANET_NAMES      8  /*@BINARY*/
 extern const char *const planet_name[PLANET_NAMES];
 
 /* Planet class, the Star Trek convention, printed as a letter with no space
@@ -104,10 +104,10 @@ extern const char *const planet_name[PLANET_NAMES];
  * THE CLASS IS NOT DISPLAY ONLY -- see PFIND_* below. It decides how likely
  * the planet is to be worth landing on, and this port had a note here saying
  * that was unmeasured. It is measured now. */
-#define PCLASS_M          0
-#define PCLASS_N          1
-#define PCLASS_O          2
-#define PCLASS_COUNT      3
+#define PCLASS_M          0  /*@ID*/
+#define PCLASS_N          1  /*@ID*/
+#define PCLASS_O          2  /*@ID*/
+#define PCLASS_COUNT      3  /*@ID*/
 extern const char planet_class_letter[PCLASS_COUNT];
 
 /* What ORBIT's scan finds, and what LAND then collects. These are the four
@@ -123,10 +123,10 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * A settlement is destroyed by the same thing that destroys a base: an
  * evacuation deadline nobody met. That event is NOT built here; see the note
  * on PF_RUINED. */
-#define PFIND_SETTLERS    0
-#define PFIND_MONGOL      1      /* a Mongol supply station */
-#define PFIND_ENERGIUM    2
-#define PFIND_NOTHING     3
+#define PFIND_SETTLERS    0  /*@ID*/
+#define PFIND_MONGOL      1      /* a Mongol supply station */  /*@ID*/
+#define PFIND_ENERGIUM    2  /*@ID*/
+#define PFIND_NOTHING     3  /*@ID*/
 
 /* READ OUT OF THE BINARY 2026-08-26, and it replaced an invented split.
  *
@@ -179,11 +179,11 @@ extern const char planet_class_letter[PCLASS_COUNT];
  *
  * PF_SETTLED below carries it. The DEADLINE is not modelled yet -- that wants
  * fn 0x151D0 read -- so a settlement here is never "destroyed". */
-#define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */
-#define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */
+#define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */  /*@BINARY*/
+#define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */  /*@BINARY*/
 
-#define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */
-#define PF_TAKEN       0x02      /* the find has been collected or evacuated */
+#define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */  /*@ID*/
+#define PF_TAKEN       0x02      /* the find has been collected or evacuated */  /*@ID*/
 /* A settlement that was not relieved in time. Nothing sets this yet: the
    scheduled evacuation event ("Planet Gallista-8, quad 8-4, requests
    evacuation. They can only hold out until 3516.5.") is a separate job, the
@@ -194,7 +194,7 @@ extern const char planet_class_letter[PCLASS_COUNT];
    at [0x1DA2] and inserting "destroyed " when the deadline has passed.
    Nothing in the binary ever writes such a flag. Use
    planet_settlement_lost(). */
-#define PF_SETTLED     0x08
+#define PF_SETTLED     0x08  /*@ID*/
 
 typedef struct {
     uint8_t quad;      /* galaxy cell, 0..63 -- fixed for the game */
@@ -221,12 +221,12 @@ extern uint8_t planet_count;
  * as ids with no producer for the same reason the score sheet keeps rows that
  * are always zero -- so that building the thing that fills them is a call to
  * one place, not a change to the shape of the game. */
-#define ITEM_MONGOL_ENERGIUM  0
-#define ITEM_PLASMA_BOLTS     1
-#define ITEM_PLASMA_SHIELD    2
-#define ITEM_LIFE_SUPPORT     3
-#define ITEM_RAW_ENERGIUM     4
-#define ITEM_COUNT            5
+#define ITEM_MONGOL_ENERGIUM  0  /*@ID*/
+#define ITEM_PLASMA_BOLTS     1  /*@ID*/
+#define ITEM_PLASMA_SHIELD    2  /*@ID*/
+#define ITEM_LIFE_SUPPORT     3  /*@ID*/
+#define ITEM_RAW_ENERGIUM     4  /*@ID*/
+#define ITEM_COUNT            5  /*@ID*/
 extern const char *const item_name[ITEM_COUNT];
 extern uint8_t inventory[ITEM_COUNT];
 
@@ -247,9 +247,9 @@ uint8_t planet_here(void);
    both enters orbit and reveals the find. The manual agrees: "This will allow
    the planet to be scanned for the presence of energium crystals and other
    things." */
-#define ORBIT_OK           0
-#define ORBIT_NO_PLANET    1     /* none adjacent */
-#define ORBIT_ALREADY      2
+#define ORBIT_OK           0  /*@ID*/
+#define ORBIT_NO_PLANET    1     /* none adjacent */  /*@ID*/
+#define ORBIT_ALREADY      2  /*@ID*/
 uint8_t trek_orbit(void);
 
 /* Leaving orbit. Any movement does it, the same way movement breaks a dock. */
@@ -266,17 +266,17 @@ void trek_leave_orbit(void);
  * and is already in trek_transporter_ok()/trek_shuttle_ok(). Shields up
  * refuses both: "ENGINEERING: Cannot use transporters or shuttlecraft with
  * shields up." */
-#define LAND_BY_SHUTTLE      1
-#define LAND_BY_TRANSPORTER  2
+#define LAND_BY_SHUTTLE      1  /*@ID*/
+#define LAND_BY_TRANSPORTER  2  /*@ID*/
 
-#define LAND_NO_ORBIT        0   /* "NAVIGATION: Not orbitting a planet" */
-#define LAND_SHIELDS_UP      1
-#define LAND_DAMAGED         2   /* that way down is not at 100% */
-#define LAND_NOTHING         3   /* "Nothing found." */
-#define LAND_ENERGIUM        4   /* "energium successfully mined." */
-#define LAND_SETTLERS        5   /* "Planet settlers found... Evacuating" */
-#define LAND_ATTACKED        6   /* "Landing party attacked... casualties." */
-#define LAND_ALREADY         7   /* this planet has already given up its find */
+#define LAND_NO_ORBIT        0   /* "NAVIGATION: Not orbitting a planet" */  /*@ID*/
+#define LAND_SHIELDS_UP      1  /*@ID*/
+#define LAND_DAMAGED         2   /* that way down is not at 100% */  /*@ID*/
+#define LAND_NOTHING         3   /* "Nothing found." */  /*@ID*/
+#define LAND_ENERGIUM        4   /* "energium successfully mined." */  /*@ID*/
+#define LAND_SETTLERS        5   /* "Planet settlers found... Evacuating" */  /*@ID*/
+#define LAND_ATTACKED        6   /* "Landing party attacked... casualties." */  /*@ID*/
+#define LAND_ALREADY         7   /* this planet has already given up its find */  /*@ID*/
 
 /* `casualties` receives the losses on LAND_ATTACKED, so the UI can print the
    number the original prints. Pass NULL if the caller does not care. */
@@ -300,9 +300,9 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * case (a station raids the party one time in five) or a risk on landings
  * generally. This port keeps it on the Mongol find, where the SCIENCE line
  * puts it, and applies the roll. */
-#define LANDING_ATTACK_OF_N    5   /* attacked when Random(5) == 0 */
-#define LANDING_CASUALTY_MIN   2
-#define LANDING_CASUALTY_SPAN  5   /* Random(5) + 2, so 2..6 */
+#define LANDING_ATTACK_OF_N    5   /* attacked when Random(5) == 0 */  /*@BINARY*/
+#define LANDING_CASUALTY_MIN   2  /*@BINARY*/
+#define LANDING_CASUALTY_SPAN  5   /* Random(5) + 2, so 2..6 */  /*@BINARY*/
 
 /* --------------------------------------------------------------------- USE
  *
@@ -363,32 +363,32 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * a KNOWN level and divide the gain -- because a second sample at a different
  * level separates "constant 5" from "the level" immediately. Until then this
  * reproduces the only reading we have, exactly. */
-#define CRYSTAL_V              5     /* [0x1DCC]; see above */
-#define CRYSTAL_ROLL_OF_N     6
-#define CRYSTAL_DEFECT_ROLL   0      /* roll 0        -- one in six */
-#define CRYSTAL_DUD_TO        2      /* rolls 1..2    -- two in six */
+#define CRYSTAL_V              5     /* [0x1DCC]; see above */  /*@MEASURED*/
+#define CRYSTAL_ROLL_OF_N     6  /*@BINARY*/
+#define CRYSTAL_DEFECT_ROLL   0      /* roll 0        -- one in six */  /*@BINARY*/
+#define CRYSTAL_DUD_TO        2      /* rolls 1..2    -- two in six */  /*@BINARY*/
                                      /* rolls 3..5 are good -- three in six */
-#define CRYSTAL_DEFECT_LOSS 1000     /* energy -= Random(1000) */
-#define CRYSTAL_ENERGY_BASE  700     /* both scaled by V, per the binary */
-#define CRYSTAL_ENERGY_SPAN  700
-#define CRYSTAL_SHIELD_BASE  300
-#define CRYSTAL_SHIELD_SPAN  300
+#define CRYSTAL_DEFECT_LOSS 1000     /* energy -= Random(1000) */  /*@BINARY*/
+#define CRYSTAL_ENERGY_BASE  700     /* both scaled by V, per the binary */  /*@BINARY*/
+#define CRYSTAL_ENERGY_SPAN  700  /*@BINARY*/
+#define CRYSTAL_SHIELD_BASE  300  /*@BINARY*/
+#define CRYSTAL_SHIELD_SPAN  300  /*@BINARY*/
 
-#define USE_NO_ITEM        0   /* "No energium crystals are available to load" */
-#define USE_REFUSED        1   /* the First Officer's regulations speech */
-#define USE_GOOD           2
-#define USE_DEFECTIVE      3   /* main energy systems damaged */
-#define USE_DUD            4   /* nothing happens */
+#define USE_NO_ITEM        0   /* "No energium crystals are available to load" */  /*@ID*/
+#define USE_REFUSED        1   /* the First Officer's regulations speech */  /*@ID*/
+#define USE_GOOD           2  /*@ID*/
+#define USE_DEFECTIVE      3   /* main energy systems damaged */  /*@ID*/
+#define USE_DUD            4   /* nothing happens */  /*@ID*/
 
 /* The name of a planet, derived from its quadrant. Never stored. */
-#define PLANET_NAME_OF(q)  (planet_name[(q) & 7])
-#define PLANET_DIGIT_OF(q) (((q) >> 3) + 1)
+#define PLANET_NAME_OF(q)  (planet_name[(q) & 7])  /*@BINARY*/
+#define PLANET_DIGIT_OF(q) (((q) >> 3) + 1)  /*@BINARY*/
 
 /* The evacuation deadline, fn 0x151D0:  stardate + 3.0*Random + 1.0, so one
    to four stardates of warning. [0x1D9C] is set to 9999.0 on the way out,
    which is this game's "never again" -- a galaxy gets ONE evacuation. */
-#define EVAC_WARNING_MIN_TENTHS   10
-#define EVAC_WARNING_SPAN_TENTHS  30
+#define EVAC_WARNING_MIN_TENTHS   10  /*@BINARY*/
+#define EVAC_WARNING_SPAN_TENTHS  30  /*@BINARY*/
 
 /* When the settlers run out of time, as a stardate in tenths. */
 extern uint16_t planet_evac_end;

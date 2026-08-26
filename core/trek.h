@@ -16,24 +16,24 @@
  * responsible for presenting them 1-based, as the original does.
  */
 
-#define GAL_DIM     8            /* 8x8 quadrants */
-#define QUAD_DIM    8            /* 8x8 sectors per quadrant */
-#define GAL_CELLS   (GAL_DIM * GAL_DIM)
-#define QUAD_CELLS  (QUAD_DIM * QUAD_DIM)
+#define GAL_DIM     8            /* 8x8 quadrants */  /*@CONFIRMED*/
+#define QUAD_DIM    8            /* 8x8 sectors per quadrant */  /*@CONFIRMED*/
+#define GAL_CELLS   (GAL_DIM * GAL_DIM)  /*@ID*/
+#define QUAD_CELLS  (QUAD_DIM * QUAD_DIM)  /*@ID*/
 
 /* Sector cell contents. One byte per cell; the UI maps these to glyph and
    colour (see core/ega.h for the colour rules, which are game rules). */
-#define SEC_EMPTY       0
-#define SEC_STAR        1
-#define SEC_SHIP        2
-#define SEC_BASE        3
-#define SEC_PLANET      4
-#define SEC_BATTLESHIP  5
-#define SEC_COMMAND     6
-#define SEC_SCOUT       7
-#define SEC_SUPPLY      8
+#define SEC_EMPTY       0  /*@ID*/
+#define SEC_STAR        1  /*@ID*/
+#define SEC_SHIP        2  /*@ID*/
+#define SEC_BASE        3  /*@ID*/
+#define SEC_PLANET      4  /*@ID*/
+#define SEC_BATTLESHIP  5  /*@ID*/
+#define SEC_COMMAND     6  /*@ID*/
+#define SEC_SCOUT       7  /*@ID*/
+#define SEC_SUPPLY      8  /*@ID*/
 
-#define SEC_IS_ENEMY(c) ((c) >= SEC_BATTLESHIP && (c) <= SEC_SUPPLY)
+#define SEC_IS_ENEMY(c) ((c) >= SEC_BATTLESHIP && (c) <= SEC_SUPPLY)  /*@ID*/
 
 /* Base types, as the long-range scanner reports them (manual l.291):
    1 StarBase, 2 research station, 3 supply depot. */
@@ -43,12 +43,12 @@
    nine -- which gives six StarBases at level 1 and two at level 5. FLAGGED
    rather than confirmed; one emulator run settles V and both constants with
    it. See MEASURED.md, "Bases, read out of the binary". */
-#define STARBASES_AT_LEVEL(l)  (11 - ((l) + 4))
+#define STARBASES_AT_LEVEL(l)  (11 - ((l) + 4))  /*@FITTED*/
 
-#define BASE_NONE       0
-#define BASE_STARBASE   1
-#define BASE_RESEARCH   2
-#define BASE_SUPPLY     3
+#define BASE_NONE       0  /*@ID*/
+#define BASE_STARBASE   1  /*@ID*/
+#define BASE_RESEARCH   2  /*@ID*/
+#define BASE_SUPPLY     3  /*@ID*/
 
 /* CONFIRMED against the original running in DOSBox-X, 2026-08-15, by reading
    its ENGINEERING REPORT (the E command) at the start of a level-3 game:
@@ -68,18 +68,18 @@
    of 5000 reads 90%, 2000 of 2500 reads 80%. Damage is shown by colouring
    the row red instead ("Systems marked in red are damaged"). So these three
    maxima are confirmed values, not guesses. */
-#define ENERGY_START    5000
-#define ENERGY_MAX      5000
-#define IMPULSE_START    500
-#define IMPULSE_MAX      500
-#define SHIELD_START    2500
-#define SHIELD_MAX      2500     /* manual l.501, confirmed on screen */
+#define ENERGY_START    5000  /*@CONFIRMED*/
+#define ENERGY_MAX      5000  /*@CONFIRMED*/
+#define IMPULSE_START    500  /*@CONFIRMED*/
+#define IMPULSE_MAX      500  /*@CONFIRMED*/
+#define SHIELD_START    2500  /*@CONFIRMED*/
+#define SHIELD_MAX      2500     /* manual l.501, confirmed on screen */  /*@CONFIRMED*/
 
 /* MEASURED at command level 3: nine, shown as a 3x3 array of red stars below
    the shields dial, one per torpedo. Firing one put it out. Three tubes and
    nine torpedoes is a coherent bit of design; an earlier guess of 10 was
    wrong. Whether the count varies by level is untested. */
-#define TORPS_START      9
+#define TORPS_START      9  /*@MEASURED*/
 
 /* Enemy count -- MEASURED 2026-08-24, and the formula is
  *
@@ -104,20 +104,20 @@
  *
  * The old note called it "fitted, not confirmed ... more new games at a
  * single level would tighten it". That is what happened. */
-#define ENEMY_BASE        10
-#define ENEMY_PER_LEVEL    8
-#define ENEMY_SPREAD       9     /* trek_rand_n(9) gives the observed 0..8 */
-#define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */
+#define ENEMY_BASE        10  /*@FITTED*/
+#define ENEMY_PER_LEVEL    8  /*@FITTED*/
+#define ENEMY_SPREAD       9     /* trek_rand_n(9) gives the observed 0..8 */  /*@FITTED*/
+#define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */  /*@CONFIRMED*/
 
 /* Stardates are carried in tenths, so these exceed cc65's 16-bit signed int
    and must be written unsigned -- an unsuffixed 35000 promotes to long,
    which this core forbids (cl65 warns "Constant is long"). */
-#define STARDATE_START  35000U   /* 3500.0 */
-#define MISSION_TENTHS  300U     /* 30 stardates to secure the sector */
-#define WARP_MIN        10       /* tenths: warp 1.0 */
-#define WARP_MAX        80       /* tenths: warp 8.0, emergency (manual l.250) */
-#define WARP_CRUISE     60       /* tenths: warp 6.0, safe cruising */
-#define WARP_START      10       /* CONFIRMED: the original opens at warp 1.0,
+#define STARDATE_START  35000U   /* 3500.0 */  /*@CONFIRMED*/
+#define MISSION_TENTHS  300U     /* 30 stardates to secure the sector */  /*@CONFIRMED*/
+#define WARP_MIN        10       /* tenths: warp 1.0 */  /*@CONFIRMED*/
+#define WARP_MAX        80       /* tenths: warp 8.0, emergency (manual l.250) */  /*@CONFIRMED*/
+#define WARP_CRUISE     60       /* tenths: warp 6.0, safe cruising */  /*@CONFIRMED*/
+#define WARP_START      10       /*@CONFIRMED*/ /* CONFIRMED: the original opens at warp 1.0,
                                     not the 5.0 an earlier draft assumed */
 
 /* Travel must cost more than the converter replaces while you travel, or
@@ -139,7 +139,7 @@
    IMPULSE_ENERGY_UNIT is MEASURED: sector 6,6 -> 6,5, a distance of exactly
    1, cost 6.3 units (493.8 -> 487.5); an earlier hop cost 6.2. The previous
    value of 60 was ten times too expensive. */
-#define IMPULSE_ENERGY_UNIT   6  /* per sector -- measured, see above */
+#define IMPULSE_ENERGY_UNIT   6  /* per sector -- measured, see above */  /*@MEASURED*/
 
 /* ------------------------------------------------------- movement timing */
 
@@ -151,7 +151,7 @@
    why ship.time_frac exists: the clock is carried in tenths and a one-sector
    hop does not reach one. The previous value was 0.1 per sector, PROVISIONAL
    and 2.4x too dear. */
-#define IMPULSE_STARDATE_DIV  24
+#define IMPULSE_STARDATE_DIV  24  /*@MEASURED*/
 
 /* MEASURED 2026-08-25: time = 11 * distance_in_quadrants / warp^2 stardates,
    with the distance taken over ABSOLUTE sector positions and divided by 8 --
@@ -170,7 +170,7 @@
    Five arbitrary fractions landing on integer-difference distances is not
    something a wrong constant does. The constant this replaces was ~9.98,
    fitted from two readings. */
-#define WARP_STARDATE_NUM     11
+#define WARP_STARDATE_NUM     11  /*@MEASURED*/
 
 /* Weapons.
  *
@@ -204,7 +204,7 @@
  *
  * LASER_RANGE_ZERO is in whole sectors; distances are 8.8 fixed point, so
  * comparisons against it must shift. */
-#define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */
+#define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */  /*@FITTED*/
 
 /* Full scale on the original's laser Temp gauge, whose printed scale reads
    "0 ... 1000 1500".
@@ -239,25 +239,34 @@
  *
  * So heat is a gauge and not a mechanic, and this constant is the scale of a
  * readout rather than a threshold anything crosses. See MEASURED.md, "Run 2". */
-#define LASER_HEAT_MAX     1500
+#define LASER_HEAT_MAX     1500  /*@MEASURED*/
 
 /* What the game itself never lets the heat word exceed -- MEASURED, and the
    reason LASER_HEAT_MAX above is the scale of a READOUT rather than a
    threshold anything crosses. The gauge draws heat x LASER_HEAT_SCALE against
    LASER_HEAT_MAX, so a capped word fills two thirds of the bar. */
-#define LASER_HEAT_CAP      100
-#define LASER_HEAT_SCALE     10
+#define LASER_HEAT_CAP      100  /*@MEASURED*/
+#define LASER_HEAT_SCALE     10  /*@MEASURED*/
 
 /* Energy per point of heat. FITTED from ONE eyeballed reading -- 1,250 units
    fired left the gauge "around 700 of its 1500 scale", so a word near 70 --
    and it is the weakest number in this file. Nothing but the gauge reads
    heat, so an error here costs a picture and not a mechanic. */
-#define HEAT_PER_UNIT        18
+#define HEAT_PER_UNIT        18  /*@FITTED*/
 
 /* A note on the provenance tags in this file, now that there is a fifth.
  *
  *   CONFIRMED   -- predicted in advance, then seen to happen in the original.
  *   MEASURED    -- read off the original, by screen or by memory.
+ * EVERY #define IN THIS FILE AND core/planet.h CARRIES ITS TIER ON ITS OWN
+ * LINE, in a trailing comment reading at-sign then the tier name, and
+ * `make tiers` lists them and fails on an untagged one. The tiers used to live only in prose, and a scan for them attributed
+ * the nearest preceding paragraph -- reporting constants as fitted that were
+ * measured, which is worse than no audit.
+ *
+ *   BINARY      -- read out of the original's CODE with tools/dis16.py. An
+ *                  exact constant of Anderson's, not a sample. This tier did
+ *                  not exist before 2026-08-26.
  *   DERIVED     -- taken from the FORTRAN line's source (reference/sst2k),
  *                  which is what EGA Trek is a port of. Shape only. Anderson
  *                  rewrote formulas and dropped rules outright, so a DERIVED
@@ -306,18 +315,18 @@
  * The constants below are the LEVEL-3 values, which is what the core uses
  * today; the scaling is not modelled yet. Whether supply ships scale the same
  * way is untested -- 120 is a single level-3 reading. */
-#define HP_BATTLESHIP       355  /* read from memory, level 3 */
-#define HP_SUPPLY           120  /* read from memory, level 3. NOTE: this is a
+#define HP_BATTLESHIP       355  /* read from memory, level 3 */  /*@MEASURED*/
+#define HP_SUPPLY           120  /*@MEASURED*/ /* read from memory, level 3. NOTE: this is a
                                     SPAWN value, not the class maximum, which
                                     INFO puts at 150 -- it showed 120 as 80%.
                                     The other three are class maxima, all read
                                     at 100% on 2026-08-24. */
-#define HP_COMMAND          695  /* MEASURED: read from the enemy table at
+#define HP_COMMAND          695  /*@MEASURED*/ /* MEASURED: read from the enemy table at
                                     level 3, for the ship the console names
                                     the Mongol Commander. The earlier 500 was
                                     inferred from damage arithmetic and
                                     bracketed 441..501; it was wrong. */
-#define HP_SCOUT            255  /* MEASURED 2026-08-21: the INFO panel names
+#define HP_SCOUT            255  /*@MEASURED*/ /* MEASURED 2026-08-21: the INFO panel names
                                     the 255-hit-point ship "Mongol Scout" at
                                     Shields 100%. This also closes the reading
                                     that had been unexplained since the first
@@ -328,11 +337,11 @@
 extern uint16_t enemy_hp[QUAD_CELLS];
 
 /* Outcomes of firing. */
-#define FIRE_OK           0   /* hit, target survived */
-#define FIRE_KILL         1   /* hit, target destroyed */
-#define FIRE_BAD_COORDS   2
-#define FIRE_NO_TARGET    3   /* nothing hostile in that sector */
-#define FIRE_NO_ENERGY    4   /* main banks hold less than requested */
+#define FIRE_OK           0   /* hit, target survived */  /*@ID*/
+#define FIRE_KILL         1   /* hit, target destroyed */  /*@ID*/
+#define FIRE_BAD_COORDS   2  /*@ID*/
+#define FIRE_NO_TARGET    3   /* nothing hostile in that sector */  /*@ID*/
+#define FIRE_NO_ENERGY    4   /* main banks hold less than requested */  /*@ID*/
 
 /* The measured laser formula, as a pure function so it can be tested against
    the readings directly. `dist` is 8.8 fixed point, as trek_dist returns;
@@ -355,7 +364,7 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
    game, with nothing else having happened, showed main at 4950 of 5000. This
    is the manual's unquantified "small amount of energy from the main energy
    banks" (l.339-341). Lowering shields is free. */
-#define SHIELD_RAISE_COST    50
+#define SHIELD_RAISE_COST    50  /*@PROVISIONAL*/
 
 /* Galaxy, as four flat byte arrays rather than an array of structs. Flat
    arrays carry no padding, so the 68000 alignment tax the commodore-uno
@@ -375,19 +384,19 @@ extern uint8_t sector[QUAD_CELLS];
  * DS:235A, all 100 on a fresh game. Twelve rather than the ten on its console
  * because the manual documents a transporter and a shuttlecraft that the
  * console never shows. See MEASURED.md. */
-#define SYS_CONVERTER    0
-#define SYS_SHIELDS      1
-#define SYS_LIFE         2
-#define SYS_LASERS       3
-#define SYS_TUBES        4
-#define SYS_WARP         5
-#define SYS_IMPULSE      6
-#define SYS_SRSCAN       7
-#define SYS_LRSCAN       8
-#define SYS_COMPUTER     9
-#define SYS_TRANSPORTER 10
-#define SYS_SHUTTLE     11
-#define SYS_COUNT       12
+#define SYS_CONVERTER    0  /*@ID*/
+#define SYS_SHIELDS      1  /*@ID*/
+#define SYS_LIFE         2  /*@ID*/
+#define SYS_LASERS       3  /*@ID*/
+#define SYS_TUBES        4  /*@ID*/
+#define SYS_WARP         5  /*@ID*/
+#define SYS_IMPULSE      6  /*@ID*/
+#define SYS_SRSCAN       7  /*@ID*/
+#define SYS_LRSCAN       8  /*@ID*/
+#define SYS_COMPUTER     9  /*@ID*/
+#define SYS_TRANSPORTER 10  /*@ID*/
+#define SYS_SHUTTLE     11  /*@ID*/
+#define SYS_COUNT       12  /*@ID*/
 
 /* Repair rates, MEASURED from the manual 2026-08-24, which gives the whole
  * table (l.464-469):
@@ -426,8 +435,8 @@ extern uint8_t sector[QUAD_CELLS];
  * turns while the focused lasers climbed 0 to 100. That is the manual's "at
  * the expense of other systems" read literally, and it is why there is no
  * budget to divide -- there are four rates and a rule about who gets one. */
-#define REPAIR_PER_STARDATE_FOCUS         60
-#define REPAIR_PER_STARDATE_FOCUS_DOCKED 100
+#define REPAIR_PER_STARDATE_FOCUS         60  /*@MEASURED*/
+#define REPAIR_PER_STARDATE_FOCUS_DOCKED 100  /*@MEASURED*/
 
 typedef struct {
     uint8_t  quad_y, quad_x;
@@ -479,7 +488,7 @@ extern Ship ship;
 
 /* Outcomes of a move request. The UI turns these into messages; the core
    never formats text, so it stays free of any platform's character set. */
-#define MOVE_OK             0
+#define MOVE_OK             0  /*@ID*/
 /* MEASURED 2026-08-25: this is a PARTIAL MOVE, not a refusal. The original
    walks the straight line and leaves the ship in the last clear cell, having
    charged it for the distance it actually covered; the message names the cell
@@ -487,15 +496,15 @@ extern Ship ship;
    trek_block_y/x carry that cell. True of quadrant changes too -- the
    departure path is walked through the quadrant being LEFT, and a move
    blocked there leaves the ship in it. */
-#define MOVE_BLOCKED        1   /* stopped short: see trek_block_y/x */
-#define MOVE_NO_ENERGY      2
-#define MOVE_SAME_PLACE     3
-#define MOVE_BAD_COORDS     4
-#define MOVE_WARP_TOO_LOW   5   /* distance needs a higher warp factor */
+#define MOVE_BLOCKED        1   /* stopped short: see trek_block_y/x */  /*@ID*/
+#define MOVE_NO_ENERGY      2  /*@ID*/
+#define MOVE_SAME_PLACE     3  /*@ID*/
+#define MOVE_BAD_COORDS     4  /*@ID*/
+#define MOVE_WARP_TOO_LOW   5   /* distance needs a higher warp factor */  /*@ID*/
 /* Manual: impulse engines below 50% "simply stop functioning", and the
    original refuses with "ENGINEERING: Move aborted; impulse engines are too
    damaged to use" -- a hard no, not a slower move. */
-#define MOVE_NO_IMPULSE     6
+#define MOVE_NO_IMPULSE     6  /*@ID*/
 
 /* Deterministic PRNG. Owned here rather than taken from libc so that a seed
    reproduces the same galaxy on every platform -- which is what makes a
@@ -569,13 +578,13 @@ void trek_advance_time(uint16_t tenths);
  *
  * `lost` receives the amount destroyed, so the UI can report it; pass NULL
  * if the caller does not care. */
-#define POOL_MAIN        1
-#define POOL_IMPULSE     2
-#define POOL_SHIELDS     3
+#define POOL_MAIN        1  /*@ID*/
+#define POOL_IMPULSE     2  /*@ID*/
+#define POOL_SHIELDS     3  /*@ID*/
 
-#define DIVERT_OK        0
-#define DIVERT_ILLOGICAL 1   /* same pool, or a pool that does not exist */
-#define DIVERT_SHORT     2   /* source does not hold that much */
+#define DIVERT_OK        0  /*@ID*/
+#define DIVERT_ILLOGICAL 1   /* same pool, or a pool that does not exist */  /*@ID*/
+#define DIVERT_SHORT     2   /* source does not hold that much */  /*@ID*/
 
 uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
 
@@ -597,9 +606,9 @@ uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
  * is a UI consequence, but it is a game rule -- it is how the player reads
  * the state at a glance -- so it is recorded here rather than left to the
  * presentation layer to invent. */
-#define SHIELD_OK          0
-#define SHIELD_ALREADY     1
-#define SHIELD_NO_ENERGY   2   /* main banks cannot pay the raising cost */
+#define SHIELD_OK          0  /*@ID*/
+#define SHIELD_ALREADY     1  /*@ID*/
+#define SHIELD_NO_ENERGY   2   /* main banks cannot pay the raising cost */  /*@ID*/
 
 uint8_t trek_shields_up(void);
 uint8_t trek_shields_down(void);
@@ -608,13 +617,13 @@ uint8_t trek_shields_down(void);
 /* MEASURED: floor(20 * elapsed_stardates), and it does NOT divide between
    damaged systems -- two damaged at once each repaired at the full rate. The
    manual claims the crew divide their time evenly; the original does not. */
-#define REPAIR_PER_STARDATE  20
+#define REPAIR_PER_STARDATE  20  /*@MEASURED*/
 
 /* Short range scanner resolution, MEASURED off the original's own code:
    above 90 everything shows, at or below 50 nothing does, and in between
    only the ship, stars and novas. */
-#define SRSCAN_FULL          90
-#define SRSCAN_BLIND         50
+#define SRSCAN_FULL          90  /*@CONFIRMED*/
+#define SRSCAN_BLIND         50  /*@CONFIRMED*/
 
 /* Enemy fire. MEASURED 2026-08-21 by a controlled run against the original --
    one enemy, its hit points written back every turn, our sector fixed, damage
@@ -647,13 +656,13 @@ uint8_t trek_shields_down(void);
  * This supersedes an earlier four-point estimate at a single range that put
  * the coefficient nearer 0.95 and suggested the curve flattened into a floor.
  * It does not flatten; that reading was one range with n=4. */
-#define ENEMY_FIRE_PCT          78   /* percent of hit points, before falloff */
+#define ENEMY_FIRE_PCT          78   /* percent of hit points, before falloff */  /*@MEASURED*/
 
 /* MEASURED: enemies hold fire on about half of their turns -- 5/10, 5/10,
    7/10 and 4/8 across four blocks. Not an artefact of dropped turns: a
    dropped turn shows up as a zero followed by a doubled reading, and the
    surviving figures were tight with no doubles. */
-#define ENEMY_FIRE_ONE_IN        2
+#define ENEMY_FIRE_ONE_IN        2  /*@MEASURED*/
 
 /* A hit that gets past the shields can wreck a system.
  *
@@ -680,7 +689,7 @@ uint8_t trek_shields_down(void);
  * original's shields are a PROPORTIONAL absorber -- at a charge of 200 out of
  * 2500 they took a steady 6.5% of five separate hits -- not a bucket that
  * subtracts. The law is unresolved; see MEASURED.md, "Run 3". */
-#define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */
+#define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */  /*@PROVISIONAL*/
 
 /* ------------------------------------------- shields, and what a hit does
  *
@@ -742,48 +751,48 @@ uint8_t trek_shields_down(void);
 
    and the fitted `charge / 3100` in MEASURED.md was approximating
    2500 / 0.8 = 3125. */
-#define SHIELD_ABSORB_NUM   4
-#define SHIELD_ABSORB_DEN   5
+#define SHIELD_ABSORB_NUM   4  /*@BINARY*/
+#define SHIELD_ABSORB_DEN   5  /*@BINARY*/
 
-#define SHIELD_SYS_HIT_MIN       600
+#define SHIELD_SYS_HIT_MIN       600  /*@FITTED*/
 
 /* MEASURED: a hit that gets through does NOT always wreck something --
    "systems were damaged on roughly three hits in five once a few hundred
    units were reaching energy". */
-#define SYS_DAMAGE_IN_N          3
-#define SYS_DAMAGE_OF_N          5
+#define SYS_DAMAGE_IN_N          3  /*@MEASURED*/
+#define SYS_DAMAGE_OF_N          5  /*@MEASURED*/
 
 /* MEASURED, and this is the half this port had most wrong. Eleven system hits
    were observed and the resulting percentage was ZERO eight times. The four
    that survived read 5%, 22%, 38% and 42%. `trek.c` used to take 20 to 59
    points off, which is a modest bite where the original usually annihilates. */
-#define SYS_WRECK_IN_N           8
-#define SYS_WRECK_OF_N          11
-#define SYS_RESIDUAL_MIN         5
-#define SYS_RESIDUAL_SPAN       38    /* 5..42 inclusive */
+#define SYS_WRECK_IN_N           8  /*@MEASURED*/
+#define SYS_WRECK_OF_N          11  /*@MEASURED*/
+#define SYS_RESIDUAL_MIN         5  /*@MEASURED*/
+#define SYS_RESIDUAL_SPAN       38    /* 5..42 inclusive */  /*@MEASURED*/
 
 /* MEASURED: TWO systems can go in a single turn -- seen twice, Life Support
    with Transporter and EnergyConverter with Warp Engines. Two of the nine
    damaging turns, which is where these come from. */
-#define SYS_SECOND_IN_N          2
-#define SYS_SECOND_OF_N          9
+#define SYS_SECOND_IN_N          2  /*@MEASURED*/
+#define SYS_SECOND_OF_N          9  /*@MEASURED*/
 
 /* What happened during a turn. The core never formats text, so it hands the
    UI a list of facts and lets each platform word them. */
-#define EV_NONE          0
-#define EV_HIT           1   /* y,x = firing sector; amount = damage */
-#define EV_SHIELD_HOLD   2   /* amount = absorbed entirely by shields */
-#define EV_SYSTEM_HIT    3   /* y = system index; amount = new repair pct */
-#define EV_SHIP_LOST     4
-#define EV_ENEMY_MOVED   5   /* y,x = where it moved to */
+#define EV_NONE          0  /*@ID*/
+#define EV_HIT           1   /* y,x = firing sector; amount = damage */  /*@ID*/
+#define EV_SHIELD_HOLD   2   /* amount = absorbed entirely by shields */  /*@ID*/
+#define EV_SYSTEM_HIT    3   /* y = system index; amount = new repair pct */  /*@ID*/
+#define EV_SHIP_LOST     4  /*@ID*/
+#define EV_ENEMY_MOVED   5   /* y,x = where it moved to */  /*@ID*/
 /* Scheduled events, reported the same way. y,x are the GALAXY cell they
    concern, not a sector, except EV_POD_HIT which concerns the whole
    quadrant. `amount` on EV_BASE_ATTACKED is the deadline as a stardate in
    tenths, so the UI can print "they can last until". */
-#define EV_BASE_ATTACKED 6
-#define EV_BASE_LOST     7
-#define EV_TRACTORED     8   /* y,x = the quadrant we were dragged to */
-#define EV_POD_HIT       9   /* amount = damage, to us and to every enemy */
+#define EV_BASE_ATTACKED 6  /*@ID*/
+#define EV_BASE_LOST     7  /*@ID*/
+#define EV_TRACTORED     8   /* y,x = the quadrant we were dragged to */  /*@ID*/
+#define EV_POD_HIT       9   /* amount = damage, to us and to every enemy */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
@@ -831,13 +840,13 @@ void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max);
  * Deliberately NOT included: the ancestor's snapshot-for-time-warp, deep
  * space probes, and supercommander movement. Those need features this core
  * does not have, and inventing them would be worse than leaving them out. */
-#define SCHED_BASE_ATTACK    0   /* a base comes under attack */
-#define SCHED_BASE_FALLS     1   /* ... and is destroyed if not relieved */
-#define SCHED_TRACTOR        2   /* a commander drags us across the galaxy */
-#define SCHED_DEATH_POD      3   /* a Vandal death pod arrives */
-#define SCHED_COUNT          4
+#define SCHED_BASE_ATTACK    0   /* a base comes under attack */  /*@DERIVED*/
+#define SCHED_BASE_FALLS     1   /* ... and is destroyed if not relieved */  /*@DERIVED*/
+#define SCHED_TRACTOR        2   /* a commander drags us across the galaxy */  /*@DERIVED*/
+#define SCHED_DEATH_POD      3   /* a Vandal death pod arrives */  /*@DERIVED*/
+#define SCHED_COUNT          4  /*@DERIVED*/
 
-#define SCHED_NEVER     0xFFFFU  /* the ancestor's FOREVER */
+#define SCHED_NEVER     0xFFFFU  /* the ancestor's FOREVER */  /*@DERIVED*/
 
 void     trek_schedule(uint8_t kind, uint16_t offset_tenths);
 void     trek_unschedule(uint8_t kind);
@@ -939,11 +948,11 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * The undocked figure confirms REPAIR_PER_STARDATE 20 to within the display's
  * rounding, and the rate was identical with one system damaged and with three,
  * which independently confirms that repair does not divide between them. */
-#define REPAIR_PER_STARDATE_DOCKED  50
+#define REPAIR_PER_STARDATE_DOCKED  50  /*@MEASURED*/
 
-#define DOCK_OK              0
-#define DOCK_NO_BASE         1   /* no base adjacent */
-#define DOCK_ALREADY         2
+#define DOCK_OK              0  /*@ID*/
+#define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/
+#define DOCK_ALREADY         2  /*@ID*/
 
 uint8_t trek_dock(void);
 void    trek_undock(void);       /* any movement breaks the dock */
@@ -965,18 +974,18 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 
 /* Fire one torpedo at a sector. A torpedo destroys a standard Mongol
    outright, confirmed against the original. */
-#define TORP_OK          0   /* hit, target survived */
-#define TORP_KILL        1
-#define TORP_MISS        2
-#define TORP_NONE_LEFT   3
-#define TORP_BAD_COORDS  4
+#define TORP_OK          0   /* hit, target survived */  /*@ID*/
+#define TORP_KILL        1  /*@ID*/
+#define TORP_MISS        2  /*@ID*/
+#define TORP_NONE_LEFT   3  /*@ID*/
+#define TORP_BAD_COORDS  4  /*@ID*/
 /* MEASURED 2026-08-23: firing a torpedo AT a star answers "Torpedo absorbed by
  * star." and the star survives -- it is not a miss, and the shot is spent. A
  * star in the FLIGHT PATH is a different case entirely: it goes supernova and
  * takes the quadrant with it. This port does not ray-march yet, so only the
  * first case is modelled; the second is what the "Stars destroyed @ -5"
  * scoring line comes from. */
-#define TORP_ABSORBED    5   /* the target cell held a star */
+#define TORP_ABSORBED    5   /* the target cell held a star */  /*@ID*/
 
 /* Torpedo damage. MEASURED 2026-08-21 against the original, by writing a large
  * hit-point value into the target so it SURVIVES the shot and then reading the
@@ -1001,9 +1010,9 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
  * capped 37% of the time at range 5 against 33% observed, and 183..283 at 7.6
  * against 176..247 observed. Nineteen shots is not many for three constants,
  * and the ancestor's own 700+100*Rand() is a different base entirely. */
-#define TORP_MAX_DAMAGE      355   /* MEASURED, the cap */
-#define TORP_BASE            500   /* FITTED, before falloff */
-#define TORP_SPREAD          101   /* FITTED, a 0..100 roll on top */
+#define TORP_MAX_DAMAGE      355   /* MEASURED, the cap */  /*@MEASURED*/
+#define TORP_BASE            500   /* FITTED, before falloff */  /*@FITTED*/
+#define TORP_SPREAD          101   /* FITTED, a 0..100 roll on top */  /*@FITTED*/
 
 /* Accuracy, MEASURED the same day: 6/6 inside range 2.24, 6/6 at range 5.00,
  * 4/7 at 7.62. Certain out to five and degrading past it. The original
@@ -1014,10 +1023,10 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 /* Three tubes. MEASURED from the original's own refusals -- "Captain, we have
  * only three tubes." and "Captain, only N tubes are functional." -- and it
  * asks how many to fire before it asks where. */
-#define TORP_TUBES             3
+#define TORP_TUBES             3  /*@CONFIRMED*/
 
-#define TORP_SURE_DIST         5   /* whole sectors; inside this it cannot miss */
-#define TORP_MISS_PCT_PER_UNIT 16
+#define TORP_SURE_DIST         5   /* whole sectors; inside this it cannot miss */  /*@MEASURED*/
+#define TORP_MISS_PCT_PER_UNIT 16  /*@FITTED*/
 /* `damage` receives the figure delivered; pass NULL if not wanted. */
 uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage);
 
@@ -1039,9 +1048,9 @@ uint16_t trek_enemy_full_hp(uint8_t type);
 uint8_t trek_self_destruct(void);
 
 /* Mission state. */
-#define GAME_ON          0
-#define GAME_WON         1   /* every Mongol destroyed */
-#define GAME_LOST        2   /* ship gone */
+#define GAME_ON          0  /*@ID*/
+#define GAME_WON         1   /* every Mongol destroyed */  /*@ID*/
+#define GAME_LOST        2   /* ship gone */  /*@ID*/
 uint8_t trek_game_state(void);
 
 /* The itemised score, using the original's own rubric. MEASURED, every weight
@@ -1074,19 +1083,19 @@ uint8_t trek_game_state(void);
 /* MEASURED off the Detailed Evaluation's own rubric, and reachable at last:
    settlements evacuated, at 200 apiece. See core/planet.h for what produces
    them. */
-#define SCORE_PER_RESCUE       200
-#define SCORE_PER_MONGOL        10
-#define SCORE_PER_COMMANDER     20
-#define SCORE_PER_ENEMY_BASE    50
-#define SCORE_PER_KILL_DAY     500
-#define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */
-#define SCORE_INCOMPLETE      (-300)
+#define SCORE_PER_RESCUE       200  /*@MEASURED*/
+#define SCORE_PER_MONGOL        10  /*@MEASURED*/
+#define SCORE_PER_COMMANDER     20  /*@MEASURED*/
+#define SCORE_PER_ENEMY_BASE    50  /*@MEASURED*/
+#define SCORE_PER_KILL_DAY     500  /*@FITTED*/
+#define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */  /*@MEASURED*/
+#define SCORE_INCOMPLETE      (-300)  /*@MEASURED*/
 
 /* MEASURED 2026-08-24 off two loss sheets, combat and self-destruct alike. It
    is a flat penalty for losing the ship, SEPARATE from the casualties, and it
    is absent from a surviving ship's sheet. See the note below CREW_COMPLEMENT
    for why this constant was deleted once and why that was a mistake. */
-#define SCORE_SHIP_LOST       (-200)
+#define SCORE_SHIP_LOST       (-200)  /*@MEASURED*/
 
 /* SETTLED 2026-08-24 by a combat death: the line is REAL and it is -200.
 
@@ -1118,14 +1127,14 @@ uint8_t trek_game_state(void);
    losing the ship and reading the Detailed Evaluation: the whole penalty is
    the crew, at a point each, and -300 + -430 came to exactly the -730 printed.
    An earlier SCORE_SHIP_LOST (-200) here was invented and double-counted. */
-#define CREW_COMPLEMENT        430
+#define CREW_COMPLEMENT        430  /*@MEASURED*/
 
 /* Minimum elapsed time for the rate term, in tenths -- the ancestor's five
    stardates. It applies unconditionally here, where the ancestor applies it
    only when time is zero or enemies remain; with the term gated on a finished
    mission, its other trigger cannot fire. Without a floor a win at 0.1
    stardates would compute 500 x kills x 10, which leaves 16 bits. */
-#define SCORE_MIN_TENTHS        50
+#define SCORE_MIN_TENTHS        50  /*@DERIVED*/
 
 int16_t trek_score(void);
 
@@ -1188,9 +1197,9 @@ uint8_t trek_tubes_available(void);
    a star. Below 50% they do not function at all." Long range: "When less
    than 100% repaired they can no longer detect enemy ships. Below 50% they
    are not functional." */
-#define SCAN_DEAD    0
-#define SCAN_COARSE  1   /* stars only -- no ships */
-#define SCAN_FULL    2
+#define SCAN_DEAD    0  /*@ID*/
+#define SCAN_COARSE  1   /* stars only -- no ships */  /*@ID*/
+#define SCAN_FULL    2  /*@ID*/
 uint8_t trek_srscan_level(void);
 uint8_t trek_lrscan_level(void);
 

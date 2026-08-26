@@ -17,9 +17,9 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check check-tables exit-test sound-check clean
+.PHONY: all test port-check check-tables tiers exit-test sound-check clean
 
-all: test port-check check-tables
+all: test port-check check-tables tiers
 
 test: build/test_trek build/test_serial build/test_hof
 	./build/test_trek
@@ -45,6 +45,14 @@ build/test_serial: core/test/test_serial.c core/serial.c core/trek.c \
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ core/test/test_serial.c core/serial.c core/trek.c \
 	    core/planet.c
+
+# What in the core is measured and what is still a guess. Every #define in
+# core/trek.h and core/planet.h carries a /*@TIER*/ marker on its own line;
+# this fails if one arrives without a provenance. The markers used to live in
+# the prose above a constant, and a scan for them attributed the nearest
+# preceding paragraph -- which reported constants as fitted that were not.
+tiers:
+	@python3 tools/tiers.py
 
 # The port's fixed tables against the ORIGINAL BINARY. Added 2026-08-26 after
 # core/planet.c shipped SEVEN planet names against the binary's EIGHT -- the
