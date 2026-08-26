@@ -852,6 +852,46 @@ useless for the far store but is EXACTLY where an overlay wants to land. So:
     preload, and the biggest open risk in the overlay scope below disappears;
   * it would make startup faster too, which is worth having on its own.
 
+### LOAD against the CHRIN loop: 8.2x, measured 2026-08-26
+
+Same machine, same drive, same 4,096-byte payload, read into the same buffer
+with the buffer cleared between the two so a stale success could not look like
+a fast one. `c128/test/loadbench.c`, built by `make -C c128 loadbench`.
+
+    CHRIN loop, a byte at a time   107 jiffies   1.78s    2,296 bytes/sec
+    KERNAL LOAD, one call           13 jiffies   0.22s   18,904 bytes/sec
+
+Both read all 4,096 bytes, and the buffer was compared against the payload at
+four offsets afterwards -- LOAD delivers the right bytes, not just the right
+count.
+
+**And 8.2x is a LOWER BOUND on the real gain.** The bench's CHRIN path is
+kinder than the port's: it does one `cbm_k_chkin` for the whole file, where
+`far_load` calls `plat_read` in 64-byte chunks and pays a `chkin`/`clrch` pair
+per chunk. The port's actual path is slower than the 2,296 B/s measured here.
+
+**What this changes.**
+
+  * **Overlays should be LOADed straight into the window.** LOAD puts data in
+    the bank-0 address space, which is useless for the far store and exactly
+    right for an overlay. A swap becomes one LOAD of about 3K -- roughly a
+    sixth of a second -- with no bank 1, no far copy and no startup preload.
+    The biggest open risk in the overlay scope below disappears with it.
+  * **Secondary address 0 is the one to use**: "put it where I say", so the
+    file's two header bytes are read and discarded and the overlay lands at
+    the window whatever address it was built at.
+  * **STRINGS.DAT and MUSIC.DAT should probably move too.** They are SEQ files
+    read through CHRIN because the far store needs them in bank 1, and LOAD
+    cannot reach bank 1... except that it can be LOADed into a bank-0 buffer
+    and STASHed across, which is still far quicker than 4,600 bytes of CHRIN.
+    Worth measuring before assuming; it is startup time, which the player
+    feels on every launch.
+  * The disk seam keeps its byte-at-a-time path regardless -- SAVE and the
+    hall of fame need real file writes and small reads, and LOAD cannot write.
+
+**This is the answer to "would a d81 be faster".** It would, by about 10%.
+The read path is worth 8.2x. Format was the wrong question.
+
 ### SCOPE: the overlay seam (written 2026-08-26, NOT BUILT)
 
 Read this before starting it. The mechanism is proven, the arithmetic is

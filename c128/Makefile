@@ -38,7 +38,7 @@ SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
 
-.PHONY: all run rund d64 monitor test verify music clean
+.PHONY: all run rund d64 monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -148,6 +148,27 @@ $(D64): $(OUT)
 	fi
 	@echo "d64: $(D64)"
 	@c1541 -attach $(D64) -dir
+
+# Which way of reading a file is faster: LOAD, or the CHRIN loop the disk
+# seam uses? Answer on 2026-08-26: LOAD, by 8.2x. See test/loadbench.c, and
+# NOTES.md "LOAD against the CHRIN loop". Not part of the game.
+loadbench: test/loadbench.c
+	@mkdir -p build
+	@# NO -T trek128.ld here: that script puts writable data in lowram, and
+	@# a 4K buffer does not fit there. The stock script is what this wants.
+	$(MOSCC) -Oz -I src -I ../core -Wall -Wl,-Map=build/loadbench.map \
+	    -o build/loadbench.prg test/loadbench.c
+	@python3 -c "p = bytes((i*7 + i//251) & 0xFF for i in range(4096)); \
+	    open('build/bench.seq','wb').write(p); \
+	    open('build/bench.prg','wb').write(bytes([0,0x40]) + p)"
+	rm -f build/bench.d64
+	c1541 -format "loadbench,01" d64 build/bench.d64 >/dev/null
+	c1541 -attach build/bench.d64 -write build/loadbench.prg loadbench >/dev/null
+	c1541 -attach build/bench.d64 -write build/bench.seq bench,s >/dev/null
+	c1541 -attach build/bench.d64 -write build/bench.prg benchp >/dev/null
+	@echo "run:  x128 -binarymonitor -binarymonitoraddress ip4://127.0.0.1:6502 \
+-autostart build/bench.d64"
+	@echo "then read the two jiffy counts from \`result\` in build/loadbench.map"
 
 rund: $(D64)
 	x128 -autostart $(D64)
