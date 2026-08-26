@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../trek.h"
+#include "../planet.h"
 #include "../serial.h"
 
 static int failures;
@@ -61,6 +62,9 @@ static void test_round_trip(void) {
     uint8_t i;
     uint16_t hp_before[QUAD_CELLS];
     uint8_t  known_before[GAL_CELLS];
+    Planet   planets_before[PLANET_MAX];
+    uint8_t  inv_before[ITEM_COUNT];
+    uint8_t  count_before, defect_before;
     Ship before;
 
     trek_new_game(4, 999);
@@ -86,7 +90,22 @@ static void test_round_trip(void) {
     base_under_attack = 17;
     bases_lost = 2;
 
+    /* The planet chain. Same trick as the ship fields: move every one of them
+       off what a fresh galaxy would hold, so a field the serialiser forgot
+       cannot pass by still looking right. */
+    ship.orbiting = 2;
+    ship.rescues  = 3;
+    planets[2].flags = PF_SCANNED | PF_TAKEN;
+    planets[2].find  = PFIND_SETTLERS;
+    planets[2].sec   = 41;
+    inventory[ITEM_RAW_ENERGIUM] = 2;
+    planet_defect_restore(40);
+
     before = ship;
+    memcpy(planets_before, planets, sizeof planets_before);
+    memcpy(inv_before, inventory, sizeof inv_before);
+    count_before  = planet_count;
+    defect_before = planet_defect_pct();
     memcpy(hp_before, enemy_hp, sizeof hp_before);
     memcpy(known_before, gal_known, sizeof known_before);
 
@@ -99,6 +118,10 @@ static void test_round_trip(void) {
     memset(gal_known, 0, sizeof gal_known);
     base_under_attack = 0;
     bases_lost = 0;
+    memset(planets, 0, sizeof planets);
+    memset(inventory, 0, sizeof inventory);
+    planet_count = 0;
+    planet_defect_restore(0);
 
     check(trek_state_load(buf, TREK_SAVE_SIZE), "load succeeds");
 
@@ -133,6 +156,16 @@ static void test_round_trip(void) {
 
     check_eq(base_under_attack, 17, "base_under_attack");
     check_eq(bases_lost, 2, "bases_lost");
+
+    check_eq(ship.orbiting, before.orbiting, "the planet being orbited");
+    check_eq(ship.rescues,  before.rescues,  "settlements evacuated");
+    check_eq(planet_count,  count_before,    "planet count");
+    check(memcmp(planets, planets_before, sizeof planets_before) == 0,
+          "the whole planet list survives, tail included");
+    check(memcmp(inventory, inv_before, sizeof inv_before) == 0,
+          "the inventory survives");
+    check_eq(planet_defect_pct(), defect_before,
+             "the escalating crystal odds survive -- SAVE cannot launder them");
 }
 
 /* The RNG and the event queue are as much of the game as the galaxy is.

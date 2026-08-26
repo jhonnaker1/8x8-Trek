@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../trek.h"
+#include "../planet.h"
 
 static int failures = 0;
 
@@ -2184,6 +2185,266 @@ static void test_manual_movement(void) {
        "a within-quadrant delta needs working impulse engines");
 }
 
+/* ------------------------------------------------------------- planets */
+
+/* Put exactly one planet where the test wants it, with the find the test
+   wants. Everything about the chain downstream of generation is easier to
+   assert against a scene than against whatever a galaxy rolled. */
+static void one_planet(uint8_t find, uint8_t dy, uint8_t dx) {
+    uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    uint8_t sy = (uint8_t)((ship.sec_y + dy) & 7);
+    uint8_t sx = (uint8_t)((ship.sec_x + dx) & 7);
+
+    planet_count     = 1;
+    planets[0].quad  = q;
+    planets[0].sec   = (uint8_t)((sy << 3) | sx);
+    planets[0].name  = 0;
+    planets[0].cls   = PCLASS_M;
+    planets[0].find  = find;
+    planets[0].flags = 0;
+    sector[planets[0].sec] = SEC_PLANET;
+    ship.orbiting = PLANET_NONE;
+    ship.shields_up = 0;
+}
+
+static void test_planet_generation(void) {
+    uint16_t seed, energium = 0, total = 0, doubled_up = 0;
+    uint8_t  lo = 255, hi = 0, i, j, bad_name = 0, bad_class = 0;
+
+    puts("planet generation");
+
+    for (seed = 1; seed < 401; seed++) {
+        trek_new_game(3, seed);
+        if (planet_count < lo) lo = planet_count;
+        if (planet_count > hi) hi = planet_count;
+
+        for (i = 0; i < planet_count; i++) {
+            total++;
+            if (planets[i].find == PFIND_ENERGIUM) energium++;
+            if (planets[i].name >= PLANET_NAMES)  bad_name++;
+            if (planets[i].cls  >= PCLASS_COUNT)  bad_class++;
+            for (j = (uint8_t)(i + 1); j < planet_count; j++)
+                if (planets[j].quad == planets[i].quad) doubled_up++;
+        }
+    }
+
+    /* DERIVED from the ancestor: five to ten, and the one galaxy we have read
+       held five. Both ends have to be reachable or the model is not this one. */
+    ok(lo == PLANET_MIN, "the smallest galaxy holds PLANET_MIN planets");
+    ok(hi == PLANET_MIN + PLANET_SPREAD - 1, "and the largest holds ten");
+
+    ok(bad_name == 0,  "every planet's name is in the table");
+    ok(bad_class == 0, "every planet's class is M, N or O");
+
+    /* One in three, and this is the only DERIVED probability in the file that
+       is worth asserting -- the ancestor's own comment says one in three, so a
+       drift here means the roll was rewritten, not that a constant moved. */
+    printf("  energium on %u of %u planets (%u%%), want 33\n",
+           energium, total, (unsigned)(100u * energium / total));
+    ok(energium * 100u / total >= 30 && energium * 100u / total <= 36,
+       "energium falls on one planet in three");
+
+    /* MEASURED: quadrant 6-4 held two of them. A generator that refused
+       collisions would pass every other test in this file and silently
+       contradict the only PLANET LIST page we have. */
+    ok(doubled_up > 0, "two planets can share a quadrant, as 6-4 did");
+}
+
+static void test_orbit(void) {
+    uint16_t before;
+
+    puts("ORBIT");
+
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_ENERGIUM, 3, 3);
+    ok(trek_orbit() == ORBIT_NO_PLANET, "a planet three sectors off is not adjacent");
+    ok(ship.orbiting == PLANET_NONE,    "and no orbit was entered");
+
+    one_planet(PFIND_ENERGIUM, 1, 1);
+    before = ship.stardate;
+    ok(trek_orbit() == ORBIT_OK,         "a planet diagonally adjacent is");
+    ok(ship.orbiting == 0,               "and the orbit records which planet");
+    ok(ship.stardate == before,          "ORBIT costs no time (MEASURED: 0.0)");
+    ok((planets[0].flags & PF_SCANNED) != 0,
+       "the scan is part of the orbit, not a second command");
+    ok(trek_orbit() == ORBIT_ALREADY,    "orbiting twice is refused");
+
+    /* Leaving the quadrant leaves orbit. Without this a LAND after a warp
+       jump would land on a planet in a quadrant the ship is no longer in --
+       and every field trek_land() checks would still look right. */
+    trek_enter_quadrant();
+    ok(ship.orbiting == PLANET_NONE, "entering a quadrant breaks the orbit");
+}
+
+static void test_landing(void) {
+    uint16_t before, cas = 0;
+
+    puts("LAND");
+
+    trek_new_game(3, 909);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_ENERGIUM, 0, 1);
+
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_NO_ORBIT,
+       "landing without orbiting first is refused");
+
+    trek_orbit();
+    ship.shields_up = 1;
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_SHIELDS_UP,
+       "neither way down works with the shields up");
+    ship.shields_up = 0;
+
+    ship.sys[SYS_TRANSPORTER] = 99;
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_DAMAGED,
+       "the transporter is 100% or nothing (manual)");
+    ship.sys[SYS_TRANSPORTER] = 100;
+
+    before = ship.stardate;
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ENERGIUM, "energium is mined");
+    ok(ship.stardate == before, "the transporter costs no time (MEASURED)");
+    ok(inventory[ITEM_RAW_ENERGIUM] == 1, "and one crystal comes aboard");
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ALREADY,
+       "the same planet does not give up a second crystal");
+
+    /* The shuttlecraft's price, and the whole reason to prefer the
+       transporter: 0.2 stardays for the round trip (manual l.490-492). */
+    trek_new_game(3, 910);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_NOTHING, 0, 1);
+    trek_orbit();
+    before = ship.stardate;
+    ok(trek_land(LAND_BY_SHUTTLE, 0) == LAND_NOTHING, "a barren planet yields nothing");
+    ok(ship.stardate == (uint16_t)(before + 2),
+       "the shuttlecraft costs 0.2 stardates where the transporter costs none");
+
+    /* Settlers, which is what makes the +200 line on the score sheet real. */
+    trek_new_game(3, 911);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_SETTLERS, 0, 1);
+    trek_orbit();
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_SETTLERS, "settlers are found");
+    ok(ship.rescues == 1, "and evacuating them counts as a rescue");
+
+    /* A ruined settlement scans the same and rescues nobody. */
+    trek_new_game(3, 912);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_SETTLERS, 0, 1);
+    planets[0].flags |= PF_RUINED;
+    trek_orbit();
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_NOTHING,
+       "a destroyed settlement has nobody left to take off");
+    ok(ship.rescues == 0, "and scores nothing");
+
+    /* A Mongol supply station costs a landing party and is NOT cleared by
+       being walked into -- the party can be sent again, and lose again. */
+    trek_new_game(3, 913);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_MONGOL, 0, 1);
+    trek_orbit();
+    ok(trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_ATTACKED,
+       "a Mongol supply station receives the landing party badly");
+    ok(cas >= LANDING_CASUALTY_MIN &&
+       cas <= LANDING_CASUALTY_MIN + LANDING_CASUALTY_SPAN - 1,
+       "the casualties are reported for the message");
+    ok(ship.casualties == cas, "and land on the ship's tally, which scores");
+    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ATTACKED,
+       "the station is still there on the next visit");
+}
+
+static void test_energium(void) {
+    uint16_t seed, good = 0, defective = 0, dud = 0, before;
+    uint8_t  r, first_pct;
+
+    puts("USE -- raw energium");
+
+    trek_new_game(3, 700);
+    ship.energy = 100; ship.shields = 100;
+    ok(trek_use_energium(0, 0) == USE_NO_ITEM, "with no crystal there is nothing to load");
+
+    /* The gate is the manual's, to the unit: shields under 50% AND main
+       energy under 20%. Both boundaries, both directions -- an off-by-one
+       either way would still let the mechanic look like it works. */
+    inventory[ITEM_RAW_ENERGIUM] = 1;
+    ship.shields = 100;
+    ship.energy  = ENERGY_MAX / 5;
+    ok(!trek_energium_allowed(), "energy at exactly 20% is refused");
+    ship.energy = (uint16_t)(ENERGY_MAX / 5 - 1);
+    ok(trek_energium_allowed(), "one unit under 20% is allowed");
+    ship.shields = SHIELD_MAX / 2;
+    ok(!trek_energium_allowed(), "shields at exactly 50% are refused");
+    ship.shields = (uint16_t)(SHIELD_MAX / 2 - 1);
+    ok(trek_energium_allowed(), "one unit under 50% is allowed");
+
+    ship.energy = 3000;
+    ok(trek_use_energium(0, 0) == USE_REFUSED, "and a healthy ship is refused outright");
+    ok(inventory[ITEM_RAW_ENERGIUM] == 1, "a refusal does not consume the crystal");
+
+    /* The measured outcome: energy 500 -> 7435 of a 5000 maximum. The point
+       of the whole mechanic is that it goes OVER. */
+    trek_new_game(3, 701);
+    for (seed = 1; seed < 400; seed++) {
+        trek_srand(seed);
+        ship.energy  = 500;
+        ship.shields = 300;
+        inventory[ITEM_RAW_ENERGIUM] = 1;
+        planet_defect_restore(CRYSTAL_DEFECT_PCT_0);
+        r = trek_use_energium(0, 0);
+        if (r == USE_GOOD) {
+            good++;
+            if (ship.energy <= ENERGY_MAX)      good += 10000;  /* poisons the count */
+            if (ship.shields != SHIELD_MAX)     good += 10000;
+        } else if (r == USE_DEFECTIVE) defective++;
+        else if (r == USE_DUD)         dud++;
+    }
+    ok(good < 10000, "a good crystal ALWAYS takes energy above ENERGY_MAX");
+    ok(defective > 0 && dud > 0 && good > 0, "all three outcomes occur");
+    printf("  good %u, defective %u, dud %u of %u\n",
+           good, defective, dud, (unsigned)(good + defective + dud));
+
+    /* One measured sample: 500 -> 7435, a gain of 6935. The ancestor's
+       formula is 5000 + 0..4499, so every gain must be in that band. */
+    trek_srand(12345);
+    ship.energy = 500; ship.shields = 300;
+    inventory[ITEM_RAW_ENERGIUM] = 20;
+    planet_defect_restore(0);
+    while (trek_use_energium(0, 0) != USE_GOOD) { ship.energy = 500; }
+    ok(ship.energy >= 500 + CRYSTAL_ENERGY_BASE &&
+       ship.energy <  500 + CRYSTAL_ENERGY_BASE + CRYSTAL_ENERGY_SPAN,
+       "the gain is the ancestor's 5000..9499, which contains the measured 6935");
+
+    /* THE CONVERTER MUST NOT CONFISCATE THE OVERCHARGE. This is the whole
+       reason the mechanic is worth having, and until 2026-08-26 the next
+       tenth of a stardate silently reset energy to 5000 -- no message, and
+       nothing else in the game could ever exceed the maximum to notice. */
+    before = ship.energy;
+    trek_advance_time(1);
+    ok(ship.energy == before,
+       "a passing turn does not confiscate energy above the maximum");
+
+    /* The odds get worse every time -- the ancestor's cryprob, doubling. A
+       mechanic you can repeat safely is not the gamble either game describes. */
+    trek_new_game(3, 702);
+    planet_defect_restore(CRYSTAL_DEFECT_PCT_0);
+    first_pct = planet_defect_pct();
+    ship.energy = 400; ship.shields = 100;
+    inventory[ITEM_RAW_ENERGIUM] = 3;
+    trek_use_energium(0, 0);
+    ok(planet_defect_pct() > first_pct, "each crystal loaded raises the odds of the next");
+}
+
+static void test_rescue_scoring(void) {
+    ScoreSheet s;
+
+    puts("rescues on the score sheet");
+
+    trek_new_game(3, 55);
+    ship.rescues = 3;
+    trek_score_sheet(&s);
+    ok(s.rescues == 3, "the sheet counts the evacuations");
+    ok(s.rescue_pts == 3 * SCORE_PER_RESCUE, "at 200 apiece (MEASURED rubric)");
+}
+
 int main(void) {
     test_distance();
     test_no_16bit_overflow();
@@ -2218,6 +2479,11 @@ int main(void) {
     test_blocked_movement();
     test_warp_timing();
     test_manual_movement();
+    test_planet_generation();
+    test_orbit();
+    test_landing();
+    test_energium();
+    test_rescue_scoring();
 
     puts("");
     if (failures) {

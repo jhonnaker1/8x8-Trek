@@ -197,27 +197,49 @@ class Mon(object):
 
 
 def symbol(name, maps=MAPS):
-    """Address of a linked symbol, from the cl65 map file.
+    """Address of a linked symbol, from the link map.
 
-    cc65 lists a symbol under "Exports list" only if another module imports
-    it, so a global used in just one translation unit will not appear here
-    however global it looks. main.c touches kb_inject once for exactly this
-    reason.
+    TWO MAP FORMATS, because this port changed toolchains under this helper.
+
+    llvm-mos/lld (since 2026-08-23) writes five columns -- VMA, LMA, size,
+    align, name -- with the NAME LAST and no leading underscore:
+
+            16cb     16cb        1     1                 kb_inject
+
+    cc65 wrote an "Exports list" of `_name  address` pairs instead. This read
+    only the cc65 form until 2026-08-26 and had been raising KeyError on every
+    lookup since the toolchain moved; nothing noticed because the two scripts
+    that call it are run by hand. Both forms are accepted now, lld first.
+
+    Either way a symbol has to be REFERENCED to be listed, which is why
+    main.c assigns kb_inject once under TREK_DEBUG_INPUT.
+
+    Note the address is a property of ONE BUILD. kb_inject has moved three
+    times (1682, 1683, 1685, 16cb); a hard-coded address injects into whatever
+    now lives there and reports nothing wrong. Always read it from the map of
+    the build actually running.
     """
-    if not name.startswith("_"):
-        name = "_" + name
+    bare = name[1:] if name.startswith("_") else name
     for path in maps:
         if not os.path.exists(path):
             continue
         for line in open(path):
-            for i, tok in enumerate(line.split()):
-                if tok == name:
-                    parts = line.split()
-                    if i + 1 < len(parts):
-                        try:
-                            return int(parts[i + 1], 16), path
-                        except ValueError:
-                            pass
+            parts = line.split()
+            if not parts:
+                continue
+            # lld: name last, address first.
+            if parts[-1] == bare and len(parts) >= 2:
+                try:
+                    return int(parts[0], 16), path
+                except ValueError:
+                    pass
+            # cc65: "_name  address".
+            for i, tok in enumerate(parts):
+                if tok == "_" + bare and i + 1 < len(parts):
+                    try:
+                        return int(parts[i + 1], 16), path
+                    except ValueError:
+                        pass
     raise KeyError("%s not found in any of %s -- build with `make monitor`?"
                    % (name, ", ".join(maps)))
 

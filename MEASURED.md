@@ -3402,6 +3402,26 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### The planet name's digit is the QUADRANT ROW (2026-08-26)
+
+Not a new run -- a re-reading of what three sessions already captured, prompted
+by building the model. Every planet name we have, against the quadrant it was
+in:
+
+    Gallista-5   quad 5-4        Cygnus-6     quad 6-4
+    Gallista-6   quad 6-4        Andromeda-7  quad 7-1
+    Sigma-7      quad 7-6        Gallista-8   quad 8-4
+    Xevious-8    quad 8-8
+
+Seven for seven. The digit is the 1-based quadrant ROW, so it is not part of
+the name at all, and the seven names in the binary (Andromeda, Ceti Alpha,
+Cygnus, Gallista, Gamma Regula, Sigma, Xevious) are the whole table. It is also
+what makes the duplicates legible: Gallista-5 and Gallista-6 are two planets
+sharing a name, disambiguated by row.
+
+NOTES.md carried one of them as "Gallisto" from a screen capture. The binary
+and the distress message both say **Gallista**.
+
 ### Not reached, and now the only run-1 item left
 
 **Supply and Research docking quantities.** Every base this run turned out to

@@ -456,6 +456,15 @@ typedef struct {
     uint16_t casualties;
     uint8_t  lost;            /* ship destroyed */
     uint8_t  docked;          /* BASE_NONE, or the type docked at */
+    /* Index into planets[], or PLANET_NONE. Here rather than in planet.c
+       because it is ship state -- it has to be saved, and movement has to
+       break it -- and because putting it here keeps planet.h out of trek.h.
+       0xFF is PLANET_NONE; core/planet.h owns the name. */
+    uint8_t  orbiting;
+    /* Settlements evacuated. MEASURED as a scoring line at 200 each on the
+       original's Detailed Evaluation, and it printed zero here until there
+       were planets to evacuate. */
+    uint16_t rescues;
 } Ship;
 
 extern Ship ship;
@@ -486,6 +495,10 @@ extern Ship ship;
 void     trek_srand(uint16_t seed);
 uint16_t trek_rand(void);
 uint8_t  trek_rand_n(uint8_t n);        /* 0 .. n-1 */
+/* The same, for a range wider than a byte. One divide, and the only caller is
+   the energium crystal's 0..4499 -- which is once per crystal, not once per
+   object placed, so the 6502 can afford it where trek_rand_n could not. */
+uint16_t trek_rand_n16(uint16_t n);
 
 /* Distance in 8.8 fixed point between two cells of an 8x8 grid, from a
    64-entry table. Serves both sectors and quadrants, since both are 8x8.
@@ -524,6 +537,18 @@ uint16_t trek_bearing(uint8_t sy, uint8_t sx);
  * DELETED. None of it survived contact with the original. */
 void trek_new_game(uint8_t level, uint16_t seed);
 void trek_enter_quadrant(void);         /* rebuild `sector` from the chart */
+
+/* A random empty cell of the current quadrant, or 0xFF if there is none.
+   Public so core/planet.c can put a planet down after trek_enter_quadrant()
+   has placed everything else; nothing outside the core should call it. */
+uint8_t trek_free_sector(void);
+
+/* Move the clock by `tenths`: the converter tops up, the crew repair, and
+   NOTHING ELSE. Scheduled events are deliberately not run here -- movement
+   uses this and lets the turn loop call trek_run_events() afterwards, so
+   anything else that consumes time (a shuttlecraft round trip) does the same
+   and the messages arrive by one route rather than two. */
+void trek_advance_time(uint16_t tenths);
 
 /* Energy transfer between the three pools -- the E command.
  *
@@ -741,6 +766,14 @@ typedef struct {
    fire, which is the only way to assert a proportion. Appends its events to
    `ev` in the usual way. */
 void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max);
+
+/* Wreck ONE NAMED system, at the measured severity -- zero eight times in
+   eleven, and 5..42% otherwise. Public for the same reason trek_take_hit is:
+   damage arrives from places that are not enemy fire. A defective energium
+   crystal damages the main energy systems specifically, so it needs to say
+   which, where an enemy hit rolls for it. Note the casualties come with it;
+   they are part of what wrecking a system means here. */
+void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max);
 
 
 /* ------------------------------------------------------- scheduled events
@@ -1003,9 +1036,13 @@ uint8_t trek_game_state(void);
  * FITTED, not measured -- but it is a far better-founded guess than before,
  * because the condition is no longer invented.
  *
- * Terms this core does not have: rescues (+200), which need planet
- * evacuations, and stars destroyed (-5), which need a torpedo that can hit
- * one. Both are in the rubric and neither is reachable yet. */
+ * Terms this core does not have: stars destroyed (-5), which needs a torpedo
+ * that can hit one. Rescues (+200) WERE on this list and are now live -- see
+ * core/planet.h and SCORE_PER_RESCUE below. */
+/* MEASURED off the Detailed Evaluation's own rubric, and reachable at last:
+   settlements evacuated, at 200 apiece. See core/planet.h for what produces
+   them. */
+#define SCORE_PER_RESCUE       200
 #define SCORE_PER_MONGOL        10
 #define SCORE_PER_COMMANDER     20
 #define SCORE_PER_ENEMY_BASE    50

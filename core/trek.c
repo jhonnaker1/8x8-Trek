@@ -1,4 +1,5 @@
 #include "trek.h"
+#include "planet.h"
 
 uint8_t gal_enemies[GAL_CELLS];
 uint8_t gal_base[GAL_CELLS];
@@ -28,6 +29,11 @@ uint16_t trek_rand(void) {
 uint8_t trek_rand_n(uint8_t n) {
     if (n == 0) return 0;
     return (uint8_t)(trek_rand() % n);
+}
+
+uint16_t trek_rand_n16(uint16_t n) {
+    if (n == 0) return 0;
+    return (uint16_t)(trek_rand() % n);
 }
 
 /* -------------------------------------------------------------- distance */
@@ -76,7 +82,7 @@ static void reveal_around(uint8_t qy, uint8_t qx) {
 /* Picks a random free sector and returns its index, or 0xFF if the quadrant
    is somehow full. Bounded retries rather than a scan, since a quadrant
    holds at most a handful of objects out of 64 cells. */
-static uint8_t free_sector(void) {
+uint8_t trek_free_sector(void) {
     uint8_t tries, i;
     for (tries = 0; tries < 100; tries++) {
         i = trek_rand_n(QUAD_CELLS);
@@ -130,12 +136,12 @@ void trek_enter_quadrant(void) {
     sector[(ship.sec_y << 3) | ship.sec_x] = SEC_SHIP;
 
     for (n = 0; n < gal_stars[q]; n++) {
-        cell = free_sector();
+        cell = trek_free_sector();
         if (cell != 0xFF) sector[cell] = SEC_STAR;
     }
 
     if (gal_base[q] != BASE_NONE) {
-        cell = free_sector();
+        cell = trek_free_sector();
         if (cell != 0xFF) sector[cell] = SEC_BASE;
     }
 
@@ -143,7 +149,7 @@ void trek_enter_quadrant(void) {
        briefing's "a large number of enemy cruisers, a few command vessels"
        (manual l.211). */
     for (n = 0; n < gal_enemies[q]; n++) {
-        cell = free_sector();
+        cell = trek_free_sector();
         if (cell == 0xFF) break;
         i = trek_rand_n(10);
         if (i < 6)      sector[cell] = SEC_BATTLESHIP;
@@ -152,6 +158,13 @@ void trek_enter_quadrant(void) {
         else            sector[cell] = SEC_COMMAND;
         enemy_hp[cell] = enemy_strength(sector[cell]);
     }
+
+    /* Planets last, so they take a cell nothing else wanted. Leaving the
+       quadrant also leaves orbit -- the same rule movement applies to a dock,
+       and the reason trek_land() can trust ship.orbiting without rechecking
+       where the ship is. */
+    trek_leave_orbit();
+    planet_place();
 
     reveal_around(ship.quad_y, ship.quad_x);
 }
@@ -249,6 +262,9 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.sec_y  = trek_rand_n(QUAD_DIM);
     ship.sec_x  = trek_rand_n(QUAD_DIM);
 
+    /* Before trek_enter_quadrant(), which places the planets it rolls. */
+    planet_new();
+
     trek_enter_quadrant();
 
     /* Seed the schedule. The ancestor does the same in its setup, with means
@@ -275,7 +291,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
 /* The converter supplies ENERGY_PER_DAY per stardate at full repair
    (manual l.265), so a tenth of a stardate is a tenth of that. Damage is
    not modelled yet -- there is no damage system. */
-static void advance_time(uint16_t tenths) {
+void trek_advance_time(uint16_t tenths) {
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
 
     /* Repair is a FOUR-ENTRY RATE TABLE, not a stack of multipliers. Pick the
@@ -308,8 +324,17 @@ static void advance_time(uint16_t tenths) {
        l.367-369), so a wrecked converter cannot dig you out of a hole. */
     gain = (uint16_t)((gain * ship.sys[SYS_CONVERTER]) / 100);
 
-    if (ship.energy + gain > ENERGY_MAX) ship.energy = ENERGY_MAX;
-    else ship.energy = (uint16_t)(ship.energy + gain);
+    /* THE CONVERTER TOPS UP; IT NEVER DRAINS. The `>` test alone used to
+       assign ENERGY_MAX unconditionally once the sum passed it, which quietly
+       CONFISCATED any energy above the maximum on the very next turn. Nothing
+       could exceed it until energium could -- a used crystal takes the ship to
+       7435 of 5000, MEASURED -- and the overcharge would have evaporated on
+       the first tenth of a stardate that passed, with no message and no test
+       to catch it. trek_dock() already guarded the same way. */
+    if (ship.energy < ENERGY_MAX) {
+        if (ship.energy + gain > ENERGY_MAX) ship.energy = ENERGY_MAX;
+        else ship.energy = (uint16_t)(ship.energy + gain);
+    }
 
     /* MEASURED: floor(20 * stardates), applied to every damaged system at
        the full rate rather than divided between them.
@@ -399,10 +424,10 @@ uint8_t trek_dock(void) {
        movement that moves the clock at all -- the whole turn-cost table is in
        MEASURED.md, "Time advances ONLY on movement and docking". This port
        charged nothing for it until 2026-08-26. Exactly one tenth, so
-       advance_time() rather than the hundredths carry: there is no fraction
+       trek_advance_time() rather than the hundredths carry: there is no fraction
        to keep. The dock is already recorded above, so the repair this buys is
        at the docked rate, which is what spending the turn alongside means. */
-    advance_time(1);
+    trek_advance_time(1);
 
     return DOCK_OK;
 }
@@ -614,7 +639,7 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
 }
 
 /* Movement returns a status code and has no event list to fill, so the queue
-   is drained from here instead of from advance_time(). The turn loop calls
+   is drained from here instead of from trek_advance_time(). The turn loop calls
    this once after whatever consumed the turn -- which also means an event
    fires after the move that carried the clock past it, not in the middle of
    it, and the player sees the two in the order they happened. */
@@ -625,7 +650,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
 }
 
 uint8_t trek_advance(uint16_t tenths, TrekEvent *ev, uint8_t max) {
-    advance_time(tenths);
+    trek_advance_time(tenths);
     return trek_run_events(ev, max);
 }
 
@@ -741,7 +766,7 @@ uint8_t trek_set_warp(uint8_t tenths) {
 static void advance_hundredths(uint16_t h) {
     h = (uint16_t)(h + ship.time_frac);
     ship.time_frac = (uint8_t)(h % 10u);
-    advance_time((uint16_t)(h / 10u));
+    trek_advance_time((uint16_t)(h / 10u));
 }
 
 /* --------------------------------------------------------- movement paths */
@@ -1250,7 +1275,7 @@ static uint16_t enemy_fire_energy(uint16_t hp) {
    percentage was ZERO eight times in eleven, and the four survivors read 5%,
    22%, 38% and 42%. This port used to take 20 to 59 points off a system,
    which is a modest bite where the original usually annihilates. */
-static void wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max) {
+void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max) {
     ship.sys[which] = (trek_rand_n(SYS_WRECK_OF_N) < SYS_WRECK_IN_N)
         ? 0
         : (uint8_t)(SYS_RESIDUAL_MIN + trek_rand_n(SYS_RESIDUAL_SPAN));
@@ -1291,7 +1316,7 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
        it with nothing reaching energy at all. That is why this sits here,
        above the penetration test, rather than inside it. */
     if (absorbed >= SHIELD_SYS_HIT_MIN)
-        wreck_system(SYS_SHIELDS, ev, n, max);
+        trek_wreck_system(SYS_SHIELDS, ev, n, max);
 
     if (!through) return;
 
@@ -1315,14 +1340,14 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
     if (through >= SYSTEM_DAMAGE_THRESHOLD &&
         trek_rand_n(SYS_DAMAGE_OF_N) < SYS_DAMAGE_IN_N) {
         uint8_t first = trek_rand_n(SYS_COUNT);
-        wreck_system(first, ev, n, max);
+        trek_wreck_system(first, ev, n, max);
 
         if (trek_rand_n(SYS_SECOND_OF_N) < SYS_SECOND_IN_N) {
             uint8_t second = trek_rand_n(SYS_COUNT);
             /* Never the same one twice in a turn: the original's pairs were
                two DIFFERENT systems, and re-wrecking one already at 0 would
                print a second message saying nothing happened. */
-            if (second != first) wreck_system(second, ev, n, max);
+            if (second != first) trek_wreck_system(second, ev, n, max);
         }
     }
 }
@@ -1621,7 +1646,8 @@ void trek_score_sheet(ScoreSheet *s) {
 
     /* Mechanisms that do not exist yet. Written out rather than left to a
        memset so it is obvious they are zero by absence, not by outcome. */
-    s->rescues     = 0; s->rescue_pts    = 0;
+    s->rescues     = ship.rescues;
+    s->rescue_pts  = (int16_t)(ship.rescues * SCORE_PER_RESCUE);
     s->enemy_bases = 0; s->enemy_base_pts = 0;
     s->stars       = 0; s->star_pts      = 0;
 

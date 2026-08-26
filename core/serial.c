@@ -1,5 +1,6 @@
 #include "serial.h"
 #include "trek.h"
+#include "planet.h"
 
 /* A cursor rather than an index passed around. Cheapest thing on a 6502, and
    it keeps every field to one line so the save and load orders can be read
@@ -63,6 +64,7 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     put16(ship.killed);  put16(ship.killed_cmd);
     put16(ship.casualties);
     put8(ship.lost);     put8(ship.docked);
+    put8(ship.orbiting); put16(ship.rescues);
     for (i = 0; i < SYS_COUNT; i++) put8(ship.sys[i]);
 
     for (i = 0; i < GAL_CELLS; i++) put8(gal_enemies[i]);
@@ -81,6 +83,22 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
 
     put8(base_under_attack);
     put8(bases_lost);
+
+    /* The planet list, and the whole array rather than planet_count entries
+       of it -- a fixed-size record is what lets TREK_SAVE_SIZE be a constant
+       and the byte-exact test in test_serial.c stay byte-exact. planet_new()
+       clears the tail so those bytes are zeros and not last game's galaxy. */
+    put8(planet_count);
+    for (i = 0; i < PLANET_MAX; i++) {
+        put8(planets[i].quad);  put8(planets[i].sec);
+        put8(planets[i].name);  put8(planets[i].cls);
+        put8(planets[i].find);  put8(planets[i].flags);
+    }
+    for (i = 0; i < ITEM_COUNT; i++) put8(inventory[i]);
+    /* How far the captain has pushed his luck with raw energium. Leave it out
+       and reloading resets the odds, which makes SAVE a way to launder the
+       risk out of the one mechanic that is meant to carry some. */
+    put8(planet_defect_pct());
 
     return pos;
 }
@@ -111,6 +129,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     ship.killed = get16();  ship.killed_cmd = get16();
     ship.casualties = get16();
     ship.lost = get8();     ship.docked = get8();
+    ship.orbiting = get8(); ship.rescues = get16();
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = get8();
 
     for (i = 0; i < GAL_CELLS; i++) gal_enemies[i] = get8();
@@ -125,6 +144,15 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
 
     base_under_attack = get8();
     bases_lost = get8();
+
+    planet_count = get8();
+    for (i = 0; i < PLANET_MAX; i++) {
+        planets[i].quad = get8();  planets[i].sec  = get8();
+        planets[i].name = get8();  planets[i].cls  = get8();
+        planets[i].find = get8();  planets[i].flags = get8();
+    }
+    for (i = 0; i < ITEM_COUNT; i++) inventory[i] = get8();
+    planet_defect_restore(get8());
 
     return 1;
 }

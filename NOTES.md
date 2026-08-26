@@ -1124,12 +1124,18 @@ corrected time law vindicated.
      -- and it was three things, not one. See "The shield law" below.
   5. ~~**A system hit is far too gentle.**~~ **DONE 2026-08-26**, matching all
      three measured statistics over 2,000 sampled hits.
-  6. **The planet chain** -- ORBIT, LAND, USE -- captured end to end in run 1,
-     including energium taking energy ABOVE the maximum. Never built.
+  6. ~~**The planet chain** -- ORBIT, LAND, USE~~ **THE MODEL IS BUILT
+     2026-08-26.** core/planet.h and core/planet.c: the planet list, the four
+     finds, ORBIT, LAND both ways down, the inventory and USE. Verified on the
+     machine -- a nine-planet galaxy generated on the C128 and Sigma-6 drawn in
+     the short range scan of quadrant 6-5. What is NOT built is the UI: no
+     ORBIT/LAND/USE command reaches it yet, and no PLANET LIST page. See "The
+     planet chain, built" below.
   7. **RAY**, with its dialog, success sequence and refusal all captured.
   8. **The Top Secret loss report**, the frame five more loss endings reuse.
-  9. **Three scoring lines with no mechanism**: rescues @ 200, enemy bases
-     destroyed @ 50, stars destroyed @ -5. All three print as zero today.
+  9. **Two scoring lines with no mechanism**: enemy bases destroyed @ 50 and
+     stars destroyed @ -5. ~~Rescues @ 200~~ is LIVE as of 2026-08-26 --
+     evacuating a settlement raises ship.rescues and the sheet reads it.
  10. **Reinforcements arriving mid-fight** -- "A Mongol has appeared at 5-4",
      seen repeatedly across the runs.
 
@@ -1140,6 +1146,126 @@ Four and five WERE one job and are done. The shield absorption constant is
 still open in the sense that its system term is a hypothesis that fits rather
 than a measurement; a one-enemy quadrant would settle it, and the shape is
 right either way.
+
+### The planet chain, built (2026-08-26)
+
+The model, not the screens. `core/planet.h` carries the provenance and
+`core/planet.c` the forty lines of rules; the UI has no ORBIT, LAND or USE
+command yet and no PLANET LIST page.
+
+**Two things fell out of the binary that no measurement run had found**, and
+both were sitting in `reference/strings.txt` the whole time. Which is the
+third time this project has gone to an emulator for something a grep would
+have answered -- see "Search the manual before adding anything here".
+
+**The digit after a planet's name is the quadrant ROW.** Seven samples across
+three sessions, seven agreements: Gallista-5 in 5-4, Cygnus-6 and Gallista-6
+both in 6-4, Andromeda-7 in 7-1, Sigma-7 in 7-6, Gallista-8 in 8-4, Xevious-8
+in 8-8. So a planet stores a name INDEX and nothing else about its name, and
+the duplicates in that list become legible -- Gallista-5 and Gallista-6 are
+two planets sharing one of seven names, told apart by the row they sit in.
+
+The seven names are the binary's own table. NOTES.md had one of them as
+"Gallisto", transcribed off a screen capture; the binary says **Gallista**,
+and so does the distress message in MEASURED.md. Corrected.
+
+**The USE gate is stated outright in the manual, and it agrees with the
+ancestor to the unit.** The manual (l.351-354): "regulations prohibit the use
+of raw energium except in extreme emergencies; your shields must be under 50%
+and main energy under 20%." Twenty percent of ENERGY_MAX is 1000, **which is
+the literal threshold in the ancestor's usecrystals()** -- `if (game.energy >=
+1000) ... prohibit such an operation`. Two independent documents landing on the
+same number is the strongest evidence in the whole file, and it makes the one
+measured USE (energy 500, shields 300, both well under) a confirmation rather
+than the only support.
+
+#### What the ancestor supplied, and what EGA Trek changed
+
+`reference/sst2k` earned its keep here. Three constants come from it:
+
+  - **five to ten planets**, its `MAXUNINHAB/2 + (MAXUNINHAB/2+1)*Rand()`.
+    The one EGA Trek galaxy whose PLANET LIST we have read held FIVE -- that
+    range's exact minimum, which is the same shape of evidence that settled
+    the enemy count.
+  - **class M, N or O on a flat third**, its `Rand()*3.0`. All three letters
+    appear in that one list.
+  - **energium on one planet in three**, its `Rand()*1.5`, whose own comment
+    says so.
+  - **the crystal's payoff**, `5000.0*(1.0 + 0.9*Rand())`. The measured use
+    added 6935 to a ship at 500, which sits comfortably inside 5000..9499.
+
+And EGA Trek plainly changed two things. The ancestor's bad crystal **destroys
+the ship** -- `cryprob` starts at 0.05, doubles with every use, and a failed
+roll calls `kaboom()`. EGA Trek's strings have it damage the main energy
+systems and leave you alive. The escalating odds are kept, because a gamble
+you can repeat safely is not a gamble. And the ancestor does not touch the
+shields; EGA Trek's measured use took them 300 to 2500, so a good crystal
+fills them.
+
+Its NINHAB flood of inhabited worlds is deliberately NOT reproduced. That is
+32 class-M planets behind an option flag, and EGA Trek shows no sign of it:
+seven names in the entire binary, a list page that fits on two lines, and a
+settlement that is a per-planet FIND rather than a category of planet.
+
+#### The converter was confiscating energy, and nothing could have noticed
+
+`trek_advance_time()` read
+
+        if (ship.energy + gain > ENERGY_MAX) ship.energy = ENERGY_MAX;
+
+which assigns the maximum unconditionally once the sum passes it -- **including
+when energy was already above it**. Until energium there was nothing in the
+game that could exceed ENERGY_MAX, so the bug was unreachable and invisible;
+the first crystal would have taken the ship to 7435 and the next tenth of a
+stardate would have quietly taken it back to 5000, with no message. `trek_dock`
+had guarded against exactly this since it was written.
+
+The core test asserts it now, and the assertion was checked the only way an
+assertion is worth anything: by putting the old line back and watching it fail.
+
+#### What is still open, and it is one cheap session
+
+**The split of the three non-energium finds.** Energium's third is derived and
+the other two thirds -- settlers, a Mongol supply station, nothing -- are
+invented to give each of the binary's four SCIENCE lines something to print.
+One DOSBox run orbiting every planet in a galaxy and reading the scan line off
+would settle it, and the PLANET LIST page names every planet to visit.
+
+Also unmeasured, and flagged as such in planet.h: the landing-party casualty
+count, whether the class letter gates anything, and whether the second set of
+crystal-loading strings ("Loading energium crystal...", "The crystal must be
+damaged...") belongs to Mongol energium, which is the reading planet.h takes.
+
+**A string collision worth knowing about.** `NAVIGATION: Not adjacent to
+planet.` is what this port prints when DOCK is refused, adopted 2026-08-26 as
+"the original's own words, planet and all" after watching it on screen. The
+binary ALSO carries `NAVIGATION: Not adjacent to base`, unused in that
+capture. So either Anderson's DOCK prints the wrong string -- a bug this port
+now faithfully reproduces -- or the measurement was of something else. ORBIT
+legitimately wants the planet wording, so the two now share it. Worth one
+glance next time the original is running.
+
+#### The rig was broken and had been for three days
+
+`tools/vice_mon.py`'s `symbol()` prepends an underscore and parses the cl65
+map format. This port left cc65 on 2026-08-23. Every lookup through it has
+raised KeyError since, and nothing noticed because the two scripts that call
+it are run by hand. It reads the lld five-column format now, cc65's second.
+
+`kb_inject` has now moved four times -- 1682, 1683, 1685, 16cb -- which is the
+whole argument for reading it from the map of the build actually running.
+
+#### Cost
+
+The overlay window went from 0x0D00 to 0x0F00: `serial.c` grew 412 bytes
+serialising the planet list and pushed the FRONT overlay past the window. That
+is 512 bytes off the free pool, plus the resident model itself; **3,673 bytes
+free**, down from about 4,800.
+
+The Makefile printed `window is 3328` for one build afterwards, because the
+window size was written there as well as in the linker script. It is read out
+of `trek128.ld` now, and an overlay that does not fit fails the build instead
+of printing a line that reads like an overflow.
 
 ### The shield law, and what a hit does now (2026-08-26)
 

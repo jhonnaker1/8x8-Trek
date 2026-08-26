@@ -60,7 +60,7 @@ MEMORY {
      * the linker: it gives each overlay a distinct place in the ELF so their
      * file ranges do not collide, while their RUN addresses all coincide at
      * the window. That overlap is why the link needs --no-check-sections. */
-    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x0D00, LENGTH = 0x0D00
+    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x0F00, LENGTH = 0x0F00
 
     /* ONE STAGING REGION PER OVERLAY, and they must not be merged back into
      * one. A single `AT>ovlimg` shared by every overlay does NOT advance the
@@ -74,12 +74,12 @@ MEMORY {
      * the window is a link error here as well as there. Adding an overlay
      * means adding a region; `make verify` fails the build if two of them
      * ever share a load address again. */
-    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x0E00
-    ovlimg1 (rw) : ORIGIN = 0x10E00, LENGTH = 0x0E00
-    ovlimg2 (rw) : ORIGIN = 0x11C00, LENGTH = 0x0E00
-    ovlimg3 (rw) : ORIGIN = 0x12A00, LENGTH = 0x0E00
-    ovlimg4 (rw) : ORIGIN = 0x13800, LENGTH = 0x0E00
-    ovlimg5 (rw) : ORIGIN = 0x14600, LENGTH = 0x0E00
+    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x0F00
+    ovlimg1 (rw) : ORIGIN = 0x10F00, LENGTH = 0x0F00
+    ovlimg2 (rw) : ORIGIN = 0x11E00, LENGTH = 0x0F00
+    ovlimg3 (rw) : ORIGIN = 0x12D00, LENGTH = 0x0F00
+    ovlimg4 (rw) : ORIGIN = 0x13C00, LENGTH = 0x0F00
+    ovlimg5 (rw) : ORIGIN = 0x14B00, LENGTH = 0x0F00
 
     /* SHORT OF $C000 ON PURPOSE.
      *
@@ -96,7 +96,7 @@ MEMORY {
      *
      * If that assumption ever breaks -- recursion, a function pointer table,
      * alloca -- raise this and expect to have to free space for it. */
-    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x0D00
+    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x0F00
 }
 
 __rc0 = __basic_zp_start;

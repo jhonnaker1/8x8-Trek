@@ -34,7 +34,7 @@ LDLIBS = -lcopy-data
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/music_data.c src/storage.c src/farmem.c src/overlay.c \
       src/strpool.c src/strdata.c \
-      ../core/trek.c ../core/hof.c ../core/serial.c
+      ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
 
@@ -60,11 +60,19 @@ OVERLAYS = eval hof front info repair msgs
 # $(1) = overlay name, $(2) = the ELF to cut it out of. NOT $$< -- $(call)
 # expands once and the result is not re-expanded, so an automatic variable
 # would arrive at objcopy as a literal dollar sign.
+# READ OUT OF THE LINKER SCRIPT, NOT REPEATED HERE. This printed "window is
+# 3328" for one build after trek128.ld went to 0x0F00, which reads as an
+# overflow on an overlay that fits. One number, one home.
+OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1/p' trek128.ld)
+
 define OVL_IMAGE
 	$(OBJCOPY) --dump-section=.ovl_$(1)=build/ovl_$(1).raw $(2) /dev/null
-	@python3 -c "d = open('build/ovl_$(1).raw','rb').read(); \
+	@python3 -c "import sys; \
+	    d = open('build/ovl_$(1).raw','rb').read(); \
+	    w = int('$(OVL_WINDOW)', 16); \
 	    open('build/ovl$(1).prg','wb').write(bytes([0x00,0x40]) + d); \
-	    print('  overlay $(1): %d bytes, window is %d' % (len(d), 0xD00))"
+	    print('  overlay $(1): %d bytes, window is %d' % (len(d), w)); \
+	    sys.exit('overlay $(1) does not fit the window') if len(d) > w else None"
 endef
 
 .PHONY: all run rund d64 monitor test verify music loadbench clean
@@ -91,7 +99,8 @@ test:
 	cc -Wall -Wextra -o build/test_egavdc test/test_egavdc.c
 	./build/test_egavdc
 	cc -Wall -Wextra -o build/test_panels test/test_panels.c src/ui.c \
-	   src/layout.c ../core/trek.c ../core/hof.c ../core/serial.c
+	   src/layout.c ../core/trek.c ../core/planet.c ../core/hof.c \
+	   ../core/serial.c
 	./build/test_panels
 	cc -Wall -Wextra -o build/test_sid test/test_sid.c -lm
 	./build/test_sid
