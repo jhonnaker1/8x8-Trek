@@ -64,7 +64,7 @@ static void test_round_trip(void) {
     uint8_t  known_before[GAL_CELLS];
     Planet   planets_before[PLANET_MAX];
     uint8_t  inv_before[ITEM_COUNT];
-    uint8_t  count_before, defect_before;
+    uint8_t  count_before;
     Ship before;
 
     trek_new_game(4, 999);
@@ -99,13 +99,11 @@ static void test_round_trip(void) {
     planets[2].find  = PFIND_SETTLERS;
     planets[2].sec   = 41;
     inventory[ITEM_RAW_ENERGIUM] = 2;
-    planet_defect_restore(40);
 
     before = ship;
     memcpy(planets_before, planets, sizeof planets_before);
     memcpy(inv_before, inventory, sizeof inv_before);
     count_before  = planet_count;
-    defect_before = planet_defect_pct();
     memcpy(hp_before, enemy_hp, sizeof hp_before);
     memcpy(known_before, gal_known, sizeof known_before);
 
@@ -121,7 +119,6 @@ static void test_round_trip(void) {
     memset(planets, 0, sizeof planets);
     memset(inventory, 0, sizeof inventory);
     planet_count = 0;
-    planet_defect_restore(0);
 
     check(trek_state_load(buf, TREK_SAVE_SIZE), "load succeeds");
 
@@ -164,8 +161,6 @@ static void test_round_trip(void) {
           "the whole planet list survives, tail included");
     check(memcmp(inventory, inv_before, sizeof inv_before) == 0,
           "the inventory survives");
-    check_eq(planet_defect_pct(), defect_before,
-             "the escalating crystal odds survive -- SAVE cannot launder them");
 }
 
 /* The RNG and the event queue are as much of the game as the galaxy is.

@@ -535,8 +535,11 @@ OVL_CODE("planet") static void do_use(void) {
     ui_dialog_line(S(S_196));
 
     {
-        TrekEvent ev[4];
-        uint8_t r = trek_use_energium(ev, 4);
+        /* No event array: a defective crystal costs ENERGY and damages no
+           system, so there is nothing for the core to report. It used to be
+           TrekEvent ev[4] against a trek_wreck_system() that the binary says
+           does not happen. */
+        uint8_t r = trek_use_energium(0, 0);
         switch (r) {
             case USE_GOOD:
                 ui_dialog_line(S(S_198));

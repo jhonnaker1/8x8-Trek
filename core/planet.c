@@ -20,21 +20,12 @@ const char *const item_name[ITEM_COUNT] = {
     "LIFE SUPPORT SUPPLIES", "RAW ENERGIUM"
 };
 
-/* The ancestor's cryprob, which doubles with every crystal loaded. Module
-   state rather than a Ship field because it is a property of how far the
-   captain has pushed his luck, and it is one byte the save file carries. */
-static uint8_t crystal_defect_pct;
-
-uint8_t planet_defect_pct(void)          { return crystal_defect_pct; }
-void    planet_defect_restore(uint8_t v) { crystal_defect_pct = v; }
-
 /* -------------------------------------------------------------- new game */
 
 void planet_new(void) {
     uint8_t i, roll;
 
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = 0;
-    crystal_defect_pct = CRYSTAL_DEFECT_PCT_0;
     ship.orbiting = PLANET_NONE;
     ship.rescues  = 0;
 
@@ -206,35 +197,46 @@ uint8_t trek_energium_allowed(void) {
 }
 
 uint8_t trek_use_energium(TrekEvent *ev, uint8_t max) {
-    uint8_t n = 0;
-    uint16_t gain;
+    uint8_t roll;
+    uint16_t v, gain, loss;
+
+    (void)ev; (void)max;    /* nothing here damages a system -- see planet.h */
 
     if (!inventory[ITEM_RAW_ENERGIUM]) return USE_NO_ITEM;
     if (!trek_energium_allowed())      return USE_REFUSED;
 
     inventory[ITEM_RAW_ENERGIUM]--;
 
-    /* The gamble, and it gets worse every time. Roll the catastrophe first:
-       a defective crystal is a defective crystal whether or not it would
-       also have been a dud. */
-    if (trek_rand_n(100) < crystal_defect_pct) {
-        /* Doubled on a FAILURE only would make the mechanic safer the more it
-           misfires, which is backwards. The ancestor doubles on success; this
-           doubles on use, which covers both and is the same thing whenever a
-           failure is survivable. */
-        if (crystal_defect_pct <= 50) crystal_defect_pct *= 2;
-        trek_wreck_system(SYS_CONVERTER, ev, &n, max);
+    /* ONE ROLL OF SIX, and it is the binary's own. No escalating risk: that
+       was the ancestor's mechanic and EGA Trek does not have it. */
+    roll = trek_rand_n(CRYSTAL_ROLL_OF_N);
+
+    if (roll == CRYSTAL_DEFECT_ROLL) {
+        /* Energy, not a system. Floored at zero rather than allowed to
+           underflow -- the original does the same test against 0.0 and
+           stores zero when the subtraction goes negative. */
+        loss = trek_rand_n16(CRYSTAL_DEFECT_LOSS);
+        ship.energy = (uint16_t)(loss >= ship.energy ? 0 : ship.energy - loss);
         return USE_DEFECTIVE;
     }
-    if (crystal_defect_pct <= 50) crystal_defect_pct *= 2;
+    if (roll <= CRYSTAL_DUD_TO) return USE_DUD;
 
-    if (trek_rand_n(100) < CRYSTAL_DUD_PCT) return USE_DUD;
+    /* Both gains scale by the same V, and the one measurement pins V to five
+       -- see planet.h for why it is not the command level. Staged so no
+       intermediate leaves 16 bits: 5 x 1399 is 6995, and the gate caps energy
+       below 1000 before this runs, so the sum tops out at 7994. */
+    v = CRYSTAL_V;
+    gain = (uint16_t)(v * (CRYSTAL_ENERGY_BASE
+                           + trek_rand_n16(CRYSTAL_ENERGY_SPAN)));
+    ship.energy = (uint16_t)(ship.energy + gain);
 
-    /* OVERCHARGE. Deliberately past ENERGY_MAX -- see planet.h. The sum
-       cannot leave 16 bits: the gate above caps energy at 999 before this
-       runs, so the worst case is 999 + 9499. */
-    gain = (uint16_t)(CRYSTAL_ENERGY_BASE + trek_rand_n16(CRYSTAL_ENERGY_SPAN));
-    ship.energy  = (uint16_t)(ship.energy + gain);
-    ship.shields = SHIELD_MAX;
+    /* TOPPED UP, not set to full. The measured 300-to-2500 was this amount
+       reaching the ceiling, which is a different mechanic from assignment --
+       a badly damaged shield pool does NOT come back full from one crystal. */
+    gain = (uint16_t)(v * (CRYSTAL_SHIELD_BASE
+                           + trek_rand_n16(CRYSTAL_SHIELD_SPAN)));
+    if (ship.shields + gain > SHIELD_MAX) ship.shields = SHIELD_MAX;
+    else ship.shields = (uint16_t)(ship.shields + gain);
+
     return USE_GOOD;
 }

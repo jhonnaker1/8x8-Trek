@@ -289,36 +289,59 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * every other mechanic clamps to -- energium OVERCHARGES the ship, and that
  * is the whole point of a mechanic gated on being nearly dead.
  *
- * The amount is DERIVED from the ancestor, which adds `5000.0*(1.0+0.9*Rand())`
- * -- 5000 to 9500. Our one sample added 6935, comfortably inside it. Shields
- * going to full is EGA Trek's own addition; the ancestor does not do it. */
-#define CRYSTAL_ENERGY_BASE   5000
-#define CRYSTAL_ENERGY_SPAN   4500   /* 0.9 * 5000, so 5000..9499 */
-
-/* Three outcomes, one per pair of strings in the binary:
+ * ------------------------------------------------------------------------
+ * READ OUT OF THE BINARY 2026-08-26, replacing an invented model.
  *
- *   good       "Crystal loaded...it appears good!"  "Energy levels increasing..."
- *   defective  "This crystal is defective! Energy systems going unstable..."
- *              "Damage to main energy systems."
- *   dud        "The crystal appears to be damaged." "No energy gain is apparent."
+ * The routine is fn 0x0ED3B and the outcome is `Random(6)`, decoded from raw
+ * bytes at 0x0EE80:
  *
- * The ancestor's version of the bad branch DESTROYS THE SHIP -- its cryprob
- * starts at 0.05 and DOUBLES with every use, and a failed roll calls kaboom().
- * EGA Trek softened that: its bad branch damages the main energy systems and
- * leaves you alive. The escalating probability is kept, because a mechanic
- * you can safely repeat is not the gamble either game is describing.
+ *     roll 0        DEFECTIVE   energy -= Random(1000), floored at zero
+ *     roll 1, 2     DUD         nothing happens
+ *     roll 3, 4, 5  GOOD        calls fn 0x0934E
  *
- * PROVISIONAL, both of them. 5% doubling is the ancestor's number, not a
- * measured one, and the dud's flat 10% is invented outright -- it is the
- * weakest constant in this file and nothing but a message depends on it.
+ * A crystal WORKS HALF THE TIME, duds a third of the time and hurts one time
+ * in six. This port shipped 5% escalating (the ancestor's cryprob, doubled
+ * per use) with a 10% dud invented outright. Both wrong, and THE ESCALATION
+ * DOES NOT EXIST -- there is no state here, each crystal is an independent
+ * roll of six. planet_defect_pct() and its save-file byte are gone with it.
  *
- * The binary carries a SECOND set of loading strings ("Loading energium
- * crystal...", "The crystal must be damaged...", "No energy is gained.") in a
- * different literal pool. The reading here is that those belong to Mongol
- * energium, a separate inventory item with a parallel routine. Unconfirmed,
- * and it changes nothing until that item has a source. */
-#define CRYSTAL_DEFECT_PCT_0   5     /* first use */
-#define CRYSTAL_DUD_PCT       10
+ * The defective branch also does something other than what was built: it
+ * SUBTRACTS ENERGY and floors it at zero. It does not wreck the converter.
+ * The port called trek_wreck_system(SYS_CONVERTER) on the strength of the
+ * message "Damage to main energy systems.", which reads like system damage
+ * and is not.
+ *
+ * The success handler, fn 0x0934E, is two lines of arithmetic:
+ *
+ *     energy  += V * (700 + Random(700))
+ *     shields += V * (300 + Random(300))
+ *
+ * -- so shields are TOPPED UP by an amount rather than set to full as this
+ * port had it. The measured 300-to-2500 was that amount reaching the ceiling.
+ *
+ * V is [0x1DCC], and the one measurement PINS IT TO FIVE. The gain was 6935,
+ * and 6935 = V x (700 + r) with r in 0..699 has exactly ONE solution in V:
+ * 5 x 1387. No other divisor lands in the window.
+ *
+ * The obvious guess was that V is the command level, and this file used that
+ * for about an hour. The evidence is against it: run 1's tooling starts games
+ * at level 3, and V is 5. So V is taken as the constant the measurement gives
+ * rather than a level dependence the measurement contradicts.
+ *
+ * What would settle it beyond doubt is one emulator run -- load a crystal at
+ * a KNOWN level and divide the gain -- because a second sample at a different
+ * level separates "constant 5" from "the level" immediately. Until then this
+ * reproduces the only reading we have, exactly. */
+#define CRYSTAL_V              5     /* [0x1DCC]; see above */
+#define CRYSTAL_ROLL_OF_N     6
+#define CRYSTAL_DEFECT_ROLL   0      /* roll 0        -- one in six */
+#define CRYSTAL_DUD_TO        2      /* rolls 1..2    -- two in six */
+                                     /* rolls 3..5 are good -- three in six */
+#define CRYSTAL_DEFECT_LOSS 1000     /* energy -= Random(1000) */
+#define CRYSTAL_ENERGY_BASE  700     /* both scaled by V, per the binary */
+#define CRYSTAL_ENERGY_SPAN  700
+#define CRYSTAL_SHIELD_BASE  300
+#define CRYSTAL_SHIELD_SPAN  300
 
 #define USE_NO_ITEM        0   /* "No energium crystals are available to load" */
 #define USE_REFUSED        1   /* the First Officer's regulations speech */
@@ -333,12 +356,5 @@ uint8_t trek_use_energium(TrekEvent *ev, uint8_t max);
 
 /* Whether the gate is open, so the UI can ask before it offers. */
 uint8_t trek_energium_allowed(void);
-
-/* The escalating odds of a defective crystal, for core/serial.c only -- the
-   same arrangement as trek_rng_state(). A save that forgets this reopens the
-   game at the starting odds, which turns SAVE into a way to launder the risk
-   out of the one mechanic built to carry some. */
-uint8_t planet_defect_pct(void);
-void    planet_defect_restore(uint8_t v);
 
 #endif

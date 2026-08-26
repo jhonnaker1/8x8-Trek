@@ -2372,8 +2372,8 @@ static void test_landing(void) {
 }
 
 static void test_energium(void) {
-    uint16_t seed, good = 0, defective = 0, dud = 0, before;
-    uint8_t  r, first_pct;
+    uint16_t seed, good = 0, defective = 0, dud = 0, before, e0;
+    uint8_t  r;
 
     puts("USE -- raw energium");
 
@@ -2382,8 +2382,7 @@ static void test_energium(void) {
     ok(trek_use_energium(0, 0) == USE_NO_ITEM, "with no crystal there is nothing to load");
 
     /* The gate is the manual's, to the unit: shields under 50% AND main
-       energy under 20%. Both boundaries, both directions -- an off-by-one
-       either way would still let the mechanic look like it works. */
+       energy under 20%. Both boundaries, both directions. */
     inventory[ITEM_RAW_ENERGIUM] = 1;
     ship.shields = 100;
     ship.energy  = ENERGY_MAX / 5;
@@ -2399,57 +2398,67 @@ static void test_energium(void) {
     ok(trek_use_energium(0, 0) == USE_REFUSED, "and a healthy ship is refused outright");
     ok(inventory[ITEM_RAW_ENERGIUM] == 1, "a refusal does not consume the crystal");
 
-    /* The measured outcome: energy 500 -> 7435 of a 5000 maximum. The point
-       of the whole mechanic is that it goes OVER. */
+    /* THE ODDS ARE THE BINARY'S: Random(6), roll 0 defective, 1..2 dud,
+       3..5 good. Half of crystals work. This is the assertion that would
+       have caught what shipped -- 5% escalating and a 10% dud, both
+       invented -- so it is written against the proportions and not against
+       "all three occur". */
     trek_new_game(3, 701);
-    for (seed = 1; seed < 400; seed++) {
+    for (seed = 1; seed < 601; seed++) {
         trek_srand(seed);
         ship.energy  = 500;
         ship.shields = 300;
         inventory[ITEM_RAW_ENERGIUM] = 1;
-        planet_defect_restore(CRYSTAL_DEFECT_PCT_0);
         r = trek_use_energium(0, 0);
-        if (r == USE_GOOD) {
-            good++;
-            if (ship.energy <= ENERGY_MAX)      good += 10000;  /* poisons the count */
-            if (ship.shields != SHIELD_MAX)     good += 10000;
-        } else if (r == USE_DEFECTIVE) defective++;
-        else if (r == USE_DUD)         dud++;
+        if      (r == USE_GOOD)      good++;
+        else if (r == USE_DEFECTIVE) defective++;
+        else if (r == USE_DUD)       dud++;
     }
-    ok(good < 10000, "a good crystal ALWAYS takes energy above ENERGY_MAX");
-    ok(defective > 0 && dud > 0 && good > 0, "all three outcomes occur");
-    printf("  good %u, defective %u, dud %u of %u\n",
-           good, defective, dud, (unsigned)(good + defective + dud));
+    printf("  good %u  dud %u  defective %u of %u (want 50/33/17)\n",
+           good, dud, defective, (unsigned)(good + dud + defective));
+    ok(good * 100u / 600u >= 46 && good * 100u / 600u <= 54,
+       "a crystal works three times in six");
+    ok(dud * 100u / 600u >= 29 && dud * 100u / 600u <= 38,
+       "duds two times in six");
+    ok(defective * 100u / 600u >= 13 && defective * 100u / 600u <= 21,
+       "and is defective one time in six");
 
-    /* One measured sample: 500 -> 7435, a gain of 6935. The ancestor's
-       formula is 5000 + 0..4499, so every gain must be in that band. */
-    trek_srand(12345);
-    ship.energy = 500; ship.shields = 300;
+    /* A defective crystal takes ENERGY. It does not wreck the converter,
+       which is what this port did on the strength of the message. */
+    trek_srand(3);
+    ship.energy = 900; ship.shields = 100;
+    for (r = 0; r < SYS_COUNT; r++) ship.sys[r] = 100;
     inventory[ITEM_RAW_ENERGIUM] = 20;
-    planet_defect_restore(0);
-    while (trek_use_energium(0, 0) != USE_GOOD) { ship.energy = 500; }
-    ok(ship.energy >= 500 + CRYSTAL_ENERGY_BASE &&
-       ship.energy <  500 + CRYSTAL_ENERGY_BASE + CRYSTAL_ENERGY_SPAN,
-       "the gain is the ancestor's 5000..9499, which contains the measured 6935");
+    while (trek_use_energium(0, 0) != USE_DEFECTIVE) {
+        ship.energy = 900; ship.shields = 100;
+        inventory[ITEM_RAW_ENERGIUM] = 20;
+    }
+    ok(ship.energy < 900, "a defective crystal costs energy");
+    ok(ship.sys[SYS_CONVERTER] == 100, "and damages no system");
 
-    /* THE CONVERTER MUST NOT CONFISCATE THE OVERCHARGE. This is the whole
-       reason the mechanic is worth having, and until 2026-08-26 the next
-       tenth of a stardate silently reset energy to 5000 -- no message, and
-       nothing else in the game could ever exceed the maximum to notice. */
+    /* A good crystal overcharges past ENERGY_MAX, and TOPS UP the shields
+       rather than filling them -- a badly damaged pool does not come back
+       full from one crystal. */
+    trek_srand(9);
+    ship.energy = 500; ship.shields = 0;
+    inventory[ITEM_RAW_ENERGIUM] = 40;
+    while (trek_use_energium(0, 0) != USE_GOOD) {
+        ship.energy = 500; ship.shields = 0;
+        inventory[ITEM_RAW_ENERGIUM] = 40;
+    }
+    ok(ship.energy > ENERGY_MAX, "a good crystal takes energy above ENERGY_MAX");
+    e0 = (uint16_t)(CRYSTAL_V * CRYSTAL_ENERGY_BASE);
+    ok(ship.energy >= 500 + e0 &&
+       ship.energy <  500 + e0 + CRYSTAL_V * CRYSTAL_ENERGY_SPAN,
+       "by V x (700 + rand 700), the binary's own expression");
+    ok(ship.shields > 0 && ship.shields <= SHIELD_MAX,
+       "and tops the shields up without setting them full");
+
+    /* THE CONVERTER MUST NOT CONFISCATE THE OVERCHARGE. */
     before = ship.energy;
     trek_advance_time(1);
     ok(ship.energy == before,
        "a passing turn does not confiscate energy above the maximum");
-
-    /* The odds get worse every time -- the ancestor's cryprob, doubling. A
-       mechanic you can repeat safely is not the gamble either game describes. */
-    trek_new_game(3, 702);
-    planet_defect_restore(CRYSTAL_DEFECT_PCT_0);
-    first_pct = planet_defect_pct();
-    ship.energy = 400; ship.shields = 100;
-    inventory[ITEM_RAW_ENERGIUM] = 3;
-    trek_use_energium(0, 0);
-    ok(planet_defect_pct() > first_pct, "each crystal loaded raises the odds of the next");
 }
 
 static void test_rescue_scoring(void) {

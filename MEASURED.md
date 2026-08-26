@@ -3402,6 +3402,45 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### The energium crystal, read out of the binary (2026-08-26) -- EXACT
+
+`fn 0x0ED3B`, decoded from raw bytes at 0x0EE80. **A crystal is one roll of
+six and nothing else:**
+
+    roll 0        DEFECTIVE   energy -= Random(1000), floored at zero
+    roll 1, 2     DUD         "The crystal appears to be damaged."
+    roll 3, 4, 5  GOOD        calls fn 0x0934E
+
+So it **works half the time**, duds a third of the time, and hurts one time
+in six. Everything this port shipped here was invented and all of it was
+wrong: 5% escalating (the ancestor's `cryprob`, doubled per use) and a 10%
+dud. **The escalation does not exist** -- there is no state, each crystal is
+an independent roll -- and the saved byte that carried it is gone.
+
+The defective branch **subtracts energy**. It does not wreck the converter,
+which is what the port did on the strength of the message "Damage to main
+energy systems."
+
+`fn 0x0934E`, the success handler, is two lines:
+
+    energy  += V * (700 + Random(700))
+    shields += V * (300 + Random(300))
+
+Shields are **topped up by an amount, not set to full**. The measured
+300-to-2500 was that amount hitting the ceiling, which is a different mechanic
+from assignment: a badly damaged shield pool does NOT come back full from one
+crystal.
+
+**V = 5, and the single measurement pins it.** The gain was 6935, and
+`6935 = V * (700 + r)` with `r` in 0..699 has exactly one solution in V --
+5 x 1387. No other divisor lands in the window.
+
+V was assumed to be the command level for about an hour. The evidence is
+against it: run 1's tooling starts games at level 3 and V is 5. One emulator
+run would settle it beyond doubt -- load a crystal at a KNOWN level and divide
+-- because a second sample at a different level separates "constant 5" from
+"the level" immediately.
+
 ### Galaxy generation, read out of the binary (2026-08-26)
 
 `fn 0x04FD1` is galaxy generation: it references the galaxy array at DS:0x2560
