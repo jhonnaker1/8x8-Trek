@@ -40,6 +40,63 @@ HDR = C128 / "src" / "input.h"
 SRC = C128 / "src" / "input.c"
 
 
+MAP = C128 / "build" / "trek128.map"
+
+
+def check_data_init(mapfile):
+    """.data must actually be copied to where the code expects to find it.
+
+    THIS IS THE SOUND BUG, AND IT IS A WHOLE CLASS, NOT ONE VARIABLE.
+
+    llvm-mos initialises .data at startup only if copy-data.c.obj is linked
+    in, and the Commodore targets deliberately leave it out: their stock
+    script puts c_readonly and c_writeable in the SAME region, so .data's run
+    address equals its load address and there is nothing to copy.
+
+    trek128.ld moves c_writeable to lowram. That splits the two -- and with no
+    copy routine, every `static x = <nonzero>;` in the port came up as
+    whatever RAM held. sid.c's `enabled` came up 0, so snd_poll() returned on
+    its first line and the port was silent with correct note data sitting in
+    bank 1. It took a bank-1 dump to rule the data out and a poke to $1301 to
+    prove the driver had been right all along.
+
+    Nothing else catches it. Both test suites run natively, where .data is the
+    host's problem; the map looks healthy, because the section really does
+    have a VMA, an LMA and a size. Only the running machine shows that the
+    bytes never arrived -- so check the LINK instead, on every build.
+    """
+    if not mapfile.exists():
+        die(f"{mapfile.name} not found -- the map is how this is checked")
+    text = mapfile.read_text()
+
+    size = vma = lma = None
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 5 and parts[4] == ".data":
+            vma, lma, size = (int(parts[i], 16) for i in range(3))
+            break
+    if size is None:
+        die("no .data section line in the map -- has the link script changed?")
+
+    if size == 0:
+        print("verify: .data is empty -- nothing to copy")
+        return
+    if vma == lma:
+        print(f"verify: .data is {size} bytes, loaded in place -- ok")
+        return
+    if "__do_copy_data" not in text:
+        die(
+            f".data is {size} bytes at ${vma:04x}, loaded at ${lma:04x}, "
+            "and NOTHING COPIES IT.\n"
+            "         Every `static x = <nonzero>;` in the port will come up "
+            "as garbage\n"
+            "         on the real machine. Link -lcopy-data -- see LDLIBS in "
+            "the Makefile."
+        )
+    print(f"verify: .data is {size} bytes at ${vma:04x}, copied from "
+          f"${lma:04x} -- ok")
+
+
 def die(msg):
     print(f"verify: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -97,6 +154,8 @@ def main():
 
     if not prg.exists():
         die(f"{prg} not built yet -- run make first")
+
+    check_data_init(MAP)
 
     consts = constants()
     rows = table_rows()

@@ -623,72 +623,82 @@ nothing and found a live bug.
   decide for themselves; this is presentation, and presentation is per-platform
   by design.
 
-### OPEN BUG: no sound since the music moved to bank 1
+### FIXED: no sound since the music moved to bank 1
 
-**Reported by Jamie 2026-08-24, and NOT fixed.** The music was silent before
-the far-store fix because `far_load("MUSIC.DAT")` was failing; that failure is
-gone and it is STILL silent.
+**Reported by Jamie 2026-08-24. FIXED 2026-08-25, and it was never the sound
+code, or the bank-1 move.** `.data` was never initialised on the real machine,
+so sid.c's `static uint8_t enabled = 1;` came up 0 and `snd_poll()` returned on
+its first line -- with correct note data sitting in bank 1 the whole time.
 
-What is verified: `far_len` is 3,359 (2,267 strings + 1,092 music), `mus_base`
-is 2,267, `mus_ok` is set. So the file loads and the driver has been told where
-it is. **That is state, not sound** -- I called it fixed on the strength of
-those three numbers, which was the wrong standard for a thing you listen to.
+The bug is latent from the llvm-mos migration on 2026-08-23, when
+`c128/trek128.ld` was written, not from the bank-1 move a day later. Why it
+surfaced when it did is NOT established: uninitialised RAM is uninitialised,
+and $1301 may simply have held a nonzero byte before. The coincidence is what
+sent this looking at the far store for two days, and the far store was
+innocent.
 
-Where to look next, roughly in order of suspicion:
+**The cause is our own link script.** llvm-mos copies `.data` from its load
+address to its run address only if `copy-data.c.obj` is LINKED IN, and the
+Commodore targets deliberately leave it out: `commodore.ld` aliases
+`c_readonly` and `c_writeable` to the same region, so a Commodore `.data` has
+VMA == LMA and there is nothing to copy. `c128/lib/libcrt0.a` bundles
+init-stack, zero-bss, zero-zp-bss and copy-**zp**-data, and no copy-data.
 
-- `mus_on` is never set, or `snd_music()` is refused earlier than expected.
-  Read `mus_on` and `note_left` from the monitor WHILE the title screen is up.
-- The far offsets are wrong by a track: `mus_offset[]` is generated from note
-  counts, and a track's terminator may not be counted the way the loader lays
-  it out. Dump the first bytes at `mus_base` and compare against
-  `c128/build/music.dat`.
-- `snd_poll()` is not reaching `music_tick()` -- the region detector and the
-  tick accumulator are untouched by this work, but a far read per note change
-  is new and could be starving the poll loop.
-- ~~`make sound-check` has not been run since the move.~~ **RUN 2026-08-24 and
-  it REPRODUCES THE BUG HEADLESSLY**: `PAL -- never found the first note
-  (290 Hz)` and the same for NTSC. So the loop no longer needs Jamie's ears --
-  edit, `make sound-check`, read the answer.
+`trek128.ld` overrides `REGION_ALIAS("c_writeable", lowram)` -- the whole point
+of that file, and the thing that bought the SAVE seam its space. That splits
+VMA from LMA, and nothing was left to bridge them. The fix is one line:
+`LDLIBS = -lcopy-data` in `c128/Makefile`, 26 bytes.
 
-**The harness itself was broken, and that came first.**
+**The map looked perfectly healthy.** `.data` had a VMA ($1300), an LMA
+($be74) and a size (3). What it did not have was anything in `.init.200`
+between `__do_zero_bss` and `__do_copy_zp_data`, and that absence is invisible
+unless you go looking for it.
+
+**How it was actually caught, and the order matters.** The bank-1 dump was
+supposed to convict the far store and instead exonerated it: 1,092 bytes at
+$48DB in `ram01` byte-for-byte identical to `build/music.dat`, and the string
+pool at $4000 reading correctly. With the data cleared, the driver state was
+the only place left, and it read `mus_on=1 mus_ok=1 mus_base=08DB` with
+`mus == mus_head` and `note_left = 0` -- a driver that had been told everything
+and ticked exactly zero times. `snd_poll()` has one early return. Poking
+`$1301 = 1` in the running machine started the title tune mid-frame.
+
+**Only `enabled` actually mattered.** The other two bytes of `.data` are
+`alert_quad` (main.c) and `base_under_attack` (core/trek.c), and both are
+re-assigned by `trek_new_game()` or the per-game reset before anything reads
+them. `enabled` is written nowhere but its initialiser and `snd_toggle()`.
+
+**`make verify` now checks the link, on every build.** If `.data` is non-empty
+and its VMA differs from its LMA, `__do_copy_data` must be in the map or the
+build fails. This is a CLASS, not a variable: every `static x = <nonzero>;`
+anywhere in the port depended on it, and neither test suite can see it --
+both run natively, where `.data` is the host's problem. `c128/Makefile` also
+gained itself as a link dependency, so a change to `LDLIBS` forces a relink.
+
+**Verified end to end.** `make sound-check` passes on both regions: worst pitch
+error +0.44%, tempo +1.0% over ten notes. On the running machine `.data` reads
+`FF 01 40` -- the load image exactly -- and `mus` advances on its own.
+
+**The harness was broken too, and that had to be fixed first.**
 `tools/sound_check.py` autostarted the bare `trek128.prg`. Since the bank-1
 move the music is a FILE ON THE DISK -- with no disk attached `far_load` fails,
 `mus_ok` stays 0 and `snd_music()` refuses, so the tool reported "never found
 the first note" for a build whose driver might have been fine. It now
-autostarts the D64 and `make sound-check` builds it first.
+autostarts the D64 and `make sound-check` builds it first. **Moving data
+invalidates every harness that loads the program**; grep for what autostarts
+what, every time.
 
-**With a valid disk it is STILL silent**, on both regions. So the bug is real
-and the instrument is now honest about it.
-
-**Host-side data is RULED OUT.** `mus_offset[]` is `0, 412, 1052, 1058, 1072,
-1078, 1084` and the terminator spans in `build/music.dat` are exactly the same
-seven. The blob opens `36, 0` -- a 36-tick REST -- then `3, 29`, which is the
-290 Hz the checker looks for, and `music_tick()` handles a leading rest
-correctly (a zero FREQUENCY is a rest; only a zero DURATION ends a track).
-`build/strings.dat` is 2267 bytes, exactly the measured `mus_base`.
-
-**What is now ruled out**, by reading the code rather than guessing:
-
-- The init ORDER is right: `str_load()`, `snd_init()`, `far_load("MUSIC.DAT")`,
-  `snd_music_data()`, then `snd_music(MUS_TITLE)` before `ui_title()`.
-- `snd_poll()` IS reached: it is called from inside `scan()`, which
-  `kb_waitkey()` spins on, so it runs thousands of times a second on the title
-  screen.
-- `far_read()` works in general -- the string pool goes through the same call
-  at runtime and the title screen has words on it.
-
-**The remaining signature points one way.** `music_tick()` reads two bytes at
-`mus`, and if `note[0]` is zero it rewinds to `mus_head`, reads again, and on a
-second zero sets `mus_on = 0` and gates the voice off. **A far read that
-returns zeros for the music region produces exactly what we see**: instant
-silence, with `far_len`, `mus_base` and `mus_ok` all correct because the file
-did load. So the next thing to check is what is actually AT `mus_base` in bank
-1 -- dump it and compare against `c128/build/music.dat` -- rather than anything
-in the driver.
+**A latent bug spotted in passing, not hit.** `snd_poll()` guards with
+`(!mus && !sfx)`, and both are far OFFSETS, not pointers -- a track whose base
+offset is 0 would read as "nothing playing". It is safe only because
+`mus_base` is currently 2,267. `mus_on`/`sfx_on` already exist and say this
+properly.
 
 **The lesson to carry:** sound fails silently in the most literal way, which is
 exactly why `make sound-check` exists. Verifying the loader's state proves the
-data arrived, not that anything plays.
+data arrived, not that anything plays -- and when every piece of state is
+right and the thing still does not work, the next suspect is whether the code
+you are reading is the code that ran.
 
 ### Wanted on their own merits
 

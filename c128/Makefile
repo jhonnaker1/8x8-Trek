@@ -9,6 +9,28 @@
 MOSCC = $(HOME)/llvm-mos/bin/mos-c128-clang
 CFLAGS = -Oz -I src -I ../core -Wall -T trek128.ld
 
+# -lcopy-data IS NOT OPTIONAL HERE, AND LEAVING IT OFF COST THE SOUND BUG.
+#
+# llvm-mos only initialises .data if the routine that copies it from its load
+# address to its run address is LINKED IN, and the Commodore targets do not
+# link it: their stock script aliases c_readonly and c_writeable to the same
+# region, so .data's VMA equals its LMA and there is nothing to copy. The c128
+# libcrt0.a leaves copy-data.c.obj out on exactly that reasoning.
+#
+# trek128.ld moves c_writeable to lowram (see the header there). That splits
+# VMA from LMA -- and with no copy routine, .data was simply NEVER INITIALISED.
+# The three bytes in it came up as whatever was in RAM. One of them was sid.c's
+# `enabled`, which is why the port was silent: snd_poll() returns immediately
+# on !enabled, so mus_base, mus_ok and the bank-1 note data were all correct
+# and the driver never ran a tick. Proven by poking $1301 = 1 in VICE, which
+# started the title tune mid-frame.
+#
+# THE FAILURE IS SILENT AND IT IS NOT LOCAL TO SOUND. Any `static x = 1;` in
+# any file lands in .data. The linker does not warn, the map looks right --
+# .data has a VMA, an LMA and a size -- and only reading the running machine
+# shows the bytes never arrived. `make verify` now checks for the routine.
+LDLIBS = -lcopy-data
+
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/music_data.c src/storage.c src/farmem.c \
       src/strpool.c src/strdata.c \
@@ -63,18 +85,18 @@ HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
 # guest memory, but only if it knows where a variable lives, and the map is
 # the only place that says. Poking ship state and screenshotting the result is
 # the fastest way to check a panel without playing to that state.
-$(OUT): $(SRC) $(HDR) trek128.ld
+$(OUT): $(SRC) $(HDR) trek128.ld Makefile
 	@mkdir -p build
-	$(MOSCC) $(CFLAGS) -Wl,-Map=build/trek128.map -o $(OUT) $(SRC)
+	$(MOSCC) $(CFLAGS) -Wl,-Map=build/trek128.map -o $(OUT) $(SRC) $(LDLIBS)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
 # must not have it. Separate output means `make run` can never accidentally
 # launch the instrumented one.
-$(DEBUG_OUT): $(SRC) $(HDR) trek128.ld
+$(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 	@mkdir -p build
 	$(MOSCC) $(CFLAGS) -DTREK_DEBUG_INPUT \
-	     -Wl,-Map=build/trek128-debug.map -o $(DEBUG_OUT) $(SRC)
+	     -Wl,-Map=build/trek128-debug.map -o $(DEBUG_OUT) $(SRC) $(LDLIBS)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows

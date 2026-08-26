@@ -20,6 +20,27 @@
  * Derived from mos-platform/c128/lib/link.ld and commodore.ld. The ONLY
  * substantive change is REGION_ALIAS("c_writeable", lowram); everything else
  * is those two files inlined so the alias can be overridden.
+ *
+ * THAT ONE CHANGE HAS A DEBT, AND NOT PAYING IT COST THE SOUND BUG. Moving
+ * c_writeable off c_readonly gives .data a run address that differs from its
+ * load address -- and llvm-mos only bridges the two if copy-data.c.obj is
+ * LINKED IN. The Commodore targets never link it, because with both aliases
+ * on the same region their .data needs no copy at all; c128/lib/libcrt0.a
+ * bundles init-stack, zero-bss, zero-zp-bss and copy-ZP-data, and no
+ * copy-data. So .data was simply never initialised, and sid.c's
+ * `static uint8_t enabled = 1;` came up 0.
+ *
+ * It has been latent since the llvm-mos migration on 2026-08-23, which is
+ * when this script was written. Why it SURFACED alongside the bank-1 move a
+ * day later is not established -- uninitialised RAM is uninitialised, and
+ * $1301 may simply have held a nonzero byte before. Do not read the timing as
+ * evidence about the far store; the bank-1 dump cleared it outright.
+ *
+ * c128/Makefile links -lcopy-data for exactly this reason, and `make verify`
+ * fails the build if .data is non-empty, has VMA != LMA, and no
+ * __do_copy_data in the map. Do not drop either without moving c_writeable
+ * back. The failure is silent, the map looks correct, and both test suites
+ * run natively where .data is the host's problem.
  */
 
 __basic_zp_start = 0x000A;
