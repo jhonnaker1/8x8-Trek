@@ -57,6 +57,9 @@ static const Key keys[] = {
     { 2, 4, KB_C }, { 2, 5, KB_F },
     /* A, for A# -- acknowledge a message. */
     { 1, 2, KB_A },
+    /* O)rbit, and U for USE. Added 2026-08-26 with the planet chain. LAND
+       needs no new key -- L, A, N and D were all already here. */
+    { 4, 6, KB_O }, { 3, 6, KB_U },
     { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
     { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 },
     { 2, 0, KB_DIGIT0 + 5 }, { 2, 3, KB_DIGIT0 + 6 },

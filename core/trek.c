@@ -947,8 +947,11 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
                         (uint8_t)((ship.quad_x << 3) | sx));
 
     /* A move stopped on its very first step has not moved the ship, so it
-       does not cast off either. Every other outcome breaks the dock. */
-    if (walk_dy || walk_dx) trek_undock();
+       does not cast off either. Every other outcome breaks the dock -- and
+       the orbit, for the same reason: an orbit is a position relative to a
+       planet, and one sector of impulse leaves it. Without this, LAND would
+       still find ship.orbiting set from across the quadrant. */
+    if (walk_dy || walk_dx) { trek_undock(); trek_leave_orbit(); }
 
     sector[(ship.sec_y << 3) | ship.sec_x] = SEC_EMPTY;
     ship.sec_y = (uint8_t)(walk_y & 7);
@@ -1074,7 +1077,7 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
        four sectors of a westward jump at warp 1.0 cost 5.5000 stardates,
        which is 11 * 0.5 and not 11 * 1. */
     if (walk_path(ay1, ax1)) {
-        if (walk_dy || walk_dx) trek_undock();
+        if (walk_dy || walk_dx) { trek_undock(); trek_leave_orbit(); }
 
         sector[(ship.sec_y << 3) | ship.sec_x] = SEC_EMPTY;
         ship.sec_y = (uint8_t)(walk_y & 7);

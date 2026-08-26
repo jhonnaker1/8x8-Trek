@@ -9,6 +9,7 @@
 #include "input.h"
 #include "egavdc.h"
 #include "../../core/trek.h"
+#include "../../core/planet.h"
 #include "../../core/hof.h"
 #include "../../core/serial.h"
 #include "../../core/storage.h"
@@ -559,6 +560,42 @@ void ui_draw_viewer(void) {
     uint16_t d;
 
     clear_panel(P_VIEWER);
+
+    /* MEASURED, indirectly but plainly: the binary carries a run of MAIN
+       VIEWER page titles with numeric page codes -- SPACE COMM NET 411,
+       STANDARD ORBIT 301, POWER DISTRIB 509, SHIP STATUS 501, GRAV FIELD
+       502, ARRAY MONITOR 504, STRUC INTEGRITY 505, PLANET LIST 601 and 602.
+       So the viewer is a paged instrument display and STANDARD ORBIT is the
+       page it shows while orbiting. This port draws that one page; the rest
+       are decoration for a screen this port does not have room to cycle.
+       The orbit page wins over the enemy silhouette because being in orbit
+       is the rarer state and the one the player just asked for. */
+    if (ship.orbiting != PLANET_NONE) {
+        const Planet *p = &planets[ship.orbiting];
+        char row[24];
+        unsigned char k = 0;
+
+        scr_puts(x, y, S(S_232), COL_LABEL);
+
+        /* Built into a buffer and drawn with scr_puts, NOT written cell by
+           cell with scr_put: scr_put takes a raw SCREEN CODE, where a letter
+           is 1..26, and only scr_puts runs text through the converter. A
+           name pushed through scr_put draws as punctuation. */
+        while (planet_name[p->name][k] && k < 16) {
+            row[k] = planet_name[p->name][k];
+            k++;
+        }
+        row[k++] = '-';
+        row[k++] = (char)('0' + ((p->quad >> 3) + 1));
+        row[k] = 0;
+        scr_puts(x, (unsigned char)(y + 2), row, COL_VALUE);
+
+        row[0] = 'T'; row[1] = 'Y'; row[2] = 'P'; row[3] = 'E'; row[4] = ' ';
+        row[5] = planet_class_letter[p->cls];
+        row[6] = 0;
+        scr_puts(x, (unsigned char)(y + 3), row, COL_VALUE);
+        return;
+    }
 
     cell = nearest_enemy(&d);
     if (cell == QUAD_CELLS) {
@@ -1221,6 +1258,84 @@ void ui_repair_report(void) {
                  repair_tenths((unsigned char)(100 - pct),
                                REPAIR_PER_STARDATE), color);
     }
+
+    scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
+             S(S_40), COL_DEPT);
+}
+
+/* ------------------------------------------------------- PLANET LIST
+
+   The original puts this on the MAIN VIEWER, across TWO pages -- its binary
+   holds both "PLANET LIST 601" and "PLANET LIST 602". This port gives it one
+   full-width report instead, in the shape of STATE OF REPAIR, for a reason
+   worth writing down rather than deciding twice: the capture in NOTES.md
+   shows THREE COLUMNS of entries per row, and this port's MAIN VIEWER is
+   twenty columns wide because that is what the 640x350 measurement gives it.
+   Three columns of "6-4N Cygnus-6" is sixty characters. Both cannot be true
+   of the same panel, so one of the two readings is wrong and neither is worth
+   guessing at. A report holds all ten either way.
+
+   The format IS the original's: quadrant, class letter with no space, name
+   with the row digit. "5-4N GALLISTA-5".
+
+   Only planets in scanned quadrants are listed, which is the CHART's own rule
+   rather than a measured one -- the chart is titled CHART OF KNOWN GALAXY and
+   a planet list that knows more than the chart would be odd. Whether the
+   original gates it at all is unmeasured. */
+OVL_CODE("planet") void ui_planet_list(void) {
+    unsigned char y = (unsigned char)(REP_Y + 2);
+    unsigned char i, k, n = 0;
+    const Planet *p;
+    char row[24];
+
+    box(REP_X, REP_Y, REP_W, REP_H, COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 15), REP_Y, S(S_225), COL_VALUE);
+
+    for (i = 0; i < planet_count; i++) {
+        p = &planets[i];
+        if (!gal_known[p->quad]) continue;
+
+        /* "5-4N GALLISTA-5", one string, one seek. */
+        row[0] = (char)('0' + ((p->quad >> 3) + 1));
+        row[1] = '-';
+        row[2] = (char)('0' + ((p->quad & 7) + 1));
+        row[3] = planet_class_letter[p->cls];
+        row[4] = ' ';
+        k = 5;
+        while (planet_name[p->name][k - 5]) row[k] = planet_name[p->name][k - 5], k++;
+        row[k++] = '-';
+        row[k++] = (char)('0' + ((p->quad >> 3) + 1));
+        row[k] = 0;
+        scr_puts((unsigned char)(REP_X + 3), y, row, COL_VALUE);
+
+        /* What ORBIT found, once it has been there. An unvisited planet says
+           nothing, which is the whole point of going. */
+        if (p->flags & PF_TAKEN)
+            scr_puts((unsigned char)(REP_X + 24), y, S(S_206), COL_GRID);
+        else if (p->flags & PF_SCANNED)
+            switch (p->find) {
+                case PFIND_ENERGIUM:
+                    scr_puts((unsigned char)(REP_X + 24), y, S(S_200), COL_GRID);
+                    break;
+                case PFIND_SETTLERS:
+                    scr_puts((unsigned char)(REP_X + 24), y, S(S_228), COL_GRID);
+                    break;
+                case PFIND_MONGOL:
+                    scr_puts((unsigned char)(REP_X + 24), y, S(S_216), COL_GRID);
+                    break;
+                default:
+                    scr_puts((unsigned char)(REP_X + 24), y, S(S_197), COL_GRID);
+                    break;
+            }
+
+        y++;
+        n++;
+        if (y >= (unsigned char)(REP_Y + REP_H - 3)) break;
+    }
+
+    if (!n)
+        scr_puts((unsigned char)(REP_X + 12), (unsigned char)(REP_Y + 4),
+                 S(S_218), COL_GRID);
 
     scr_puts((unsigned char)(REP_X + 11), (unsigned char)(REP_Y + REP_H - 2),
              S(S_40), COL_DEPT);

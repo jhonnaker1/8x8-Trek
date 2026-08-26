@@ -51,7 +51,7 @@ DEBUG_OUT = build/trek128-debug.prg
 # That is the whole idea, and without this lld refuses the link.
 OBJCOPY = $(HOME)/llvm-mos/bin/llvm-objcopy
 LDFLAGS = -Wl,--no-check-sections
-OVERLAYS = eval hof front info repair msgs
+OVERLAYS = eval hof front info repair msgs planet
 
 # Each overlay ships as a PRG. The two-byte header is the load address, which
 # ovl_load() discards by using secondary address 0 -- the window is where it
@@ -141,6 +141,7 @@ $(OUT): build/trek128.elf
 	$(call OVL_IMAGE,info,build/trek128.elf)
 	$(call OVL_IMAGE,repair,build/trek128.elf)
 	$(call OVL_IMAGE,msgs,build/trek128.elf)
+	$(call OVL_IMAGE,planet,build/trek128.elf)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
@@ -161,6 +162,7 @@ $(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 	$(call OVL_IMAGE,info,build/trek128-debug.elf)
 	$(call OVL_IMAGE,repair,build/trek128-debug.elf)
 	$(call OVL_IMAGE,msgs,build/trek128-debug.elf)
+	$(call OVL_IMAGE,planet,build/trek128-debug.elf)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows
@@ -220,6 +222,9 @@ $(D64): $(OUT)
 	    python3 -c "import sys; d = open('build/music.dat','rb').read(); \
 	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
 	    c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null; \
+	else \
+	    echo "d64: NO MUSIC.DAT -- the game will play SILENTLY."; \
+	    echo "     run \`make music\` (needs reference/) to generate it."; \
 	fi
 	@# The overlays, one PRG each. ovl_load() LOADs them into the window.
 	@for o in $(OVERLAYS); do \

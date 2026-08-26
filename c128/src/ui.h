@@ -109,6 +109,11 @@ void ui_info_panel(void);
    Blocks on an explicit Y or N -- see ui.c for why RETURN is not a shortcut. */
 uint8_t ui_play_again(void);
 
+/* PLANET LIST. Every charted planet with its quadrant, class and name, and
+   what ORBIT found there once it has been. Costs no turn -- it is a report.
+   See ui.c for why this is a report and not a MAIN VIEWER page. */
+void ui_planet_list(void);
+
 void ui_evaluation(void);
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score);
 

@@ -12,6 +12,7 @@
 #include "sid.h"
 #include "../../core/farmem.h"
 #include "../../core/trek.h"
+#include "../../core/planet.h"
 
 /* 8x8 Trek -- C128 VDC port, milestone 2.
  *
@@ -285,6 +286,277 @@ static void do_dock(void) {
             ui_message(S(S_52), S(S_53));
             break;
     }
+}
+
+/* ------------------------------------------------- the planet chain
+
+   ORBIT, LAND and USE. The model and every constant behind it are in
+   core/planet.h; this is only the wording and the dialogs. The original's
+   own strings are in reference/strings.txt and are followed where they fit
+   -- the panel gives a message 38 cells minus its department, and several of
+   Anderson's lines are twice that, so the long ones are said shorter rather
+   than truncated. See check_message_widths() in tools/verify_prg.py for why
+   truncation is not an option. */
+
+/* The planet's name and class, "GAMMA REGULA-8, TYPE O". The digit is the
+   1-based quadrant ROW and is not stored -- see core/planet.h. */
+static uint8_t put_planet(char *buf, const Planet *p) {
+    uint8_t k = put_str(buf, planet_name[p->name]);
+    buf[k++] = '-';
+    k += put_u16(buf + k, (uint16_t)((p->quad >> 3) + 1));
+    return k;
+}
+
+/* What the orbit scan says. SCIENCE has 29 cells to say it in, so these are
+   the original's four findings in this port's own words rather than its
+   sentences: "SCIENCE: Scanners indicate the presence of energium on planet."
+   is 53 characters before the department is counted. */
+static const char *scan_line(const Planet *p) {
+    switch (p->find) {
+        case PFIND_ENERGIUM: return "ENERGIUM PRESENT ON PLANET.";
+        case PFIND_SETTLERS: return (p->flags & PF_RUINED)
+                                    ? "A DESTROYED SETTLEMENT."
+                                    : "A SETTLEMENT ON THE PLANET.";
+        case PFIND_MONGOL:   return "A MONGOL SUPPLY STATION.";
+        default:             return "NOTHING OF INTEREST.";
+    }
+}
+
+static void do_orbit(void) {
+    const Planet *p;
+    uint8_t k;
+
+    switch (trek_orbit()) {
+        case ORBIT_OK:
+            p = &planets[ship.orbiting];
+            ui_message(S(S_52), S(S_204));
+            /* The original's second line reads "Planet Sigma-7, Type O." and
+               will not fit behind NAVIGATION: with the longest of the seven
+               names. The word PLANET goes, since the line above just said
+               we are orbiting one. */
+            k = put_planet(linebuf, p);
+            k += put_str(linebuf + k, S(S_193));
+            linebuf[k++] = planet_class_letter[p->cls];
+            linebuf[k] = 0;
+            ui_message(S(S_52), linebuf);
+            ui_message(S(S_178), scan_line(p));
+            break;
+        case ORBIT_ALREADY:
+            ui_message(S(S_52), S(S_240));
+            break;
+        default:
+            /* The original's own words, and the string this port already
+               had -- see the note in do_dock about which command it was
+               measured on. */
+            ui_message(S(S_52), S(S_53));
+            break;
+    }
+}
+
+/* LAND and USE both live in the PLANET overlay -- they are dialogs that run
+   only when asked, and between them they are most of a kilobyte. do_orbit
+   stays resident: it is three messages, and it is on the path of every turn
+   that ends in one.
+
+   LAND. The original's four-beat sequence per route, then the finding.
+
+   The manual is the authority on the choice: the transporter "is the better
+   choice since the shuttlecraft takes 0.2 stardays to make the round trip
+   whereas the transporter is virtually instantaneous". Both are 100%-or-
+   nothing, and the menu marks a damaged one the way the original does, with
+   a "(damaged)" suffix rather than by hiding the option. */
+OVL_CODE("planet") static void do_land(void) {
+    char buf[8];
+    uint16_t cas = 0;
+    uint8_t how, r, k;
+
+    if (ship.orbiting == PLANET_NONE) {
+        /* Anderson's spelling, two t's and all -- the same rule the DOCK
+           refusal follows. */
+        ui_message(S(S_52), S(S_220));
+        return;
+    }
+    if (ship.shields_up) {
+        /* "ENGINEERING: Cannot use transporters or shuttlecraft with shields
+           up." is 62 characters against the 25 the panel gives ENGINEERING. */
+        ui_message(S(S_31), S(S_229));
+        return;
+    }
+
+    ui_dialog_open(S(S_209));
+    ui_dialog_line(S(S_208));
+
+    k = put_str(linebuf, S(S_188));
+    if (!trek_shuttle_ok()) k += put_str(linebuf + k, S(S_191));
+    linebuf[k] = 0;
+    ui_dialog_line(linebuf);
+
+    k = put_str(linebuf, S(S_189));
+    if (!trek_transporter_ok()) k += put_str(linebuf + k, S(S_191));
+    linebuf[k] = 0;
+    ui_dialog_line(linebuf);
+
+    ui_dialog_line(S(S_190));
+    ui_dialog_ask(S(S_242), buf, sizeof buf);
+
+    how = (uint8_t)grab_num(buf);
+    if (how != 1 && how != 2) {
+        ui_dialog_line(S(S_194));
+        ui_dialog_close();
+        return;
+    }
+    how = (uint8_t)(how == 1 ? LAND_BY_SHUTTLE : LAND_BY_TRANSPORTER);
+
+    /* A FRESH PAGE FOR THE TRIP. The menu is five rows of the dialog's nine,
+       and the four beats plus the finding plus the closing prompt is six
+       more -- so on one page the box reframes mid-sequence and the player is
+       left looking at an empty dialog with HIT RETURN in it. The landing had
+       worked; it just said nothing.
+
+       Caught on the machine and not by a test: the inventory held the
+       crystal while the screen held nothing, which is the same silent shape
+       the F)ix system list failed in. */
+    ui_dialog_open(S(S_209));
+
+    /* The first two beats go out BEFORE the core is asked, because they are
+       the trip and the trip happens whatever is waiting on the surface. */
+    if (how == LAND_BY_SHUTTLE) {
+        if (!trek_shuttle_ok()) {
+            ui_dialog_line(S(S_230));
+            ui_dialog_close();
+            return;
+        }
+        ui_dialog_line(S(S_215));
+        ui_dialog_line(S(S_212));
+    } else {
+        if (!trek_transporter_ok()) {
+            ui_dialog_line(S(S_236));
+            ui_dialog_close();
+            return;
+        }
+        ui_dialog_line(S(S_214));
+        ui_dialog_line(S(S_213));
+    }
+
+    r = trek_land(how, &cas);
+    switch (r) {
+        case LAND_ENERGIUM:
+            ui_dialog_line(S(S_201));
+            break;
+        case LAND_SETTLERS:
+            ui_dialog_line(S(S_226));
+            ui_dialog_line(S(S_205));
+            break;
+        case LAND_ATTACKED:
+            k = put_str(linebuf, S(S_210));
+            k += put_u16(linebuf + k, cas);
+            k += put_str(linebuf + k, S(S_192));
+            linebuf[k] = 0;
+            ui_dialog_line(linebuf);
+            break;
+        case LAND_ALREADY:
+            ui_dialog_line(S(S_223));
+            break;
+        default:
+            ui_dialog_line(S(S_221));
+            break;
+    }
+
+    ui_dialog_line(how == LAND_BY_SHUTTLE ? S(S_231)
+                                          : S(S_211));
+    ui_dialog_close();
+}
+
+/* USE. One item has a source in this core -- raw energium -- but the dialog
+   is built off the inventory array rather than around that one item, because
+   the original's is: it prints a numbered list of the types held, with the
+   quantity in brackets, and the four other types are already named in
+   core/planet.h waiting for something to produce them. */
+OVL_CODE("planet") static void do_use(void) {
+    char buf[8];
+    uint8_t i, k, n = 0, pick;
+    uint8_t slot[ITEM_COUNT];
+
+    for (i = 0; i < ITEM_COUNT; i++)
+        if (inventory[i]) slot[n++] = i;
+
+    if (!n) {
+        /* "ENGINEERING: No energium crystals are available to load." */
+        ui_message(S(S_31), S(S_224));
+        return;
+    }
+
+    ui_dialog_open(S(S_239));
+    ui_dialog_line(S(S_241));
+    for (i = 0; i < n; i++) {
+        k = put_str(linebuf, "  ");
+        k += put_u16(linebuf + k, (uint16_t)(i + 1));
+        k += put_str(linebuf + k, ". ");
+        k += put_str(linebuf + k, item_name[slot[i]]);
+        k += put_str(linebuf + k, " (");
+        k += put_u16(linebuf + k, inventory[slot[i]]);
+        linebuf[k++] = ')';
+        linebuf[k] = 0;
+        ui_dialog_line(linebuf);
+    }
+    ui_dialog_ask(S(S_242), buf, sizeof buf);
+
+    pick = (uint8_t)grab_num(buf);
+    if (pick < 1 || pick > n) { ui_dialog_close(); return; }
+
+    if (slot[pick - 1] != ITEM_RAW_ENERGIUM) {
+        /* Named, held, and with nothing yet that uses it. Saying so is
+           better than a silent no-op. */
+        ui_dialog_line(S(S_219));
+        ui_dialog_close();
+        return;
+    }
+
+    /* The gate is the manual's, and refusing here rather than after the
+       warning is the original's order too: the First Officer speaks up
+       before Engineering is ever asked. */
+    if (!trek_energium_allowed()) {
+        ui_dialog_open(S(S_239));
+        ui_dialog_line(S(S_207));
+        ui_dialog_line(S(S_195));
+        ui_dialog_line(S(S_238));
+        ui_dialog_close();
+        return;
+    }
+
+    /* A fresh page, for the reason LAND takes one: the item list plus the
+       warning plus the outcome does not fit nine rows. */
+    ui_dialog_open(S(S_239));
+    ui_dialog_line(S(S_203));
+    ui_dialog_line(S(S_234));
+    ui_dialog_ask(S(S_227), buf, sizeof buf);
+    if (buf[0] != KB_Y) { ui_dialog_close(); return; }
+
+    ui_dialog_line(S(S_196));
+
+    {
+        TrekEvent ev[4];
+        uint8_t r = trek_use_energium(ev, 4);
+        switch (r) {
+            case USE_GOOD:
+                ui_dialog_line(S(S_198));
+                ui_dialog_line(S(S_202));
+                break;
+            case USE_DEFECTIVE:
+                ui_dialog_line(S(S_237));
+                ui_dialog_line(S(S_233));
+                ui_dialog_line(S(S_199));
+                break;
+            case USE_DUD:
+                ui_dialog_line(S(S_235));
+                ui_dialog_line(S(S_217));
+                break;
+            default:
+                ui_dialog_line(S(S_222));
+                break;
+        }
+    }
+    ui_dialog_close();
 }
 
 /* SFX_A and SFX_B are MEASURED, not matched by ear: the routine that starts
@@ -699,6 +971,16 @@ static void do_info(void) {
     ui_draw_all();
 }
 
+/* PLANET LIST, in the same shape as INFO and STATE OF REPAIR: an overlay is
+   loaded, the report paints over the console, and the console is redrawn
+   when the player is done with it. */
+static void do_planets(void) {
+    ovl_load(OVL_PLANET);
+    ui_planet_list();
+    while (kb_waitkey() != KB_RETURN) { }
+    ui_draw_all();
+}
+
 /* The alert.
  *
  * MEASURED: the original starts 0x09AE from the routine whose strings are
@@ -1022,6 +1304,18 @@ int main(void) {
             else if (word_is(cmd, "SND"))  do_sound();
             else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
+            /* LAND and USE are WORDS on the original's reference card --
+               "LAND      send Landing party to planet", "USE       Use a
+               miscellaneous item" -- and they have to be, because L is the
+               lasers and U is nothing. O)rbit is the single key the card
+               gives it, and sits with the other letters below. */
+            else if (word_is(cmd, "LAND")) { ovl_load(OVL_PLANET); do_land();
+                                             enemy_turn(0); }
+            else if (word_is(cmd, "USE"))  { ovl_load(OVL_PLANET); do_use();
+                                             enemy_turn(0); }
+            /* PLAN is this port's own, for a report the original reaches
+               some other way -- see ui_planet_list. A report, so no turn. */
+            else if (word_is(cmd, "PLAN")) do_planets();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
             else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
@@ -1029,6 +1323,7 @@ int main(void) {
             else if (c == KB_L) { do_lasers();     enemy_turn(1); }
             else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
             else if (c == KB_D) { do_dock();       enemy_turn(0); }
+            else if (c == KB_O) { do_orbit();      enemy_turn(0); }
             else if (c == KB_S) do_self();     /* S)elf, per the card */
             else if (c == KB_E) { do_energy();     enemy_turn(0); }
             else if (c == KB_X) { do_max_energy(); enemy_turn(0); }

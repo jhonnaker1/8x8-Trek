@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 188
+#define STR_COUNT 243
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -194,6 +194,61 @@
 #define S_185  185   /* SYSTEM */
 #define S_186  186   /* TO (1-3): */
 #define S_187  187   /* WEAPONS:  */
+#define S_188  188   /*   1) SHUTTLE CRAFT */
+#define S_189  189   /*   2) TRANSPORTER */
+#define S_190  190   /*   3) ABORT LANDING */
+#define S_191  191   /*  (DAMAGED) */
+#define S_192  192   /*  CASUALTIES. */
+#define S_193  193   /* , TYPE  */
+#define S_194  194   /* ABORTING MISSION. */
+#define S_195  195   /* ALLOW SUCH A DANGEROUS PROCEDURE EXCEPT */
+#define S_196  196   /* ATTEMPTING TO LOAD ENERGIUM... */
+#define S_197  197   /* BARREN */
+#define S_198  198   /* CRYSTAL LOADED...IT APPEARS GOOD! */
+#define S_199  199   /* DAMAGE TO MAIN ENERGY SYSTEMS. */
+#define S_200  200   /* ENERGIUM */
+#define S_201  201   /* ENERGIUM SUCCESSFULLY MINED. */
+#define S_202  202   /* ENERGY LEVELS INCREASING... */
+#define S_203  203   /* ENGINEERING: CAPTAIN, I WISH TO REMIND YOU */
+#define S_204  204   /* ENTERING STANDARD ORBIT. */
+#define S_205  205   /* EVACUATING SETTLERS... */
+#define S_206  206   /* EXPLORED */
+#define S_207  207   /* FIRST OFFICER: CAPTAIN, REGULATIONS DO NOT */
+#define S_208  208   /* HOW DO YOU WISH TO GET TO THE PLANET? */
+#define S_209  209   /* LANDING PARTY */
+#define S_210  210   /* LANDING PARTY ATTACKED...  */
+#define S_211  211   /* LANDING PARTY BEAMING UP. */
+#define S_212  212   /* LANDING PARTY HAS ARRIVED... */
+#define S_213  213   /* LANDING PARTY IS ON PLANET... */
+#define S_214  214   /* LANDING PARTY TO TRANSPORTER... */
+#define S_215  215   /* LAUNCHING SHUTTLECRAFT... */
+#define S_216  216   /* MONGOL STATION */
+#define S_217  217   /* NO ENERGY GAIN IS APPARENT. */
+#define S_218  218   /* NO PLANETS CHARTED */
+#define S_219  219   /* NO USE FOR THAT JUST NOW. */
+#define S_220  220   /* NOT ORBITTING A PLANET. */
+#define S_221  221   /* NOTHING FOUND. */
+#define S_222  222   /* NOTHING HAPPENS. */
+#define S_223  223   /* NOTHING LEFT ON THIS PLANET. */
+#define S_224  224   /* NOTHING TO USE, CAPTAIN. */
+#define S_225  225   /* PLANET LIST */
+#define S_226  226   /* PLANET SETTLERS FOUND... */
+#define S_227  227   /* PROCEDURE. ARE YOU SURE <Y/N>?  */
+#define S_228  228   /* SETTLEMENT */
+#define S_229  229   /* SHIELDS UP; CANNOT LAND. */
+#define S_230  230   /* SHUTTLECRAFT IS DAMAGED. */
+#define S_231  231   /* SHUTTLECRAFT RETURNING. */
+#define S_232  232   /* STANDARD ORBIT 301 */
+#define S_233  233   /* SYSTEMS GOING UNSTABLE... */
+#define S_234  234   /* THAT THIS IS AN EXTREMELY HAZARDOUS */
+#define S_235  235   /* THE CRYSTAL APPEARS TO BE DAMAGED. */
+#define S_236  236   /* THE TRANSPORTER IS DAMAGED. */
+#define S_237  237   /* THIS CRYSTAL IS DEFECTIVE! ENERGY */
+#define S_238  238   /* UNDER EXTREME LOW ENERGY CONDITIONS. */
+#define S_239  239   /* USE AN ITEM */
+#define S_240  240   /* WE ARE ALREADY IN ORBIT. */
+#define S_241  241   /* WHICH ITEM DO YOU WISH TO USE? */
+#define S_242  242   /* WHICH?  */
 
 extern const unsigned int str_offset[STR_COUNT];
 

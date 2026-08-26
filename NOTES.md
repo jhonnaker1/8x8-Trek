@@ -1128,9 +1128,10 @@ corrected time law vindicated.
      2026-08-26.** core/planet.h and core/planet.c: the planet list, the four
      finds, ORBIT, LAND both ways down, the inventory and USE. Verified on the
      machine -- a nine-planet galaxy generated on the C128 and Sigma-6 drawn in
-     the short range scan of quadrant 6-5. What is NOT built is the UI: no
-     ORBIT/LAND/USE command reaches it yet, and no PLANET LIST page. See "The
-     planet chain, built" below.
+     the short range scan of quadrant 6-5. **The UI followed the same day:**
+     O)rbit, LAND, USE and a PLANET LIST report, all driven end to end on the
+     machine. See "The planet chain, built" and "The planet chain reaches the
+     screen" below.
   7. **RAY**, with its dialog, success sequence and refusal all captured.
   8. **The Top Secret loss report**, the frame five more loss endings reuse.
   9. **Two scoring lines with no mechanism**: enemy bases destroyed @ 50 and
@@ -1266,6 +1267,89 @@ The Makefile printed `window is 3328` for one build afterwards, because the
 window size was written there as well as in the linker script. It is read out
 of `trek128.ld` now, and an overlay that does not fit fails the build instead
 of printing a line that reads like an overflow.
+
+### The planet chain reaches the screen (2026-08-26)
+
+O)rbit as a single key, LAND and USE as words, and a PLANET LIST report. The
+card settles the first three: `O)rbit    standard Orbit around planet`, `LAND
+send Landing party to planet`, `USE       Use a miscellaneous item`. LAND and
+USE HAVE to be words -- L is the lasers and U was nothing -- and LAND needed
+no new key at all, since L, A, N and D were all in the matrix already. Two
+went in: O at row 4 bit 6 and U at row 3 bit 6.
+
+#### The MAIN VIEWER turns out to be a paged instrument
+
+`reference/strings.txt` carries nine viewer page titles with numeric page
+codes -- SPACE COMM NET 411, STANDARD ORBIT 301, POWER DISTRIB 509, SHIP
+STATUS 501, GRAV FIELD 502, ARRAY MONITOR 504, STRUC INTEGRITY 505, and
+PLANET LIST 601 AND 602. Some carry their layouts: POWER DISTRIB's is
+`PMAX PAVL PPCT` over `1:5000 2:0500 3:2500`, which is the three energy pools
+at their maxima, so those pages are live data rather than scenery. Written up
+in MEASURED.md.
+
+**STANDARD ORBIT 301 is now drawn**, and it is the nicest thing in this
+change: enter orbit and the MAIN VIEWER stops showing the nearest enemy and
+shows the page the original shows, with the planet's name and class under it.
+It is a mechanic the port had no idea existed a day ago.
+
+The other eight pages are not built. There is no measurement of how the
+original cycles them.
+
+#### Why PLANET LIST is a report and not a viewer page
+
+Because the two readings we have contradict each other and neither is worth
+guessing at. The binary says PLANET LIST needs TWO viewer pages. The capture
+in this file shows THREE COLUMNS of entries per row -- and this port's MAIN
+VIEWER is twenty columns wide, because that is what the 640x350 measurement
+gives it. Three columns of `6-4N Cygnus-6` is sixty characters.
+
+So one of those is wrong about something, and a full-width report in the
+shape of STATE OF REPAIR holds all ten planets either way. The FORMAT is the
+original's: quadrant, class letter with no space, name with the row digit --
+`4-4M GAMMA REGULA-4`. Reached by `PLAN`, which is this port's own command
+for a page the original reaches some other way.
+
+One rule in it is DERIVED rather than measured: only planets in scanned
+quadrants are listed. That is the CHART's own rule -- it is titled CHART OF
+KNOWN GALAXY -- and a planet list that knew more than the chart would be odd.
+Whether the original gates it at all is unmeasured.
+
+#### The dialog scrolled the landing away, and the state was perfect
+
+The landing sequence is nine lines: a four-line menu, the prompt, two beats
+of the trip, the finding, and the beat coming home. The dialog holds nine.
+Adding the closing HIT RETURN reframed the box, so the player was shown an
+EMPTY dialog and the landing said nothing.
+
+The inventory held the crystal the whole time. That is the exact shape of
+"correct state is not a working feature" -- every test passed, the model was
+right, and the only way to find it was to look at the screen. It is also the
+second time this port has had it: the F)ix system list failed the same way.
+
+Fixed by paging deliberately -- the menu is one page and the trip is the
+next, which is the original's flow anyway. USE takes a fresh page before its
+warning for the same reason.
+
+#### Cost, and the overlay it bought
+
+`do_land` and `do_use` are most of a kilobyte of dialog that runs only when
+asked, so they went into a seventh overlay with `ui_planet_list`. That is
+2,580 bytes moved out of the resident image. do_orbit stayed resident: it is
+three messages and it sits on the path of an ordinary turn.
+
+Resident went 34,408 to 36,026 and free space to **2,055 bytes**. The link
+map confirms only the three marked entry points landed in `.ovl_planet` --
+every helper they share with resident code stayed resident, which is LTO's
+own correctness requirement and not something to take on trust.
+
+#### A silent build gap, closed
+
+`make d64` writes MUSIC.DAT only `if [ -f build/music.dat ]` and said nothing
+when it was absent -- so a tree without `reference/` built a disk that plays
+silently with no indication why. It prints a two-line notice now. (Prompted
+by Jamie reporting no music: the driver was measured running at full volume
+with the gate open on the disk build, so the silence was never in the code,
+but a build that can quietly produce a silent game should say so.)
 
 ### The shield law, and what a hit does now (2026-08-26)
 

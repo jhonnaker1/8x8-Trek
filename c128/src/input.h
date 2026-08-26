@@ -54,9 +54,11 @@
 #define KB_L      76
 #define KB_M      77
 #define KB_N      78
+#define KB_O      79
 #define KB_Q      81
 #define KB_R      82
 #define KB_T      84
+#define KB_U      85
 #define KB_W      87
 #define KB_Y      89
 

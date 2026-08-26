@@ -56,7 +56,8 @@
 #define OVL_INFO   3    /* ui_info_panel */
 #define OVL_REPAIR 4    /* ui_repair_report */
 #define OVL_MSGS   5    /* ui_messages_view */
-#define OVL_COUNT  6
+#define OVL_PLANET 6    /* ui_planet_list */
+#define OVL_COUNT  7
 
 #define OVL_NONE   0xFF
 

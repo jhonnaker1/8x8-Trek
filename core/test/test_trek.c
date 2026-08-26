@@ -2275,6 +2275,16 @@ static void test_orbit(void) {
        and every field trek_land() checks would still look right. */
     trek_enter_quadrant();
     ok(ship.orbiting == PLANET_NONE, "entering a quadrant breaks the orbit");
+
+    /* And so does one sector of impulse. An orbit is a position relative to
+       a planet; without this, LAND would still find ship.orbiting set from
+       clear across the quadrant and every field it checks would look right. */
+    trek_new_game(3, 4243);
+    ship.sec_y = 4; ship.sec_x = 4;
+    one_planet(PFIND_ENERGIUM, 1, 1);
+    ok(trek_orbit() == ORBIT_OK, "in orbit again");
+    trek_move_impulse(0, 0);
+    ok(ship.orbiting == PLANET_NONE, "and moving one sector breaks it too");
 }
 
 static void test_landing(void) {

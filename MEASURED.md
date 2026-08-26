@@ -3402,6 +3402,30 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### The MAIN VIEWER is a PAGED INSTRUMENT DISPLAY (2026-08-26)
+
+Found in `reference/strings.txt` while building the planet UI, not in a run.
+The binary carries a run of viewer page titles, each with a numeric page code:
+
+    SPACE COMM NET 411        SHIP STATUS 501
+    STANDARD ORBIT 301        GRAV FIELD 502
+    POWER DISTRIB 509         ARRAY MONITOR 504
+    PLANET LIST 601           STRUC INTEGRITY 505
+    PLANET LIST 602
+
+Several carry their layout with them. POWER DISTRIB 509 is followed by
+`PMAX   PAVL   PPCT` and `1:5000` `2:0500` `3:2500` -- the three energy pools
+at their maxima, so that page is LIVE DATA and not decoration. ARRAY MONITOR
+504 has ONLINE/OFFLINE rows, STRUC INTEGRITY 505 a four-row table.
+
+Three things follow. The viewer is a multi-page instrument, not one display.
+STANDARD ORBIT is the page it shows while orbiting a planet -- which is a
+mechanic, not scenery. And PLANET LIST needs TWO pages, so whatever the
+viewer's capacity is, the planet list exceeds it.
+
+The port draws STANDARD ORBIT 301 and nothing else of this; there is no
+paging mechanism, and no measurement of how the original cycles them.
+
 ### The planet name's digit is the QUADRANT ROW (2026-08-26)
 
 Not a new run -- a re-reading of what three sessions already captured, prompted
