@@ -37,6 +37,14 @@
 
 /* Base types, as the long-range scanner reports them (manual l.291):
    1 StarBase, 2 research station, 3 supply depot. */
+/* How many StarBases a galaxy holds. The binary computes `11 - V` where V is
+   [0x1DF0], the same value the enemy total scales by. V = level + 4 is the
+   reading -- a `cmp V, 9` in the same routine only makes sense if V reaches
+   nine -- which gives six StarBases at level 1 and two at level 5. FLAGGED
+   rather than confirmed; one emulator run settles V and both constants with
+   it. See MEASURED.md, "Bases, read out of the binary". */
+#define STARBASES_AT_LEVEL(l)  (11 - ((l) + 4))
+
 #define BASE_NONE       0
 #define BASE_STARBASE   1
 #define BASE_RESEARCH   2

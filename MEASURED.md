@@ -3402,6 +3402,44 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### Bases, read out of the binary (2026-08-26)
+
+**TWO LOOPS, and the base TYPE is not in a separate array at all** -- it is
+the middle digit of the chart word, exactly as the manual's long-range scanner
+description says (1 StarBase, 2 research station, 3 supply depot). The open
+item "Supply and Research docking quantities... wants the base-type array
+located in memory" was looking for something that does not exist.
+
+**StarBases** (fn 0x04FD1 at 0x053BB):
+
+    count = 11 - V
+    qy,qx = Random(6) + 2                  ; 2..7 -- never on the edge
+    retry while (chart[q] % 100) >= 10     ; already has a base
+    retry while |qy - last_y| <= 2 AND |qx - last_x| <= 2
+    chart[q] += 10                         ; type 1
+
+That third rule is the interesting one: **a StarBase is rejected if it lands
+within two quadrants of the previously placed one**, so they are deliberately
+spread across the map. Running for repairs is meant to be a decision.
+
+**Research stations and supply depots** (0x0553D):
+
+    count = 2 + Random(3)                  ; 2..4
+    qy,qx = Random(8) + 1                  ; anywhere, edges included
+    retry while (chart[q] % 100) >= 10
+    chart[q] += (i odd) ? 20 : 30          ; ALTERNATING by loop parity
+
+So the two rarer types alternate strictly rather than being rolled. This
+port placed two to four bases TOTAL and rolled the type per base at
+6/2/2 -- wrong in every particular.
+
+**V is the open value**, the same [0x1DF0] the enemy total scales by. Two
+things in this routine argue V = level + 4: `11 - V` has to stay positive and
+small, and a `cmp V, 9` sits at 0x05482, which is meaningless if V is a
+command level of 1..5. That reading gives 7 - level StarBases -- six at level
+1, two at level 5, a sensible curve. FLAGGED, not confirmed. One emulator run
+settles V and with it both this and the enemy count.
+
 ### THE PLANET MODEL, read out of the binary (2026-08-26) -- EXACT
 
 `fn 0x04FD1` at 0x052B3, decoded from raw bytes:

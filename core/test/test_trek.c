@@ -34,10 +34,14 @@ static void ok(int cond, const char *what) {
 static void clear_quadrant(void) {
     uint8_t i;
     for (i = 0; i < QUAD_CELLS; i++) {
-        if (sector[i] == SEC_SHIP) continue;
         sector[i]   = SEC_EMPTY;
         enemy_hp[i] = 0;
     }
+    /* And put the ship where ship.sec_y/x SAY it is. Several tests assign
+       those fields directly without touching the map, so preserving whatever
+       cell happened to hold SEC_SHIP left a phantom ship behind -- which
+       blocks a path just as well as a planet does. */
+    sector[(ship.sec_y << 3) | ship.sec_x] = SEC_SHIP;
 }
 
 static void test_distance(void) {
@@ -165,7 +169,30 @@ static void test_generation(void) {
     }
 
     trek_new_game(3, 12345);   /* restore the state the rest of this test uses */
-    ok(bases >= 2 && bases <= 4, "between two and four bases placed");
+    /* TWO LOOPS, not one -- see trek.c. StarBases are 11 - V of them (the
+       reading gives 7 - level), then two to four research/supply stations.
+       The old assertion of "two to four bases" was this port's own model. */
+    {
+        uint8_t sb = 0, other = 0, k;
+        for (k = 0; k < GAL_CELLS; k++) {
+            if (gal_base[k] == BASE_STARBASE) sb++;
+            else if (gal_base[k] != BASE_NONE) other++;
+        }
+        ok(sb == STARBASES_AT_LEVEL(3), "a level-3 galaxy holds 7-level StarBases");
+        ok(other >= 2 && other <= 4, "plus two to four research/supply stations");
+    }
+
+    /* MEASURED: StarBases never sit on the galaxy's edge, and never within
+       two quadrants of the previously placed one. */
+    {
+        uint8_t k, edge = 0;
+        for (k = 0; k < GAL_CELLS; k++)
+            if (gal_base[k] == BASE_STARBASE) {
+                uint8_t y = (uint8_t)(k >> 3), x = (uint8_t)(k & 7);
+                if (y == 0 || y == 7 || x == 0 || x == 7) edge++;
+            }
+        ok(edge == 0, "and no StarBase on the galaxy's edge");
+    }
     ok(starless == 0,            "every quadrant has 0..8 stars");
 
     {
@@ -329,6 +356,7 @@ static void test_warp(void) {
         e1 = ship.energy;
         qy = (uint8_t)((ship.quad_y + 1) & 7);
         if (qy == ship.quad_y) qy = (uint8_t)((qy + 1) & 7);
+        clear_quadrant();     /* the departure path must be clear -- see above */
         trek_move_warp(qy, ship.quad_x, 3, 3);
         ok(ship.energy < e1, "warping at cruise costs more than the converter replaces");
     }
@@ -571,7 +599,11 @@ static void test_laser_heat(void) {
     ok((uint16_t)(ship.laser_heat * LASER_HEAT_SCALE) <= LASER_HEAT_MAX,
        "so the drawn bar can never leave its own scale");
 
-    /* Cleared by leaving the quadrant, which is what Jamie watched it do. */
+    /* Cleared by leaving the quadrant, which is what Jamie watched it do.
+       The quadrant is emptied first so the warp cannot be stopped short by
+       an object standing in the departure path -- a blocked move never
+       leaves, and the test would then be asserting nothing. */
+    clear_quadrant();
     trek_move_warp((uint8_t)((ship.quad_y + 1) & 7), ship.quad_x, 3, 3);
     ok(ship.laser_heat == 0, "changing quadrant clears it");
 }
@@ -1217,6 +1249,7 @@ static void test_enemy_movement(void) {
     ship.shields_up = 0;
     ship.energy = 0;
     ship.torps  = 0;
+    clear_quadrant();     /* the Commander needs a clear run -- see above */
     sector[(0 << 3) | 0] = SEC_COMMAND;
     enemy_hp[(0 << 3) | 0] = HP_COMMAND;
 

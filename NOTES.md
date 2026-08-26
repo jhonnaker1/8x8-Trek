@@ -586,7 +586,10 @@ Still open from those runs:
   shields absorbed everything. No clean edge yet.
 - **Supply and Research docking quantities.** A StarBase restocks energy and
   shields to full in one 0.1-stardate turn; the other two types were never
-  found. Wants the base-type array located in memory, not another survey.
+  found. ~~Wants the base-type array located in memory~~ -- **there is no such
+  array.** The type is the MIDDLE DIGIT of the chart word (2026-08-26), so
+  what is left is only what each type GIVES, which is the dock routine at
+  fn 0x0F022 and is a disassembly job, not a survey.
 - ~~The STATE OF REPAIR estimate formula~~ **ABANDONED as cosmetic
   2026-08-24.** It is not a function of points remaining at all -- two adjacent
   tenth-boundaries sit one point apart while a third sits three points away, so

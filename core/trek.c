@@ -184,7 +184,7 @@ uint8_t  base_under_attack = GAL_CELLS;
 uint8_t  bases_lost = 0;
 
 void trek_new_game(uint8_t level, uint16_t seed) {
-    uint8_t i, q, bases, placed;
+    uint8_t i, q, bases, placed, last_y, last_x;
     uint16_t total;
 
     trek_srand(seed);
@@ -217,18 +217,51 @@ void trek_new_game(uint8_t level, uint16_t seed) {
         total--;
     }
 
-    /* Two to four friendly bases, at most one per quadrant. StarBases are
-       the useful ones; research and supply stations are rarer (manual
-       l.356-360). */
+    /* BASES, READ OUT OF THE BINARY 2026-08-26 (fn 0x04FD1, 0x053BB and
+       0x0553D). Two separate loops, and neither resembles what this port did.
+
+       StarBases first: `11 - V` of them, always in quadrants 2..7 on both
+       axes so never on the galaxy's edge, and -- the interesting rule --
+       REJECTED IF WITHIN TWO QUADRANTS OF THE PREVIOUS ONE on both axes.
+       They are deliberately spread across the map, which is what makes
+       running for repairs a real decision rather than a lookup.
+
+       Then two to four research stations and supply depots, ALTERNATING by
+       loop parity: odd iterations place a research station, even ones a
+       supply depot. Any quadrant, edges included.
+
+       V is [0x1DF0], the same open value as the enemy total -- see
+       MEASURED.md. `11 - V` and a `cmp V, 9` elsewhere in the routine only
+       make sense if V reaches 9, so V = level + 4 is the reading and gives
+       7 - level StarBases: six at level 1, two at level 5. FLAGGED. */
+    bases = (uint8_t)(STARBASES_AT_LEVEL(level));
+    last_y = last_x = 0;              /* the original starts from 0,0 too */
+    for (placed = 0; placed < bases; placed++) {
+        uint8_t qy = 0, qx = 0, tries;
+        for (tries = 0; tries < 200; tries++) {
+            qy = (uint8_t)(1 + trek_rand_n(6));   /* 1-based 2..7 */
+            qx = (uint8_t)(1 + trek_rand_n(6));
+            q  = (uint8_t)((qy << 3) | qx);
+            if (gal_base[q] != BASE_NONE) continue;
+            if (abs_diff(last_y, qy) <= 2 && abs_diff(last_x, qx) <= 2)
+                continue;                          /* too close to the last */
+            break;
+        }
+        if (tries >= 200) break;      /* the original can spin; this cannot */
+        last_y = qy; last_x = qx;
+        gal_base[q] = BASE_STARBASE;
+    }
+
     bases = (uint8_t)(2 + trek_rand_n(3));
-    placed = 0;
-    while (placed < bases) {
-        q = trek_rand_n(GAL_CELLS);
-        if (gal_base[q] != BASE_NONE) continue;
-        i = trek_rand_n(10);
-        gal_base[q] = (uint8_t)(i < 6 ? BASE_STARBASE
-                              : (i < 8 ? BASE_SUPPLY : BASE_RESEARCH));
-        placed++;
+    for (placed = 0; placed < bases; placed++) {
+        uint8_t tries;
+        for (tries = 0; tries < 200; tries++) {
+            q = trek_rand_n(GAL_CELLS);
+            if (gal_base[q] == BASE_NONE) break;
+        }
+        if (tries >= 200) break;
+        /* Odd then even, exactly as the loop counter's low bit selects. */
+        gal_base[q] = (uint8_t)((placed & 1) ? BASE_SUPPLY : BASE_RESEARCH);
     }
 
     ship.energy       = ENERGY_START;
