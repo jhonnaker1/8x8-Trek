@@ -3477,6 +3477,51 @@ Undocked"), and `fn 0x22773` is the viewer's system page.
 stride 16, is the twelve SYSTEM NAMES -- "EnergyConverter" is fifteen
 characters and fits exactly. Not planets, and not a population.
 
+### A PLANET'S NAME IS ITS QUADRANT (2026-08-26) -- EXACT
+
+`fn 0x151D0`, the evacuation message, builds the planet's name like this:
+
+    mov ax, [0x1E1E]      ; the settled planet's quadrant COLUMN
+    mov dx, 13
+    mul dx                ; x 13 -- the name table's stride
+    add di, 0x1075        ; -> planet_name[x]
+
+and appends the ROW separately with Str(). So:
+
+    name  = planet_name[quad_x]        digit = quad_y
+
+**Nothing about a planet's name is stored.** That is why the table has exactly
+EIGHT entries: one per column.
+
+Eleven for eleven against the PLANET LIST photograph -- 5-1 Andromeda-5, 5-4
+Gallista-5, 5-5 Gamma Regula-5, 5-6 Sigma-5, 6-2 Ceti Alpha-6, 6-5 Gamma
+Regula-6, 6-7 Vega-6, 7-2 Ceti Alpha-7, 7-4 Gallista-7, 7-8 Xevious-7, 8-1
+Andromeda-8.
+
+The ROW half was already measured seven times. The COLUMN half is new, and it
+explains what seven samples could not: why Gallista appears twice (both in
+column 4), and why the name table has eight entries and not seven or twelve.
+
+This port had a random name index in the Planet record, which could put
+Xevious in column 1. The field is gone.
+
+### THE EVACUATION DEADLINE (2026-08-26)
+
+Same routine, at 0x15212:
+
+    if (stardate <= [0x1D9C]) return       ; a "next event" gate
+    [0x1D9C] = 9999.0                      ; and NEVER AGAIN
+    [0x1DA2] = stardate + 3.0*Random + 1.0 ; ONE TO FOUR stardates of warning
+
+Both constants decode exactly (9999.0 and 3.0). The 9999 is this game's
+"never": stardates run around 3500, so setting the gate there means **a galaxy
+gets ONE evacuation**, which fits a single settled planet.
+
+The message assembles as "Planet <name>-<row>, quad <row>-<col>, requests
+evacuation. They can only hold out until <deadline>." with the deadline
+printed 6:1 -- matching the captured "Planet Gallista-8, quad 8-4, requests
+evacuation. They can only hold out until 3516.5."
+
 ### THE SETTLED PLANET: there is exactly ONE (2026-08-26)
 
 Found where it should have been looked for -- in ORBIT, which prints the

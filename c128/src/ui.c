@@ -581,8 +581,8 @@ void ui_draw_viewer(void) {
            cell with scr_put: scr_put takes a raw SCREEN CODE, where a letter
            is 1..26, and only scr_puts runs text through the converter. A
            name pushed through scr_put draws as punctuation. */
-        while (planet_name[p->name][k] && k < 16) {
-            row[k] = planet_name[p->name][k];
+        while (PLANET_NAME_OF(p->quad)[k] && k < 16) {
+            row[k] = PLANET_NAME_OF(p->quad)[k];
             k++;
         }
         row[k++] = '-';
@@ -1302,7 +1302,7 @@ OVL_CODE("planet") void ui_planet_list(void) {
         row[3] = planet_class_letter[p->cls];
         row[4] = ' ';
         k = 5;
-        while (planet_name[p->name][k - 5]) row[k] = planet_name[p->name][k - 5], k++;
+        while (PLANET_NAME_OF(p->quad)[k - 5]) row[k] = PLANET_NAME_OF(p->quad)[k - 5], k++;
         row[k++] = '-';
         row[k++] = (char)('0' + ((p->quad >> 3) + 1));
         row[k] = 0;

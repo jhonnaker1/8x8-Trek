@@ -2268,7 +2268,6 @@ static void one_planet(uint8_t find, uint8_t dy, uint8_t dx) {
     planet_count     = 1;
     planets[0].quad  = q;
     planets[0].sec   = (uint8_t)((sy << 3) | sx);
-    planets[0].name  = 0;
     planets[0].cls   = PCLASS_M;
     planets[0].find  = find;
     planets[0].flags = 0;
@@ -2292,7 +2291,9 @@ static void test_planet_generation(void) {
         for (i = 0; i < planet_count; i++) {
             en_cls[planets[i].cls]++;
             if (planets[i].find == PFIND_ENERGIUM) en_hit[planets[i].cls]++;
-            if (planets[i].name >= PLANET_NAMES)  bad_name++;
+            /* The NAME is derived from the quadrant column, not stored, so
+               what there is to check is that every column maps to a name. */
+            if (PLANET_NAME_OF(planets[i].quad) == 0) bad_name++;
             if (planets[i].cls  >= PCLASS_COUNT)  bad_class++;
             for (j = (uint8_t)(i + 1); j < planet_count; j++)
                 if (planets[j].quad == planets[i].quad) doubled_up++;
@@ -2305,7 +2306,7 @@ static void test_planet_generation(void) {
     ok(hi == PLANET_MIN + PLANET_SPREAD - 1,
        "and the largest holds nineteen");
 
-    ok(bad_name == 0,  "every planet's name is in the table");
+    ok(bad_name == 0,  "every planet's column maps to a name");
     ok(bad_class == 0, "every planet's class is M, N or O");
 
     /* THE FIND DEPENDS ON THE CLASS, and that is the assertion worth making

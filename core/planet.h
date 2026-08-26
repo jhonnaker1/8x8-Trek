@@ -66,40 +66,30 @@
 
 #define PLANET_NONE    0xFF      /* "no planet" / "not orbiting one" */
 
-/* THE DIGIT AFTER THE NAME IS THE QUADRANT ROW, and it is not part of the
- * name. Seven samples from three separate sessions, seven agreements:
+/* A PLANET'S NAME IS ENTIRELY DETERMINED BY ITS QUADRANT. Nothing about it
+ * is stored, which is why there are exactly EIGHT names for eight columns:
  *
- *     Gallista-5   quad 5-4        Cygnus-6     quad 6-4
- *     Gallista-6   quad 6-4        Andromeda-7  quad 7-1
- *     Sigma-7      quad 7-6        Gallista-8   quad 8-4
- *     Xevious-8    quad 8-8
+ *     name  = planet_name[quad_x]        (1-based column, so index quad_x-1)
+ *     digit = quad_y                     (1-based row)
  *
- * So a planet stores a name INDEX and nothing else about its name; the
- * printed form is planet_name[i], '-', and the 1-based quadrant row. It is
- * also what makes the duplicates in that list legible -- Gallista-5 and
- * Gallista-6 are two different planets sharing a name, told apart by the row.
+ * READ OUT OF THE BINARY 2026-08-26 in fn 0x151D0, the evacuation message:
+ * `mov ax,[0x1E1E]; mov dx,13; mul dx; add di,0x1075` -- the quadrant COLUMN
+ * times the name table's stride of thirteen. The row is appended separately
+ * with Str().
  *
- * EIGHT names, and getting that number wrong is the cautionary tale attached
- * to this file. The list was first taken from reference/strings.txt, which
- * shows seven -- and `strings` had silently dropped VEGA. The binary holds a
- * fixed-stride table, 13 bytes per entry, length-prefixed Pascal strings:
+ * ELEVEN FOR ELEVEN against the PLANET LIST photograph:
  *
- *     \x09Andromeda\0\0\0   \x0aCeti Alpha\0\0   \x06Cygnus\0\0\0\0\0\0
- *     \x08Gallista\0\0\0\0   \x0cGamma Regula     \x05Sigma\0\0\0\0\0\0\0
- *     \x04Vega\0\0\0\0\0\0\0\0  \x07Xevious\0\0\0\0\0
+ *     5-1 Andromeda-5     6-2 Ceti Alpha-6    7-4 Gallista-7
+ *     5-4 Gallista-5      6-5 Gamma Regula-6  7-8 Xevious-7
+ *     5-5 Gamma Regula-5  6-7 Vega-6          8-1 Andromeda-8
+ *     5-6 Sigma-5         7-2 Ceti Alpha-7
  *
- * Alphabetical, stride 13, longest name twelve characters. The same block
- * shows why strings.txt cannot be trusted for a TABLE: two entries below it
- * come out joined as "Life support suppliesRaw energium", with no separator
- * at all. It is fine for finding a message and wrong for counting a list.
+ * The row rule was already measured seven times; the COLUMN rule is new and
+ * explains what the seven-sample note could not -- why Gallista appeared
+ * twice (columns 4 and 4) and why the table has exactly eight entries.
  *
- * The port shipped seven for a day, so it could never name a planet Vega and
- * named one Xevious wherever the original would have said Vega. Found by
- * Jamie photographing the original's PLANET LIST page -- the same way the
- * truncated command list was found. Read the BINARY for tables.
- *
- * An earlier note in NOTES.md also transcribed one name off a screen capture
- * as "Gallisto"; the binary says Gallista. The binary wins twice. */
+ * So the Planet record carries no name field. An earlier one rolled a random
+ * name index, which could put Xevious in column 1. */
 #define PLANET_NAMES      8
 extern const char *const planet_name[PLANET_NAMES];
 
@@ -210,7 +200,6 @@ typedef struct {
     uint8_t sec;       /* sector cell, 0..63 -- chosen when the quadrant is
                           built, and stored rather than recomputed so that a
                           game saved in orbit reloads in the same orbit */
-    uint8_t name;      /* index into planet_name[] */
     uint8_t cls;       /* PCLASS_* */
     uint8_t find;      /* PFIND_* */
     uint8_t flags;     /* PF_* */
@@ -389,6 +378,16 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
 #define USE_GOOD           2
 #define USE_DEFECTIVE      3   /* main energy systems damaged */
 #define USE_DUD            4   /* nothing happens */
+
+/* The name of a planet, derived from its quadrant. Never stored. */
+#define PLANET_NAME_OF(q)  (planet_name[(q) & 7])
+#define PLANET_DIGIT_OF(q) (((q) >> 3) + 1)
+
+/* The evacuation deadline, fn 0x151D0:  stardate + 3.0*Random + 1.0, so one
+   to four stardates of warning. [0x1D9C] is set to 9999.0 on the way out,
+   which is this game's "never again" -- a galaxy gets ONE evacuation. */
+#define EVAC_WARNING_MIN_TENTHS   10
+#define EVAC_WARNING_SPAN_TENTHS  30
 
 /* The Y/N confirmation ENGINEERING asks for is the UI's; by the time this is
    called the captain has said yes. `ev`/`max` carry the system damage on

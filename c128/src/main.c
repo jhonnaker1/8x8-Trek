@@ -301,9 +301,9 @@ static void do_dock(void) {
 /* The planet's name and class, "GAMMA REGULA-8, TYPE O". The digit is the
    1-based quadrant ROW and is not stored -- see core/planet.h. */
 static uint8_t put_planet(char *buf, const Planet *p) {
-    uint8_t k = put_str(buf, planet_name[p->name]);
+    uint8_t k = put_str(buf, PLANET_NAME_OF(p->quad));
     buf[k++] = '-';
-    k += put_u16(buf + k, (uint16_t)((p->quad >> 3) + 1));
+    k += put_u16(buf + k, PLANET_DIGIT_OF(p->quad));
     return k;
 }
 

@@ -47,7 +47,6 @@ void planet_new(void) {
         }
         planets[i].quad  = q;
         planets[i].sec   = 0;
-        planets[i].name  = trek_rand_n(PLANET_NAMES);
         planets[i].cls   = trek_rand_n(PCLASS_COUNT);
         planets[i].flags = 0;
 
@@ -72,7 +71,6 @@ void planet_new(void) {
            dirty tail would travel into save files and out again. */
         planets[i].quad  = 0;
         planets[i].sec   = 0;
-        planets[i].name  = 0;
         planets[i].cls   = 0;
         planets[i].find  = PFIND_NOTHING;
         planets[i].flags = 0;

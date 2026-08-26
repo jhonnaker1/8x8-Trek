@@ -40,7 +40,7 @@ static uint16_t get16(void) {
    record is fixed-size, so 518 is all of it. */
 #define SAVE_FIXED_BYTES 517
 typedef char save_size_tracks_planet_max[
-    (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 6 * PLANET_MAX) ? 1 : -1];
+    (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
 /* The field list appears TWICE, once to save and once to load, and that is
    deliberate rather than lazy.
@@ -106,7 +106,7 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     put8(planet_count);
     for (i = 0; i < PLANET_MAX; i++) {
         put8(planets[i].quad);  put8(planets[i].sec);
-        put8(planets[i].name);  put8(planets[i].cls);
+        put8(planets[i].cls);
         put8(planets[i].find);  put8(planets[i].flags);
     }
     for (i = 0; i < ITEM_COUNT; i++) put8(inventory[i]);
@@ -159,7 +159,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     planet_count = get8();
     for (i = 0; i < PLANET_MAX; i++) {
         planets[i].quad = get8();  planets[i].sec  = get8();
-        planets[i].name = get8();  planets[i].cls  = get8();
+        planets[i].cls  = get8();
         planets[i].find = get8();  planets[i].flags = get8();
     }
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = get8();
