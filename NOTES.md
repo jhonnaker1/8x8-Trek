@@ -556,7 +556,15 @@ Still open from those runs:
   fresh quadrant or a restored save per shot: a successful ray clears the
   SECTOR MAP, and writing the enemy table does not put ships back on it.
 - **One sample of dying in COMBAT**, to settle whether the -200 ship-loss
-  penalty is universal or particular to self-destruction. Cheap.
+  penalty is universal or particular to self-destruction. Attempted three times
+  on 2026-08-24 and lost all three to trailing keystrokes walking through the
+  end screens -- see MEASURED.md, "The capture problem". The QUIT sheet does
+  narrow it: with the ship ALIVE there is no ship-loss line at all, so the line
+  is conditional on losing the ship.
+- **`Rescues @ 200 each`** -- a scoring line found on the surviving-ship sheet
+  2026-08-24 that this port has never had, and the scoring end of the
+  distress-signal mechanic. The weight is known; what is not is what counts as
+  a rescue.
 - **Boarding-party frequency and duration.** The mechanic is in the string
   table; the numbers need elapsed play.
 - **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
@@ -564,19 +572,22 @@ Still open from those runs:
 
 **Opened by runs 1 to 3, and all cheap next time the rig is up:**
 
-- **The shield absorption law.** Runs 3 and 4 both failed on it, for different
-  reasons -- run 3 poisoned its own shield pool, run 4 had TWO enemies firing
-  so every reading was the sum of two hits. It needs a quadrant with exactly
-  one enemy. Run 4 did establish that the shield SYSTEM takes damage when the
-  pool absorbs a big hit, which we model nowhere.
+- **The shield absorption law.** SHAPE SETTLED 2026-08-24 with one enemy at
+  last: at a given charge the absorbed amount is REPEATABLE, and the absorbed
+  fraction RISES with charge -- 0.33 at 1000, 0.47 at 1500, 0.65 at 2000. Three
+  of the four levels fit `fraction = charge / 3100`; 2500 does not. The
+  constant is still open. It is emphatically not `amount - shields`.
 - **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
   turns in five once a few hundred units reached energy, and never while the
   shields absorbed everything. No clean edge yet.
 - **Supply and Research docking quantities.** A StarBase restocks energy and
   shields to full in one 0.1-stardate turn; the other two types were never
   found. Wants the base-type array located in memory, not another survey.
-- **The STATE OF REPAIR estimate formula**, which runs about a tenth above
-  points/rate.
+- ~~The STATE OF REPAIR estimate formula~~ **ABANDONED as cosmetic
+  2026-08-24.** It is not a function of points remaining at all -- two adjacent
+  tenth-boundaries sit one point apart while a third sits three points away, so
+  no single rate produces it. A display estimate with no gameplay effect, and
+  it has cost parts of two sessions.
 
 **Seen repeatedly across runs 1 to 5 and never measured** -- added 2026-08-24,
 because all three are mechanics this port has no part of:

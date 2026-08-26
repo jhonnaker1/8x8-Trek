@@ -3716,3 +3716,128 @@ Two things did come out of it:
 - **System damage does not need penetration.** One turn damaged the shield
   system with `to_energy` at zero. So the trigger is not simply "something got
   through".
+
+## Session 6 (2026-08-24): the survivor's sheet, and a rescue line we never knew about
+
+### Two endings, two different memos
+
+The Top Secret memo has at least two forms, and they differ in the header as
+well as the body.
+
+**Ship lost** (self-destruct, captured earlier):
+
+    To:  Headquarters
+    Re:  Loss of U.S.S. Lexington, RCB-92
+
+**Ship survives** (QUIT):
+
+    To:  Captain, U.S.S. Lexington, RCB-92
+    Re:  Battle Results
+
+    Captain: The results of your operations against the Mongol Empire have
+    been evaluated. We have found the following:
+
+Both then print the same three lines -- stardays in action, Mongol ships
+destroyed per stardate, score.
+
+`Q` itself asks inline in the COMMAND panel (`Quit (Y/N)?`), not in a dialog
+box.
+
+### The evaluation sheet's LINES vary by ending -- and there is a rescue line
+
+The surviving sheet, after quitting immediately:
+
+    ITEM                                      SCORE
+      0 Rescues @ 200 each..............         0
+        Penalty for incomplete mission..      -300
+      0 Mongols killed @ 10 each........         0
+      0 Commanders killed @ 20 each.....         0
+      0 Enemy bases destroyed @ 50 each.         0
+   0.00 Kill/day ratio @ 500 per day....         0
+      0 Casualties on board Lexington...         0
+      0 Stars destroyed @ -5 each.......         0
+      0 Bases hit @ -200 each...........         0
+        TOTAL...........................      -300
+
+Two things this port does not have:
+
+- **`Rescues @ 200 each`.** That is the scoring end of the distress-signal
+  mechanic -- the manual's feature list says "Successful rescues increase
+  score" and this is the weight. It does NOT appear on the self-destruct
+  sheet, so the line set is per-ending.
+- **No `Penalty for loss of ship` line here**, where the self-destruct sheet
+  had one at -200. So that line is conditional on losing the ship, which
+  supports it being real rather than a misreading. **Still not settled**: a
+  COMBAT death sheet is the discriminator and it was lost three times to the
+  capture problem below.
+
+Quitting alive with nothing done scores exactly -300, the incomplete-mission
+penalty and nothing else.
+
+### Shields, with exactly one enemy at last
+
+The condition runs 3 and 4 both lacked. Enemy pinned at (2,8) with 900 hit
+points, our sector fixed at (4,4), systems written to 100 and the pools set
+before every turn, shields raised:
+
+    charge 2500   absorbed 464/464, 824/927, 189/554
+    charge 2000   absorbed 743/1149, 769/1194, 743/1147
+    charge 1500   absorbed 561/1206, 562/1206, 551/1178
+    charge 1000   absorbed 242/739
+
+**At a given charge the absorbed AMOUNT is repeatable** -- 742.6, 768.7, 742.6
+at 2000, and 561.3, 561.6, 551.0 at 1500. That is the first repeatable shield
+reading this project has produced.
+
+The absorbed FRACTION rises with charge: 0.327 at 1000, 0.466 at 1500, 0.647 at
+2000. Those three fit `fraction = charge / C` with C near 3100 to within a few
+percent, and 2500 does not (0.890 observed against 0.806 predicted). **The
+shape is settled and the constant is not**: shields absorb a share of the hit
+that grows with their charge, and the rest reaches energy.
+
+Whatever it is, it is NOT `amount - shields`.
+
+### System damage reports casualties, and zeroes the system
+
+    Transporter damaged. Now at 0%. There are 7 casualties reported in
+    Engineering.
+    Shields damaged. Now at 0%. There are 1 casualties reported in Engineering.
+    EnergyConverter damaged. Now at 0%.
+
+Three systems in ONE turn, all to zero, with per-system casualty counts. It
+also confirms energy reaching 0 does NOT destroy the ship -- the Lexington sat
+at 0.0 energy and kept playing.
+
+### Save and restore is a working checkpoint
+
+`SAVE` takes `<Enter>` for a default filename; on restart, `Restore a saved
+game (Y/N)? Y` then `File name, <Enter> for default, <ESC> to abort`. Restoring
+put the ship back in quadrant 8-7 with the same four battleships and the same
+stardate. **That is the rig for sampling RAY**, which needs a fresh quadrant
+per shot.
+
+### The repair-time estimate is NOT a function of points remaining
+
+Fresh sweep, one system, both columns:
+
+    pct    0    1    2    3    4    5   40   41   42   43   44   45   46   47
+    dock  2.1  2.1  2.0  2.0  2.0  2.0  1.3  1.3  1.2  1.2  1.2  1.2  1.2  1.1
+    adrft 5.1  5.0  5.0  4.9  4.9  4.8  3.0  3.0  3.0  2.9  2.8  2.8  2.8  2.7
+
+The undocked column fits `points / 19.5` truncated to a tenth for the first
+eight rows, and then breaks: the 2.8/2.9 boundary and the 2.9/3.0 boundary are
+ONE point apart while the 2.7/2.8 boundary is three points away. A single rate
+cannot produce that. **Abandoned as cosmetic** -- it is a display estimate with
+no gameplay effect, and it has now cost parts of two sessions.
+
+### The capture problem, three times in one session
+
+**Death is asynchronous to your input, and any loop that sends a key after the
+action will destroy the screen you are trying to capture.** Three separate
+combat deaths were lost this way -- the trailing keystrokes walked through the
+loss report, the evaluation and the hall of fame into a new game before the
+screenshot. Checking `live()` at the top of the loop is not enough, because the
+ship dies in the middle of the volley you just committed to.
+
+The technique that works: send the action, then send NOTHING and poll `live()`,
+and screenshot the moment it goes false.
