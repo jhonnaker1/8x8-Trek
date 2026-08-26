@@ -1134,8 +1134,12 @@ corrected time law vindicated.
      O)rbit, LAND, USE and a PLANET LIST report, all driven end to end on the
      machine. See "The planet chain, built" and "The planet chain reaches the
      screen" below.
-  7. **RAY**, with its dialog, success sequence and refusal all captured.
-  8. **The Top Secret loss report**, the frame five more loss endings reuse.
+  7. **RAY** -- dialog, success sequence, refusal AND the fatal outcome all
+     captured (the last on 2026-08-26). Nothing left to capture; only its
+     ODDS are open, and those have resisted four attempts.
+  8. **The Top Secret loss report** -- **CAPTURED 2026-08-26**, see
+     MEASURED.md. Still unbuilt. It is the frame five more loss endings reuse,
+     and its cause line is what varies between them.
   9. **Two scoring lines with no mechanism**: enemy bases destroyed @ 50 and
      stars destroyed @ -5. ~~Rescues @ 200~~ is LIVE as of 2026-08-26 --
      evacuating a settlement raises ship.rescues and the sheet reads it.
