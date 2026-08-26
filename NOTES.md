@@ -1072,6 +1072,58 @@ fourteen available; two-line boxes would fit three). With the two strings
 above shortened, nothing in the port needs a second line, so this is a feature
 to build if the message set grows, not a bug to fix now.
 
+### AUDIT: what the DOSBox runs found against what the port does (2026-08-26)
+
+Jamie asked whether everything measured has landed. Checked against the code,
+not from memory. **Most of it has; ten things have not, and three of those are
+small enough to be oversights rather than work.**
+
+#### In the port
+
+Repair rate table and focus starvation; the whole movement model (path,
+rounding, stop-short, truncated billing, distance/24 and 11*d/warp^2 over
+absolute sectors); combat costing no time; self-destruct destroying nothing;
+the -200 ship-loss penalty and the evaluation sheet; all four enemy class
+maxima; laser effectiveness being exactly the Lasers percentage with heat not
+touching damage; the enemy fire law, enemy motion (commanders only, on turns
+the player fires) and the enemy-count formula; max warp = 1 + 0.09 x
+percentage; the long range tractor beam; and the warp energy model, which the
+corrected time law vindicated.
+
+#### MEASURED AND MISSING -- the three small ones
+
+  1. **DOCK costs 0.1 stardates and this port charges nothing.**
+     `trek_dock()` never touches the clock, and `enemy_turn()` does not
+     advance it either, so docking is free here. Measured twice, in the run-1
+     turn-cost table. It is one call.
+  2. **Laser heat should cap at 100.** The original caps that word at 100 and
+     draws it against a 0..1500 scale at roughly ten to one, so its Temp bar
+     never passes 1000. This port accumulates the raw fired energy up to
+     65535 against the same scale, so the gauge pegs red after one serious
+     volley. Cosmetic, but it is a measured number we have and do not use.
+  3. **The DOCK refusal wording.** Measured: `NAVIGATION: Not adjacent to
+     planet.` -- the original's own words, planet and all. This port says
+     `NO BASE ALONGSIDE.` under a different department.
+
+#### MEASURED AND MISSING -- the real work
+
+  4. **Shields subtract instead of absorbing a share.** Run 3. The shape is
+     settled (absorbed fraction rises with charge) and the constant is not.
+  5. **A system hit is far too gentle.** The original leaves a system at 0%
+     eight times in eleven and can take two in one turn.
+  6. **The planet chain** -- ORBIT, LAND, USE -- captured end to end in run 1,
+     including energium taking energy ABOVE the maximum. Never built.
+  7. **RAY**, with its dialog, success sequence and refusal all captured.
+  8. **The Top Secret loss report**, the frame five more loss endings reuse.
+  9. **Three scoring lines with no mechanism**: rescues @ 200, enemy bases
+     destroyed @ 50, stars destroyed @ -5. All three print as zero today.
+ 10. **Reinforcements arriving mid-fight** -- "A Mongol has appeared at 5-4",
+     seen repeatedly across the runs.
+
+Items 4 and 5 are one job, not two: both are combat damage from run 3 and both
+need the shield absorption constant, which is still open. Items 7 and 8 are
+also one job -- RAY's fourth outcome is what needs the report screen.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,
