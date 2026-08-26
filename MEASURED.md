@@ -3402,6 +3402,50 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### BLACK HOLES, and THE SECTOR MAP'S FORMAT (2026-08-26)
+
+Both out of the MOVE routine, `fn 0x0C609`, which also owns the tractor beam
+and the warp-damage message. Decoded from raw bytes at 0x0D000.
+
+**A black hole is a SPACE in the sector map.** The move code tests
+`cmp byte [di+0x2622], 0x20` and branches into the black hole handling when
+the destination cell is a blank. Empty space is `'.'` (0x2E) and the ship is
+`'E'` (0x45).
+
+**So the sector map is at DS:0x2622, ASCII, STRIDE TEN** -- the index is
+`sec_y * 10 + sec_x`, not `* 8`. That is the structure MEASURED.md has called
+"separate from the enemy table" since the RAY session and never located. It
+also explains the display directly: the original draws blank for a black hole
+and a dot for vacuum, which is exactly what the bytes say.
+
+**What entering one does** (0x0D0B6):
+
+    Random(5)
+      == 0   "NAVIGATION: The ship has entered a black hole..."
+             ending code 7  ->  SHIP DESTROYED
+      != 0   "...and has been thrown free in quadrant Y-X."
+             qy,qx = Random(8)+1, retried while chart[q] >= 999
+             sec_y,sec_x = Random(8)+1
+             sector map[sec_y*10 + sec_x] = 'E'
+
+So a black hole **destroys the ship one time in five** and otherwise throws it
+to a uniformly random quadrant AND sector anywhere in the galaxy. Both
+outcomes are why it confounds any sampled measurement taken by playing: the
+throw silently changes the quadrant, and the destruction is attributed to
+whatever the player last did.
+
+Ending code 7 is the "pulled into black hole & destroyed" line, alongside 9
+for the death ray.
+
+The `chart[q] >= 999` retry looks like a sentinel rather than a real
+threshold: the chart word packs `enemies*100 + type*10 + stars` and enemies
+cap at four, so a real quadrant never reaches 999.
+
+**Still open: where black holes are PLACED.** They are spaces written into the
+sector map when a quadrant is built, so a galaxy-level record decides which
+quadrants have them. The candidate is the byte array at DS:0x23E9, which
+generation sets to 1 for `Random(7) < 3` of something -- not yet confirmed.
+
 ### Bases, read out of the binary (2026-08-26)
 
 **TWO LOOPS, and the base TYPE is not in a separate array at all** -- it is

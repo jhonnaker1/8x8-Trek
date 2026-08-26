@@ -1150,11 +1150,12 @@ corrected time law vindicated.
  10. **Reinforcements arriving mid-fight** -- "A Mongol has appeared at 5-4",
      seen repeatedly across the runs, and "Mongol reinforcements are reported
      in quadrant 7-1" seen 2026-08-26.
- 11. **Black holes.** Added to this list 2026-08-26 -- they have been in these
-     notes since 2026-08-20 and in the manual's feature list all along, and
-     the numbered list never carried them, so the work has been costed without
-     them. The binary has the lot: entering one, being thrown free in a named
-     quadrant, a loss ending, and torpedoes both sucked in and deflected.
+ 11. **Black holes.** Added 2026-08-26, and the MECHANIC IS NOW READ: a black
+     hole is a SPACE in the sector map, entering one destroys the ship one
+     time in five (ending code 7) and otherwise throws it to a uniformly
+     random quadrant and sector. See MEASURED.md. What is still open is where
+     they are PLACED, and the torpedo interaction. The same pass located the
+     SECTOR MAP itself at DS:0x2622, ASCII, stride TEN.
 
 Items 7 and 8 are one job -- RAY's fourth outcome is what needs the report
 screen, and five more loss endings reuse the same frame once it exists.
