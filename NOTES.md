@@ -1184,27 +1184,41 @@ Trek. Naming each routine is then free, because CODE FOLLOWS ITS OWN STRINGS
 
 DECODED so far, with what each gave:
 
-    0x04FD1  27  galaxy generation  planets, bases, enemy placement
-    0x07375   1  RAY               Random(6): 1/6 works, 2/6 destroys us
+    0x04FD1  27  galaxy generation  planet count/class/find, ONE per quadrant,
+                                    both base loops, enemy count and placement
+    0x07375   1  RAY                Random(6): 1/6 works, 2/6 destroys us
     0x070C0   1  RAY misfire
-    0x0934E   2  crystal success   energy/shields += V*(700|300 + Random)
-    0x0C609   8  MOVE              black holes, tractor beam, warp damage
-    0x0E3A1   2  LAND              attacked 1/5, casualties Random(5)+2
-    0x0ED3B   2  USE               Random(6): 3/6 good, 2/6 dud, 1/6 defective
+    0x0934E   2  crystal success    energy/shields += 5*(700|300 + Random)
+    0x0C609   8  MOVE               black holes (1/5 fatal), tractor, warp dmg
+    0x0E092   -  ORBIT              the scan, the class letters, "destroyed"
+    0x0E3A1   2  LAND               attacked 1/5, casualties Random(5)+2
+    0x0ED3B   2  USE                Random(6): 3/6 good, 2/6 dud, 1/6 defective
+    0x15105   -  distress signal    LOCATION-triggered, not scheduled
+    0x151D0   -  evacuation         deadline = stardate + 1..4; NAME = quadrant
+    0x15C07   3  the SPY            1/150, one system down 10..99
+    0x16844   2  damage/shields     absorb = dmg * charge * sys%, pool x0.8
+    0x0F1D4   -  STATE OF REPAIR    (identified; locates the systems array)
 
-STILL TO READ, and all of it is on the open list:
+STILL TO READ, with the open item each would close:
 
-    0x16844   2  SHIELD ABSORPTION   "Shields absorb / unit hit from"
-    0x20DCE   7  DAMAGE REPORTS      "on R Deck", "failing. Now at"
-    0x15D6E   2  department damage   "Engineering / Laser control"
-    0x0A8C8   4  TORPEDO damage      "absorbed by star", "triggers nova"
-    0x09563   2  torpedo firing      "unit hit from plasma bolt"
-    0x15C07   3  THE SPY  -- DECODED  1/150, damages a random system 10..99
-    0x1ED00   3  supernova events    "a star having gone nova"
-    0x15F51   4  Union wreckage      "Wreckage of Union ship present"
-    0x181E8   2  capture             "Mongol supplies captured..."
-    0x1DD4F   2  death pod + score
-    0x0F022   -  DOCKING             what each base type gives
+    0x20DCE   7  damage reports     SYSTEM_DAMAGE_THRESHOLD, severity
+    0x15D6E   2  department damage   "     "
+    0x0A8C8   4  TORPEDO damage     falloff; "Torpedo triggers nova" (item 9's
+                                    stars @ -5); the two black hole cases
+    0x09563   2  torpedo firing     TORP_BASE, TORP_SPREAD
+    0x0F022   -  DOCKING            what Supply and Research actually give
+    0x15A4C   1  reinforcements     item 10
+    0x1DD4F   2  death pod + score  pod damage law, score kill-rate term
+    0x1ED00   3  supernova          unbuilt
+    0x15F51   4  Union wreckage     unbuilt screen
+    0x181E8   1  capture            boarding-party frequency
+    0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
+    rest of 0x16844                 the enemy fire law, ENEMY_FIRE_PCT
+    rest of 0x04FD1                 stars, BLACK HOLE PLACEMENT, ship start
+
+NOT gettable this way: screen layouts, how the MAIN VIEWER cycles, and
+[0x1DF0] -- the V that scales the enemy count and the StarBase count. V wants
+one emulator run: start a game at a known level and read one word.
 
 Two corrections this map forced on earlier notes in this file:
 
