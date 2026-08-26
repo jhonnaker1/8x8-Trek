@@ -43,9 +43,31 @@
  * an option flag, and EGA Trek shows no sign of it: seven names in the whole
  * binary, a list page that fits on two lines, and a settlement that is a
  * per-planet find rather than a category of planet. */
-#define PLANET_MIN        5
-#define PLANET_SPREAD     6      /* trek_rand_n(6) gives 0..5, so 5..10 */
-#define PLANET_MAX       10
+/* REFUTED 2026-08-26, the same evening it was written, by a photograph of the
+ * original's PLANET LIST page:
+ *
+ *     5-1N Andromeda-5     6-5M Gamma Regula-6   7-4N Gallista-7
+ *     5-4N Gallista-5      6-7N Vega-6           7-8N Xevious-7
+ *     5-5M Gamma Regula-5  7-2N Ceti Alpha-7     8-1M Andromeda-8
+ *     5-6O Sigma-5         6-2O Ceti Alpha-6
+ *     PLANET LIST 602
+ *
+ * ELEVEN PLANETS ON ONE PAGE, and that is page 602 of two -- the binary
+ * carries PLANET LIST 601 as well, holding the quadrants below 5-1, since the
+ * list is sorted by quadrant. So the galaxy holds at least twelve and at most
+ * twenty-two, against a model that said five to ten. The ancestor's
+ * uninhabited-planet count was the wrong population to derive from.
+ *
+ * PROVISIONAL and deliberately generous: twelve to twenty-two spans what the
+ * evidence allows, and PLANET_MAX covers the top of it. Page 601 has not been
+ * captured -- the viewer cycles its pages on its own and 601 did not come
+ * round -- and one photograph of it would settle the count exactly. That is
+ * on the open list in NOTES.md.
+ *
+ * Cost of being generous: six bytes of RAM and six of save file per slot. */
+#define PLANET_MIN       12
+#define PLANET_SPREAD    11      /* trek_rand_n(11) gives 0..10, so 12..22 */
+#define PLANET_MAX       22
 
 #define PLANET_NONE    0xFF      /* "no planet" / "not orbiting one" */
 
@@ -89,9 +111,14 @@ extern const char *const planet_name[PLANET_NAMES];
 /* Planet class, the Star Trek convention, printed as a letter with no space
  * between the quadrant and the name: "6-4M Gallista-6".
  *
- * MEASURED: M, N and O all appear in the one list we have. DERIVED for the
- * distribution -- the ancestor rolls `Rand()*3.0`, a flat third each, and
- * three classes appearing among five planets is consistent with that.
+ * MEASURED: M, N and O all appear in the lists we have. DERIVED for the
+ * distribution -- the ancestor rolls `Rand()*3.0`, a flat third each.
+ *
+ * CONTESTED 2026-08-26: the eleven planets of PLANET LIST 602 read six N,
+ * three M and two O. A flat third would expect 3.7 each, and six N against
+ * that is not damning on eleven samples -- but it leans, and it leans the way
+ * a weighted roll would. Page 601 doubles the sample for free once captured.
+ * Left flat until then rather than fitted to eleven planets.
  *
  * The class is DISPLAY ONLY here. Whether EGA Trek gives it a mechanical
  * meaning is UNMEASURED: the one class-O planet we watched had energium on

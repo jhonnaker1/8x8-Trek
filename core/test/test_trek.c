@@ -1485,6 +1485,14 @@ static void test_torpedo(void) {
 
     trek_new_game(3, 777);
     ship.sec_y = 4; ship.sec_x = 4;
+    /* CLEAR the target cell rather than trusting seed 777 to leave it empty.
+       It did until 2026-08-26, when the planet count went from five-to-ten up
+       to twelve-to-twenty-two and a planet landed on 7,7 -- so a test about
+       torpedoes started failing because of a constant in another file. A test
+       that depends on what a seed happens to place is a test that will break
+       for a reason it is not about. */
+    sector[(7 << 3) | 7] = SEC_EMPTY;
+    enemy_hp[(7 << 3) | 7] = 0;
     r = trek_fire_torpedo(7, 7, &dmg);
     ok(r == TORP_MISS,   "firing at empty space misses");
     ok(dmg == 0,         "and reports no damage");
@@ -2231,7 +2239,8 @@ static void test_planet_generation(void) {
     /* DERIVED from the ancestor: five to ten, and the one galaxy we have read
        held five. Both ends have to be reachable or the model is not this one. */
     ok(lo == PLANET_MIN, "the smallest galaxy holds PLANET_MIN planets");
-    ok(hi == PLANET_MIN + PLANET_SPREAD - 1, "and the largest holds ten");
+    ok(hi == PLANET_MIN + PLANET_SPREAD - 1,
+       "and the largest holds PLANET_MIN+SPREAD-1");
 
     ok(bad_name == 0,  "every planet's name is in the table");
     ok(bad_class == 0, "every planet's class is M, N or O");
