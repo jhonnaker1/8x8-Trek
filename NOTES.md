@@ -1120,10 +1120,10 @@ corrected time law vindicated.
 
 #### MEASURED AND MISSING -- the real work
 
-  4. **Shields subtract instead of absorbing a share.** Run 3. The shape is
-     settled (absorbed fraction rises with charge) and the constant is not.
-  5. **A system hit is far too gentle.** The original leaves a system at 0%
-     eight times in eleven and can take two in one turn.
+  4. ~~**Shields subtract instead of absorbing a share.**~~ **DONE 2026-08-26**
+     -- and it was three things, not one. See "The shield law" below.
+  5. ~~**A system hit is far too gentle.**~~ **DONE 2026-08-26**, matching all
+     three measured statistics over 2,000 sampled hits.
   6. **The planet chain** -- ORBIT, LAND, USE -- captured end to end in run 1,
      including energium taking energy ABOVE the maximum. Never built.
   7. **RAY**, with its dialog, success sequence and refusal all captured.
@@ -1133,9 +1133,13 @@ corrected time law vindicated.
  10. **Reinforcements arriving mid-fight** -- "A Mongol has appeared at 5-4",
      seen repeatedly across the runs.
 
-Items 4 and 5 are one job, not two: both are combat damage from run 3 and both
-need the shield absorption constant, which is still open. Items 7 and 8 are
-also one job -- RAY's fourth outcome is what needs the report screen.
+Items 7 and 8 are one job -- RAY's fourth outcome is what needs the report
+screen, and five more loss endings reuse the same frame once it exists.
+
+Four and five WERE one job and are done. The shield absorption constant is
+still open in the sense that its system term is a hypothesis that fits rather
+than a measurement; a one-enemy quadrant would settle it, and the shape is
+right either way.
 
 ### The shield law, and what a hit does now (2026-08-26)
 
