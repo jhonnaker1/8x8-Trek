@@ -1213,8 +1213,38 @@ STILL TO READ, with the open item each would close:
     0x15F51   4  Union wreckage     unbuilt screen
     0x181E8   1  capture            boarding-party frequency
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
+    0x09CC1   1  LASERS             HEAT_PER_UNIT -- "Lasers overheat",
+                                    "Amount to fire at"
     rest of 0x16844                 the enemy fire law, ENEMY_FIRE_PCT
     rest of 0x04FD1                 stars, BLACK HOLE PLACEMENT, ship start
+
+TWO THINGS THIS MAP MISSED, found by auditing the provenance tiers rather
+than the routine list (2026-08-26):
+
+  * **`HEAT_PER_UNIT` had no address against it.** trek.h calls it "the
+    weakest number in trek.h" -- FITTED from ONE eyeballed reading -- and the
+    laser routine was never identified. It is `fn 0x09CC1`, which owns
+    "Lasers overheat" and "Amount to fire at". A routine map organised by
+    OPEN ITEM would have caught this; one organised by what the strings
+    happened to turn up did not.
+
+  * **THE EVENT ARCHITECTURE IS DERIVED AND UNVERIFIED, and it is not a
+    constant.** This port schedules base attacks, death pods and tractor
+    beams through `trek_expran` -- the ancestor's exponential deviate -- with
+    means expressed as fractions of the mission length, and reschedules at
+    300/400/500. All of that comes from sst2k's events.c.
+
+    **Neither EGA Trek event decoded so far uses a queue at all.** The spy is
+    a flat `Random(150)` tested per turn (fn 0x15C07) and the distress signal
+    is LOCATION-TRIGGERED (fn 0x15105). No schedule, no deviate, no deadline
+    slot. The one thing that genuinely does carry a deadline is the base
+    attack, which is measured.
+
+    So the port may have the right behaviour on top of a structure the
+    original does not have. Reading 0x15A4C (reinforcements), 0x1ED00
+    (supernova) and 0x1DD4F (death pod) would settle whether ANY EGA Trek
+    event is scheduled, and that is a question about the shape of the core,
+    not about a number.
 
 NOT gettable this way: screen layouts, how the MAIN VIEWER cycles, and
 [0x1DF0] -- the V that scales the enemy count and the StarBase count. V wants
