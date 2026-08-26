@@ -2361,13 +2361,19 @@ static void test_landing(void) {
     ship.sec_y = 4; ship.sec_x = 4;
     one_planet(PFIND_MONGOL, 0, 1);
     trek_orbit();
-    ok(trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_ATTACKED,
-       "a Mongol supply station receives the landing party badly");
+    /* ONE IN FIVE, so the loop -- a single landing usually comes back with
+       nothing. The old test asserted an attack on the first visit, which the
+       binary says happens a fifth of the time. */
+    while (trek_land(LAND_BY_TRANSPORTER, &cas) != LAND_ATTACKED)
+        ;
+    ok(1, "a Mongol supply station receives the landing party badly");
     ok(cas >= LANDING_CASUALTY_MIN &&
        cas <= LANDING_CASUALTY_MIN + LANDING_CASUALTY_SPAN - 1,
        "the casualties are reported for the message");
     ok(ship.casualties == cas, "and land on the ship's tally, which scores");
-    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ATTACKED,
+    /* The claim is that the station is NOT consumed, so assert that directly
+       rather than through an outcome that is now one-in-five. */
+    ok((planets[0].flags & PF_TAKEN) == 0,
        "the station is still there on the next visit");
 }
 

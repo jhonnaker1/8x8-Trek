@@ -267,11 +267,26 @@ void trek_leave_orbit(void);
 uint8_t trek_land(uint8_t how, uint16_t *casualties);
 
 /* A landing party that walks into a Mongol supply station comes back short.
-   PROVISIONAL: the original prints a casualty count and we have never seen
-   one, so this is a plausible range and nothing more. It feeds ship.casualties
-   and therefore scores at a point each, which is the only place it is felt. */
-#define LANDING_CASUALTY_MIN   1
-#define LANDING_CASUALTY_SPAN 10   /* 1..10 */
+ *
+ * READ OUT OF THE BINARY 2026-08-26, fn 0x0E3A1, decoded from raw bytes at
+ * 0x0E435:
+ *
+ *     mov ax,5; Random(5); or ax,ax; jnz  ->  attacked only on a ZERO roll
+ *     "Landing party attacked..."
+ *     mov ax,5; Random(5); add ax,2       ->  casualties = 2..6
+ *
+ * So the count is `Random(5) + 2`, and this port shipped 1..10 invented. Two
+ * casualties is the floor: a raided landing party ALWAYS loses at least two.
+ *
+ * The gate is a one-in-five roll, and it is certain as a gate. WHICH case it
+ * guards is not yet read -- the block sits between the settlers case and the
+ * energium case in a switch over the find, so it is either the Mongol station
+ * case (a station raids the party one time in five) or a risk on landings
+ * generally. This port keeps it on the Mongol find, where the SCIENCE line
+ * puts it, and applies the roll. */
+#define LANDING_ATTACK_OF_N    5   /* attacked when Random(5) == 0 */
+#define LANDING_CASUALTY_MIN   2
+#define LANDING_CASUALTY_SPAN  5   /* Random(5) + 2, so 2..6 */
 
 /* --------------------------------------------------------------------- USE
  *

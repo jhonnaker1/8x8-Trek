@@ -3402,6 +3402,28 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### The landing party's casualties, read out of the binary (2026-08-26)
+
+`fn 0x0E3A1`, decoded from raw bytes at 0x0E435:
+
+    mov ax,5; Random(5); or ax,ax; jnz  ->  attacked only on a ZERO roll
+    "Landing party attacked..."
+    mov ax,5; Random(5); add ax,2       ->  casualties = 2..6
+    " casualties."
+
+So a raided landing party **always loses at least two**, and never more than
+six. This port shipped 1..10, invented.
+
+The attack itself is **one in five**, which changes the feel of the Mongol
+supply station considerably: most landings on one come back empty rather than
+short. WHICH case that gate guards is not yet read -- the block sits between
+the settlers case and the energium case in a switch over the find -- so it is
+either the Mongol station specifically or a risk on landings generally. The
+port keeps it on the Mongol find, where the SCIENCE line puts it.
+
+The routine also resolved all 29 of its strings cleanly, which is what
+confirms the segment base of 37648 shared with the crystal handlers.
+
 ### The energium crystal, read out of the binary (2026-08-26) -- EXACT
 
 `fn 0x0ED3B`, decoded from raw bytes at 0x0EE80. **A crystal is one roll of

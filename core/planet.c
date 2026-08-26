@@ -173,7 +173,12 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
     case PFIND_MONGOL:
         /* The station is not cleared by being walked into: PF_TAKEN is NOT
            set, so a second landing party can be sent to the same reception.
-           That is the reading of a find the original never says you removed. */
+           That is the reading of a find the original never says you removed.
+
+           ONE IN FIVE. The binary rolls Random(5) and only a zero is an
+           attack, so most visits to a Mongol station come back empty-handed
+           rather than short-handed. */
+        if (trek_rand_n(LANDING_ATTACK_OF_N) != 0) return LAND_NOTHING;
         lost = (uint16_t)(LANDING_CASUALTY_MIN
                           + trek_rand_n(LANDING_CASUALTY_SPAN));
         ship.casualties = (uint16_t)(ship.casualties + lost);
