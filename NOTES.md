@@ -801,6 +801,57 @@ may go, and roughly 30-60ms to copy a window. Design it as a SEAM like
 `core/farmem.h`: C128, X16, F256 and CoCo 3 all want one, and MEGA65 and the
 Amiga implement it as a direct call.
 
+### Disk speed, and what the rig has been all along (measured 2026-08-26)
+
+**This machine runs JiffyDOS at both ends** -- `JiffyDOS_C128_6.01` as the
+C128 kernal and `JiffyDOS_1541-II_6.00` in drive 8 -- and it always has. Every
+disk timing this project has ever taken was JiffyDOS-accelerated. Jamie's
+call: **that is fine and it is the assumed environment**, JiffyDOS being
+common on real machines now. Worth knowing rather than discovering later. It
+is also why VICE prints `C128MEM: Warning - Unknown kernal image`: JiffyDOS
+patches the kernal and the checksum no longer matches a stock ROM.
+
+**d64 versus d81, measured.** Timed in emulated jiffies off the KERNAL clock
+at `$A0`, watching `far_len` step 0 -> 3535 (STRINGS.DAT) -> 4627
+(MUSIC.DAT). NTSC, so 60 jiffies to the second.
+
+    drive                        1,092-byte file   reset -> both loaded
+    1541-II + JiffyDOS  (d64)         125 jiffies        348  (5.8s)
+    1581    + JiffyDOS  (d81)         118 jiffies        314  (5.2s)
+
+**The d81 is about 10% faster overall and 6% on a small file.** Real, but not
+the order of magnitude the overlay question needs, and d64 is the more
+universal format. The port needs no code change either way -- same device,
+same filenames -- so this is a build decision, not an architectural one.
+
+A JiffyDOS 1581 ROM makes NO difference to the d81 figures: two runs with and
+without the flag were identical to the jiffy. (They were the same
+configuration: `DosName1581` in vicerc already pointed at the JiffyDOS image.)
+
+**AND A TRAP, PAID FOR ONCE.** An early reading said the d81 was SLOWER, 30
+jiffies against 22. That was the instrument: the poll started six seconds
+after launch, by which time the first transition had already happened, so the
+"22" was the interval between two OBSERVATIONS and not between two events.
+Tracing from reset reverses the sign. Start the trace before the thing you are
+timing, and check the rig by re-running at a different poll rate -- 3ms and
+60ms agree here, which is what says the polling is not perturbing it.
+
+**THE FORMAT IS NOT THE BOTTLENECK, THE READ PATH IS.** 1,092 bytes in ~2.0
+seconds is about 550 bytes a second, nowhere near what JiffyDOS delivers.
+`plat_read` in `c128/src/storage.c` reads ONE BYTE AT A TIME through
+`cbm_k_chrin()` with a `cbm_k_readst()` after every one -- two KERNAL calls
+per byte. That is the slowest path the KERNAL offers.
+
+The KERNAL's LOAD ($FFD5) reads a whole file in one call and is exactly what
+JiffyDOS accelerates hardest. It loads into the bank-0 address space, which is
+useless for the far store but is EXACTLY where an overlay wants to land. So:
+
+  * measure LOAD against the CHRIN loop before designing overlay loading;
+  * if LOAD is the several-times faster it should be, an overlay swap is one
+    LOAD straight into the window -- no bank 1, no far copy, no startup
+    preload, and the biggest open risk in the overlay scope below disappears;
+  * it would make startup faster too, which is worth having on its own.
+
 ### SCOPE: the overlay seam (written 2026-08-26, NOT BUILT)
 
 Read this before starting it. The mechanism is proven, the arithmetic is
