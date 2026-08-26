@@ -535,27 +535,43 @@ memory rather than another survey.
 
 Everything about *what a thing does* has been on disk; these are numbers.
 
-**From the plan's own runs 4 and 5:**
+**Runs 4 and 5 ran 2026-08-24.** What they closed:
 
-- **`RAY`'s four outcome odds**, and the Top Secret loss report on the fatal
-  one.
+- ~~The Top Secret loss report~~ **CAPTURED** -- a Dept. of Space memo with
+  From/To/Date/Re, one sentence naming the loss, then stardays, kills per
+  stardate and score. It is the frame the other loss endings reuse.
+- ~~The Detailed Evaluation~~ **CAPTURED with every weight on screen**, and it
+  contradicts a recorded measurement: there IS a `Penalty for loss of ship` at
+  -200 that this port deleted. Contested, see trek.h.
+- ~~`SELFDESTRUCT_FACTOR`~~ **It destroys NOTHING.** Four enemies present, the
+  nearest at range 1.41, zero killed. Another ancestor rule Anderson dropped.
+- ~~`HP_SCOUT`~~ was never open. It was measured on 2026-08-21 and a stale note
+  claiming otherwise got carried into the plan and this list. All four classes
+  now confirmed at 100%: Scout 255, Battleship 355, Commander 695, Supply 150.
+- `RAY`'s dialog, its success sequence and its no-enemies refusal are captured.
+
+Still open from those runs:
+
+- **`RAY`'s outcome ODDS** -- one sample, a success. Repeat sampling needs a
+  fresh quadrant or a restored save per shot: a successful ray clears the
+  SECTOR MAP, and writing the enemy table does not put ships back on it.
+- **One sample of dying in COMBAT**, to settle whether the -200 ship-loss
+  penalty is universal or particular to self-destruction. Cheap.
 - **Boarding-party frequency and duration.** The mechanic is in the string
   table; the numbers need elapsed play.
-- **`SELFDESTRUCT_FACTOR`** -- the last ancestor-derived number inside an
-  implemented command.
 - **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
   warnings. Specification only, never prose.
 
 **Opened by runs 1 to 3, and all cheap next time the rig is up:**
 
-- **The shield absorption law.** Run 3 got the shape and not the formula --
-  the instrument poisoned its own shield pool partway through. See MEASURED.md,
-  "Run 3".
+- **The shield absorption law.** Runs 3 and 4 both failed on it, for different
+  reasons -- run 3 poisoned its own shield pool, run 4 had TWO enemies firing
+  so every reading was the sum of two hits. It needs a quadrant with exactly
+  one enemy. Run 4 did establish that the shield SYSTEM takes damage when the
+  pool absorbs a big hit, which we model nowhere.
 - **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
   turns in five once a few hundred units reached energy, and never while the
   shields absorbed everything. No clean edge yet.
-- **`HP_SCOUT`.** Two classes are now pinned -- Supply maxes at 150 (`INFO`
-  showed 120 as 80%) and a Battleship reads 355. A scout has not been met.
 - **Supply and Research docking quantities.** A StarBase restocks energy and
   shields to full in one 0.1-stardate turn; the other two types were never
   found. Wants the base-type array located in memory, not another survey.

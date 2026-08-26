@@ -255,7 +255,11 @@
  * today; the scaling is not modelled yet. Whether supply ships scale the same
  * way is untested -- 120 is a single level-3 reading. */
 #define HP_BATTLESHIP       355  /* read from memory, level 3 */
-#define HP_SUPPLY           120  /* read from memory, level 3 */
+#define HP_SUPPLY           120  /* read from memory, level 3. NOTE: this is a
+                                    SPAWN value, not the class maximum, which
+                                    INFO puts at 150 -- it showed 120 as 80%.
+                                    The other three are class maxima, all read
+                                    at 100% on 2026-08-24. */
 #define HP_COMMAND          695  /* MEASURED: read from the enemy table at
                                     level 3, for the ship the console names
                                     the Mongol Commander. The earlier 500 was
@@ -880,7 +884,20 @@ uint8_t trek_game_state(void);
 #define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */
 #define SCORE_INCOMPLETE      (-300)
 
-/* There is no ship-loss line on the original's sheet. MEASURED 2026-08-20 by
+/* CONTESTED 2026-08-24 -- read this before trusting the paragraph below.
+   A self-destruct sheet from run 4 PRINTS "Penalty for loss of ship .... -200"
+   as its own line, above the casualties line, and the arithmetic closes to the
+   unit: -200 -300 +20 +20 -430 = the -890 shown. So the line exists.
+
+   Either the 2026-08-20 reading missed it, or the penalty attaches to
+   self-destruction and not to being shot down. ONE sample of dying in combat
+   settles it, and it is cheap. The constant stays out until then, because
+   restoring it on one screenshot would be the same mistake pointing the other
+   way. See MEASURED.md, "Runs 4 and 5".
+
+   The original note follows.
+
+   There is no ship-loss line on the original's sheet. MEASURED 2026-08-20 by
    losing the ship and reading the Detailed Evaluation: the whole penalty is
    the crew, at a point each, and -300 + -430 came to exactly the -730 printed.
    An earlier SCORE_SHIP_LOST (-200) here was invented and double-counted. */

@@ -3588,3 +3588,131 @@ hit. The earlier blocks, taken before any low write, show no such behaviour.
 So a session that writes the shield pair must not write a small value into it
 and then expect large ones to stick. This invalidated the absorption sweep and
 is why the law above is unresolved rather than measured.
+
+## Runs 4 and 5 (2026-08-24): the loss report, the scoring sheet, and RAY
+
+### All four enemy classes read at 100%
+
+`INFO` steps through every enemy in the quadrant and prints its hit points as a
+percentage of the class maximum. One quadrant held all four:
+
+    Mongol Scout        255   100%
+    Mongol Battleship   355   100%
+    Mongol Commander    695   100%
+    Mongol Supply       150   (seen as 120 at 80%, run 3)
+
+`trek.h` already carries 255, 355 and 695 and all three are confirmed. **The
+plan's claim that `HP_SCOUT` was "still 100 and still unmeasured" was false** --
+it was measured on 2026-08-21 and the note saying otherwise was carried forward
+into the measurement plan and then into the open list twice. Third time this
+class of error has cost a session; see [[negative-claims-about-egatrek]].
+
+`HP_SUPPLY 120` is a spawn value, not the class maximum, which is **150**.
+
+### RAY
+
+The confirmation, in WEAPONS CONTROL: the death ray is experimental in nature
+and has been highly prone to failures, are you sure you wish to continue (Y/N).
+
+On success the dialog prints three beats -- preparing, firing, and it worked --
+then waits on enter. **Every enemy in the quadrant died**: two ships gone from
+the table, the Mongol counter 40 to 38, ALERT back to Green.
+
+With no enemies present it refuses: `SCIENCE: Scanners show no enemy ships in
+this quadrant.`
+
+**The odds are still one sample.** Repeat sampling is blocked by something
+worth knowing: a successful RAY clears the SECTOR MAP, and writing ships back
+into the enemy table does not put them back on the map -- the two are separate
+structures, and the game asks the map. Sampling RAY needs a fresh quadrant or a
+restored save per shot, not a memory poke.
+
+### Self-destruct, and it takes nothing with it
+
+Three stages: a RED confirmation box ("this is a desperate measure", Y/N), then
+`Enter self-destruct password:`, then `Hit ESC to abort` and a pause before it
+fires.
+
+**With four enemies in the quadrant, the nearest at range 1.41, it destroyed
+NONE of them.** The Mongol counter did not move and the report printed
+`Mongol ships destroyed per stardate: 0.00`. So `SELFDESTRUCT_FACTOR` looks
+like another ancestor rule Anderson dropped. One sample, but an unambiguous
+one.
+
+### The Top Secret loss report -- the screen RAY's fatal outcome needs
+
+A memo, and the frame the other loss endings reuse:
+
+    Dept. of Space / EARTH HEADQUARTERS / Top Secret
+    From: Commander, Earth Sector
+    To:   Headquarters
+    Date: <stardate>
+    Re:   Loss of U.S.S. Lexington, RCB-92
+
+    <one sentence naming how the ship was lost>
+
+    Stardays in action:                  1.5
+    Mongol ships destroyed per stardate:  0.00
+    Score:                               -890
+
+For self-destruct the sentence is that the ship was destroyed per order of the
+captain this stardate, with loss of all aboard.
+
+### The Detailed Evaluation, with every weight on screen
+
+    ITEM                                      SCORE
+        Penalty for loss of ship..........    -200
+        Penalty for incomplete mission....    -300
+      2 Mongols killed @ 10 each.........       20
+      1 Commanders killed @ 20 each......       20
+      0 Enemy bases destroyed @ 50 each..        0
+   0.00 Kill/day ratio @ 500 per day.....        0
+    430 Casualties on board Lexington....     -430
+      0 Stars destroyed @ -5 each........        0
+      0 Bases hit @ -200 each............        0
+        TOTAL.............................    -890
+
+Every weight matches `trek.h` -- 10, 20, 50, 500, -200, -300 -- and the
+casualties are one point each with 430 being the whole complement, so
+self-destruct kills all hands.
+
+**But there IS a "Penalty for loss of ship" line, at -200, and this port
+deleted it.** `trek.h` says "There is no ship-loss line on the original's
+sheet", measured on 2026-08-20 from a sheet that totalled -730 with no kills.
+Today's sheet prints the line and the arithmetic closes exactly:
+-200 -300 +20 +20 -430 = -890.
+
+Either the 2026-08-20 reading missed a line, or the penalty applies to
+self-destruction and not to being shot down. **One sample of dying in combat
+settles it** and it is cheap. Until then the constant stays out, because
+putting it back on one screenshot would be making the same mistake in the
+other direction.
+
+Note the two kill lines are NOT exclusive: two ships died, one of them a
+commander, and the sheet scored 2 x 10 AND 1 x 20.
+
+### Shields: more data, and the confound that spoiled it
+
+Fifteen pinned turns at six charge levels, with the shield pool written through
+its CURRENT word only (writing the pair is what poisoned run 3):
+
+    charge 2500   absorbed 212/212, 795/795, 786/1057
+    charge 1800   absorbed 470/860, 457/898, 468/919
+    charge 1200   absorbed 429/969, 183/889, 209/1004
+    charge  800   absorbed 231/816, 184/886, 188/868
+    charge  500   absorbed 158/918,  82/942, 665/764
+
+The three 1800 rows are tight -- 470, 457, 468, all about 0.26 of the charge --
+and the rest are not. **The confound is that TWO enemies were firing**, so each
+"hit" is the sum of up to two hits resolved in sequence, and the first one
+damages the shield SYSTEM before the second arrives. The law needs a quadrant
+with exactly one enemy.
+
+Two things did come out of it:
+
+- **The shield SYSTEM takes damage when the pool absorbs a big hit** -- to 71%
+  on an 795-unit hit that was otherwise fully absorbed, and to 0% twice. That
+  is a mechanic separate from the pool draining, and this port has none of it.
+- **System damage does not need penetration.** One turn damaged the shield
+  system with `to_energy` at zero. So the trigger is not simply "something got
+  through".
