@@ -30,9 +30,16 @@
 #define G_CROSS    91    /* PETSCII 0xDB  +   */
 #define G_BLOCK   160    /* reverse space -- a solid cell in the attr colour */
 
+/* A panel with no title in its border. Not an empty pooled string: that
+   would still cost an id and a far read to draw nothing. */
+#define PANEL_NO_TITLE 0xFF
+
 typedef struct {
     unsigned char x, y, w, h;
-    const char *title;
+    /* AN ID, NOT A POINTER -- see sys_name_id in ui.c for why. The eight
+       titles were 88 bytes of the binary; they are eight bytes now.
+       PANEL_NO_TITLE for a panel that carries none. */
+    unsigned char title;
 } Panel;
 
 /* MEASURED off a 640x350 capture of the original (2026-08-19); the full

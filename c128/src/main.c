@@ -126,10 +126,10 @@ static uint8_t put_tenths_str(char *p, uint16_t tenths) {
 
 static const char *enemy_name(unsigned char c) {
     switch (c) {
-        case SEC_COMMAND: return "COMMANDER";
-        case SEC_SCOUT:   return "SCOUT";
-        case SEC_SUPPLY:  return "SUPPLY SHIP";
-        default:          return "MONGOL";
+        case SEC_COMMAND: return S(S_137);
+        case SEC_SCOUT:   return S(S_157);
+        case SEC_SUPPLY:  return S(S_158);
+        default:          return S(S_159);
     }
 }
 
@@ -194,9 +194,9 @@ static void report_divert(uint8_t r, uint16_t lost) {
                 /* CONFIRMED on the original: transferring into a full pool
                    destroys the surplus. Saying so matters -- the player
                    otherwise sees energy vanish with no explanation. */
-                uint8_t k = put_str(linebuf, "DONE. ");
+                uint8_t k = put_str(linebuf, S(S_168));
                 k += put_u16(linebuf + k, lost);
-                k += put_str(linebuf + k, " UNITS LOST");
+                k += put_str(linebuf + k, S(S_104));
                 linebuf[k] = 0;
                 ui_message(S(S_31), linebuf);
             } else {
@@ -221,9 +221,9 @@ static void do_energy(void) {
 
     ui_dialog_ask(S(S_37), line, sizeof line);
     from = grab_num(line);
-    ui_dialog_ask("TO (1-3):", line, sizeof line);
+    ui_dialog_ask(S(S_186), line, sizeof line);
     to = grab_num(line);
-    ui_dialog_ask("AMOUNT:", line, sizeof line);
+    ui_dialog_ask(S(S_164), line, sizeof line);
     amount = grab_num(line);
 
     {
@@ -262,21 +262,21 @@ static void do_dock(void) {
                empty. */
             switch (ship.docked) {
                 case BASE_STARBASE:
-                    ui_message("HELM: ", S(S_23));
+                    ui_message(S(S_170), S(S_23));
                     break;
                 case BASE_SUPPLY:
-                    ui_message("HELM: ", S(S_25));
+                    ui_message(S(S_170), S(S_25));
                     break;
                 default:
-                    ui_message("HELM: ", S(S_24));
+                    ui_message(S(S_170), S(S_24));
                     break;
             }
             break;
         case DOCK_ALREADY:
-            ui_message("HELM: ", S(S_92));
+            ui_message(S(S_170), S(S_92));
             break;
         default:
-            ui_message("HELM: ", S(S_53));
+            ui_message(S(S_170), S(S_53));
             break;
     }
 }
@@ -297,7 +297,7 @@ static void do_lasers(void) {
 
     if (!found) {
         snd_beep();
-        ui_message("SCIENCE: ", S(S_55));
+        ui_message(S(S_178), S(S_55));
         return;
     }
 
@@ -315,7 +315,7 @@ static void do_lasers(void) {
         what = sector[cell];   /* a kill clears the cell; name it first */
 
         {
-            uint8_t n = put_str(linebuf, "AMOUNT TO FIRE AT ");
+            uint8_t n = put_str(linebuf, S(S_105));
             n += put_u16(linebuf + n, (uint16_t)(y + 1));
             n += put_str(linebuf + n, ",");
             n += put_u16(linebuf + n, (uint16_t)(x + 1));
@@ -333,7 +333,7 @@ static void do_lasers(void) {
             case FIRE_KILL: {
                 uint8_t killed = (sector[cell] == SEC_EMPTY);
                 uint8_t n = put_u16(linebuf, dealt);
-                n += put_str(linebuf + n, " UNIT HIT ON ");
+                n += put_str(linebuf + n, S(S_103));
                 n += put_str(linebuf + n, enemy_name(what));
                 linebuf[n] = 0;
                 ui_dialog_line(linebuf);
@@ -531,23 +531,6 @@ static void do_warp(const char *line) {
     else ui_message(S(S_31), S(S_45));
 }
 
-static const char *sys_name(uint8_t i) {
-    switch (i) {
-        case SYS_CONVERTER:   return "CONVERTER";
-        case SYS_SHIELDS:     return "SHIELDS";
-        case SYS_LIFE:        return "LIFE SUPPORT";
-        case SYS_LASERS:      return "LASERS";
-        case SYS_TUBES:       return "ENTORP TUBES";
-        case SYS_WARP:        return "WARP ENGINES";
-        case SYS_IMPULSE:     return "IMPULSE ENGINE";
-        case SYS_SRSCAN:      return "S.R. SCANNER";
-        case SYS_LRSCAN:      return "L.R. SCANNER";
-        case SYS_COMPUTER:    return "COMPUTER";
-        case SYS_TRANSPORTER: return "TRANSPORTER";
-        default:              return "SHUTTLECRAFT";
-    }
-}
-
 /* Append " y,x" in the original's 1-based presentation. */
 static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
     uint8_t n = put_u16(buf, (uint16_t)(y + 1));
@@ -613,7 +596,7 @@ static void do_self(void) {
     /* "Mongol ship(s) destroyed" is EGA Trek's own phrasing, from the death
        pod's damage report. */
     { uint8_t k = put_u16(linebuf, n);
-      k += put_str(linebuf + k, " MONGOL SHIP(S) DESTROYED.");
+      k += put_str(linebuf + k, S(S_100));
       linebuf[k] = 0;
       ui_dialog_line(linebuf); }
     ui_dialog_close();
@@ -668,7 +651,7 @@ static void do_fix(void) {
         if (i > SYS_COUNT) { snd_beep(); continue; }
 
         ship.repair_focus = i;
-        { uint8_t k = put_str(row, "CONCENTRATING ON ");
+        { uint8_t k = put_str(row, S(S_111));
           k += put_str(row + k, ui_sys_name((uint8_t)(i - 1)));
           row[k] = 0;
           ui_dialog_line(row); }
@@ -700,7 +683,7 @@ static void do_hail(void) {
    invention. */
 static void do_sound(void) {
     snd_toggle();
-    ui_message(S(S_18), snd_enabled() ? "SOUND ON" : "SOUND OFF");
+    ui_message(S(S_18), snd_enabled() ? S(S_182) : S(S_181));
 }
 
 static void do_info(void) {
@@ -753,65 +736,70 @@ static void enemy_turn(uint8_t player_fired) {
         switch (ev[i].kind) {
             case EV_SHIELD_HOLD:
                 k  = put_u16(linebuf, ev[i].amount);
-                k += put_str(linebuf + k, " ABSORBED FROM ");
+                k += put_str(linebuf + k, S(S_97));
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 break;
             case EV_HIT:
                 if (turn_sfx == 0xFF) turn_sfx = SFX_E;
                 k  = put_u16(linebuf, ev[i].amount);
-                k += put_str(linebuf + k, " HIT FROM ");
+                k += put_str(linebuf + k, S(S_99));
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 break;
             case EV_SYSTEM_HIT:
-                k  = put_str(linebuf, sys_name(ev[i].y));
+                /* ui_sys_name(), not a second copy of the same twelve
+                   names -- this file carried its own switch, which is 143
+                   bytes of duplicate prose and one more place to get the
+                   wording wrong. It also said CONVERTER where the original
+                   says EnergyConverter; the shared table is the right one. */
+                k  = put_str(linebuf, ui_sys_name(ev[i].y));
                 k += put_str(linebuf + k, " AT ");
                 k += put_u16(linebuf + k, ev[i].amount);
                 break;
             case EV_ENEMY_MOVED:
-                k  = put_str(linebuf, "MONGOL NOW AT ");
+                k  = put_str(linebuf, S(S_117));
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 linebuf[k] = 0;
-                ui_message("SCANNER: ", linebuf);
+                ui_message(S(S_176), linebuf);
                 continue;
             case EV_BASE_ATTACKED:
                 /* The deadline is the point of the message, as it is in the
                    original: "They can last until 3517.8." */
                 k  = put_str(linebuf, "BASE ");
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                k += put_str(linebuf + k, " HIT TIL ");
+                k += put_str(linebuf + k, S(S_160));
                 k += put_tenths_str(linebuf + k, ev[i].amount);
                 linebuf[k] = 0;
-                ui_message("COMMS: ", linebuf);
+                ui_message(S(S_166), linebuf);
                 continue;
             case EV_BASE_LOST:
                 k  = put_str(linebuf, "BASE ");
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                k += put_str(linebuf + k, " DESTROYED");
+                k += put_str(linebuf + k, S(S_98));
                 linebuf[k] = 0;
-                ui_message("COMMS: ", linebuf);
+                ui_message(S(S_166), linebuf);
                 continue;
             case EV_TRACTORED:
-                k  = put_str(linebuf, "DRAGGED TO QUAD ");
+                k  = put_str(linebuf, S(S_113));
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 linebuf[k] = 0;
-                ui_message("HELM: ", linebuf);
+                ui_message(S(S_170), linebuf);
                 continue;
             case EV_POD_HIT:
                 turn_sfx = SFX_D;      /* MEASURED: the pod has its own sound */
-                k  = put_str(linebuf, "DEATH POD ");
+                k  = put_str(linebuf, S(S_112));
                 k += put_u16(linebuf + k, ev[i].amount);
-                k += put_str(linebuf + k, " ON ALL");
+                k += put_str(linebuf + k, S(S_162));
                 linebuf[k] = 0;
-                ui_message("DAMAGE: ", linebuf);
+                ui_message(S(S_167), linebuf);
                 continue;
             case EV_SHIP_LOST:
-                ui_message("HELM: ", S(S_93));
+                ui_message(S(S_170), S(S_93));
                 continue;
             default:
                 continue;
         }
         linebuf[k] = 0;
-        ui_message("DAMAGE: ", linebuf);
+        ui_message(S(S_167), linebuf);
     }
 
     if (turn_sfx != 0xFF) snd_effect(turn_sfx);
@@ -842,9 +830,9 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             ui_dialog_line(S(S_85));
             break;
         case TORP_OK: {
-            uint8_t k = put_str(linebuf, "MONGOL DAMAGED -- ");
+            uint8_t k = put_str(linebuf, S(S_116));
             k += put_u16(linebuf + k, dmg);
-            k += put_str(linebuf + k, " UNIT HIT");
+            k += put_str(linebuf + k, S(S_163));
             linebuf[k] = 0;
             ui_dialog_line(linebuf);
             break;
@@ -873,7 +861,7 @@ static void do_torpedo(const char *line) {
 
     if (ship.torps == 0) {
         snd_beep();
-        ui_message("WEAPONS: ", S(S_14));
+        ui_message(S(S_187), S(S_14));
         return;
     }
 
@@ -907,9 +895,9 @@ static void do_torpedo(const char *line) {
             return;
         }
         if (salvo > tubes) {
-            uint8_t k = put_str(linebuf, "CAPTAIN, ONLY ");
+            uint8_t k = put_str(linebuf, S(S_107));
             k += put_u16(linebuf + k, (uint16_t)tubes);
-            k += put_str(linebuf + k, tubes == 1 ? " TUBE WORKS." : " TUBES WORK.");
+            k += put_str(linebuf + k, tubes == 1 ? S(S_101) : S(S_102));
             linebuf[k] = 0;
             snd_beep();
             ui_dialog_line(linebuf);
@@ -917,9 +905,9 @@ static void do_torpedo(const char *line) {
         }
     }
     if (salvo > ship.torps) {
-        uint8_t k = put_str(linebuf, "CAPTAIN, THERE ARE ONLY ");
+        uint8_t k = put_str(linebuf, S(S_108));
         k += put_u16(linebuf + k, (uint16_t)ship.torps);
-        k += put_str(linebuf + k, " LEFT.");
+        k += put_str(linebuf + k, S(S_161));
         linebuf[k] = 0;
         snd_beep();
         ui_dialog_line(linebuf);
@@ -927,7 +915,7 @@ static void do_torpedo(const char *line) {
     }
 
     for (shot = 1; shot <= salvo; shot++) {
-        uint8_t k = put_str(linebuf, "SECTOR TO FIRE #");
+        uint8_t k = put_str(linebuf, S(S_122));
         k += put_u16(linebuf + k, (uint16_t)shot);
         k += put_str(linebuf + k, " AT:");
         linebuf[k] = 0;
@@ -1008,7 +996,7 @@ int main(void) {
         alert_quad = 0xFF;      /* a new galaxy alerts on its first quadrant */
 
         ui_draw_all();
-        ui_message("HELM: ", S(S_9));
+        ui_message(S(S_170), S(S_9));
 
         for (;;) {
             ui_read_command(cmd, sizeof cmd);

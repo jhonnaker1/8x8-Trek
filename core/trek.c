@@ -1488,27 +1488,17 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
 }
 
 uint8_t trek_self_destruct(void) {
-    uint8_t cell, n = 0;
+    /* IT DESTROYS NOTHING, AND THAT IS MEASURED. This used to carry the
+       ancestor's kaboom() -- everything whose power times distance was within
+       25 times our remaining energy went with us. EGA Trek dropped it: run 5
+       self-destructed with four enemies present, the nearest at range 1.41,
+       and killed ZERO. Another ancestor rule Anderson did not take.
 
-    for (cell = 0; cell < QUAD_CELLS; cell++) {
-        uint16_t d, reach;
-        if (!SEC_IS_ENEMY(sector[cell])) continue;
-
-        d = (uint16_t)(trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
-                                 abs_diff((uint8_t)(cell & 7), ship.sec_x)) >> 8);
-
-        /* The ancestor tests `power * distance <= 25 * energy`. Divided through
-           by 25 instead, because 25 * 5000 does not fit 16 bits while the left
-           side does: hit points reach 695 and distance 9, so the product stays
-           under 6300. The division costs a little precision at the boundary and
-           nothing anywhere else. */
-        reach = (uint16_t)((uint16_t)(enemy_hp[cell] * d) / SELFDESTRUCT_FACTOR);
-        if (reach <= ship.energy) { kill_enemy(cell); n++; }
-    }
-
+       The return value stays, because the UI still reports a count and the
+       other loss endings will want the same shape. It is now always nought. */
     ship.lost = 1;
     ship.casualties = CREW_COMPLEMENT;   /* as with any loss of the ship */
-    return n;
+    return 0;
 }
 
 /* --------------------------------------------------------- mission state */

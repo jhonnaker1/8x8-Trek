@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 97
+#define STR_COUNT 188
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -103,6 +103,97 @@
 #define S_94    94   /* WE HAVE NOT GOT IT. */
 #define S_95    95   /* WEAPONS CONTROL */
 #define S_96    96   /* WELCOME ABOARD CAPTAIN! */
+#define S_97    97   /*  ABSORBED FROM  */
+#define S_98    98   /*  DESTROYED */
+#define S_99    99   /*  HIT FROM  */
+#define S_100  100   /*  MONGOL SHIP(S) DESTROYED. */
+#define S_101  101   /*  TUBE WORKS. */
+#define S_102  102   /*  TUBES WORK. */
+#define S_103  103   /*  UNIT HIT ON  */
+#define S_104  104   /*  UNITS LOST */
+#define S_105  105   /* AMOUNT TO FIRE AT  */
+#define S_106  106   /* BASES HIT @ -200 EACH */
+#define S_107  107   /* CAPTAIN, ONLY  */
+#define S_108  108   /* CAPTAIN, THERE ARE ONLY  */
+#define S_109  109   /* CASUALTIES ON BOARD LEXINGTON */
+#define S_110  110   /* COMMANDERS KILLED @ 20 EACH */
+#define S_111  111   /* CONCENTRATING ON  */
+#define S_112  112   /* DEATH POD  */
+#define S_113  113   /* DRAGGED TO QUAD  */
+#define S_114  114   /* ENEMY BASES DESTROYED @ 50 EACH */
+#define S_115  115   /* KILL/DAY RATIO @ 500 PER DAY */
+#define S_116  116   /* MONGOL DAMAGED --  */
+#define S_117  117   /* MONGOL NOW AT  */
+#define S_118  118   /* MONGOLS KILLED @ 10 EACH */
+#define S_119  119   /* PENALTY FOR INCOMPLETE MISSION */
+#define S_120  120   /* PENALTY FOR LOSS OF SHIP */
+#define S_121  121   /* RESCUES @ 200 EACH */
+#define S_122  122   /* SECTOR TO FIRE # */
+#define S_123  123   /* STARS DESTROYED @ -5 EACH */
+#define S_124  124   /* ENERGYCONVERTER */
+#define S_125  125   /* SHIELDS */
+#define S_126  126   /* LIFE SUPPORT */
+#define S_127  127   /* LASERS */
+#define S_128  128   /* ENTORP TUBES */
+#define S_129  129   /* WARP ENGINES */
+#define S_130  130   /* IMPULSE ENGINE */
+#define S_131  131   /* S.R. SCANNER */
+#define S_132  132   /* L.R. SCANNER */
+#define S_133  133   /* COMPUTER */
+#define S_134  134   /* TRANSPORTER */
+#define S_135  135   /* SHUTTLECRAFT */
+#define S_136  136   /* LT. COMMANDER */
+#define S_137  137   /* COMMANDER */
+#define S_138  138   /* CAPTAIN */
+#define S_139  139   /* COMMODORE */
+#define S_140  140   /* ADMIRAL */
+#define S_141  141   /* ....######.... */
+#define S_142  142   /* ...########... */
+#define S_143  143   /* ......##...... */
+#define S_144  144   /* ..###########. */
+#define S_145  145   /* SHORT RANGE SCAN */
+#define S_146  146   /* STATUS */
+#define S_147  147   /* CHART OF KNOWN GALAXY */
+#define S_148  148   /* COMMAND */
+#define S_149  149   /* MAIN VIEWER */
+#define S_150  150   /* SYSTEMS STATUS */
+#define S_151  151   /* MONGOL COMMANDER */
+#define S_152  152   /* MONGOL SCOUT */
+#define S_153  153   /* SUPPLY STATION */
+#define S_154  154   /* MONGOL BATTLESHIP */
+#define S_155  155   /* RESTORE A SAVED GAME (Y/N)? */
+#define S_156  156   /* WILL YOU REQUIRE A BRIEFING (Y/N)? */
+#define S_157  157   /* SCOUT */
+#define S_158  158   /* SUPPLY SHIP */
+#define S_159  159   /* MONGOL */
+#define S_160  160   /*  HIT TIL  */
+#define S_161  161   /*  LEFT. */
+#define S_162  162   /*  ON ALL */
+#define S_163  163   /*  UNIT HIT */
+#define S_164  164   /* AMOUNT: */
+#define S_165  165   /* BEARING: */
+#define S_166  166   /* COMMS:  */
+#define S_167  167   /* DAMAGE:  */
+#define S_168  168   /* DONE.  */
+#define S_169  169   /* ENERGY */
+#define S_170  170   /* HELM:  */
+#define S_171  171   /* IMPULSE */
+#define S_172  172   /* MONGOLS */
+#define S_173  173   /* RANGE: */
+#define S_174  174   /* RCB-92 */
+#define S_175  175   /* SAVE GAME */
+#define S_176  176   /* SCANNER:  */
+#define S_177  177   /* SCANNERS */
+#define S_178  178   /* SCIENCE:  */
+#define S_179  179   /* SECTOR: */
+#define S_180  180   /* SHIELDS: */
+#define S_181  181   /* SOUND OFF */
+#define S_182  182   /* SOUND ON */
+#define S_183  183   /* STARDATE */
+#define S_184  184   /* STARDATE: */
+#define S_185  185   /* SYSTEM */
+#define S_186  186   /* TO (1-3): */
+#define S_187  187   /* WEAPONS:  */
 
 extern const unsigned int str_offset[STR_COUNT];
 

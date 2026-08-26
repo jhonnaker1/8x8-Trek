@@ -1480,21 +1480,24 @@ static void test_self_destruct(void) {
     sector[(1 << 3) | 1] = SEC_COMMAND;   enemy_hp[(1 << 3) | 1] = HP_COMMAND;
     sector[(6 << 3) | 6] = SEC_BATTLESHIP; enemy_hp[(6 << 3) | 6] = HP_BATTLESHIP;
     ship.energy = ENERGY_START;
+    /* MEASURED 2026-08-24: it kills NOTHING, at any energy. The ancestor's
+       kaboom() took the quadrant with a full tank; EGA Trek dropped the rule,
+       and run 5 proved it -- four enemies, nearest at range 1.41, zero
+       killed. These two cases used to assert 2 and 0 and were the ancestor
+       being tested, not the original. */
     n = trek_self_destruct();
-    ok(n == 2,              "at full energy it takes everything in the quadrant");
-    ok(ship.lost,           "and the ship with it");
+    ok(n == 0,              "it destroys nothing, even at full energy");
+    ok(ship.lost,           "but the ship is lost");
     ok(ship.casualties == CREW_COMPLEMENT, "all hands, as with any loss");
     ok(trek_game_state() == GAME_LOST, "the mission is over");
 
-    /* An empty tank takes nothing -- which is what makes it a last act rather
-       than a weapon. */
     trek_new_game(3, 777);
     ship.sec_y = 4; ship.sec_x = 4;
     sector[(1 << 3) | 1] = SEC_COMMAND; enemy_hp[(1 << 3) | 1] = HP_COMMAND;
     ship.energy = 0;
     n = trek_self_destruct();
-    ok(n == 0,  "with the banks empty it takes nothing with it");
-    ok(ship.lost, "but the ship is still lost");
+    ok(n == 0,  "and nothing with the banks empty either");
+    ok(ship.lost, "the ship is still lost");
 }
 
 static void test_game_state_and_score(void) {

@@ -117,7 +117,7 @@ void ui_draw_scan(void) {
        reads as a scanner rather than as a blank hole in the console. */
     if (level == SCAN_DEAD) {
         scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 4),
-                 "SCANNERS", EGA_TO_VDC(EGA_LTRED));
+                 S(S_177), EGA_TO_VDC(EGA_LTRED));
         scr_puts((unsigned char)(p->x + 3), (unsigned char)(p->y + 5),
                  S(S_43), EGA_TO_VDC(EGA_LTRED));
         return;
@@ -248,19 +248,19 @@ void ui_draw_status(void) {
 
        Energy is three separate pools, as the original's ENGINEERING REPORT
        shows -- main banks, impulse engines, and shield charge. */
-    scr_puts(lx, y, "STARDATE", COL_LABEL);
+    scr_puts(lx, y, S(S_183), COL_LABEL);
     put_tenths(vx, y, ship.stardate, COL_VALUE);
     y++;
 
-    scr_puts(lx, y, "ENERGY", COL_LABEL);
+    scr_puts(lx, y, S(S_169), COL_LABEL);
     put_num(vx, y, ship.energy, 5, COL_VALUE);
     y++;
-    scr_puts(lx, y, "IMPULSE", COL_LABEL);
+    scr_puts(lx, y, S(S_171), COL_LABEL);
     put_num(vx, y, ship.impulse, 5, COL_VALUE);
     y++;
     /* Green when raised: the charge figure alone does not say whether the
        shields are actually up. */
-    scr_puts(lx, y, "SHIELDS", COL_LABEL);
+    scr_puts(lx, y, S(S_125), COL_LABEL);
     put_num(vx, y, ship.shields, 5,
             ship.shields_up ? EGA_TO_VDC(EGA_LTGREEN) : COL_VALUE);
     y++;
@@ -271,7 +271,7 @@ void ui_draw_status(void) {
     put_tenths((unsigned char)(vx - 1), y, (uint16_t)ship.warp, COL_VALUE);
     y++;
     /* The original's own word, and its own panel label: "Mongols:". */
-    scr_puts(lx, y, "MONGOLS", COL_LABEL);
+    scr_puts(lx, y, S(S_172), COL_LABEL);
     put_num(vx, y, ship.enemies_left, 5, EGA_TO_VDC(EGA_LTRED));
 }
 
@@ -301,7 +301,7 @@ void ui_draw_badge(void) {
 
     scr_puts((unsigned char)(p->x + 2), y, S(S_89), COL_VALUE);
     y++;
-    scr_puts((unsigned char)(cx - 3), y, "RCB-92", COL_VALUE);
+    scr_puts((unsigned char)(cx - 3), y, S(S_174), COL_VALUE);
     y++;
 
     /* All one colour. Outlining the rounded rows in cyan the way the original
@@ -505,14 +505,14 @@ void ui_draw_lasers(void) {
    PETSCII silhouette and the caption, bearing and distance carry the rest.
    The nearest enemy is the subject, which is what the original tracks: its
    scanner reports follow whichever ship is closing. */
-#define VIEW_EMPTY_MSG "NO CONTACT"
+#define VIEW_EMPTY_MSG S(S_54)
 
 static const char *enemy_class(unsigned char c) {
     switch (c) {
-        case SEC_COMMAND:    return "MONGOL COMMANDER";
-        case SEC_SCOUT:      return "MONGOL SCOUT";
-        case SEC_SUPPLY:     return "SUPPLY STATION";
-        default:             return "MONGOL BATTLESHIP";
+        case SEC_COMMAND:    return S(S_151);
+        case SEC_SCOUT:      return S(S_152);
+        case SEC_SUPPLY:     return S(S_153);
+        default:             return S(S_154);
     }
 }
 
@@ -1106,19 +1106,24 @@ void ui_draw_all(void) {
 /* Full names, as the original's report spells them. The SYSTEMS STATUS panel
    uses three-letter abbreviations because it has four columns to fit; this has
    the width for the real thing. Same order as SYS_*. */
-static const char *const sys_name[SYS_COUNT] = {
-    "ENERGYCONVERTER", "SHIELDS",       "LIFE SUPPORT",   "LASERS",
-    "ENTORP TUBES",    "WARP ENGINES",  "IMPULSE ENGINE", "S.R. SCANNER",
-    "L.R. SCANNER",    "COMPUTER",      "TRANSPORTER",    "SHUTTLECRAFT"
+/* IDS, NOT POINTERS. tools/gen_strings.py cannot rewrite a static initialiser
+   -- a literal there has no call to become -- so tables like this one held
+   their text in the binary long after the prose around them had moved to bank
+   1. Twelve names is 143 bytes; twelve ids is twelve. Same for rank_name and
+   ship_art below, and for the panel titles in layout.c. */
+static const unsigned char sys_name_id[SYS_COUNT] = {
+    S_124, S_125, S_126, S_127,
+    S_128, S_129, S_130, S_131,
+    S_132, S_133, S_134, S_135
 };
 
 /* The same names, for anything outside this file that needs them -- F)ix lists
    them so the player can pick a number. */
 const char *ui_sys_name(uint8_t i) {
-    /* Written as an if rather than a ternary: cc65 rejects the conditional
-       here, one arm being `const char *const` from the table and the other a
-       plain string literal. */
-    if (i < SYS_COUNT) return sys_name[i];
+    /* The pointer comes out of a rotating pool slot and stays valid for the
+       next few S() calls, which is enough: every caller copies or draws it
+       immediately. See core/strpool.h. */
+    if (i < SYS_COUNT) return S(sys_name_id[i]);
     return "";
 }
 
@@ -1175,7 +1180,7 @@ void ui_repair_report(void) {
     box(REP_X, REP_Y, REP_W, REP_H, COL_LABEL);
     scr_puts((unsigned char)(REP_X + 14), REP_Y, S(S_75), COL_VALUE);
 
-    scr_puts((unsigned char)(REP_X + 2),  (unsigned char)(REP_Y + 1), "SYSTEM", COL_LABEL);
+    scr_puts((unsigned char)(REP_X + 2),  (unsigned char)(REP_Y + 1), S(S_185), COL_LABEL);
     scr_puts((unsigned char)(REP_X + 26), (unsigned char)(REP_Y + 1), S(S_66), COL_LABEL);
     scr_puts((unsigned char)(REP_X + 24), (unsigned char)(REP_Y + 2), S(S_22), COL_LABEL);
 
@@ -1185,7 +1190,7 @@ void ui_repair_report(void) {
         if (pct > 100) pct = 100;
         color = sys_color(pct);
 
-        scr_puts((unsigned char)(REP_X + 2), y, sys_name[i], color);
+        scr_puts((unsigned char)(REP_X + 2), y, S(sys_name_id[i]), color);
         put_num((unsigned char)(REP_X + 18), y, pct, 3, color);
         scr_put((unsigned char)(REP_X + 21), y, SC_PCT, color);
 
@@ -1272,7 +1277,7 @@ static void msgv_draw(unsigned char top) {
         if (entry != last) { log_fetch(entry); last = entry; }
 
         if ((line % MSGV_PER_ENTRY) == 0) {
-            scr_puts(x, y, "STARDATE:", COL_MSGV_DATE);
+            scr_puts(x, y, S(S_184), COL_MSGV_DATE);
             put_tenths((unsigned char)(x + 10), y, view_date, COL_MSGV_DATE);
         } else {
             scr_puts((unsigned char)(x + 1), y, view_dept, COL_MSGV_TEXT);
@@ -1417,7 +1422,7 @@ static uint8_t save_read(Setup *s, const char *name) {
 void ui_save_game(const Setup *s) {
     char name[18];
 
-    ui_dialog_open("SAVE GAME");
+    ui_dialog_open(S(S_175));
     ui_dialog_line(S(S_3));
     ui_dialog_ask(S(S_34), name, sizeof name);
     if (!name[0]) strcpy(name, SAVE_DEFAULT);
@@ -1464,12 +1469,12 @@ void ui_setup(Setup *s) {
 
     scr_clear();
     scr_puts(31, 1, S(S_89), COL_VALUE);
-    scr_puts(36, 2, "RCB-92",           COL_VALUE);
+    scr_puts(36, 2, S(S_174),           COL_VALUE);
     scr_puts(2,  5, S(S_96), COL_MSG);
 
-    s->briefing = ask_yes(7, "WILL YOU REQUIRE A BRIEFING (Y/N)?");
+    s->briefing = ask_yes(7, S(S_156));
 
-    if (ask_yes(9, "RESTORE A SAVED GAME (Y/N)?")) {
+    if (ask_yes(9, S(S_155))) {
         /* MEASURED 2026-08-24: the original asks for a file name here with a
            default and an ESC abort, and on success goes STRAIGHT to the
            console -- it does not go on to ask the name, level and password,
@@ -1576,18 +1581,18 @@ void ui_evaluation(void) {
        the ship-loss penalty and omits RESCUES, a surviving ship's does the
        reverse. MEASURED 2026-08-24 off both. */
     if (sh.ship_lost_pts)
-        ev_row(y++, NULL, "PENALTY FOR LOSS OF SHIP", sh.ship_lost_pts, COL_MSG);
+        ev_row(y++, NULL, S(S_120), sh.ship_lost_pts, COL_MSG);
     else {
         ev_count(c, sh.rescues);
-        ev_row(y++, c, "RESCUES @ 200 EACH", sh.rescue_pts, COL_MSG);
+        ev_row(y++, c, S(S_121), sh.rescue_pts, COL_MSG);
     }
-    ev_row(y++, NULL, "PENALTY FOR INCOMPLETE MISSION", sh.incomplete_pts, COL_MSG);
+    ev_row(y++, NULL, S(S_119), sh.incomplete_pts, COL_MSG);
     ev_count(c, sh.mongols);
-    ev_row(y++, c, "MONGOLS KILLED @ 10 EACH", sh.mongol_pts, COL_MSG);
+    ev_row(y++, c, S(S_118), sh.mongol_pts, COL_MSG);
     ev_count(c, sh.commanders);
-    ev_row(y++, c, "COMMANDERS KILLED @ 20 EACH", sh.commander_pts, COL_MSG);
+    ev_row(y++, c, S(S_110), sh.commander_pts, COL_MSG);
     ev_count(c, sh.enemy_bases);
-    ev_row(y++, c, "ENEMY BASES DESTROYED @ 50 EACH", sh.enemy_base_pts, COL_MSG);
+    ev_row(y++, c, S(S_114), sh.enemy_base_pts, COL_MSG);
 
     /* The rate prints with two decimals, as the original does -- 0.00 on an
        unfinished mission, which is the commonest sight on this screen. */
@@ -1600,15 +1605,15 @@ void ui_evaluation(void) {
         r[k++] = (char)('0' + (sh.rate_hundredths / 10) % 10);
         r[k++] = (char)('0' + sh.rate_hundredths % 10);
         r[k]   = '\0';
-        ev_row(y++, r, "KILL/DAY RATIO @ 500 PER DAY", sh.rate_pts, COL_MSG);
+        ev_row(y++, r, S(S_115), sh.rate_pts, COL_MSG);
     }
 
     ev_count(c, sh.casualties);
-    ev_row(y++, c, "CASUALTIES ON BOARD LEXINGTON", sh.casualty_pts, COL_MSG);
+    ev_row(y++, c, S(S_109), sh.casualty_pts, COL_MSG);
     ev_count(c, sh.stars);
-    ev_row(y++, c, "STARS DESTROYED @ -5 EACH", sh.star_pts, COL_MSG);
+    ev_row(y++, c, S(S_123), sh.star_pts, COL_MSG);
     ev_count(c, sh.bases_hit);
-    ev_row(y++, c, "BASES HIT @ -200 EACH", sh.bases_hit_pts, COL_MSG);
+    ev_row(y++, c, S(S_106), sh.bases_hit_pts, COL_MSG);
 
     y++;
     ev_row(y, NULL, "TOTAL", sh.total, COL_VALUE);
@@ -1621,8 +1626,8 @@ void ui_evaluation(void) {
    screen, and TREK.SCR holds ten records, two per level. Only the current
    game's entry is shown: writing the file needs disk I/O, which is deliberately
    absent along with save and restore. */
-static const char *const rank_name[5] = {
-    "LT. COMMANDER", "COMMANDER", "CAPTAIN", "COMMODORE", "ADMIRAL"
+static const unsigned char rank_name_id[5] = {
+    S_136, S_137, S_138, S_139, S_140
 };
 
 /* The hall of fame, now persistent.
@@ -1671,7 +1676,7 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
 
     for (i = 0; i < HOF_RANKS; i++) {
         y = (unsigned char)(10 + i * 2);
-        scr_puts(46, y, rank_name[i], COL_VALUE);
+        scr_puts(46, y, S(rank_name_id[i]), COL_VALUE);
 
         /* First place bright, second place dim on the row below -- which is
            how the original distinguishes them, and why ten records fit in
@@ -1753,25 +1758,26 @@ void ui_title(void) {
        them. Blocks sidestep the character set entirely, and match the
        original's filled artwork better than line-drawing would. */
     {
-        static const char *const ship_art[5] = {
-            "....######....",
-            "...########...",
-            "....######....",
-            "......##......",
-            "..###########."
+        static const unsigned char ship_art_id[5] = {
+            S_141, S_142, S_141, S_143, S_144
         };
         unsigned char r, c;
-        for (r = 0; r < 5; r++)
-            for (c = 0; ship_art[r][c]; c++)
-                if (ship_art[r][c] == '#')
+        for (r = 0; r < 5; r++) {
+            /* One fetch per row, held across the inner loop -- which makes no
+               S() call of its own, so the slot cannot be rotated out from
+               under it. */
+            const char *art = S(ship_art_id[r]);
+            for (c = 0; art[c]; c++)
+                if (art[c] == '#')
                     scr_put((unsigned char)(8 + c), (unsigned char)(11 + r),
                             G_BLOCK, EGA_TO_VDC(EGA_LTGRAY));
+        }
     }
 
     /* Ship plate, bottom left, matching the console's own badge panel. */
     box(4, 16, 24, 7, COL_LABEL);
     scr_puts(9,  17, S(S_89), COL_VALUE);
-    scr_puts(13, 18, "RCB-92",           COL_VALUE);
+    scr_puts(13, 18, S(S_174),           COL_VALUE);
     scr_puts(9,  20, S(S_20),   EGA_TO_VDC(EGA_LTCYAN));
 
     /* And the credit. The original earns this panel -- EGA Trek was shareware
@@ -1878,7 +1884,7 @@ void ui_info_panel(void) {
         scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 4),
                  enemy_class(sector[cell]), color);
 
-        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 6), "SECTOR:", COL_LABEL);
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 6), S(S_179), COL_LABEL);
         put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 6),
                 (uint16_t)(y + 1), 1, COL_VALUE);
         scr_put((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 6), 45, COL_VALUE);
@@ -1887,14 +1893,14 @@ void ui_info_panel(void) {
 
         d = trek_dist((unsigned char)(y > ship.sec_y ? y - ship.sec_y : ship.sec_y - y),
                       (unsigned char)(x > ship.sec_x ? x - ship.sec_x : ship.sec_x - x));
-        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 7), "RANGE:", COL_LABEL);
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 7), S(S_173), COL_LABEL);
         put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 7),
                 (uint16_t)(d >> 8), 1, COL_VALUE);
         scr_put((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 7), SC_DOT, COL_VALUE);
         put_num((unsigned char)(INF_X + 16), (unsigned char)(INF_Y + 7),
                 (uint16_t)(((d & 0xFF) * 100) >> 8), 2, COL_VALUE);
 
-        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 8), "BEARING:", COL_LABEL);
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 8), S(S_165), COL_LABEL);
         put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 8),
                 trek_bearing(y, x), 3, COL_VALUE);
 
@@ -1905,7 +1911,7 @@ void ui_info_panel(void) {
            sides: 6950 and 69 both fit, and the answer is the same percentage. */
         pct  = full ? (uint16_t)(((uint16_t)(enemy_hp[cell] * 10)) / (full / 10 ? full / 10 : 1)) : 0;
         if (pct > 100) pct = 100;
-        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 9), "SHIELDS:", COL_LABEL);
+        scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 9), S(S_180), COL_LABEL);
         put_num((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 9), pct, 3,
                 sys_color((unsigned char)pct));
         scr_put((unsigned char)(INF_X + 17), (unsigned char)(INF_Y + 9), SC_PCT,

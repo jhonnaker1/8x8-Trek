@@ -506,9 +506,10 @@ and answers mechanics; MEASURED.md has its own back catalogue.
   and repaired a focused system at a StarBase about 40% too fast. Now four
   rate constants with all four asserted in `test_trek.c`. See MEASURED.md,
   "The repair table is a table, not a product".
-- ~~**`SELFDESTRUCT_FACTOR`**~~ **MEASURED 2026-08-24: it should be NOTHING.**
-  Self-destruct destroys no enemies at all. No longer a measurement item; it is
-  a line of code to delete.
+- ~~**`SELFDESTRUCT_FACTOR`**~~ **DELETED 2026-08-26.** Self-destruct destroys
+  no enemies at all -- run 5, four present, nearest at range 1.41, zero killed.
+  The constant and the ancestor's `kaboom()` reach test are gone;
+  `trek_self_destruct()` still returns a count, and it is always nought.
 
 ### Run 1 is DONE (2026-08-24) -- see MEASURED.md
 
@@ -700,51 +701,105 @@ data arrived, not that anything plays -- and when every piece of state is
 right and the thing still does not work, the next suspect is whether the code
 you are reading is the code that ran.
 
-### THE C128 LINK OVERFLOWS BY 1,118 BYTES -- the bank-1 phase is now due
+### The string pool is finished, and the image links again (2026-08-26)
 
-**As of 2026-08-25 the C128 image does not link.** The movement correction is
-finished, measured and tested, and it costs 1,424 bytes against 303 bytes of
-headroom. `make -C c128` fails with `section '.rodata' will not fit in region
-'ram'`. Nothing is hidden and nothing is half-done: `make test` passes, the
-c128 native tests pass, and the core is correct. The image is simply full.
+**It links with 169 bytes free.** The movement correction had put it 1,118
+bytes over; finishing the string pool took 1,292 bytes out.
 
-This is the phase the plan named -- implement, then SIZE, then place in bank 1
--- arriving on schedule rather than as a surprise. What it needs is not more
-shaving.
+Where they came from, in the order they were found:
 
-**Where the 1,424 went**, from the link map:
+        364  the generator learned three more drawing functions
+        564  static initialiser tables, by hand -- see below
+        322  a duplicate system-name table, deleted outright
+        ~40  MINLEN lowered from 10 to 6
+         ~2  SELFDESTRUCT_FACTOR and the rule it belonged to
 
-        460  walk_path            the straight-line walk
-        329  path_dist            distance at galaxy scale
-        201  report_move          "BLOCKED BY OBJECT AT 7-6"
-        163  warp_hundredths      11 * d / warp^2, staged for 16 bits
-        156  warp_energy          factored out; now called twice
-         71  trek_move_impulse
-         36  advance_hundredths   the sub-tenth clock carry
-         8   trek_move_warp
+`.rodata.str1.1` went from **1,564 bytes across 146 literals to 291 across
+55**, and the pool now carries 3,535 bytes of text in bank 1.
 
-Already shaved, and recorded so it is not attempted twice: the walk was 631
-bytes when it computed `round(delta * i / n)` per step per axis, because each
-of those is a 16-bit divide. Accumulators dropped it to 460 and the whole walk
-now runs in eight-bit adds. `path_dist`'s fraction was tried three ways --
-divide (271), sixteen subtractions (329), four-step binary long division (302
-in place, and the smallest of the three once the surrounding code settled).
-`report_move` came down 71 bytes by writing two single digits instead of
-calling the 16-bit formatter twice. There is no third round of this worth
-having; the remaining functions are all doing measured arithmetic.
+**What the generator could never reach, and why.** `tools/gen_strings.py` only
+rewrites a literal that is a direct argument to a known drawing function,
+because a literal in a static initialiser has no call to become. So every
+TABLE kept its text in the binary long after the prose around it had moved:
 
-**The target is already identified and already tooled.** `.rodata.str1.1` is
-**1,564 bytes of string literals still compiled into the binary** -- 187
-distinct strings across `c128/src/*.c` that never went through the string
-pool. The top forty alone are 1,259 bytes. `core/strpool.h`, `S(id)`,
-`tools/gen_strings.py` and `c128/src/strings.txt` are the machinery for
-exactly this and are already carrying 2,267 bytes in bank 1. Moving the large
-literals across is mechanical, and it is what closes this.
+    sys_name[12]   143 bytes   ui.c    -> sys_name_id[]
+    rank_name[5]    60 bytes   ui.c    -> rank_name_id[]
+    ship_art[5]     60 bytes   ui.c    -> ship_art_id[]
+    panels[].title  88 bytes   layout.c -> Panel.title is an id now
 
-Two other things the map says, for when that is being planned:
-`.text.main` is **14,798 bytes** -- almost everything is inlined into it, so it
-is not one function's fault and not one function's fix -- and `enemy_turn` is
-4,223.
+Those are hand conversions and they are the pattern for any future table:
+hold the id, call `S()` at the point of use. `PANEL_NO_TITLE` (0xFF) marks the
+badge panel, which carries no title -- an empty pooled string would still cost
+an id and a far read to draw nothing.
+
+**A duplicate table went with them, and it was the best single win.**
+`main.c` had its own twelve-case `sys_name()` switch beside `ui.c`'s
+`ui_sys_name()`, used at exactly one call site, and it said `CONVERTER` where
+the original says `EnergyConverter`. Deleting it took 322 bytes and made the
+wording righter, not just shorter. **Look for the second copy before
+optimising the first.**
+
+**MINLEN was a guess and it was wrong.** The generator skipped anything under
+ten characters, on the reasoning that short strings cost more in call overhead
+than they save. Measured, they do not: a pooled string costs two bytes of
+index and turns a load-address into a load-immediate-plus-call. The department
+prefixes alone -- `HELM: `, `COMMS: `, `SCIENCE: ` -- were 60 bytes sitting
+above the old floor. It is 6 now. Below that the remaining literals are single
+characters and separators and it genuinely stops paying.
+
+**What is deliberately still in the binary.** `STRINGS.DAT`, `MUSIC.DAT`,
+`TREK.SCR` and `EGATREK.SAV` -- 43 bytes of filenames. `STRINGS.DAT` is read
+BEFORE the pool exists and the others are opened by code that must not depend
+on it. None of them is an argument to a drawing function, which is what keeps
+them out; there is a comment in the generator saying never to add `far_load`,
+`plat_open` or `hof_*` to DRAW_FNS.
+
+Also left: the twelve three-letter `sys_abbrev` codes. Pooling them would save
+about 24 bytes and cost twelve far reads on every SYSTEMS STATUS redraw, which
+is the wrong trade -- a pooled string is a 63-byte far read, roughly 0.6ms.
+
+**Verified on the machine, not just in the map.** Title screen with its pooled
+ship art, the full nine-panel console with every pooled panel title, STATE OF
+REPAIR listing all twelve pooled system names, and a blocked move reporting
+`NAVIGATION: BLOCKED BY OBJECT AT 8-5` with the ship standing at 7-5. Impulse
+fell 500 to 494 for the one sector it flew, and the stardate did not move --
+which is the sub-tenth carry working, not a bug.
+
+**What this does NOT do is solve the ceiling.** It bought 1,292 bytes once,
+and the movement correction alone cost 1,424. The remaining feature list is
+estimated at 5,000-6,000 bytes against 169 free. See below.
+
+### THE CEILING IS REAL, AND OVERLAYS ARE THE ANSWER -- measured 2026-08-26
+
+Code is **94% of the image**: 40,621 bytes of `.text` against 2,353 of
+`.rodata`. Bank 1 is barely touched -- 4,627 bytes used of 32K -- but it holds
+DATA, and data is no longer what is overflowing. `FETCH`/`STASH` read bytes
+into a RAM buffer; nothing executes from bank 1.
+
+**The compiler has nothing left to give.** Measured: `-Wl,-mllvm,
+--inline-threshold=-50` saves 194 bytes, `--lto-O3` saves nothing, and
+`-fno-lto` COSTS 6,801. LTO is already carrying a great deal.
+
+**Overlays would free 8,561 bytes, and that is measured rather than
+estimated.** Forcing the phase functions out of `main` with `noinline` -- they
+were all inlined into it, which is why `main` was 14,846 -- gives:
+
+        ui_hall_of_fame   2,111      ui_save_game + serialiser  1,834
+        ui_evaluation     1,696      ui_info_panel              1,245
+        trek_score_sheet  1,270      ui_title                     647
+        ui_repair_report    575      ui_setup                     749
+        ui_messages_view    545
+                                            total   10,672
+
+Every one is a phase or a modal screen. None coexists with the main game loop,
+and none coexists with any other. One window the size of the largest -- 2,111
+bytes -- with the rest copied in from bank 1 frees 8,561.
+
+That is more than the whole remaining feature list. The cost is a separate
+link per overlay at a fixed address, discipline about which direction calls
+may go, and roughly 30-60ms to copy a window. Design it as a SEAM like
+`core/farmem.h`: C128, X16, F256 and CoCo 3 all want one, and MEGA65 and the
+Amiga implement it as a direct call.
 
 ### Wanted on their own merits
 

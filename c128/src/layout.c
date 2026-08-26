@@ -1,25 +1,27 @@
 #include "vdc.h"
 #include "layout.h"
 #include "egavdc.h"
+#include "../../core/strpool.h"
+#include "strdata.h"
 
 /* See layout.h for where these numbers come from and what the one deliberate
    departure from the original is. */
 const Panel panels[PANEL_COUNT] = {
     /* Top band, rows 0..10. The scan panel carries no title because the
        original's does not -- its column headers are the top line. */
-    {  0,  0, 21, 11, "SHORT RANGE SCAN" },
-    { 20,  0, 21, 11, "STATUS" },
-    { 41,  0, 39, 11, "CHART OF KNOWN GALAXY" },
+    {  0,  0, 21, 11, S_145 },
+    { 20,  0, 21, 11, S_146 },
+    { 41,  0, 39, 11, S_147 },
 
     /* Middle band, rows 11..17. LASERS and COMMAND share row 14. */
-    {  0, 11, 21,  4, "LASERS" },
-    {  0, 14, 21,  4, "COMMAND" },
-    { 21, 11, 19,  7, "MAIN VIEWER" },
+    {  0, 11, 21,  4, S_127 },
+    {  0, 14, 21,  4, S_148 },
+    { 21, 11, 19,  7, S_149 },
 
     /* Bottom band, rows 17..24. The badge has no title in its border: the
        ship name is the first line inside it. */
-    {  0, 17, 20,  8, "" },
-    { 20, 17, 20,  8, "SYSTEMS STATUS" },
+    {  0, 17, 20,  8, PANEL_NO_TITLE },
+    { 20, 17, 20,  8, S_150 },
 
     /* Columns 40..79 of rows 11..24 are deliberately absent from this table.
        That is the message region, and it has no frame of its own -- see
@@ -44,8 +46,11 @@ static void draw_panel(const Panel *p) {
     scr_put(p->x, bottom, G_BL, BORDER_COL);
     scr_put(right, bottom, G_BR, BORDER_COL);
 
-    /* Title sits in the top border, one cell in, like the original. */
-    scr_puts((unsigned char)(p->x + 2), p->y, p->title, TITLE_COL);
+    /* Title sits in the top border, one cell in, like the original. The
+       badge panel carries none, which is PANEL_NO_TITLE rather than an empty
+       string -- an empty string would still cost a pool id and a fetch. */
+    if (p->title != PANEL_NO_TITLE)
+        scr_puts((unsigned char)(p->x + 2), p->y, S(p->title), TITLE_COL);
 }
 
 /* The milestone-1 EGA palette swatch lived in MAIN VIEWER and has been

@@ -876,16 +876,17 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage);
    points as the percentage the original's INFO panel calls "Shields". */
 uint16_t trek_enemy_full_hp(uint8_t type);
 
-/* Self destruct. DERIVED from the ancestor's kaboom(): everything in the
-   quadrant whose power times its distance is within 25 times our remaining
-   energy is destroyed with us. So a full tank takes the quadrant with it and
-   an empty one takes almost nothing, which is what makes it a last act rather
-   than a weapon.
+/* Self destruct. MEASURED 2026-08-24: it destroys NOTHING.
+ *
+ * This port carried the ancestor's kaboom() -- everything whose power times
+ * its distance fell within 25 times our remaining energy died with us, so a
+ * full tank took the quadrant with it. Run 5 tested it directly: four enemies
+ * present, the nearest at range 1.41, zero killed. SELFDESTRUCT_FACTOR is
+ * gone with the rule it belonged to.
  *
  * The password is the UI's business -- the core is not told it, because the
  * core formats no text and compares no strings. Returns how many enemies went
- * with us, and sets ship.lost. */
-#define SELFDESTRUCT_FACTOR  25
+ * with us, which is now always nought, and sets ship.lost. */
 uint8_t trek_self_destruct(void);
 
 /* Mission state. */

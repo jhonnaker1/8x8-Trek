@@ -34,9 +34,29 @@ LIST = "c128/src/strings.txt"      # the source of truth, and COMMITTED
 
 # Literals are pooled ONLY when they are a direct argument to one of these.
 DRAW_FNS = ("ui_message", "ui_dialog_line", "ui_dialog_ask", "ui_dialog_ask_esc",
-            "ui_dialog_open", "scr_puts", "ui_confirm")
+            "ui_dialog_open", "scr_puts", "ui_confirm",
+            # Added 2026-08-26, when the image overflowed and the 1,564 bytes
+            # still in .rodata had to come out. All three take a const char*
+            # and copy or draw it immediately, so a rotating pool slot is
+            # safe: only one pooled string is ever alive per call.
+            "put_str", "ev_row", "gauge_row", "ask_yes")
 
-MINLEN = 10          # shorter than this costs more in call overhead than it saves
+# NEVER pool a name the loader itself needs. "STRINGS.DAT" is read before the
+# pool exists, and "MUSIC.DAT" and "TREK.SCR" are opened by code that must not
+# depend on it. None of them is an argument to a DRAW_FN, which is what keeps
+# them out -- do not add far_load, plat_open or hof_* to that list.
+
+# Lowered from 10 to 6 on 2026-08-26, and MEASURED rather than reasoned: the
+# 10 was a guess that short strings cost more in call overhead than they save.
+# They do not. A pooled string costs two bytes of index and turns a
+# load-address into a load-immediate-plus-call, which is one or two bytes at
+# the site; a six-character literal is seven bytes of .rodata. The department
+# prefixes alone -- "HELM: ", "COMMS: ", "SCIENCE: " -- were 60 bytes sitting
+# above the old floor.
+#
+# Below six it really does stop paying, and the remaining literals at that
+# length are single characters and separators.
+MINLEN = 6
 MAXLEN = 63          # STR_MAX - 1 in core/strpool.h
 
 
