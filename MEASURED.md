@@ -3477,6 +3477,30 @@ Undocked"), and `fn 0x22773` is the viewer's system page.
 stride 16, is the twelve SYSTEM NAMES -- "EnergyConverter" is fifteen
 characters and fits exactly. Not planets, and not a population.
 
+### The distress signal is LOCATION-TRIGGERED, not scheduled (2026-08-26)
+
+`fn 0x15105`, 80 bytes, and it is not an event at all:
+
+    if ([0x1E1C] != ship.quad_y) return
+    if ([0x1E1E] != ship.quad_x) return
+    if (deadline [0x1DA2] <= stardate [0x1D42]) return
+    print "COMMUNICATIONS: A distress signal is being received from the planet."
+
+**You hear the distress signal by FLYING THERE.** It fires whenever the ship
+is in the settled planet's quadrant with time still on the clock -- a
+different mechanic from the base-under-attack warning, which is scheduled and
+arrives wherever you are. Worth knowing before building one as the other.
+
+This also fixes the string attribution: the distress text belongs to fn
+0x15105 at segment base 86208, not to fn 0x15C07 (the spy). The text was right
+all along; the routine was wrong.
+
+**AND NOTHING EVER MARKS A SETTLEMENT DESTROYED.** ORBIT computes it live --
+`if stardate > deadline` insert "destroyed " -- and the only writes to the
+deadline are the one in fn 0x151D0 and an initialiser. There is no flag, so
+this port's stored PF_RUINED was the wrong shape and is gone; a derived
+`planet_settlement_lost()` replaces it.
+
 ### A PLANET'S NAME IS ITS QUADRANT (2026-08-26) -- EXACT
 
 `fn 0x151D0`, the evacuation message, builds the planet's name like this:

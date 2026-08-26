@@ -314,12 +314,19 @@ static uint8_t put_planet(char *buf, const Planet *p) {
 static const char *scan_line(const Planet *p) {
     switch (p->find) {
         case PFIND_ENERGIUM: return "ENERGIUM PRESENT ON PLANET.";
-        case PFIND_SETTLERS: return (p->flags & PF_RUINED)
-                                    ? "A DESTROYED SETTLEMENT."
-                                    : "A SETTLEMENT ON THE PLANET.";
         case PFIND_MONGOL:   return "A MONGOL SUPPLY STATION.";
         default:             return "NOTHING OF INTEREST.";
     }
+}
+
+/* The settlement line is SEPARATE from the find, and the original prints both
+   for the one settled world -- its ORBIT tests the quadrant before it decodes
+   the per-quadrant byte and falls straight through into it. "Destroyed" is
+   computed from the deadline rather than stored, so this is a call and not a
+   flag test. */
+static const char *settle_line(void) {
+    return planet_settlement_lost() ? "A DESTROYED SETTLEMENT."
+                                    : "A SETTLEMENT ON THE PLANET.";
 }
 
 static void do_orbit(void) {
@@ -339,6 +346,7 @@ static void do_orbit(void) {
             linebuf[k++] = planet_class_letter[p->cls];
             linebuf[k] = 0;
             ui_message(S(S_52), linebuf);
+            if (p->flags & PF_SETTLED) ui_message(S(S_178), settle_line());
             ui_message(S(S_178), scan_line(p));
             break;
         case ORBIT_ALREADY:

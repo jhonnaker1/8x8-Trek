@@ -6,6 +6,7 @@
 Planet  planets[PLANET_MAX];
 uint8_t planet_count;
 uint8_t inventory[ITEM_COUNT];
+uint16_t planet_evac_end;
 
 /* The binary's own tables, in the binary's own order. Names, not prose. */
 const char *const planet_name[PLANET_NAMES] = {
@@ -29,6 +30,10 @@ void planet_new(void) {
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = 0;
     ship.orbiting = PLANET_NONE;
     ship.rescues  = 0;
+    /* One evacuation per galaxy, announced with one to four stardates of
+       warning -- see EVAC_WARNING_MIN_TENTHS. */
+    planet_evac_end = (uint16_t)(ship.stardate + EVAC_WARNING_MIN_TENTHS
+                                 + trek_rand_n(EVAC_WARNING_SPAN_TENTHS));
 
     planet_count = (uint8_t)(PLANET_MIN + trek_rand_n(PLANET_SPREAD));
 
@@ -92,6 +97,19 @@ void planet_place(void) {
         sector[cell]   = SEC_PLANET;
         planets[i].sec = cell;
     }
+}
+
+uint8_t planet_settlement_lost(void) {
+    return (uint8_t)(ship.stardate > planet_evac_end);
+}
+
+uint8_t planet_distress_here(void) {
+    uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    uint8_t i;
+    if (planet_settlement_lost()) return 0;
+    for (i = 0; i < planet_count; i++)
+        if ((planets[i].flags & PF_SETTLED) && planets[i].quad == q) return 1;
+    return 0;
 }
 
 uint8_t planet_here(void) {
@@ -163,7 +181,7 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
        its find -- exactly one world in a galaxy carries them. A ruined
        settlement has nobody left to take off; the scan still shows it, which
        is what the "destroyed " insert is for. */
-    if ((p->flags & PF_SETTLED) && !(p->flags & PF_RUINED)) {
+    if ((p->flags & PF_SETTLED) && !planet_settlement_lost()) {
         p->flags = (uint8_t)(p->flags & ~PF_SETTLED);
         ship.rescues++;
         return LAND_SETTLERS;

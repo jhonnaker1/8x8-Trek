@@ -691,15 +691,20 @@ static void test_converter_scales_with_repair(void) {
     uint16_t healthy, broken;
     puts("energy converter");
 
+    /* trek_advance_time, NOT trek_advance: this is about the CONVERTER, and
+       trek_advance also fires whatever is scheduled inside the window. A
+       death pod landing in that stardate costs energy and the test reads it
+       as a converter fault. It broke exactly that way when an unrelated
+       change consumed one more random number and shifted the schedule. */
     trek_new_game(3, 5150);
     ship.energy = 1000;
-    trek_advance(10, 0, 0);
+    trek_advance_time(10);
     healthy = ship.energy;
 
     trek_new_game(3, 5150);
     ship.energy = 1000;
     ship.sys[SYS_CONVERTER] = 50;
-    trek_advance(10, 0, 0);
+    trek_advance_time(10);
     broken = ship.energy;
 
     ok(healthy > broken, "a damaged converter generates less");
@@ -2437,7 +2442,8 @@ static void test_landing(void) {
     trek_new_game(3, 912);
     ship.sec_y = 4; ship.sec_x = 4;
     one_planet(PFIND_NOTHING, 0, 1);
-    planets[0].flags |= PF_SETTLED | PF_RUINED;
+    planets[0].flags |= PF_SETTLED;
+    planet_evac_end = 0;      /* the deadline has passed */
     trek_orbit();
     ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_NOTHING,
        "a destroyed settlement has nobody left to take off");

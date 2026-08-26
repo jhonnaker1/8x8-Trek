@@ -189,10 +189,11 @@ extern const char planet_class_letter[PCLASS_COUNT];
    evacuation. They can only hold out until 3516.5.") is a separate job, the
    twin of SCHED_BASE_ATTACK. The flag and the ruined-settlement scan line
    exist so that job is a schedule slot and a message, not a model change. */
-#define PF_RUINED      0x04
-/* THE settled planet -- exactly one per galaxy, and always an energium one.
-   Set on the LAST planet generated with energium, which is what the original's
-   [0x1E1C]/[0x1E1E] pair ends up holding. */
+/* NO PF_RUINED. A settlement being "destroyed" is not a stored flag: ORBIT
+   computes it live, comparing the stardate at [0x1D42] against the deadline
+   at [0x1DA2] and inserting "destroyed " when the deadline has passed.
+   Nothing in the binary ever writes such a flag. Use
+   planet_settlement_lost(). */
 #define PF_SETTLED     0x08
 
 typedef struct {
@@ -388,6 +389,19 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
    which is this game's "never again" -- a galaxy gets ONE evacuation. */
 #define EVAC_WARNING_MIN_TENTHS   10
 #define EVAC_WARNING_SPAN_TENTHS  30
+
+/* When the settlers run out of time, as a stardate in tenths. */
+extern uint16_t planet_evac_end;
+
+/* Has the settlement been lost? DERIVED, never stored -- see PF_SETTLED. */
+uint8_t planet_settlement_lost(void);
+
+/* Is the ship in the settled planet's quadrant with time still on the clock?
+   fn 0x15105 prints the distress signal on exactly this test, so the signal
+   is LOCATION-TRIGGERED rather than a scheduled event -- you hear it by
+   flying there, which is a different mechanic from the base-under-attack
+   warning and was worth finding out before building one as the other. */
+uint8_t planet_distress_here(void);
 
 /* The Y/N confirmation ENGINEERING asks for is the UI's; by the time this is
    called the captain has said yes. `ev`/`max` carry the system damage on
