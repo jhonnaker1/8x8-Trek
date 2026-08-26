@@ -49,6 +49,34 @@ __basic_zp_end = 0x0090;
 MEMORY {
     /* $1300..$1BFF, 2,304 bytes. Code and read-only data stay above. */
     lowram (rw) : ORIGIN = 0x1300, LENGTH = 0x0900
+    /* THE OVERLAY WINDOW, and the region below it is what shrank to make
+     * room. One overlay at a time is copied here from the disk; see
+     * core/overlay.h. Sizing it at what the largest overlay actually needs is
+     * deliberate -- outgrowing it is then a LINK ERROR, the same tripwire as
+     * the stack guard below, rather than an overlay that quietly runs off the
+     * end into resident code.
+     *
+     * The overlays' LOAD addresses go in `ovlimg`, which exists only inside
+     * the linker: it gives each overlay a distinct place in the ELF so their
+     * file ranges do not collide, while their RUN addresses all coincide at
+     * the window. That overlap is why the link needs --no-check-sections. */
+    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x0880, LENGTH = 0x0880
+
+    /* ONE STAGING REGION PER OVERLAY, and they must not be merged back into
+     * one. A single `AT>ovlimg` shared by every overlay does NOT advance the
+     * region pointer when the section also carries an explicit run address --
+     * both sections came out at load address $10000, so they occupied the
+     * same bytes of the ELF and llvm-objcopy dumped the SAME image twice
+     * under two names. The build was silent, the link was silent, and the
+     * game ran the hall of fame when it asked for the evaluation.
+     *
+     * Each region is exactly the window's length, so an overlay too big for
+     * the window is a link error here as well as there. Adding an overlay
+     * means adding a region; `make verify` fails the build if two of them
+     * ever share a load address again. */
+    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x0880
+    ovlimg1 (rw) : ORIGIN = 0x10880, LENGTH = 0x0880
+
     /* SHORT OF $C000 ON PURPOSE.
      *
      * 0xA3FF would run the region right up to $C000, which is where __stack
@@ -64,7 +92,7 @@ MEMORY {
      *
      * If that assumption ever breaks -- recursion, a function pointer table,
      * alloca -- raise this and expect to have to free space for it. */
-    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40
+    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x0880
 }
 
 __rc0 = __basic_zp_start;
@@ -86,13 +114,26 @@ SECTIONS {
        sat at READY, because RUN found no BASIC line to run. */
     .basic_header : { *(.basic_header) } >ram
     INCLUDE c.ld
+
+    /* One section per overlay, every one of them starting at the window.
+       ORIGIN(window) is written out rather than left implicit because a
+       section with no address takes the current dot, which after c.ld is the
+       end of .bss. */
+    .ovl_eval ORIGIN(window) : { *(.ovl.eval) } >window AT>ovlimg0
+    .ovl_hof  ORIGIN(window) : { *(.ovl.hof)  } >window AT>ovlimg1
 }
+
+/* c128/src/overlay.c takes the window's address from here rather than
+   repeating the arithmetic above. */
+__ovl_start = ORIGIN(window);
 
 INPUT(init-mmu.o)
 
 __stack = 0xC000;
 
-OUTPUT_FORMAT {
-    SHORT(ORIGIN(ram))
-    TRIM(ram)
-}
+/* NO OUTPUT_FORMAT ANY MORE. It produced the PRG directly, trimmed to `ram`,
+   which was fine until the overlays needed extracting individually. The link
+   emits an ELF now and llvm-objcopy makes both the PRG and the overlay images
+   out of it -- ONE link, so there is no way for two of them to disagree about
+   where anything went. `-O binary` over the ELF was checked byte for byte
+   against the PRG this used to write. See the $(OUT) rule in Makefile. */

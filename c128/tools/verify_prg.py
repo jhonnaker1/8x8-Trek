@@ -97,6 +97,55 @@ def check_data_init(mapfile):
           f"${lma:04x} -- ok")
 
 
+def check_overlays(mapfile):
+    """Every overlay must run at the window and load from its OWN address.
+
+    THIS IS A REAL BUG THAT SHIPPED FOR TEN MINUTES, and it was silent at
+    every stage. Overlays deliberately share a RUN address -- that is the
+    whole idea -- and the first version gave them all one staging region to
+    take their LOAD addresses from. lld does not advance a region's pointer
+    for a section that also carries an explicit run address, so both overlays
+    came out at load address $10000, occupied the same bytes of the ELF, and
+    llvm-objcopy dumped the SAME image twice under two names. The link was
+    silent, the extraction was silent, the disk looked right, and the game
+    drew the hall of fame when it asked for the evaluation.
+
+    So: same VMA is required, distinct LMAs are required, and neither is
+    something a human will notice in a map file.
+    """
+    text = mapfile.read_text()
+    ovl, window = [], None
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 5 and parts[4].startswith(".ovl_"):
+            vma, lma, size = (int(parts[i], 16) for i in range(3))
+            ovl.append((parts[4], vma, lma, size))
+        elif len(parts) == 5 and parts[4] == "window" or (
+                len(parts) >= 3 and parts[-1] == "__ovl_start"):
+            pass
+    if not ovl:
+        print("verify: no overlays in this build")
+        return
+
+    vmas = {v for _, v, _, _ in ovl}
+    if len(vmas) != 1:
+        die("overlays do not share one run address: "
+            + ", ".join("%s at $%04x" % (n, v) for n, v, _, _ in ovl))
+
+    seen = {}
+    for name, _, lma, _ in ovl:
+        if lma in seen:
+            die(f"{name} and {seen[lma]} both LOAD from ${lma:04x}, so they are\n"
+                f"         the same bytes of the ELF and llvm-objcopy will dump\n"
+                f"         one image twice. Give each overlay its own staging\n"
+                f"         region in trek128.ld.")
+        seen[lma] = name
+
+    win = max(s for _, _, _, s in ovl)
+    print("verify: %d overlays at $%04x, distinct load addresses, largest %d bytes"
+          % (len(ovl), ovl[0][1], win))
+
+
 def die(msg):
     print(f"verify: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -156,6 +205,7 @@ def main():
         die(f"{prg} not built yet -- run make first")
 
     check_data_init(MAP)
+    check_overlays(MAP)
 
     consts = constants()
     rows = table_rows()

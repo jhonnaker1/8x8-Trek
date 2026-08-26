@@ -6,6 +6,7 @@
 #include "layout.h"
 #include "ui.h"
 #include "../../core/strpool.h"
+#include "../../core/overlay.h"
 #include "strdata.h"
 #include "input.h"
 #include "sid.h"
@@ -1076,7 +1077,12 @@ int main(void) {
 
         /* And 0x071A at the end, read the same way at the evaluation screen. */
         snd_music(MUS_END);
+        /* THE ONLY WAY INTO THE EVALUATION OVERLAY. Loading and calling
+           together is what stops the two ever being separated -- see the
+           three rules in core/overlay.h. */
+        ovl_load(OVL_EVAL);
         ui_evaluation();
+        ovl_load(OVL_HOF);
         ui_hall_of_fame(setup.name, setup.level, trek_score());
 
         if (!ui_play_again()) break;

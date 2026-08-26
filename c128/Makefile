@@ -32,11 +32,40 @@ CFLAGS = -Oz -I src -I ../core -Wall -T trek128.ld
 LDLIBS = -lcopy-data
 
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
-      src/music_data.c src/storage.c src/farmem.c \
+      src/music_data.c src/storage.c src/farmem.c src/overlay.c \
       src/strpool.c src/strdata.c \
       ../core/trek.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
+
+# THE LINK EMITS AN ELF AND objcopy MAKES EVERYTHING ELSE OUT OF IT.
+#
+# trek128.ld used to carry an OUTPUT_FORMAT that wrote the PRG directly. The
+# overlays ended that: each one has to come out as its own file, and they all
+# share a run address, so what the link produces has to be something that can
+# hold them separately. One link and two objcopy passes means the resident and
+# the overlays can never disagree about where anything is -- which two links
+# from the same sources could, silently.
+#
+# --no-check-sections: the overlays deliberately overlap in the address space.
+# That is the whole idea, and without this lld refuses the link.
+OBJCOPY = $(HOME)/llvm-mos/bin/llvm-objcopy
+LDFLAGS = -Wl,--no-check-sections
+OVERLAYS = eval hof
+
+# Each overlay ships as a PRG. The two-byte header is the load address, which
+# ovl_load() discards by using secondary address 0 -- the window is where it
+# goes, whatever the file says. $4000 is written so a human LOADing one by
+# hand sees something sensible.
+# $(1) = overlay name, $(2) = the ELF to cut it out of. NOT $$< -- $(call)
+# expands once and the result is not re-expanded, so an automatic variable
+# would arrive at objcopy as a literal dollar sign.
+define OVL_IMAGE
+	$(OBJCOPY) --dump-section=.ovl_$(1)=build/ovl_$(1).raw $(2) /dev/null
+	@python3 -c "d = open('build/ovl_$(1).raw','rb').read(); \
+	    open('build/ovl$(1).prg','wb').write(bytes([0x00,0x40]) + d); \
+	    print('  overlay $(1): %d bytes, window is %d' % (len(d), 0x880))"
+endef
 
 .PHONY: all run rund d64 monitor test verify music loadbench clean
 
@@ -85,9 +114,20 @@ HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
 # guest memory, but only if it knows where a variable lives, and the map is
 # the only place that says. Poking ship state and screenshotting the result is
 # the fastest way to check a panel without playing to that state.
-$(OUT): $(SRC) $(HDR) trek128.ld Makefile
+build/trek128.elf: $(SRC) $(HDR) trek128.ld Makefile
 	@mkdir -p build
-	$(MOSCC) $(CFLAGS) -Wl,-Map=build/trek128.map -o $(OUT) $(SRC) $(LDLIBS)
+	$(MOSCC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=build/trek128.map \
+	    -o $@ $(SRC) $(LDLIBS)
+
+# The resident image: everything except the overlay sections, with the load
+# address in front of it. `-O binary` over this ELF was checked byte for byte
+# against what the old OUTPUT_FORMAT produced.
+$(OUT): build/trek128.elf
+	$(OBJCOPY) -O binary --remove-section=.ovl_* $< build/trek128.res
+	@python3 -c "d = open('build/trek128.res','rb').read(); \
+	    open('$(OUT)','wb').write(bytes([0x01,0x1C]) + d)"
+	$(call OVL_IMAGE,eval,build/trek128.elf)
+	$(call OVL_IMAGE,hof,build/trek128.elf)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
@@ -95,8 +135,15 @@ $(OUT): $(SRC) $(HDR) trek128.ld Makefile
 # launch the instrumented one.
 $(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 	@mkdir -p build
-	$(MOSCC) $(CFLAGS) -DTREK_DEBUG_INPUT \
-	     -Wl,-Map=build/trek128-debug.map -o $(DEBUG_OUT) $(SRC) $(LDLIBS)
+	$(MOSCC) $(CFLAGS) $(LDFLAGS) -DTREK_DEBUG_INPUT \
+	     -Wl,-Map=build/trek128-debug.map -o build/trek128-debug.elf $(SRC) $(LDLIBS)
+	$(OBJCOPY) -O binary --remove-section=.ovl_* build/trek128-debug.elf build/trek128-debug.res
+	@python3 -c "d = open('build/trek128-debug.res','rb').read(); \
+	    open('$(DEBUG_OUT)','wb').write(bytes([0x01,0x1C]) + d)"
+	@# The instrumented build's overlays differ from the release build's, so
+	@# they are cut from its own ELF. A debug disk needs these, not those.
+	$(call OVL_IMAGE,eval,build/trek128-debug.elf)
+	$(call OVL_IMAGE,hof,build/trek128-debug.elf)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows
@@ -157,6 +204,10 @@ $(D64): $(OUT)
 	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
 	    c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null; \
 	fi
+	@# The overlays, one PRG each. ovl_load() LOADs them into the window.
+	@for o in $(OVERLAYS); do \
+	    c1541 -attach $(D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \
+	done
 	@echo "d64: $(D64)"
 	@c1541 -attach $(D64) -dir
 

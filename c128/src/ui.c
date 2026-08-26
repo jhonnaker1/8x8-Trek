@@ -4,6 +4,7 @@
 #include "layout.h"
 #include "ui.h"
 #include "../../core/strpool.h"
+#include "../../core/overlay.h"
 #include "strdata.h"
 #include "input.h"
 #include "egavdc.h"
@@ -1564,6 +1565,12 @@ static void ev_count(char *buf, uint16_t v) {
     buf[n] = '\0';
 }
 
+/* IN AN OVERLAY -- see core/overlay.h. `noinline` is load-bearing: without
+   it the compiler folds this into its caller and the overlay section comes
+   out empty, which is exactly what was happening before (main() measured
+   14,846 bytes because every phase screen had been inlined into it). Reach it
+   only through the stub in main.c, never directly. */
+OVL_CODE("eval")
 void ui_evaluation(void) {
     ScoreSheet sh;
     char c[8];
@@ -1650,6 +1657,10 @@ static HofEntry hof[HOF_ENTRIES];
 
 #define HOF_FILE "TREK.SCR"
 
+/* IN AN OVERLAY, and it takes core/hof.c with it: every hof_* helper is
+   called from here and nowhere else, so the compiler folds them in and they
+   leave the resident image too. Same rules as ui_evaluation above. */
+OVL_CODE("hof")
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     unsigned char i, y, j, idx;
     uint16_t got = 0;
