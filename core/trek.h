@@ -721,6 +721,30 @@ uint8_t trek_shields_down(void);
    no part of. 795 absorbed took it to 71%; 385 to 518 absorbed left it alone.
    PROVISIONAL: the threshold is somewhere in 519..795 and 600 is the middle
    of that bracket, not a reading. */
+/* THE ABSORPTION CONSTANT, READ OUT OF THE BINARY 2026-08-26. fn 0x16844
+   computes, in Turbo Pascal reals:
+
+       absorbed = damage * (shields / 2500) * (sys[SHIELDS] / 100) * 0.8
+
+   with 2500 and 100 decoded from the real constants at 0x16A5A and 0x16A73
+   and 0.8 from `80 CD CC CC CC 4C` at 0x17044. 2500 is SHIELD_MAX and the
+   percentage is [0x235C], element ONE of a twelve-word array -- the same
+   index SYS_SHIELDS has here.
+
+   So the law's SHAPE was already right, including the system term this file
+   called "a hypothesis that fits rather than a measurement". It is measured
+   now. What was missing is this flat four-fifths, and it is exactly what
+   reconciles the law with the readings:
+
+       charge 1000   0.4 * 0.8 = 0.32   measured 0.33
+       charge 1500   0.6 * 0.8 = 0.48   measured 0.47
+       charge 2000   0.8 * 0.8 = 0.64   measured 0.65
+
+   and the fitted `charge / 3100` in MEASURED.md was approximating
+   2500 / 0.8 = 3125. */
+#define SHIELD_ABSORB_NUM   4
+#define SHIELD_ABSORB_DEN   5
+
 #define SHIELD_SYS_HIT_MIN       600
 
 /* MEASURED: a hit that gets through does NOT always wreck something --

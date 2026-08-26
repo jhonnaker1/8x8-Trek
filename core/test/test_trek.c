@@ -2097,7 +2097,14 @@ static void test_shield_absorption(void) {
     ship.energy  = ENERGY_MAX;
     ship.sys[SYS_SHIELDS] = 100;
     n = 0; trek_take_hit(409, ev, &n, 16);
-    ok(ship.shields == SHIELD_MAX - 409,    "up and full: the pool takes it all");
+    /* THE POOL LOSES FOUR FIFTHS, not the whole hit. This assertion used to
+       read `SHIELD_MAX - 409`, which was an over-reading of the measurement:
+       MEASURED.md says "the PRINTED FIGURE comes out of the shield pool
+       entirely and main energy is untouched", and fn 0x16844 shows the
+       printed figure is 0.8 x the protection. The clean part of that reading
+       -- energy untouched -- is asserted below and still holds. */
+    ok(ship.shields == SHIELD_MAX - (409 * SHIELD_ABSORB_NUM) / SHIELD_ABSORB_DEN,
+       "up and full: the pool loses four fifths of the hit");
     ok(ship.energy == ENERGY_MAX,           "up and full: energy is untouched");
 
     /* Shields UP but nearly flat: a small PROPORTIONAL share, the rest

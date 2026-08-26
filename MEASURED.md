@@ -3402,7 +3402,7 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
-### The shield routine: an 0.8 CONSTANT that CONTRADICTS our measurement
+### The shield routine: the 0.8, RESOLVED -- and the law CONFIRMED
 
 `fn 0x16844` is the enemy-fire and damage routine (2,707 bytes; strings
 "Shields absorb ", " unit hit from ", "Shields failing. Now at ", "Lexington
@@ -3414,31 +3414,46 @@ the product is compared against 1.0 and, if greater, printed as the amount in
 "Shields absorb N unit hit from ...". At 0x17044 the same product is combined
 with the shield real at [0x1D60].
 
-The straightforward reading is **absorbed = 0.8 x hit, a FLAT eighty percent**,
-with the shield pool reduced by that and hits under one unit not reported.
+Reading the routine from its ENTRY instead of from its message sites resolved
+it, and the answer confirms the law this port already had.
 
-**THAT CONTRADICTS WHAT WE MEASURED.** The 2026-08-24 session with one enemy
-found the absorbed FRACTION RISING WITH CHARGE -- 0.33 at 1000, 0.47 at 1500,
-0.65 at 2000 -- and this port's shield law is built on that shape. A flat 0.8
-cannot produce 0.33.
+**The absorption formula, at 0x16A51..0x16A96:**
 
-**Nothing is being changed on the strength of this.** Three readings could
-reconcile it and none is established:
+    [bp-8] = damage * (shields / 2500) * ([0x235C] / 100)
 
-  * There is more than one damage path. The routine carries TWO separate hit
-    messages -- " unit hit from base at " and " unit hit from Mongol at " --
-    besides the "Shields absorb" one, so 0.8 may belong to one of them only.
-  * The 0.8 may scale something other than the raw hit; what [bp-8] holds at
-    that point is not proven, only that the same slot feeds both the message
-    and the shield update.
-  * The measurement itself came from a session that also produced the
-    invalidated absorption sweep -- MEASURED.md already records that writing a
-    small value into the shield pair corrupted later readings in that block.
+with 2500 and 100 decoded from the real constants at 0x16A5A and 0x16A73 --
+both exact round numbers, which is itself a check on the decoding. **2500 is
+SHIELD_MAX**, and **[0x235C] is element ONE of a twelve-word array**, which is
+the index `SYS_SHIELDS` has in this port. So the three-factor shape is
+CONFIRMED, including the system term that this file has called "a hypothesis
+that fits rather than a measurement" since the law was written.
 
-Resolving it is a proper read of this routine from its entry rather than from
-its message sites, which is the next job here. The lesson from today applies:
-this file has already had three findings that looked solid and were artefacts
-of checking an assumption against itself.
+**The 0.8 applies to the POOL DRAIN and the PRINTED FIGURE, not to the
+protection.** It appears at 0x17044, where the shield real is updated, and at
+0x17085, where the reported amount is built -- never on the value that decides
+how much gets through.
+
+That placement is the only one under which both surviving measurements hold:
+
+    charge 1000   0.4 * 0.8 = 0.32   sweep read 0.33
+    charge 1500   0.6 * 0.8 = 0.48   sweep read 0.47
+    charge 2000   0.8 * 0.8 = 0.64   sweep read 0.65
+    full shields  energy untouched, as six clean hits showed
+
+and the fitted `charge / 3100` was approximating **2500 / 0.8 = 3125**.
+
+**A retraction goes with it.** The absorption sweep was recorded as INVALIDATED
+by the shield-write corruption, and the law was left "unresolved rather than
+measured" on that basis. The binary now predicts that sweep's three readings to
+within one percent, so the sweep was measuring the POOL DRAIN correctly all
+along. What was wrong was reading it as the protection.
+
+**And a test in this port was over-reading its own measurement.** It asserted
+the pool loses the WHOLE hit at full shields. The note it came from says "the
+PRINTED FIGURE comes out of the shield pool entirely and main energy is
+untouched" -- the printed figure, which is 0.8 x the protection. Energy
+untouched was the measured part and still holds; "the pool loses 409 of 409"
+was inference.
 
 ### THE DISTRESS SIGNAL, and where settled planets live (2026-08-26)
 

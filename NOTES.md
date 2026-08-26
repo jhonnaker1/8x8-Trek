@@ -581,11 +581,15 @@ Still open from those runs:
   fraction RISES with charge -- 0.33 at 1000, 0.47 at 1500, 0.65 at 2000. Three
   of the four levels fit `fraction = charge / 3100`; 2500 does not. It is
   emphatically not `amount - shields`.
-  **CONTESTED 2026-08-26 by the disassembly**, which shows a flat 0.8 applied
-  to the hit before the "Shields absorb" message in fn 0x16844. A flat 0.8
-  cannot produce 0.33, so one of the two is wrong or they describe different
-  paths -- the routine has three separate hit messages. Read the routine from
-  its ENTRY before touching the constant. See MEASURED.md.
+  **RESOLVED 2026-08-26 from the binary, and the law is CONFIRMED.** fn
+  0x16844 computes `damage * (shields/2500) * (sys[SHIELDS]/100)`, with 2500
+  decoding to SHIELD_MAX and the percentage read from element ONE of a
+  twelve-word array -- the index SYS_SHIELDS has here. The system term is
+  measured, not fitted. A separate 0.8 drains the POOL and sets the PRINTED
+  figure without touching the protection, which is the only placement under
+  which both surviving measurements hold, and `charge/3100` turns out to have
+  been approximating 2500/0.8 = 3125. The sweep recorded as invalidated was
+  measuring the pool drain correctly all along.
 - **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
   turns in five once a few hundred units reached energy, and never while the
   shields absorbed everything. No clean edge yet.

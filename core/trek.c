@@ -1326,7 +1326,7 @@ void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max) {
 }
 
 void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
-    uint16_t absorbed = 0, through;
+    uint16_t absorbed = 0, through, drain = 0;
 
     /* SHIELDS ARE A PROPORTIONAL ABSORBER -- see the law and its evidence in
        trek.h. Three things changed here at once, and this port had all three
@@ -1341,8 +1341,23 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
         uint8_t charge_pct = (uint8_t)(ship.shields / (SHIELD_MAX / 100));
         absorbed = scale_pct(scale_pct(amount, charge_pct),
                              ship.sys[SYS_SHIELDS]);
+
+        /* THE POOL LOSES FOUR FIFTHS OF WHAT IT STOPS -- see
+           SHIELD_ABSORB_NUM in trek.h. The 0.8 in fn 0x16844 is applied where
+           the shield real is updated and where the "Shields absorb N" figure
+           is printed, NOT to the protection itself, and that is the only
+           reading under which all four measurements hold: the drained
+           fractions come out 0.32/0.48/0.64 against 0.33/0.47/0.65, AND full
+           shields still absorb a hit whole with energy untouched.
+
+           Putting the 0.8 on the protection instead makes full shields let a
+           fifth of every hit through, which is measured NOT to happen. The
+           test suite caught that immediately, which is the only reason this
+           distinction got made rather than shipped. */
+        drain = (uint16_t)((absorbed * SHIELD_ABSORB_NUM) / SHIELD_ABSORB_DEN);
         if (absorbed > ship.shields) absorbed = ship.shields;
-        ship.shields = (uint16_t)(ship.shields - absorbed);
+        if (drain > ship.shields) drain = ship.shields;
+        ship.shields = (uint16_t)(ship.shields - drain);
     }
 
     through = (uint16_t)(amount - absorbed);
