@@ -1,7 +1,7 @@
-#include <string.h>
+#include <cbm.h>
+#include <stdint.h>
 
 #include "../../core/farmem.h"
-#include "../../core/storage.h"
 
 /* C128 far memory: RAM bank 1, through the KERNAL's FETCH and STASH.
  *
@@ -13,9 +13,8 @@
  * for a store that is written once at startup and read a few times a second.
  *
  * $FF74 INDFET: A = the ZERO PAGE ADDRESS of a pointer, X = bank, Y = index
- *               -> A = the byte.
- * $FF77 INDSTA: A = the byte, X = bank, Y = index, and $02B9 (STAVEC) holds
- *               the zero page address of the pointer.
+ *               -> A = the byte. Reading is all this needs now; the store is
+ *               filled by the KERNAL's own LOAD, into bank 1 directly.
  *
  * $FB/$FC is free on the C128 and sits outside llvm-mos's imaginary registers
  * at $0A..$8F, so it is safe as that pointer.
@@ -28,7 +27,6 @@
  */
 
 #define ZPPTR      0xFB
-#define STAVEC     0x02B9
 #define FAR_BANK   1
 
 /* WHY $4000 AND NOT LOWER.
@@ -57,21 +55,27 @@
 
 static uint16_t far_len = 0;
 
-/* THE WHOLE TRANSFER IS ONE ASSEMBLY LOOP.
+/* THE READ IS ONE ASSEMBLY LOOP.
  *
- * The first version wrapped FETCH and STASH in C helpers and let the compiler
- * write the loop. That cost 1,904 bytes -- more than the 1,082 of music data
- * it was displacing, so the seam lost space instead of freeing it. Every asm
- * block clobbers "memory", the compiler spills its imaginary registers around
- * each one, and doing that per byte is ruinous.
+ * The first version wrapped FETCH in a C helper and let the compiler write
+ * the loop. That cost 1,904 bytes -- more than the 1,082 of music data it was
+ * displacing, so the seam lost space instead of freeing it. Every asm block
+ * clobbers "memory", the compiler spills its imaginary registers around each
+ * one, and doing that per byte is ruinous.
  *
  * One block, looping in assembly, pays for itself. Parameters come through
  * fixed globals because llvm-mos may place a local anywhere.
  *
+ * THERE IS NO WRITE PATH ANY MORE. This used to carry a STASH half, used by
+ * far_load() to push a file across 64 bytes at a time. far_load() now hands
+ * the KERNAL bank 1 as its load target and the whole file lands there
+ * directly -- see below -- so nothing writes to the store, which is what the
+ * contract in core/farmem.h said all along ("read-only bulk data"). The
+ * STASH branch, the direction flag and the $02B9 vector went with it.
+ *
  * $FF74 INDFET: A = zero page address of a pointer, X = bank, Y = index -> A
- * $FF77 INDSTA: A = data, X = bank, Y = index, $02B9 holds the ZP address
  */
-static volatile unsigned char far_lo, far_hi, far_n, far_wr;
+static volatile unsigned char far_lo, far_hi, far_n;
 
 /* The RAM side of the transfer is reached with (zp),y, which REQUIRES a zero
    page pointer -- a .bss pointer gives "relocation R_MOS_ADDR8 out of range".
@@ -79,15 +83,13 @@ static volatile unsigned char far_lo, far_hi, far_n, far_wr;
    at $0A..$8F, the same reasoning as $FB/$FC for the far side. */
 #define ZPRAM 0xFD
 
-static void far_move(uint16_t addr, unsigned char *ram, uint8_t len, uint8_t writing) {
+static void far_move(uint16_t addr, unsigned char *ram, uint8_t len) {
     if (len == 0) return;
     far_lo = (unsigned char)(addr & 0xFF);
     far_hi = (unsigned char)(addr >> 8);
     *(volatile unsigned char *)ZPRAM       = (unsigned char)((uint16_t)ram & 0xFF);
     *(volatile unsigned char *)(ZPRAM + 1) = (unsigned char)((uint16_t)ram >> 8);
     far_n = len;
-    far_wr = writing;
-    *(volatile unsigned char *)STAVEC = ZPPTR;
 
     __asm__ volatile(
         "        lda far_lo\n"
@@ -95,57 +97,89 @@ static void far_move(uint16_t addr, unsigned char *ram, uint8_t len, uint8_t wri
         "        lda far_hi\n"
         "        sta $fc\n"
         "        ldy #0\n"
-        "1:      lda far_wr\n"
-        "        beq 2f\n"
-        "        tya\n"
-        "        tax\n"                 /* X = our RAM index, saved */
-        "        lda ($fd),y\n"
-        "        pha\n"
-        "        ldx #1\n"
-        "        pla\n"
-        "        jsr $ff77\n"           /* STASH: A=data X=bank Y=index */
-        "        jmp 3f\n"
-        "2:      ldx #1\n"
+        "1:      ldx #1\n"
         "        lda #$fb\n"
         "        jsr $ff74\n"           /* FETCH -> A */
         "        sta ($fd),y\n"
-        "3:      iny\n"
+        "        iny\n"
         "        cpy far_n\n"
         "        bne 1b\n"
         ::: "a", "x", "y", "memory");
 }
 
-/* One chunk at a time, so the RAM cost is the chunk and not the file. Kept to
-   a size that never straddles a page from a page-aligned base. */
-#define CHUNK 64
-static unsigned char chunk[CHUNK];
+/* ONE KERNAL LOAD, STRAIGHT INTO BANK 1, and it is worth the explanation.
+ *
+ * This used to open the file through the disk seam and read it with
+ * plat_read() in 64-byte chunks, STASHing each chunk across. MEASURED
+ * 2026-08-26 (c128/test/loadbench.c): a byte-at-a-time CHRIN read runs at
+ * about 2,300 bytes a second on this machine, where one KERNAL LOAD of the
+ * same 4,096 bytes takes 6 to 14 jiffies -- between eight and eighteen times
+ * faster. The port was spending seconds of every startup on it.
+ *
+ * The part that makes it simple as well as fast: SETBNK ($FF68) takes the
+ * bank the DATA is to land in, so asking for bank 1 puts the file in the far
+ * store with no bank-0 buffer, no STASH and no chunking. Verified byte for
+ * byte against the payload through the monitor before this was written.
+ *
+ * Secondary address 0 means "put it where I say", so the file's first two
+ * bytes -- its PRG load address -- are read and discarded. That is why the
+ * disk build writes STRINGS.DAT and MUSIC.DAT as PRG with a two-byte header
+ * rather than as SEQ; see the d64 rule in c128/Makefile.
+ *
+ * THE DEVICE NUMBER LIVES IN TWO PLACES NOW, here and in storage.c. That is
+ * deliberate: this is not the disk seam. storage.c serves core/storage.h,
+ * which must never learn about banks; far memory owns bank 1, so loading it
+ * is far memory's business. core/ still knows none of it.
+ */
+#define DEV      8
+#define LFN_FAR  1        /* clear of storage.c's 2 and 15 */
+
+/* Long enough for "0:" plus a 16-character CBM name and a terminator. */
+static char fname[20];
+
+/* SETBNK: A = the bank the data goes to, X = the bank the FILENAME is in.
+   The name is always here in bank 0; only the data moves. */
+static void bank_for_data(unsigned char b) {
+    far_n = b;                       /* reuse the parameter global, see above */
+    __asm__ volatile(
+        "        lda far_n\n"
+        "        ldx #0\n"
+        "        jsr $ff68\n"
+        ::: "a", "x", "memory");
+}
 
 uint16_t far_load(const char *name) {
-    uint16_t got, base = far_len, pos = far_len;
+    uint16_t base = far_len;
+    uint16_t dest = (uint16_t)(FAR_BASE + base);
+    uint16_t end;
+    uint8_t i = 0, j = 0;
 
-    /* Appends. See the note in core/farmem.h about the second tenant. */
-    if (plat_open(name) != STOR_OK) return FAR_NONE;
+    if (base >= (uint16_t)(FAR_LIMIT - FAR_BASE)) return FAR_NONE;
 
-    for (;;) {
-        got = plat_read(chunk, CHUNK);
-        if (got == 0) break;
-        /* No 32-bit arithmetic -- the core forbids `long`. `pos` cannot pass
-           the limit because this runs before every append. */
-        if (pos > (uint16_t)(FAR_LIMIT - FAR_BASE) - got) {
-            plat_close(); return FAR_NONE;
-        }
-        far_move((uint16_t)(FAR_BASE + pos), chunk, (uint8_t)got, 1);
-        pos = (uint16_t)(pos + got);
-    }
-    plat_close();
+    /* "0:" selects drive 0 of the unit. A 1541 has only one drive but wants
+       the prefix anyway, and a 1571 or an SD2IEC needs it. */
+    fname[i++] = '0'; fname[i++] = ':';
+    while (name[j] && i < (uint8_t)(sizeof fname - 1)) fname[i++] = name[j++];
+    fname[i] = '\0';
 
-    if (pos == base) return FAR_NONE;      /* the file was empty */
-    far_len = pos;
+    bank_for_data(FAR_BANK);
+    cbm_k_setlfs(LFN_FAR, DEV, 0);
+    cbm_k_setnam(fname);
+    end = (uint16_t)(uintptr_t)cbm_k_load(0, (void *)dest);
+    bank_for_data(0);                /* back to bank 0 before anything else */
+
+    /* cbm_k_load returns one past the last byte, or a KERNAL ERROR CODE --
+       a small number, never a plausible address in the store. A file that
+       loaded nothing is a failure too, which is what the missing-MUSIC.DAT
+       case relies on to play silently rather than crash. */
+    if (end <= dest || end > FAR_LIMIT) return FAR_NONE;
+
+    far_len = (uint16_t)(end - FAR_BASE);
     return base;
 }
 
 uint16_t far_size(void) { return far_len; }
 
 void far_read(uint16_t off, void *dst, uint8_t len) {
-    far_move((uint16_t)(FAR_BASE + off), (unsigned char *)dst, len, 0);
+    far_move((uint16_t)(FAR_BASE + off), (unsigned char *)dst, len);
 }

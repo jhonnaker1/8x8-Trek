@@ -28,13 +28,20 @@
 
 /* Where the answers go. Volatile and file-scope so the linker gives them a
    fixed address the monitor can read, and nothing optimises them away. */
-volatile uint16_t result[4];      /* chrin jiffies, load jiffies, bytes, ok */
+volatile uint16_t result[6];      /* chrin j, load j, n1, n2, bank1 j, n3 */
 static unsigned char buf[PAYLOAD];
 
 /* SETBNK. Not optional on this machine -- the C128 KERNAL defaults to bank
    15, where our buffer's address is ROM. Same call storage.c makes. */
 static void set_banks(void) {
     __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x");
+}
+
+/* THE INTERESTING ONE. SETBNK's A is the bank the DATA goes to, so asking for
+   bank 1 should make the KERNAL's LOAD write straight into the far store with
+   no bank-0 buffer and no STASH at all. X stays 0 -- the filename is here. */
+static void set_banks_far(void) {
+    __asm__ volatile("lda #1\n\tldx #0\n\tjsr $ff68" ::: "a", "x");
 }
 
 /* The jiffy clock, $A0..$A2, high byte first. Read twice and retry if the
@@ -91,8 +98,20 @@ static uint16_t read_load(void) {
     return (uint16_t)((unsigned char *)end - buf);
 }
 
+/* ---- path 3: one LOAD, straight into RAM bank 1 ----------------------- */
+#define FAR_BASE 0x4000
+static uint16_t read_load_bank1(void) {
+    void *end;
+    set_banks_far();
+    cbm_k_setlfs(LFN_DATA, DEV, 0);
+    cbm_k_setnam("0:BENCHP");
+    end = cbm_k_load(0, (void *)FAR_BASE);
+    set_banks();                       /* put it back before anything else */
+    return (uint16_t)((uint16_t)(uintptr_t)end - FAR_BASE);
+}
+
 int main(void) {
-    uint16_t t0, t1, t2, n1, n2;
+    uint16_t t0, t1, t2, t3, n1, n2, n3;
 
     memset(buf, 0, sizeof buf);
     t0 = jiffies();
@@ -103,10 +122,15 @@ int main(void) {
     n2 = read_load();
     t2 = jiffies();
 
+    n3 = read_load_bank1();
+    t3 = jiffies();
+
     result[0] = (uint16_t)(t1 - t0);
     result[1] = (uint16_t)(t2 - t1);
     result[2] = n1;
     result[3] = n2;
+    result[4] = (uint16_t)(t3 - t2);
+    result[5] = n3;
 
     for (;;) { }
 }

@@ -139,12 +139,23 @@ $(D64): $(OUT)
 	@# exactly what a fresh install should have anyway.
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
 	c1541 -attach $(D64) -write build/trek.scr trek.scr,s >/dev/null
-	@# Bulk data, streamed into bank 1 at startup. STRINGS.DAT always
-	@# exists; MUSIC.DAT only on a tree that has reference/, and without it
-	@# the game simply plays silently.
-	c1541 -attach $(D64) -write build/strings.dat strings.dat,s >/dev/null
+	@# Bulk data, LOADed into bank 1 at startup. WRITTEN AS PRG, NOT SEQ,
+	@# and the two-byte header is why: far_load() uses the KERNAL's LOAD
+	@# with secondary address 0, which reads and discards a PRG's load
+	@# address and puts the rest where it is told. That is eight to eighteen
+	@# times faster than the byte-at-a-time read this replaced -- see
+	@# c128/test/loadbench.c and NOTES.md. The header value is ignored, so
+	@# $4000 is written only so a human LOADing the file by hand sees
+	@# something sensible.
+	@# STRINGS.DAT always exists; MUSIC.DAT only on a tree that has
+	@# reference/, and without it the game simply plays silently.
+	@python3 -c "import sys; d = open('build/strings.dat','rb').read(); \
+	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	c1541 -attach $(D64) -write build/strings.pdat strings.dat >/dev/null
 	@if [ -f build/music.dat ]; then \
-	    c1541 -attach $(D64) -write build/music.dat music.dat,s >/dev/null; \
+	    python3 -c "import sys; d = open('build/music.dat','rb').read(); \
+	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
+	    c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null; \
 	fi
 	@echo "d64: $(D64)"
 	@c1541 -attach $(D64) -dir

@@ -26,8 +26,10 @@
  *
  * THE STORE IS LOADED FROM DISK. Initialised data has to come from somewhere,
  * and it cannot come from the binary -- the whole point is to get it out of
- * the binary. far_load() streams a file in through plat_open/plat_read, which
- * is also the only part of the disk seam nothing else has exercised yet.
+ * the binary. HOW it gets there is entirely the platform's business: the C128
+ * hands the KERNAL bank 1 as a load target and the file lands there in one
+ * call, which measured between eight and eighteen times faster than the
+ * byte-at-a-time read it started with.
  *
  * READ IN CHUNKS, NOT BYTES. On a banked target every byte costs a KERNAL call
  * or a window switch. Copy a whole record into a small RAM buffer once and

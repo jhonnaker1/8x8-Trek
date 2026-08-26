@@ -892,6 +892,45 @@ per chunk. The port's actual path is slower than the 2,296 B/s measured here.
 **This is the answer to "would a d81 be faster".** It would, by about 10%.
 The read path is worth 8.2x. Format was the wrong question.
 
+### The far store loads with LOAD now, and startup is 2.2 seconds shorter
+
+Done 2026-08-26, on the back of the 8.2x measurement above.
+
+**SETBNK takes the bank the DATA lands in.** That is the fact that made this
+simple as well as fast: `lda #1 / ldx #0 / jsr $ff68` and the KERNAL's LOAD
+writes straight into RAM bank 1. No bank-0 buffer, no STASH, no 64-byte
+chunking. Verified byte for byte against the file through the monitor before
+any of it was written.
+
+    STRINGS.DAT  3,535 bytes    ~134 jiffies  ->  20    (6.7x)
+    reset -> both files loaded   348 jiffies  -> 214    (2.2s at 60Hz)
+
+MUSIC.DAT's interval only came down from 126 to 95, and the reason is worth
+recording: that interval is not the load. `snd_init()` runs between the two
+far_loads and its region detector spins up to 30,000 times reading the raster,
+which is most of what is left. The same cost was in the baseline, so the
+comparison is honest, but do not read 95 as "the music takes 95 jiffies".
+
+**What went with it.** far_move lost its STASH half, the direction flag and
+the $02B9 STAVEC store; the 64-byte chunk buffer went too. The image came down
+140 bytes -- 169 free to 309 -- so this paid for itself twice.
+
+**The disk build writes STRINGS.DAT and MUSIC.DAT as PRG, not SEQ.** LOAD with
+secondary address 0 means "put it where I say", and it reads and discards the
+file's two-byte load address to do it. The header value is ignored; $4000 is
+written so a human LOADing the file by hand sees something sensible.
+
+**The device number now lives in two places**, farmem.c and storage.c. That is
+deliberate rather than sloppy: storage.c serves `core/storage.h`, which must
+never learn about banks, and far memory owns bank 1, so loading it is far
+memory's business. `core/` still knows about neither.
+
+**Checked, not assumed:** the title screen renders with its full prose, bank 1
+matches both files byte for byte, `make sound-check` passes on both regions --
+and a disk built WITHOUT MUSIC.DAT still comes up with words on it, far_len at
+3,535 and mus_ok at 0, playing silently exactly as the fallback intends. That
+last one is the case that broke the port before.
+
 ### SCOPE: the overlay seam (written 2026-08-26, NOT BUILT)
 
 Read this before starting it. The mechanism is proven, the arithmetic is
