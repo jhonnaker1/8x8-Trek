@@ -3402,6 +3402,47 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### RAY's fatal outcome, and its loss report (2026-08-26)
+
+Captured at last, on the fourth attempt at sampling RAY. The death ray failed
+and destroyed the ship, and the Top Secret memo it prints is the frame item 8
+has been waiting for:
+
+    From:   Commander, Earth Sector
+    To:     Headquarters
+    Date:   3500.0
+    Re:     Loss of U.S.S. Lexington, RCB-92
+
+    U.S.S. Lexington destroyed by death ray explosion this stardate, with
+    loss of all aboard.  Results of operations prior to loss follow:
+
+      Stardays in action:  0.0
+      Mongol ships destroyed per stardate: 0.00
+      Score: -730
+
+So the fatal outcome's one-sentence cause line names the death ray explicitly,
+which is what the frame varies between endings.
+
+**AND THE SCORE CONTRADICTS A SETTLED CONSTANT.** This ship was destroyed with
+nothing killed and no time elapsed, and the memo totals **-730**: -300
+incomplete plus -430 casualties, with NO -200 ship-loss line. The Detailed
+Evaluation read on 2026-08-24 for a combat death totalled -930 with the line
+printed, which is what restored `SCORE_SHIP_LOST`.
+
+Three readings that cannot all be simple:
+
+    2026-08-20  -730  loss report      no ship-loss line   -> constant deleted
+    2026-08-24  -930  detailed sheet   line printed        -> constant restored
+    2026-08-26  -730  loss report      no ship-loss line
+
+The pattern that fits all three is that **the MEMO and the DETAILED EVALUATION
+are different documents with different totals** -- the memo omits the
+ship-loss penalty and the sheet carries it -- and that the 2026-08-20 reading
+was of a memo while the 2026-08-24 one was of a sheet. That is a hypothesis
+from three samples, not a measurement. `SCORE_SHIP_LOST` stays as it is,
+because the sheet is what this port renders; but the next loss report captured
+should be read for this line specifically. See NOTES.md.
+
 ### The MAIN VIEWER is a PAGED INSTRUMENT DISPLAY (2026-08-26)
 
 Found in `reference/strings.txt` while building the planet UI, not in a run.

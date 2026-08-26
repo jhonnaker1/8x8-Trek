@@ -17,9 +17,9 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check exit-test sound-check clean
+.PHONY: all test port-check check-tables exit-test sound-check clean
 
-all: test port-check
+all: test port-check check-tables
 
 test: build/test_trek build/test_serial build/test_hof
 	./build/test_trek
@@ -45,6 +45,13 @@ build/test_serial: core/test/test_serial.c core/serial.c core/trek.c \
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ core/test/test_serial.c core/serial.c core/trek.c \
 	    core/planet.c
+
+# The port's fixed tables against the ORIGINAL BINARY. Added 2026-08-26 after
+# core/planet.c shipped SEVEN planet names against the binary's EIGHT -- the
+# list had been taken from reference/strings.txt, and `strings` dropped Vega.
+# Skips itself on a tree without reference/.
+check-tables:
+	@python3 tools/check_tables.py
 
 # Compiles the core for the 68000 as a portability check -- it is not linked
 # and nothing is run.

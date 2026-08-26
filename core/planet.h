@@ -62,11 +62,28 @@
  * also what makes the duplicates in that list legible -- Gallista-5 and
  * Gallista-6 are two different planets sharing a name, told apart by the row.
  *
- * The seven names are the binary's own table, read out of strings.txt. An
- * earlier note in NOTES.md transcribed one of them off a screen capture as
- * "Gallisto"; the binary says Gallista, and so does the distress message
- * quoted in MEASURED.md. The binary wins. */
-#define PLANET_NAMES      7
+ * EIGHT names, and getting that number wrong is the cautionary tale attached
+ * to this file. The list was first taken from reference/strings.txt, which
+ * shows seven -- and `strings` had silently dropped VEGA. The binary holds a
+ * fixed-stride table, 13 bytes per entry, length-prefixed Pascal strings:
+ *
+ *     \x09Andromeda\0\0\0   \x0aCeti Alpha\0\0   \x06Cygnus\0\0\0\0\0\0
+ *     \x08Gallista\0\0\0\0   \x0cGamma Regula     \x05Sigma\0\0\0\0\0\0\0
+ *     \x04Vega\0\0\0\0\0\0\0\0  \x07Xevious\0\0\0\0\0
+ *
+ * Alphabetical, stride 13, longest name twelve characters. The same block
+ * shows why strings.txt cannot be trusted for a TABLE: two entries below it
+ * come out joined as "Life support suppliesRaw energium", with no separator
+ * at all. It is fine for finding a message and wrong for counting a list.
+ *
+ * The port shipped seven for a day, so it could never name a planet Vega and
+ * named one Xevious wherever the original would have said Vega. Found by
+ * Jamie photographing the original's PLANET LIST page -- the same way the
+ * truncated command list was found. Read the BINARY for tables.
+ *
+ * An earlier note in NOTES.md also transcribed one name off a screen capture
+ * as "Gallisto"; the binary says Gallista. The binary wins twice. */
+#define PLANET_NAMES      8
 extern const char *const planet_name[PLANET_NAMES];
 
 /* Planet class, the Star Trek convention, printed as a letter with no space

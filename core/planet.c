@@ -10,7 +10,7 @@ uint8_t inventory[ITEM_COUNT];
 /* The binary's own tables, in the binary's own order. Names, not prose. */
 const char *const planet_name[PLANET_NAMES] = {
     "ANDROMEDA", "CETI ALPHA", "CYGNUS", "GALLISTA",
-    "GAMMA REGULA", "SIGMA", "XEVIOUS"
+    "GAMMA REGULA", "SIGMA", "VEGA", "XEVIOUS"
 };
 
 const char planet_class_letter[PCLASS_COUNT] = { 'M', 'N', 'O' };
