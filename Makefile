@@ -96,7 +96,9 @@ exit-test:
 # BOTH regions and measures. Both, because getting one right and the other
 # wrong is exactly what a broken region detector looks like, and that is the
 # bug this was written for.
+# Depends on the D64: the music is a file ON THE DISK now, not in the binary.
 sound-check:
+	$(MAKE) -C c128 d64
 	python3 tools/sound_check.py
 
 clean:

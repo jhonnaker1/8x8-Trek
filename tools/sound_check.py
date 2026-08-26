@@ -29,7 +29,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_music
 
 ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PRG   = os.path.join(ROOT, "c128", "build", "trek128.prg")
+# The D64, NOT the bare PRG. Since the bank-1 move the music and the prose live
+# in MUSIC.DAT and STRINGS.DAT on the disk image and are streamed in at startup
+# by far_load(). Autostarting the PRG gives the program no disk to read, so
+# far_load fails, mus_ok stays 0 and snd_music() refuses -- this harness then
+# reports "never found the first note" for a build whose driver may be fine.
+# It did exactly that on 2026-08-24 and cost most of a session.
+PRG   = os.path.join(ROOT, "c128", "build", "trek128.d64")
 SHOTS = os.path.join(ROOT, "c128", "build", "sound")
 CYCLES = 45000000
 

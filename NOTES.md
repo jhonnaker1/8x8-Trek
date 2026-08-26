@@ -650,6 +650,23 @@ Where to look next, roughly in order of suspicion:
   (290 Hz)` and the same for NTSC. So the loop no longer needs Jamie's ears --
   edit, `make sound-check`, read the answer.
 
+**The harness itself was broken, and that came first.**
+`tools/sound_check.py` autostarted the bare `trek128.prg`. Since the bank-1
+move the music is a FILE ON THE DISK -- with no disk attached `far_load` fails,
+`mus_ok` stays 0 and `snd_music()` refuses, so the tool reported "never found
+the first note" for a build whose driver might have been fine. It now
+autostarts the D64 and `make sound-check` builds it first.
+
+**With a valid disk it is STILL silent**, on both regions. So the bug is real
+and the instrument is now honest about it.
+
+**Host-side data is RULED OUT.** `mus_offset[]` is `0, 412, 1052, 1058, 1072,
+1078, 1084` and the terminator spans in `build/music.dat` are exactly the same
+seven. The blob opens `36, 0` -- a 36-tick REST -- then `3, 29`, which is the
+290 Hz the checker looks for, and `music_tick()` handles a leading rest
+correctly (a zero FREQUENCY is a rest; only a zero DURATION ends a track).
+`build/strings.dat` is 2267 bytes, exactly the measured `mus_base`.
+
 **What is now ruled out**, by reading the code rather than guessing:
 
 - The init ORDER is right: `str_load()`, `snd_init()`, `far_load("MUSIC.DAT")`,
