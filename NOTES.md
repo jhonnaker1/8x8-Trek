@@ -1199,7 +1199,7 @@ STILL TO READ, and all of it is on the open list:
     0x15D6E   2  department damage   "Engineering / Laser control"
     0x0A8C8   4  TORPEDO damage      "absorbed by star", "triggers nova"
     0x09563   2  torpedo firing      "unit hit from plasma bolt"
-    0x15C07   3  EVENT SCHEDULER     distress signal, REINFORCEMENTS, spy
+    0x15C07   3  THE SPY  -- DECODED  1/150, damages a random system 10..99
     0x1ED00   3  supernova events    "a star having gone nova"
     0x15F51   4  Union wreckage      "Wreckage of Union ship present"
     0x181E8   2  capture             "Mongol supplies captured..."

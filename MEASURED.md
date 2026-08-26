@@ -3455,6 +3455,101 @@ untouched" -- the printed figure, which is 0.8 x the protection. Energy
 untouched was the measured part and still holds; "the pool loses 409 of 409"
 was inference.
 
+### RETRACTED: fn 0x15C07 is the SPY, not the distress signal
+
+**The 2026-08-26 entry that read this routine as the distress signal was
+wrong, and the settled-planet conclusion drawn from it was wrong with it.**
+Retracted in full; what the routine really does is below.
+
+How it went wrong, because the shape is worth recognising. The routine has
+only TWO `mov di, imm16`, so its segment base solved on ONE match instead of
+the usual dozen -- and that one match was the anchor itself, which is
+circular. The entry recorded that caveat at the time, which is the only reason
+it was catchable. **A base solved on one string is not solved.**
+
+What broke it open was an unrelated read: the shield law uses `[0x235C]` as a
+percentage, and `0x235C` is `0x235A + 1*2`. Counting references to `0x235A`
+across the binary then names the array outright -- `fn 0x0F1D4` uses it six
+times and is the STATE OF REPAIR display ("System / Repair Time / Docked
+Undocked"), and `fn 0x22773` is the viewer's system page.
+
+**So DS:0x235A is the TWELVE SYSTEM REPAIR PERCENTAGES**, and DS:0x1188,
+stride 16, is the twelve SYSTEM NAMES -- "EnergyConverter" is fifteen
+characters and fits exactly. Not planets, and not a population.
+
+### THE SPY, read out of the binary (2026-08-26)
+
+`fn 0x15C07`, and the strings just before `fn 0x15D6E` name it: "SECURITY:
+A spy has been captured aboard the Lexington, but he has damaged the ..."
+
+    Random(150); if != 0 return              ; ONE TURN IN 150
+    if [0x1DF0] <= 7 return                  ; high V only
+    idx = f(Random(12))                      ; a SYSTEM
+    print "...he has damaged the " + system_name[idx]
+    [0x235A + idx*2] -= 10 + Random(90)      ; 10..99 points off, floored at 0
+
+A mechanic this port has no part of: a spy is caught roughly once in 150
+turns and takes ten to ninety-nine percent off one random system on the way
+out. The `[0x1DF0] > 7` gate still supports V = level + 4 -- a spy only at the
+top command levels is coherent -- but it says nothing about rescues.
+
+**Where settled planets live is OPEN AGAIN.** The per-quadrant byte at
+DS:0x24A9 holds only three find values, and the second structure has NOT been
+found. `PFIND_SETTLERS` in core/planet.h remains this port's invention.
+
+### The shield routine: the 0.8, RESOLVED -- and the law CONFIRMED
+
+`fn 0x16844` is the enemy-fire and damage routine (2,707 bytes; strings
+"Shields absorb ", " unit hit from ", "Shields failing. Now at ", "Lexington
+destroyed.", "StarBase shields protect Lexington").
+
+At 0x17044 and again at 0x17085 it multiplies a real by a constant whose six
+bytes are `80 CD CC CC CC 4C`, which decodes to **exactly 0.8**. At 0x17085
+the product is compared against 1.0 and, if greater, printed as the amount in
+"Shields absorb N unit hit from ...". At 0x17044 the same product is combined
+with the shield real at [0x1D60].
+
+Reading the routine from its ENTRY instead of from its message sites resolved
+it, and the answer confirms the law this port already had.
+
+**The absorption formula, at 0x16A51..0x16A96:**
+
+    [bp-8] = damage * (shields / 2500) * ([0x235C] / 100)
+
+with 2500 and 100 decoded from the real constants at 0x16A5A and 0x16A73 --
+both exact round numbers, which is itself a check on the decoding. **2500 is
+SHIELD_MAX**, and **[0x235C] is element ONE of a twelve-word array**, which is
+the index `SYS_SHIELDS` has in this port. So the three-factor shape is
+CONFIRMED, including the system term that this file has called "a hypothesis
+that fits rather than a measurement" since the law was written.
+
+**The 0.8 applies to the POOL DRAIN and the PRINTED FIGURE, not to the
+protection.** It appears at 0x17044, where the shield real is updated, and at
+0x17085, where the reported amount is built -- never on the value that decides
+how much gets through.
+
+That placement is the only one under which both surviving measurements hold:
+
+    charge 1000   0.4 * 0.8 = 0.32   sweep read 0.33
+    charge 1500   0.6 * 0.8 = 0.48   sweep read 0.47
+    charge 2000   0.8 * 0.8 = 0.64   sweep read 0.65
+    full shields  energy untouched, as six clean hits showed
+
+and the fitted `charge / 3100` was approximating **2500 / 0.8 = 3125**.
+
+**A retraction goes with it.** The absorption sweep was recorded as INVALIDATED
+by the shield-write corruption, and the law was left "unresolved rather than
+measured" on that basis. The binary now predicts that sweep's three readings to
+within one percent, so the sweep was measuring the POOL DRAIN correctly all
+along. What was wrong was reading it as the protection.
+
+**And a test in this port was over-reading its own measurement.** It asserted
+the pool loses the WHOLE hit at full shields. The note it came from says "the
+PRINTED FIGURE comes out of the shield pool entirely and main energy is
+untouched" -- the printed figure, which is 0.8 x the protection. Energy
+untouched was the measured part and still holds; "the pool loses 409 of 409"
+was inference.
+
 ### THE DISTRESS SIGNAL, and where settled planets live (2026-08-26)
 
 `fn 0x15C07`, 359 bytes, decoded from raw bytes:

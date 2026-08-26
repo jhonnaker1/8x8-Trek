@@ -164,22 +164,22 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * the ancestor, with the rest invented -- wrong twice over, and it had no
  * class dependence at all.
  *
- * SETTLERS ARE NOT IN THIS BYTE, and THE SECOND STRUCTURE IS NOW FOUND. Only
- * three values fit one decimal digit here, and the distress-signal routine
- * (fn 0x15C07) reads settled worlds out of a SEPARATE TWELVE-ENTRY TABLE:
- * names at DS:0x1188 stride 16, and a word each at DS:0x235A that the signal
- * drains by 10..99 and floors at zero -- a population or a countdown.
+ * SETTLERS ARE NOT IN THIS BYTE, and the second structure is STILL NOT
+ * FOUND. Only three values fit one decimal digit here, and the original
+ * plainly has settled planets -- ORBIT prints "[destroyed ]settlement on the
+ * planet" and LAND prints "Planet settlers found...".
  *
- * So PFIND_SETTLERS models the right thing in the wrong place. The faithful
- * shape is a small second table of named inhabited worlds, not a find on the
- * per-quadrant byte, and rebuilding it that way is a job of its own. Until
- * then this stays at an invented frequency -- the only invented number left
- * in this file -- because dropping it makes the rescue scoring line
- * unreachable again.
+ * A 2026-08-26 entry claimed to have found them in a twelve-entry table at
+ * DS:0x1188/DS:0x235A. THAT WAS WRONG and is retracted: 0x235A is the twelve
+ * SYSTEM REPAIR PERCENTAGES and 0x1188 the twelve SYSTEM NAMES, which the
+ * STATE OF REPAIR display uses. The routine that reads them is the SPY event,
+ * not a distress signal. See MEASURED.md.
  *
- * One more thing the same routine settles: distress signals are gated on
- * [0x1DF0] > 7, so on the reading V = level + 4 they happen ONLY at command
- * levels 4 and 5. Rescues are a high-level mechanic. See MEASURED.md. */
+ * So PFIND_SETTLERS stays at an invented frequency -- still the only invented
+ * number in this file -- because dropping it makes the rescue scoring line
+ * unreachable. Finding the real structure is still open.
+ *
+ *  */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */
 /* PROVISIONAL, invented, and the only invented number left in this file:
