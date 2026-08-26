@@ -146,6 +146,51 @@ def check_overlays(mapfile):
           % (len(ovl), ovl[0][1], win))
 
 
+MSG_W  = 40    # layout.h
+MSG_PAD = 2    # msg_box() draws inside the border
+
+
+def check_message_widths():
+    """A message the panel cannot hold is TRUNCATED, and it does not say so.
+
+    msg_box() clamps the text to MSG_W - 2 - len(department) and writes what
+    fits. Nothing warns, at build time or at run time. Two shipped that way:
+
+      COMPUTER: with the full command list, 61 characters against 28, so the
+        player was shown "M W L T D R S E Q C F A SND" and would reasonably
+        conclude that MSGS, SAVE, INFO, HAIL, SHUP, SHDN and MAX do not exist.
+        A half-list is worse than no list. Found by Jamie playing it.
+
+      ENGINEERING: IMPULSE ENGINES TOO DAMAGED, 27 against 25, losing "ED".
+
+    The panel draws ONE line per box. The original's boxes hold two and wrap,
+    which is a real difference and is written up in NOTES.md -- but with the
+    two strings above shortened, nothing in this port needs the second line,
+    so the wrap is a feature to build rather than a bug to fix.
+    """
+    src = SRC.read_text() + (C128 / "src" / "main.c").read_text() \
+        + (C128 / "src" / "ui.c").read_text()
+    strings = {}
+    for ln in (C128 / "src" / "strings.txt").read_text().splitlines():
+        if ln[:1].isdigit():
+            i, _, t = ln.partition("\t")
+            strings[int(i)] = t
+
+    bad = []
+    for d, t in re.findall(r"ui_message\(S\(S_(\d+)\),\s*S\(S_(\d+)\)\)", src):
+        dept, text = strings[int(d)], strings[int(t)]
+        room = MSG_W - MSG_PAD - len(dept)
+        if len(text) > room:
+            bad.append((dept, text, room))
+
+    if bad:
+        lines = "\n".join(
+            '         %s%s\n             %d chars, %d fit, shown as "%s"'
+            % (d, t, len(t), r, t[:r]) for d, t, r in bad)
+        die("message text that the panel will silently truncate:\n" + lines)
+    print("verify: every ui_message fits the panel -- ok")
+
+
 def die(msg):
     print(f"verify: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -206,6 +251,7 @@ def main():
 
     check_data_init(MAP)
     check_overlays(MAP)
+    check_message_widths()
 
     consts = constants()
     rows = table_rows()

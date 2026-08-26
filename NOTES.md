@@ -1034,6 +1034,44 @@ measurement to quote -- but the seam is built and adding an overlay is now
 three lines (an id, a filename, a section in the link script) plus the
 `OVL_CODE` and the stub.
 
+### The message panel silently truncates, and it shipped a half-list
+
+**Found by Jamie playing it, 2026-08-26:** typing an unknown command put "an
+odd item" in the messages window. It was the COMPUTER's reply --
+
+    COMPUTER: M W L T D R S E Q C F A SND MSGS SAVE INFO HAIL SHUP SHDN MAX
+
+-- 61 characters into a box that holds 28. `msg_box()` clamps the text to
+`MSG_W - 2 - strlen(dept)` and draws what fits, with no warning at build time
+or run time. What the player actually saw was
+
+    COMPUTER: M W L T D R S E Q C F A SND
+
+which is worse than no list at all: it invites the reasonable conclusion that
+MSGS, SAVE, INFO, HAIL, SHUP, SHDN and MAX do not exist.
+
+**Only two messages in the port are over the limit**, which is the good news:
+the command list, and `ENGINEERING: IMPULSE ENGINES TOO DAMAGED` at 27 against
+25, which was losing its last two letters. Both are now short enough to fit,
+and **`make verify` fails the build on any ui_message that will not fit** --
+it walks every `ui_message(S(a), S(b))` call, looks both strings up in
+strings.txt and does the same arithmetic msg_box() does.
+
+**The command list was never the original's**, and the code said so before
+this: "DERIVED, not measured: the original beeps at a field its parser
+refuses, not at an unknown command." The reply is `NO SUCH ORDER` now, which
+matches the original's own `NO SUCH LOCATION` phrasing. **The full list
+belongs in F1 Help**, which is already on the wanted list -- a help screen can
+give it the room it needs.
+
+**A real difference from the original, left alone deliberately.** Its message
+boxes hold TWO lines and wrap; ours hold one. That is visible in the DOSBox
+capture -- "NAVIGATION: Move blocked by object / at 1-6." Wrapping would mean
+taller boxes and so fewer of them (four boxes of three rows is exactly the
+fourteen available; two-line boxes would fit three). With the two strings
+above shortened, nothing in the port needs a second line, so this is a feature
+to build if the message set grows, not a bug to fix now.
+
 ### Wanted on their own merits
 
 - **The function keys** -- F1 Help, F2 Lasers, F3 Fire Torpedo, F4 Move Ship,

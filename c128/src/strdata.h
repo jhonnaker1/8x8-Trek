@@ -48,13 +48,13 @@
 #define S_39    39   /* HIT ESC TO ABORT */
 #define S_40    40   /* HIT RETURN TO CONTINUE */
 #define S_41    41   /* ILLOGICAL, CAPTAIN. */
-#define S_42    42   /* IMPULSE ENGINES TOO DAMAGED */
+#define S_42    42   /* IMPULSE ENGINES DAMAGED */
 #define S_43    43   /* INOPERATIVE */
 #define S_44    44   /* INSUFFICIENT ENERGY, CAPTAIN! */
 #define S_45    45   /* INVALID WARP FACTOR */
 #define S_46    46   /* LEXINGTON IN QUAD  */
 #define S_47    47   /* LONG RANGE SCANNERS INOPERATIVE */
-#define S_48    48   /* M W L T D R S E Q C F A SND MSGS SAVE INFO HAI */
+#define S_48    48   /* NO SUCH ORDER */
 #define S_49    49   /* MISSION ENDED, CAPTAIN. */
 #define S_50    50   /* MONGOL DESTROYED! */
 #define S_51    51   /* NAVIGATION */
