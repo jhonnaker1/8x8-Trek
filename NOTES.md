@@ -553,12 +553,12 @@ Everything about *what a thing does* has been on disk; these are numbers.
 
 Still open from those runs:
 
-- **`RAY`'s outcome ODDS** -- still ONE sample after three attempts. The rig
-  is understood (SAVE/restore is a working checkpoint and puts the ship back
-  exactly), but the emulator goes unstable under the long automated runs that
-  sampling needs -- blank dialogs while the API still answers. Next attempt:
-  restart dosbox PER SAMPLE, not per block. See MEASURED.md, "The apparatus
-  goes unstable".
+- **`RAY`'s outcome ODDS** -- still not measured after FOUR attempts, though
+  the fatal outcome itself is now captured along with its loss report. This
+  bullet used to blame emulator instability; that was wrong, or at least not
+  the main cause. Four harness bugs and one confound are written up under
+  "Run 6" below, with the specific fix the fifth attempt needs. Do not start
+  a fifth without reading it.
 - ~~One sample of dying in COMBAT~~ **DONE 2026-08-24 and the constant is
   restored.** The sheet prints `Penalty for loss of ship .... -200` and totals
   -930 with nothing killed. The 2026-08-20 reading that gave -730 and got the
@@ -1140,7 +1140,13 @@ corrected time law vindicated.
      stars destroyed @ -5. ~~Rescues @ 200~~ is LIVE as of 2026-08-26 --
      evacuating a settlement raises ship.rescues and the sheet reads it.
  10. **Reinforcements arriving mid-fight** -- "A Mongol has appeared at 5-4",
-     seen repeatedly across the runs.
+     seen repeatedly across the runs, and "Mongol reinforcements are reported
+     in quadrant 7-1" seen 2026-08-26.
+ 11. **Black holes.** Added to this list 2026-08-26 -- they have been in these
+     notes since 2026-08-20 and in the manual's feature list all along, and
+     the numbered list never carried them, so the work has been costed without
+     them. The binary has the lot: entering one, being thrown free in a named
+     quadrant, a loss ending, and torpedoes both sucked in and deflected.
 
 Items 7 and 8 are one job -- RAY's fourth outcome is what needs the report
 screen, and five more loss endings reuse the same frame once it exists.
@@ -1149,6 +1155,131 @@ Four and five WERE one job and are done. The shield absorption constant is
 still open in the sense that its system term is a hypothesis that fits rather
 than a measurement; a one-enemy quadrant would settle it, and the shape is
 right either way.
+
+### Run 6 (2026-08-26): the RAY rig, finally diagnosed
+
+The headline: **RAY's fatal outcome and its Top Secret loss report are
+captured** (MEASURED.md), and the rig that had failed three times is now
+understood well enough to say exactly why.
+
+#### What Jamie's photograph was worth
+
+More than the automation. Mid-run he photographed the MAIN VIEWER showing
+PLANET LIST 602, and it refuted three things this port had shipped that day:
+
+  1. **A planet name was missing.** `core/planet.c` had seven names; the
+     binary has EIGHT. `strings` had dropped VEGA. See "The eighth planet
+     name" -- `tools/check_tables.py` now reads both tables out of the binary
+     and `make` runs it.
+  2. **The planet count was five-to-ten**, and the photograph shows ELEVEN on
+     one page of two.
+  3. **The list is ONE COLUMN**, not the three the 2026-08-21 note recorded.
+     So the reason `ui_planet_list` was made a report rather than a viewer
+     page -- "the two readings contradict each other" -- was wrong: there was
+     no contradiction, just a bad transcription. The report is still the
+     better fit for this port's twenty-column viewer at twelve-plus planets,
+     but it is now a CHOICE and not a forced one, and the comment says so.
+
+Second time a photograph has found a bug the whole test suite missed; the
+truncated command list was the first. **The build machine cannot see the
+screen.**
+
+#### Why RAY had failed three times, and it was never the emulator
+
+The previous note blamed instability -- "blank dialogs while the API still
+answers" -- and prescribed restarting dosbox per sample. Instability is real,
+but it was not the cause. Four distinct bugs were in the harness, each of
+which produces plausible readings of a game doing something else:
+
+  1. **The MOVE dialog has TWO FORMS.** It asks `Quad, Sector:` while the
+     computer is at 100% and `DeltaX:/DeltaY:` once it is damaged -- the
+     manual's own rule, since automatic navigation needs 100%. A script that
+     types coordinates in one form eventually types them into the other; the
+     dialog stays open, and every command after that is typed INTO it. The
+     screenshot that showed this had `Quad, Sector: 1,2ray` in the field.
+  2. **`on_console()` does not detect a dialog.** Its two magenta samples are
+     on the COMMAND panel at the far left, which a centred dialog does not
+     cover. One batch in three came back SUCCESS with the navigation refusal
+     "no such location" plainly on the screenshot -- the enemy count had gone
+     to zero because the ship changed QUADRANT, not because the ray worked.
+  3. **The settle detection fired during a dramatic pause.** Frames hashed
+     every 0.8s: 0.0-4.9s identical ("Preparing death ray..."), 5.7-11.4s the
+     firing animation, 13.8s onward settled. "Two identical frames means
+     done" matches the five-second pause every time, so the first samples
+     were classified before the ray resolved and duly read NOTHING.
+  4. **A dead game reads as a live one, again.** The fatal outcome left the
+     enemy table reporting three live ships. Liveness has to be checked
+     BEFORE the table, not after.
+
+And one that only showed up at level 3: **the ship almost never spawns beside
+enemies.** Five launches in a row came up empty, so "restart until the spawn
+has enemies" has a yield near zero. Jamie's suggestion of level 5 -- 50 to 58
+Mongols against 34 to 42 -- is what made the hunt affordable.
+
+The harness now hops only in the first turns of a fresh game, when the
+computer is certainly at 100% and the dialog form is therefore known; verifies
+every hop by reading the sector back (each is aimed at 4,4, so a sector
+reading 4,4 means it landed); requires a clean console AND no dialog before
+firing; waits a measured 15 seconds; and checks liveness first.
+
+#### BLACK HOLES CONFOUND THIS MEASUREMENT, IN BOTH DIRECTIONS
+
+Jamie watched a sampling run fly into one, which is what surfaced this. The
+binary has the whole mechanic:
+
+    NAVIGATION: The ship has entered a black hole...
+    NAVIGATION: The ship has entered a black hole and has been thrown free
+                in quadrant <n>
+    Torpedo sucked into black hole.    Torpedo deflected by black hole.
+    U.S.S. Lexington pulled into black hole & destroyed
+
+Both outcomes corrupt a RAY sample, and they corrupt it the wrong way:
+
+  * a THROW moves the ship to another quadrant, so the enemy table empties
+    with every enemy still alive -- which this harness classifies as SUCCESS;
+  * a DESTRUCTION reads as SHIP_LOST and is attributed to the death ray,
+    which INFLATES the fatal-outcome rate this run exists to measure.
+
+Neither is separable from the memory reads. The only thing that tells them
+apart is the dialog on the screen -- the loss report's cause line says
+"pulled into black hole & destroyed" where the ray's says "destroyed by death
+ray explosion" -- so **every sample has to be validated against a screenshot
+taken while its dialog is still up**, and the harness does not yet reliably
+take one. The settle poll runs up to eleven seconds past the point the ray
+finishes, and `line("y")` leaves a spare Enter behind it (the Y/N prompt takes
+the key without one), so the box is often gone by the time the frame is
+grabbed.
+
+#### So: RAY's odds are STILL NOT MEASURED, after a fourth attempt
+
+Nothing in this section is an outcome distribution and none should be quoted
+as one. Samples were collected; not one batch survived validation. Three
+separate batches produced classifications that the screenshots then refuted --
+a SUCCESS that was a refused MOVE, a NOTHING that was the box still saying
+"Preparing death ray...", and a pair with no dialog on screen at all.
+
+What this run DID buy is that the rig is now understood rather than blamed,
+the fatal outcome and its loss report are captured, and the remaining work is
+one specific fix: grab the frame at the fifteen-second mark, before the settle
+poll and before any Enter, then classify only samples whose dialog is legible.
+
+#### Black holes are missing from the AUDIT LIST, not from these notes
+
+Recorded here since 2026-08-20 and in the manual's own feature list, but items
+4 to 10 above never mention them -- so the plan has been costed without a
+mechanic that has five strings, a loss ending and two torpedo interactions.
+Added as item 11. This is the same failure as the `HP_SCOUT` note: a thing
+known in one file and absent from the list that drives the work.
+
+#### The planet array was NOT found
+
+Worth recording as a negative so nobody spends the hour again. With eleven
+known (quadrant, class, name) triples as ground truth, the array does not
+appear as adjacent (y,x) pairs -- byte or word, stride 2..40, ordered or
+unordered -- nor as a single packed quadrant index under four encodings at
+strides 1..48. So it is not laid out like the enemy table. Reading the finds
+straight out of memory would have made the find-distribution survey nearly
+free, and it is still the right idea if the layout ever turns up.
 
 ### The planet chain, built (2026-08-26)
 
