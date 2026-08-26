@@ -1350,6 +1350,11 @@ void trek_score_sheet(ScoreSheet *s) {
     s->enemy_bases = 0; s->enemy_base_pts = 0;
     s->stars       = 0; s->star_pts      = 0;
 
+    /* MEASURED: a flat -200 for losing the ship, separate from the crew.
+       Absent from a surviving ship's sheet, present on both a combat loss and
+       a self-destruction. */
+    s->ship_lost_pts = ship.lost ? SCORE_SHIP_LOST : 0;
+
     s->mongols       = ship.killed;
     s->mongol_pts    = (int16_t)(ship.killed * SCORE_PER_MONGOL);
     s->commanders    = ship.killed_cmd;
@@ -1373,7 +1378,8 @@ void trek_score_sheet(ScoreSheet *s) {
         s->rate_pts        = (int16_t)kill_rate_points(kills, elapsed);
     }
 
-    s->total = (int16_t)(s->rescue_pts + s->incomplete_pts + s->mongol_pts
+    s->total = (int16_t)(s->ship_lost_pts
+                       + s->rescue_pts + s->incomplete_pts + s->mongol_pts
                        + s->commander_pts + s->enemy_base_pts + s->rate_pts
                        + s->casualty_pts + s->star_pts + s->bases_hit_pts);
 }

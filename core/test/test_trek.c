@@ -1484,16 +1484,17 @@ static void test_game_state_and_score(void) {
        "the recorded sheet reproduces exactly: 1 Mongol, 1 Commander, 18 casualties, unfinished");
     ok(trek_score() == -288, "and its printed total, -288");
 
-    /* The second sheet MEASURED.md records, from the game that ended in a
-       black hole: nothing achieved, mission unfinished, ship lost with all
-       hands. The original printed -730 and had no ship-loss line -- the whole
-       penalty beyond the -300 is the 430 crew at a point each. */
+    /* Nothing achieved, mission unfinished, ship lost with all hands.
+       MEASURED 2026-08-24 off a combat-death sheet: -200 for the ship, -300
+       for the unfinished mission and -430 for the crew, printing -930. An
+       earlier reading of this same case recorded -730 and had the ship-loss
+       constant deleted on the strength of it; the line is on the sheet. */
     trek_new_game(3, 4242);
     ship.enemies_left = 34;
     ship.casualties = CREW_COMPLEMENT;
     ship.lost = 1;
-    ok(trek_score() == -300 - 430, "losing the ship is scored as its crew");
-    ok(trek_score() == -730, "and its printed total, -730");
+    ok(trek_score() == -200 - 300 - 430, "the ship, the mission and the crew");
+    ok(trek_score() == -930, "and its printed total, -930");
 
     /* The sheet, line by line, against the same measured game. Every row the
        original printed is checked, including the three that are zero because
@@ -1509,8 +1510,10 @@ static void test_game_state_and_score(void) {
         ok(sh.mongol_pts == 0 && sh.commander_pts == 0, "sheet: nothing killed");
         ok(sh.rescues == 0 && sh.enemy_bases == 0 && sh.stars == 0,
            "sheet: the three unimplemented items are zero");
-        ok(sh.total == -730,                  "sheet: total matches the original");
-        ok(sh.total == sh.rescue_pts + sh.incomplete_pts + sh.mongol_pts
+        ok(sh.ship_lost_pts == -200,          "sheet: the ship-loss penalty");
+        ok(sh.total == -930,                  "sheet: total matches the original");
+        ok(sh.total == sh.ship_lost_pts + sh.rescue_pts + sh.incomplete_pts
+                     + sh.mongol_pts
                      + sh.commander_pts + sh.enemy_base_pts + sh.rate_pts
                      + sh.casualty_pts + sh.star_pts + sh.bases_hit_pts,
            "sheet: the printed lines add up to the printed total");

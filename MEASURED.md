@@ -3841,3 +3841,46 @@ ship dies in the middle of the volley you just committed to.
 
 The technique that works: send the action, then send NOTHING and poll `live()`,
 and screenshot the moment it goes false.
+
+## Session 7 (2026-08-24): the -200 ship-loss penalty is REAL
+
+A combat death, captured intact this time by sending the fatal volley and then
+sending NOTHING while polling for the game to end. Jamie called it from the
+screen before I did.
+
+The memo, on a starfield rather than a plain ground:
+
+    Re: Loss of U.S.S. Lexington, RCB-92
+    U.S.S. Lexington lost in battle with Mongols this stardate, with all
+    aboard.  Results of operations previous to loss follow:
+      Stardays in action:  0.0
+      Mongol ships destroyed per stardate: 0.00
+      Score: -930
+
+And its sheet:
+
+    Penalty for loss of ship.........  -200
+    Penalty for incomplete mission...  -300
+    430 Casualties on board Lexington  -430
+    TOTAL............................  -930
+
+**Settled.** Nothing killed, no time elapsed, and the total is -930 rather than
+the -730 this project recorded on 2026-08-20 and used to DELETE the constant.
+The line is on the sheet, in its own row, above the casualties. The earlier
+reading missed it.
+
+Three sheets now, and the line set differs by ending:
+
+    ending           ship-loss line   rescues line
+    combat death     -200             absent
+    self-destruct    -200             absent
+    quit, alive      absent           present, 0 @ 200 each
+
+So the two are alternatives, not independent rows. `trek.h` gets
+`SCORE_SHIP_LOST` back, `ScoreSheet` gets `ship_lost_pts`, `test_trek.c`
+asserts -930 on the case it used to assert -730, and `ui.c` prints whichever
+row the ending calls for.
+
+The combat-loss sentence -- "lost in battle with Mongols this stardate, with
+all aboard" -- is the second of the eight endings captured verbatim in shape,
+after self-destruction's "destroyed per order of captain".

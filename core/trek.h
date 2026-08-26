@@ -884,7 +884,26 @@ uint8_t trek_game_state(void);
 #define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */
 #define SCORE_INCOMPLETE      (-300)
 
-/* CONTESTED 2026-08-24 -- read this before trusting the paragraph below.
+/* MEASURED 2026-08-24 off two loss sheets, combat and self-destruct alike. It
+   is a flat penalty for losing the ship, SEPARATE from the casualties, and it
+   is absent from a surviving ship's sheet. See the note below CREW_COMPLEMENT
+   for why this constant was deleted once and why that was a mistake. */
+#define SCORE_SHIP_LOST       (-200)
+
+/* SETTLED 2026-08-24 by a combat death: the line is REAL and it is -200.
+
+   The Lexington was destroyed in battle with no kills and no elapsed time. Its
+   sheet printed `Penalty for loss of ship ... -200` above the casualties line
+   and totalled -930: -200 -300 -430. A self-destruct sheet the same day showed
+   the same line. A surviving ship's sheet does NOT carry it, so it is
+   conditional on losing the ship and on nothing else.
+
+   The 2026-08-20 reading that produced -730 and removed this constant was
+   wrong. SCORE_SHIP_LOST is restored below.
+
+   Historical note follows.
+
+   CONTESTED 2026-08-24 -- read this before trusting the paragraph below.
    A self-destruct sheet from run 4 PRINTS "Penalty for loss of ship .... -200"
    as its own line, above the casualties line, and the arithmetic closes to the
    unit: -200 -300 +20 +20 -430 = the -890 shown. So the line exists.
@@ -924,6 +943,7 @@ int16_t trek_score(void);
 typedef struct {
     uint16_t rescues;        int16_t rescue_pts;
                              int16_t incomplete_pts;
+    int16_t  ship_lost_pts;  /* -200 when the ship was lost, else 0 */
     uint16_t mongols;        int16_t mongol_pts;
     uint16_t commanders;     int16_t commander_pts;
     uint16_t enemy_bases;    int16_t enemy_base_pts;

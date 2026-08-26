@@ -1572,8 +1572,15 @@ void ui_evaluation(void) {
     scr_puts(EV_ITEM,    5, "ITEM",  COL_LABEL);
     scr_puts(EV_DOTS_TO, 5, "SCORE", COL_LABEL);
 
-    ev_count(c, sh.rescues);
-    ev_row(y++, c, "RESCUES @ 200 EACH", sh.rescue_pts, COL_MSG);
+    /* The original's line SET varies by ending: a lost ship's sheet carries
+       the ship-loss penalty and omits RESCUES, a surviving ship's does the
+       reverse. MEASURED 2026-08-24 off both. */
+    if (sh.ship_lost_pts)
+        ev_row(y++, NULL, "PENALTY FOR LOSS OF SHIP", sh.ship_lost_pts, COL_MSG);
+    else {
+        ev_count(c, sh.rescues);
+        ev_row(y++, c, "RESCUES @ 200 EACH", sh.rescue_pts, COL_MSG);
+    }
     ev_row(y++, NULL, "PENALTY FOR INCOMPLETE MISSION", sh.incomplete_pts, COL_MSG);
     ev_count(c, sh.mongols);
     ev_row(y++, c, "MONGOLS KILLED @ 10 EACH", sh.mongol_pts, COL_MSG);
