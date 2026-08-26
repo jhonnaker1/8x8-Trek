@@ -3884,3 +3884,25 @@ row the ending calls for.
 The combat-loss sentence -- "lost in battle with Mongols this stardate, with
 all aboard" -- is the second of the eight endings captured verbatim in shape,
 after self-destruction's "destroyed per order of captain".
+
+### The apparatus goes unstable under long automated runs (2026-08-24)
+
+Recorded because it ended the session and will end the next one the same way.
+
+After a long block of scripted input -- the shield sweeps, the death loops, and
+especially anything that keeps driving after the game has ended and restarted
+-- the emulator stops responding to input correctly. The tell is a screenshot
+crop that comes back BLANK where a dialog should be, while the API still
+answers and memory still reads. Jamie spotted it twice from the screen before
+any of my checks did.
+
+Restarting dosbox clears it. Restoring the save puts the ship back exactly, so
+the cost is small -- but it means **long unattended loops are the wrong shape
+for this instrument.** Work in short blocks, restart between them, and check a
+screenshot rather than trusting that the API answering means the guest is
+healthy.
+
+This is why `RAY`'s outcome odds are STILL one sample after three attempts.
+They need many samples, each needing a restore, which is exactly the pattern
+that destabilises the thing. The next attempt should restart the emulator per
+sample rather than per block.

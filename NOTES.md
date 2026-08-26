@@ -552,15 +552,18 @@ Everything about *what a thing does* has been on disk; these are numbers.
 
 Still open from those runs:
 
-- **`RAY`'s outcome ODDS** -- one sample, a success. Repeat sampling needs a
-  fresh quadrant or a restored save per shot: a successful ray clears the
-  SECTOR MAP, and writing the enemy table does not put ships back on it.
-- **One sample of dying in COMBAT**, to settle whether the -200 ship-loss
-  penalty is universal or particular to self-destruction. Attempted three times
-  on 2026-08-24 and lost all three to trailing keystrokes walking through the
-  end screens -- see MEASURED.md, "The capture problem". The QUIT sheet does
-  narrow it: with the ship ALIVE there is no ship-loss line at all, so the line
-  is conditional on losing the ship.
+- **`RAY`'s outcome ODDS** -- still ONE sample after three attempts. The rig
+  is understood (SAVE/restore is a working checkpoint and puts the ship back
+  exactly), but the emulator goes unstable under the long automated runs that
+  sampling needs -- blank dialogs while the API still answers. Next attempt:
+  restart dosbox PER SAMPLE, not per block. See MEASURED.md, "The apparatus
+  goes unstable".
+- ~~One sample of dying in COMBAT~~ **DONE 2026-08-24 and the constant is
+  restored.** The sheet prints `Penalty for loss of ship .... -200` and totals
+  -930 with nothing killed. The 2026-08-20 reading that gave -730 and got the
+  constant deleted had missed a line. `SCORE_SHIP_LOST` is back, with
+  `ship_lost_pts` on the sheet and the C128 renderer printing whichever row the
+  ending calls for.
 - **`Rescues @ 200 each`** -- a scoring line found on the surviving-ship sheet
   2026-08-24 that this port has never had, and the scoring end of the
   distress-signal mechanic. The weight is known; what is not is what counts as
