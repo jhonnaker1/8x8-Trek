@@ -3402,6 +3402,48 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### THE DISTRESS SIGNAL, and where settled planets live (2026-08-26)
+
+`fn 0x15C07`, 359 bytes, decoded from raw bytes:
+
+    Random(150); if != 0 return                 ; fires ONE TURN IN 150
+    if [0x1DF0] <= 7 return                     ; and only at high V
+    idx = f(Random(12))            -> [0x1CF4]
+    message := "COMMUNICATIONS: A distress signal is being received
+                from the planet" + NAME + suffix
+    NAME comes from a table at DS:0x1188, STRIDE 16, indexed by idx
+    [DS:0x235A + idx*2] -= 10 + Random(90)      ; clamped at zero
+
+**SETTLED PLANETS ARE A SEPARATE TWELVE-ENTRY TABLE.** That is the structure
+`core/planet.h` says is missing -- the per-quadrant byte at DS:0x24A9 has only
+three find values and no room for settlers, and this is where they actually
+live: a table of up to twelve named worlds at DS:0x1188 with a parallel word
+each at DS:0x235A that the distress signal DRAINS by 10..99 and floors at
+zero. That word is a population or a countdown; which of the two is not read.
+
+So the port's `PFIND_SETTLERS` is modelling the right thing in the wrong
+place, at an invented frequency. The faithful model is a second, small table
+of named inhabited worlds -- which is also why the PLANET LIST page and the
+evacuation messages name planets that the per-quadrant byte cannot describe.
+
+**A THIRD SUPPORT FOR V = level + 4.** The gate here is `[0x1DF0] > 7`, so
+distress signals -- and therefore rescues, and therefore the +200 scoring line
+-- happen ONLY at the top command levels. With V = level + 4 that is levels 4
+and 5, which is a coherent difficulty rule. The three constraints now are:
+
+    11 - V          StarBase count, must stay small and positive
+    cmp V, 9        in generation at 0x05482
+    V > 7           this gate, which wants to select the top levels
+
+all satisfied by V = level + 4 and none by V = level. Still a reading, and
+still one emulator run from being a measurement.
+
+CAVEAT on the strings: this routine has only two `mov di, imm16`, so the
+segment base solved on ONE match rather than the usual dozen. The message text
+is certainly right -- it is the only distress string in the binary and this is
+the only routine that builds it -- but the suffix at di=0x0B45 did not resolve
+and the exact wording of the assembled sentence is not confirmed.
+
 ### BLACK HOLES, and THE SECTOR MAP'S FORMAT (2026-08-26)
 
 Both out of the MOVE routine, `fn 0x0C609`, which also owns the tractor beam

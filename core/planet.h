@@ -164,14 +164,22 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * the ancestor, with the rest invented -- wrong twice over, and it had no
  * class dependence at all.
  *
- * SETTLERS ARE NOT IN THIS BYTE. The original plainly has settled planets --
- * ORBIT prints "Scanners show a [destroyed ]settlement on the planet." and
- * LAND prints "Planet settlers found... / Evacuating settlers..." -- but that
- * comes from a second structure this pass did not locate, and only three
- * values fit one decimal digit here. So PFIND_SETTLERS stays, at a frequency
- * that is THIS PORT'S INVENTION and nothing else, because dropping it would
- * make the rescue scoring line unreachable again a day after it went live.
- * Finding that second array is the next job on this routine. */
+ * SETTLERS ARE NOT IN THIS BYTE, and THE SECOND STRUCTURE IS NOW FOUND. Only
+ * three values fit one decimal digit here, and the distress-signal routine
+ * (fn 0x15C07) reads settled worlds out of a SEPARATE TWELVE-ENTRY TABLE:
+ * names at DS:0x1188 stride 16, and a word each at DS:0x235A that the signal
+ * drains by 10..99 and floors at zero -- a population or a countdown.
+ *
+ * So PFIND_SETTLERS models the right thing in the wrong place. The faithful
+ * shape is a small second table of named inhabited worlds, not a find on the
+ * per-quadrant byte, and rebuilding it that way is a job of its own. Until
+ * then this stays at an invented frequency -- the only invented number left
+ * in this file -- because dropping it makes the rescue scoring line
+ * unreachable again.
+ *
+ * One more thing the same routine settles: distress signals are gated on
+ * [0x1DF0] > 7, so on the reading V = level + 4 they happen ONLY at command
+ * levels 4 and 5. Rescues are a high-level mechanic. See MEASURED.md. */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */
 /* PROVISIONAL, invented, and the only invented number left in this file:
