@@ -565,10 +565,12 @@ Still open from those runs:
   constant deleted had missed a line. `SCORE_SHIP_LOST` is back, with
   `ship_lost_pts` on the sheet and the C128 renderer printing whichever row the
   ending calls for.
-- **`Rescues @ 200 each`** -- a scoring line found on the surviving-ship sheet
-  2026-08-24 that this port has never had, and the scoring end of the
-  distress-signal mechanic. The weight is known; what is not is what counts as
-  a rescue.
+- ~~**`Rescues @ 200 each`**~~ **LIVE 2026-08-26.** Evacuating a settlement
+  found by LAND raises `ship.rescues` and the sheet reads it at
+  `SCORE_PER_RESCUE`. What counts as a rescue is this port's answer, not a
+  measured one: one per settlement taken off, and the SCHEDULED distress
+  signal that names a planet and a deadline is still unbuilt -- see the
+  planet-chain notes.
 - **Boarding-party frequency and duration.** The mechanic is in the string
   table; the numbers need elapsed play.
 - **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
@@ -1150,9 +1152,10 @@ right either way.
 
 ### The planet chain, built (2026-08-26)
 
-The model, not the screens. `core/planet.h` carries the provenance and
-`core/planet.c` the forty lines of rules; the UI has no ORBIT, LAND or USE
-command yet and no PLANET LIST page.
+The model. `core/planet.h` carries the provenance and `core/planet.c` the
+forty lines of rules. (This section said "not the screens" for a few hours:
+the UI landed the same day and is written up under "The planet chain reaches
+the screen" below.)
 
 **Two things fell out of the binary that no measurement run had found**, and
 both were sitting in `reference/strings.txt` the whole time. Which is the
