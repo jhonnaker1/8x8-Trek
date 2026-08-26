@@ -3402,6 +3402,44 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### The shield routine: an 0.8 CONSTANT that CONTRADICTS our measurement
+
+`fn 0x16844` is the enemy-fire and damage routine (2,707 bytes; strings
+"Shields absorb ", " unit hit from ", "Shields failing. Now at ", "Lexington
+destroyed.", "StarBase shields protect Lexington").
+
+At 0x17044 and again at 0x17085 it multiplies a real by a constant whose six
+bytes are `80 CD CC CC CC 4C`, which decodes to **exactly 0.8**. At 0x17085
+the product is compared against 1.0 and, if greater, printed as the amount in
+"Shields absorb N unit hit from ...". At 0x17044 the same product is combined
+with the shield real at [0x1D60].
+
+The straightforward reading is **absorbed = 0.8 x hit, a FLAT eighty percent**,
+with the shield pool reduced by that and hits under one unit not reported.
+
+**THAT CONTRADICTS WHAT WE MEASURED.** The 2026-08-24 session with one enemy
+found the absorbed FRACTION RISING WITH CHARGE -- 0.33 at 1000, 0.47 at 1500,
+0.65 at 2000 -- and this port's shield law is built on that shape. A flat 0.8
+cannot produce 0.33.
+
+**Nothing is being changed on the strength of this.** Three readings could
+reconcile it and none is established:
+
+  * There is more than one damage path. The routine carries TWO separate hit
+    messages -- " unit hit from base at " and " unit hit from Mongol at " --
+    besides the "Shields absorb" one, so 0.8 may belong to one of them only.
+  * The 0.8 may scale something other than the raw hit; what [bp-8] holds at
+    that point is not proven, only that the same slot feeds both the message
+    and the shield update.
+  * The measurement itself came from a session that also produced the
+    invalidated absorption sweep -- MEASURED.md already records that writing a
+    small value into the shield pair corrupted later readings in that block.
+
+Resolving it is a proper read of this routine from its entry rather than from
+its message sites, which is the next job here. The lesson from today applies:
+this file has already had three findings that looked solid and were artefacts
+of checking an assumption against itself.
+
 ### THE DISTRESS SIGNAL, and where settled planets live (2026-08-26)
 
 `fn 0x15C07`, 359 bytes, decoded from raw bytes:

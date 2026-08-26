@@ -579,8 +579,13 @@ Still open from those runs:
 - **The shield absorption law.** SHAPE SETTLED 2026-08-24 with one enemy at
   last: at a given charge the absorbed amount is REPEATABLE, and the absorbed
   fraction RISES with charge -- 0.33 at 1000, 0.47 at 1500, 0.65 at 2000. Three
-  of the four levels fit `fraction = charge / 3100`; 2500 does not. The
-  constant is still open. It is emphatically not `amount - shields`.
+  of the four levels fit `fraction = charge / 3100`; 2500 does not. It is
+  emphatically not `amount - shields`.
+  **CONTESTED 2026-08-26 by the disassembly**, which shows a flat 0.8 applied
+  to the hit before the "Shields absorb" message in fn 0x16844. A flat 0.8
+  cannot produce 0.33, so one of the two is wrong or they describe different
+  paths -- the routine has three separate hit messages. Read the routine from
+  its ENTRY before touching the constant. See MEASURED.md.
 - **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
   turns in five once a few hundred units reached energy, and never while the
   shields absorbed everything. No clean edge yet.
