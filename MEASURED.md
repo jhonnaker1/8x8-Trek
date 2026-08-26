@@ -3402,6 +3402,49 @@ Three digits per quadrant: enemies, bases, stars -- enemies red when non-zero,
 bases orange, stars green. Quadrant 5-5 read `016` and its scanner showed no
 enemies, one base and six stars.
 
+### Galaxy generation, read out of the binary (2026-08-26)
+
+`fn 0x04FD1` is galaxy generation: it references the galaxy array at DS:0x2560
+fifteen times and the ship's quadrant eight times each, and it holds
+TWENTY-SEVEN Random() calls -- the enemy count, the placements, and by every
+indication the planets, stars, bases and black holes as well.
+
+**CONFIRMED, the enemy placement loop** (0x51CD..0x5255), decoded from raw
+bytes rather than trusted to one disassembly pass:
+
+    qy = Random(8) + 1
+    qx = Random(8) + 1
+    if GALAXY[qy*16 + qx*2] >= 100: retry      ; already holds an enemy
+    n = Random(4) + 1                          ; 1..4 for this quadrant
+    if placed + n > total: n = total - placed  ; clamp to what is left
+    GALAXY[q] += n * 100
+
+So a quadrant gets ALL of its enemies in one placement of one to four, and is
+never picked twice. This port increments one at a time to a cap of four, which
+reaches the same cap by a different distribution -- worth knowing, not
+obviously worth changing.
+
+It also confirms the packing outright: **enemies are stored x100** in the same
+word as bases (x10) and stars (x1), which is the chart's three digits.
+
+**NOT CONFIRMED, the total.** The arithmetic at 0x5181 is
+
+    r1 = Random(10);  r2 = Random(10);  V = [0x1DF0]
+    total = r1 + ((V - 3) * 8 * (100 - r2)) / 100
+
+and the `* 8` matches `ENEMY_PER_LEVEL` literally. But if V were the command
+level, level 3 would yield 0..9 enemies against nineteen measured samples of
+34..42, so **V is DERIVED from the level and the relation is not yet pinned**.
+[0x1DF0] has two writers: one at 0x08384 fed by a string-to-number conversion
+(the setup screen), and one at 0x15064 that reads it, compares against 6, and
+does `add ax, 4`. V = level + 4 fits the level-1 and level-5 samples and is
+marginally tight at level 3, which is not good enough to assert.
+
+Resolving it is one emulator run -- start a game at a known level and read
+[0x1DF0] -- which is exactly the division of labour this method is for: read
+the shape statically, confirm one value dynamically. Until then the port keeps
+its fitted `10 + 8*level + rand(0..8)`, which matches all nineteen samples.
+
 ### RAY's ODDS, read out of the binary (2026-08-26) -- EXACT
 
 Not sampled. Read from the code, so these are Anderson's own constants and
