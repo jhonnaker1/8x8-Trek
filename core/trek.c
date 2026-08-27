@@ -1307,22 +1307,92 @@ static uint16_t enemy_fire_energy(uint16_t hp) {
 /* Damage lands on the shields first and on the main banks once those are
    gone. MEASURED: with shields up and sufficient, the printed figure comes
    out of the shield pool entirely and main energy is untouched. */
-/* Wrecks one system, and reports it. MEASURED severity: the resulting
-   percentage was ZERO eight times in eleven, and the four survivors read 5%,
-   22%, 38% and 42%. This port used to take 20 to 59 points off a system,
-   which is a modest bite where the original usually annihilates. */
-void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max) {
-    ship.sys[which] = (trek_rand_n(SYS_WRECK_OF_N) < SYS_WRECK_IN_N)
-        ? 0
-        : (uint8_t)(SYS_RESIDUAL_MIN + trek_rand_n(SYS_RESIDUAL_SPAN));
+/* What the enemy threw at us this turn, and what the pool stopped -- the
+   original's [0x1DC8] and [0x1DC6]. Both are zeroed at the top of the fire
+   routine and read once, after it, by the damage roll. Keeping them here
+   rather than in Ship is deliberate: they do not survive a turn, so they must
+   not reach the save file. */
+static uint16_t turn_hits, turn_absorbed;
 
-    ship.casualties = (uint16_t)(ship.casualties + trek_rand_n(10));
+/* Damages ONE NAMED system by an amount in HIT UNITS, and reports it.
+   fn 0x020DCE at 0x020E37..0x020FA7; the law and its constants are in trek.h
+   above DMG_FACTOR_UP_X100. `hits` is the turn's total, not one hit. */
+void trek_wreck_system(uint8_t which, uint16_t hits,
+                       TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t factor, divisor, off, q, r;
+    int16_t  left;
+
+    /* 1.25 - charge/2500 with the shields up, a flat 0.5 with them down.
+       SHIELD_MAX/100 is 25, so the charge as a percentage is an exact divide
+       and the whole factor stays in hundredths. */
+    factor = ship.shields_up
+        ? (uint16_t)(DMG_FACTOR_UP_X100 - ship.shields / (SHIELD_MAX / 100))
+        : DMG_FACTOR_DOWN_X100;
+
+    /* 2 + 3*Random, in hundredths: 2.00 up to but not including 5.00. */
+    divisor = (uint16_t)(DMG_DIV_MIN_X100 + trek_rand_n16(DMG_DIV_SPAN_X100));
+
+    /* hits * factor / divisor, rounded, without ever forming hits*factor --
+       that overflows 16 bits at a few hundred units. The remainder term is
+       bounded by divisor*factor, which is not. */
+    q = (uint16_t)(hits / divisor);
+    r = (uint16_t)(hits % divisor);
+    off = (uint16_t)(q * factor + ((r * factor + divisor / 2) / divisor));
+
+    off = (uint16_t)(off + trek_rand_n(DMG_EXTRA_OF_N));
+
+    left = (int16_t)((int16_t)ship.sys[which] - (int16_t)off);
+    /* Anything the hit LEFT above 90 gets a second, smaller bite. It sits
+       after the subtraction in the original too, so it only ever fires when
+       the main term was small. */
+    if (left > DMG_TOPUP_ABOVE)
+        left = (int16_t)(left - (DMG_TOPUP_MIN + trek_rand_n(DMG_TOPUP_SPAN)));
+    ship.sys[which] = (uint8_t)(left < 0 ? 0 : left);
+
+    /* Round(Sign(hits - 500)) * Random(10): no lives are lost on a turn whose
+       hits never passed 500. */
+    if (hits > DMG_CASUALTY_HIT_MIN)
+        ship.casualties = (uint16_t)(ship.casualties
+                                     + trek_rand_n(DMG_CASUALTY_OF_N));
     if (*n < max) {
         ev[*n].kind   = EV_SYSTEM_HIT;
         ev[*n].y      = which;
         ev[*n].amount = ship.sys[which];
         (*n)++;
     }
+}
+
+/* Once per turn, after the enemies have fired -- fn 0x0213AD, called from the
+   main loop at 0x005993 inside a `for r = 1 to Round(hits/350) + 1`. The
+   level and penetration gates in that routine are unreachable in play (see
+   trek.h), so what is left is the count and a two-in-three roll. */
+void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t rounds, i;
+
+    /* The shield SYSTEM wears from what the POOL stopped, once, on the
+       turn's total -- fn 0x016844 at 0x0171CC. A reduction, not a wrecking,
+       and it reports nothing of its own. */
+    /* The tally is CONSUMED here. trek_enemy_turn() also clears it on entry,
+       which is where the original does it -- this second clear is what keeps
+       a hit taken outside the fire loop (a death pod) from leaking into the
+       next turn's roll, and what makes the function safe to call on its
+       own. */
+    if (turn_absorbed > SHIELD_SYS_WEAR_MIN && ship.sys[SYS_SHIELDS]) {
+        uint16_t wear = (uint16_t)((turn_absorbed - SHIELD_SYS_WEAR_BASE
+                                    + SHIELD_SYS_WEAR_DEN / 2)
+                                   / SHIELD_SYS_WEAR_DEN);
+        ship.sys[SYS_SHIELDS] = (uint8_t)(wear >= ship.sys[SYS_SHIELDS]
+                                          ? 0 : ship.sys[SYS_SHIELDS] - wear);
+    }
+
+    if (!turn_hits) { turn_absorbed = 0; return; }
+
+    rounds = (uint16_t)((turn_hits + DMG_ROUNDS_PER / 2) / DMG_ROUNDS_PER + 1);
+    for (i = 0; i < rounds; i++) {
+        if (trek_rand_n(DMG_ROLL_OF_N) == 0) continue;
+        trek_wreck_system(trek_rand_n(DMG_SYS_OF_N), turn_hits, ev, n, max);
+    }
+    turn_hits = turn_absorbed = 0;
 }
 
 void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
@@ -1362,12 +1432,11 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
 
     through = (uint16_t)(amount - absorbed);
 
-    /* MEASURED: the shield SYSTEM takes damage when the POOL absorbs a big
-       hit, and it does NOT need anything to get through -- one turn damaged
-       it with nothing reaching energy at all. That is why this sits here,
-       above the penetration test, rather than inside it. */
-    if (absorbed >= SHIELD_SYS_HIT_MIN)
-        trek_wreck_system(SYS_SHIELDS, ev, n, max);
+    /* Everything the turn cost, for the once-per-turn roll after the fire
+       loop. The original accumulates both the same way, per hit, and reads
+       them once -- system damage is not decided here. */
+    turn_hits     = (uint16_t)(turn_hits + amount);
+    turn_absorbed = (uint16_t)(turn_absorbed + absorbed);
 
     if (!through) return;
 
@@ -1382,25 +1451,6 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
         return;
     }
     ship.energy = (uint16_t)(ship.energy - through);
-
-    /* MEASURED: a penetrating hit wrecks something about three times in five,
-       and TWO systems can go in one turn. The threshold itself is still not
-       pinned -- no system was ever damaged while the shields took the whole
-       hit, and they died on roughly three hits in five once a few hundred
-       units were reaching energy. */
-    if (through >= SYSTEM_DAMAGE_THRESHOLD &&
-        trek_rand_n(SYS_DAMAGE_OF_N) < SYS_DAMAGE_IN_N) {
-        uint8_t first = trek_rand_n(SYS_COUNT);
-        trek_wreck_system(first, ev, n, max);
-
-        if (trek_rand_n(SYS_SECOND_OF_N) < SYS_SECOND_IN_N) {
-            uint8_t second = trek_rand_n(SYS_COUNT);
-            /* Never the same one twice in a turn: the original's pairs were
-               two DIFFERENT systems, and re-wrecking one already at 0 would
-               print a second message saying nothing happened. */
-            if (second != first) trek_wreck_system(second, ev, n, max);
-        }
-    }
 }
 
 /* How keen an enemy is to close, DERIVED from the ancestor's movebaddy().
@@ -1516,6 +1566,12 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
 
+    /* The turn's tally starts here and is read once, at the bottom. Anything
+       a scheduled event put in it before now is discarded, which is what the
+       original does: [0x1DC8] and [0x1DC6] are zeroed on entry to the fire
+       routine and nothing outside it is ever read from them. */
+    turn_hits = turn_absorbed = 0;
+
     /* Only on an attack -- see trek.h. This is a different trigger from the
        ancestor's, where moveklings() runs from the turn resolution whatever
        the player did. */
@@ -1563,6 +1619,9 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
 
         trek_take_hit(dmg, ev, &n, max);
     }
+
+    /* AFTER the loop, on the totals -- not per hit. See trek_combat_damage. */
+    if (!ship.lost) trek_combat_damage(ev, &n, max);
     return n;
 }
 

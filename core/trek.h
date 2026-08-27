@@ -37,13 +37,17 @@
 
 /* Base types, as the long-range scanner reports them (manual l.291):
    1 StarBase, 2 research station, 3 supply depot. */
-/* How many StarBases a galaxy holds. The binary computes `11 - V` where V is
-   [0x1DF0], the same value the enemy total scales by. V = level + 4 is the
-   reading -- a `cmp V, 9` in the same routine only makes sense if V reaches
-   nine -- which gives six StarBases at level 1 and two at level 5. FLAGGED
-   rather than confirmed; one emulator run settles V and both constants with
-   it. See MEASURED.md, "Bases, read out of the binary". */
-#define STARBASES_AT_LEVEL(l)  (11 - ((l) + 4))  /*@FITTED*/
+/* How many StarBases a galaxy holds: `11 - V` at 0x0053C5, where V is
+   [0x1DF0]. V IS SETTLED -- the setup prompt at 0x015050 rejects anything
+   outside 1..5 and then does `[0x1DF0] = n + 4`, and fourteen lines later
+   indexes the rank names at DS:0x102E by `(V - 4) * 14`, which lands on
+   "Lt. Commander" for V = 5. So V = command level + 4, and this gives six
+   StarBases at level 1 and two at level 5.
+
+   That also disposes of the `cmp V, 9` at 0x005482 (level 5) and the `V > 7`
+   that gates the spy (level 4 and up): both are level tests written in the
+   offset form. No emulator run needed after all. */
+#define STARBASES_AT_LEVEL(l)  (11 - ((l) + 4))  /*@BINARY*/
 
 #define BASE_NONE       0  /*@ID*/
 #define BASE_STARBASE   1  /*@ID*/
@@ -664,32 +668,70 @@ uint8_t trek_shields_down(void);
    surviving figures were tight with no doubles. */
 #define ENEMY_FIRE_ONE_IN        2  /*@MEASURED*/
 
-/* A hit that gets past the shields can wreck a system.
+/* SYSTEM DAMAGE FROM COMBAT -- read out of the binary 2026-08-26, and it
+ * replaced a threshold that never existed.
  *
- * MEASURED 2026-08-24 (run 3), thirty pinned turns against one enemy. Three
- * things came out of it, and two of them say this port's model is wrong:
+ * The original does NOT decide this per hit, and it does not test how much
+ * got through. `fn 0x0213AD` runs once per turn from the main loop at
+ * 0x005993, and the loop around it is:
  *
- *   - **Raised, full shields absorb the hit whole and NO system is touched.**
- *     Six landed hits of 385 to 518 units, every one taken out of the shield
- *     pool with energy untouched and not one system damaged. With the shields
- *     DOWN the same hits come out of MAIN ENERGY and wreck things. So the
- *     trigger is real and the shape here -- something has to get through --
- *     is right.
- *   - **The severity is wrong.** Eleven observed system hits left the system
- *     at 0% eight times; the others were 5%, 22%, 38% and 42%. Taking 20 to
- *     59 points off is far too gentle: a hit that lands usually annihilates.
- *   - **The count is wrong.** TWO systems went in a single turn, twice --
- *     Life Support with Transporter, EnergyConverter with Warp Engines.
+ *     rounds = Round(raw_hits_this_turn / 350.0) + 1          ; 0x00595E
+ *     for r = 1 to rounds:
+ *         if (fired_on_this_turn)          goto roll          ; [0x26DE]
+ *         if (level + 4 < 6)               return
+ *         if (absorbed_this_turn > 700)    goto roll          ; [0x1DC6]
+ *         if (Random(raw_hits) <= 175)     return             ; [0x1DC8]
+ *       roll:
+ *         if (Random(3) == 0)              return
+ *         DamageReport(2)                                     ; fn 0x020DCE
  *
- * STILL PROVISIONAL: the threshold value itself. Systems were hit on roughly
- * three turns in five once a few hundred units were reaching energy, and never
- * while the shields absorbed everything, but no clean edge was found.
+ * `[0x26DE]` is set by the enemy-fire routine whenever enemies engaged and
+ * cleared at the top of every turn, and `[0x1DC8]` is only ever non-zero on
+ * the same turns -- so the level and threshold branches below it are
+ * UNREACHABLE in play. What actually happens is: if you were fired on, roll
+ * `Round(total/350) + 1` times, and each roll damages a system two times in
+ * three. That is why two systems could go in one turn: 860 units of hits is
+ * three rounds at two-thirds each.
  *
- * Also NOT what this port implements: `through = amount - shields`. The
- * original's shields are a PROPORTIONAL absorber -- at a charge of 200 out of
- * 2500 they took a steady 6.5% of five separate hits -- not a bucket that
- * subtracts. The law is unresolved; see MEASURED.md, "Run 3". */
-#define SYSTEM_DAMAGE_THRESHOLD  100   /* penetrating hit needed to risk it */  /*@PROVISIONAL*/
+ * The port's old `through >= SYSTEM_DAMAGE_THRESHOLD` was invented, and its
+ * "roughly three hits in five" was the observable shadow of these rounds. */
+#define DMG_ROUNDS_PER         350   /* rounds = round(hits/350) + 1 */  /*@BINARY*/
+#define DMG_ROLL_OF_N            3   /* Random(3) == 0 spares the ship */  /*@BINARY*/
+#define DMG_SYS_OF_N            11   /* Random(11): never the Shuttlecraft */  /*@BINARY*/
+
+/* HOW HARD, from fn 0x020DCE at 0x020E37..0x020FA7. The subtraction is in
+ * HIT UNITS against a 0..100 scale, which is why a system that gets hit is
+ * usually annihilated -- the measured "0% eight times in eleven" is this
+ * formula, not a special case:
+ *
+ *     shields up:    sys -= Round(hits * (1.25 - charge/2500) / (2 + 3*rnd))
+ *     shields down:  sys -= Round(hits * 0.5                  / (2 + 3*rnd))
+ *     sys -= Random(5)
+ *     if (sys > 90) sys -= 10 + Random(10)
+ *     if (sys < 0)  sys = 0
+ *
+ * where `rnd` is Turbo Pascal's argument-less Random, a real in [0,1). The
+ * constants 3.0, 2.0, 2500.0, 1.25 and 0.5 all decode as exact round numbers,
+ * which is the check on the decoding.
+ *
+ * Note what the first line says: RAISED BUT EMPTY SHIELDS ARE THE WORST PLACE
+ * TO BE. At a full 2500 the factor is 0.25, at zero charge it is 1.25 -- two
+ * and a half times worse than dropping them. */
+#define DMG_FACTOR_UP_X100     125   /* 1.25 - charge/SHIELD_MAX */  /*@BINARY*/
+#define DMG_FACTOR_DOWN_X100    50   /* flat 0.5 with shields down */  /*@BINARY*/
+#define DMG_DIV_MIN_X100       200   /* 2.0 */  /*@BINARY*/
+#define DMG_DIV_SPAN_X100      300   /* + 3.0 * Random */  /*@BINARY*/
+#define DMG_EXTRA_OF_N           5   /* then Random(5) more */  /*@BINARY*/
+#define DMG_TOPUP_ABOVE         90   /* anything still above 90 ... */  /*@BINARY*/
+#define DMG_TOPUP_MIN           10   /* ... loses 10 + Random(10) */  /*@BINARY*/
+#define DMG_TOPUP_SPAN          10  /*@BINARY*/
+
+/* CASUALTIES, from 0x021006: `Round(Sign(hits - 500)) * Random(10)`, so a
+ * turn whose hits never exceeded 500 units costs no lives at all, and one
+ * that did costs 0..9. The count feeds the running total at [0x1DDE] that
+ * the Top Secret report prints. */
+#define DMG_CASUALTY_HIT_MIN   500  /*@BINARY*/
+#define DMG_CASUALTY_OF_N       10  /*@BINARY*/
 
 /* ------------------------------------------- shields, and what a hit does
  *
@@ -754,28 +796,18 @@ uint8_t trek_shields_down(void);
 #define SHIELD_ABSORB_NUM   4  /*@BINARY*/
 #define SHIELD_ABSORB_DEN   5  /*@BINARY*/
 
-#define SHIELD_SYS_HIT_MIN       600  /*@FITTED*/
+/* The shield SYSTEM wears from what the POOL stops, and it is a graded
+   reduction rather than a wrecking. From fn 0x016844 at 0x0171CC, on the
+   TURN's total absorbed, once per turn:
 
-/* MEASURED: a hit that gets through does NOT always wreck something --
-   "systems were damaged on roughly three hits in five once a few hundred
-   units were reaching energy". */
-#define SYS_DAMAGE_IN_N          3  /*@MEASURED*/
-#define SYS_DAMAGE_OF_N          5  /*@MEASURED*/
+       if (absorbed > 800 && shield_sys > 0)
+           shield_sys -= Round((absorbed - 700) / 10.0)     ; floored at 0
 
-/* MEASURED, and this is the half this port had most wrong. Eleven system hits
-   were observed and the resulting percentage was ZERO eight times. The four
-   that survived read 5%, 22%, 38% and 42%. `trek.c` used to take 20 to 59
-   points off, which is a modest bite where the original usually annihilates. */
-#define SYS_WRECK_IN_N           8  /*@MEASURED*/
-#define SYS_WRECK_OF_N          11  /*@MEASURED*/
-#define SYS_RESIDUAL_MIN         5  /*@MEASURED*/
-#define SYS_RESIDUAL_SPAN       38    /* 5..42 inclusive */  /*@MEASURED*/
-
-/* MEASURED: TWO systems can go in a single turn -- seen twice, Life Support
-   with Transporter and EnergyConverter with Warp Engines. Two of the nine
-   damaging turns, which is where these come from. */
-#define SYS_SECOND_IN_N          2  /*@MEASURED*/
-#define SYS_SECOND_OF_N          9  /*@MEASURED*/
+   so 800 absorbed costs 10 points and 1500 costs 80. The old 600 here was
+   fitted from one reading and wrecked the system outright. */
+#define SHIELD_SYS_WEAR_MIN      800  /*@BINARY*/
+#define SHIELD_SYS_WEAR_BASE     700  /*@BINARY*/
+#define SHIELD_SYS_WEAR_DEN       10  /*@BINARY*/
 
 /* What happened during a turn. The core never formats text, so it hands the
    UI a list of facts and lets each platform word them. */
@@ -808,13 +840,16 @@ typedef struct {
    `ev` in the usual way. */
 void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max);
 
-/* Wreck ONE NAMED system, at the measured severity -- zero eight times in
-   eleven, and 5..42% otherwise. Public for the same reason trek_take_hit is:
-   damage arrives from places that are not enemy fire. A defective energium
-   crystal damages the main energy systems specifically, so it needs to say
-   which, where an enemy hit rolls for it. Note the casualties come with it;
-   they are part of what wrecking a system means here. */
-void trek_wreck_system(uint8_t which, TrekEvent *ev, uint8_t *n, uint8_t max);
+/* Damage ONE NAMED system by `hits` HIT UNITS -- the turn's total, not one
+   hit. Public for the same reason trek_take_hit is: damage arrives from
+   places that are not enemy fire, and those know which system they mean.
+   Note the casualties come with it; they are part of what this does. */
+void trek_wreck_system(uint8_t which, uint16_t hits,
+                       TrekEvent *ev, uint8_t *n, uint8_t max);
+
+/* The once-per-turn system-damage roll, on what the turn actually cost.
+   trek_enemy_turn() calls it for you; nothing else should. */
+void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 
 
 /* ------------------------------------------------------- scheduled events

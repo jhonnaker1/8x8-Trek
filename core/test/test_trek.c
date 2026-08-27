@@ -2166,22 +2166,24 @@ static void test_shield_absorption(void) {
     ok(ship.energy < ENERGY_MAX, "and the rest gets through");
 }
 
-/* MEASURED: a penetrating hit usually ANNIHILATES a system rather than
-   denting it -- zero eight times in eleven -- and two can go in one turn.
-   Statistical, so these run the turn many times and check the shape. */
+/* SYSTEM DAMAGE, rewritten 2026-08-26 against fn 0x0213AD and fn 0x020DCE.
+   The old version drove trek_take_hit() and asserted "about three times in
+   five", which was the observable shadow of a per-turn loop of
+   `Round(hits/350) + 1` rounds at two-thirds each. It is that loop these test
+   now, because that is what the binary does. Statistical, so they run many
+   turns and check the shape. */
 static void test_system_damage_severity(void) {
     TrekEvent ev[16];
     uint8_t n, i, j;
     int wrecked = 0, dented = 0, turns_with_two = 0, turns_damaged = 0;
+    int hits_small = 0, hits_big = 0, up_empty = 0, down = 0;
 
-    puts("a system hit is usually annihilation (MEASURED)");
+    puts("a system hit is usually annihilation (BINARY)");
 
-    /* ONE game and one RNG stream, sampled 400 times. An earlier version
+    /* ONE game and one RNG stream, sampled many times. An earlier version
        called trek_new_game() inside the loop with sequential seeds and read
-       the first few draws of each -- which correlates, and read a wreck share
-       of 0.646 against the 0.727 the generator actually produces. The
-       generator was checked and is uniform to within a rounding error for
-       every n from 2 to 12; the test was what was biased. */
+       the first few draws of each -- which correlates, and read a share that
+       said the generator was biased when the TEST was. */
     trek_new_game(3, 4242);
     ship.shields_up = 0;              /* let it all through */
     for (i = 0; i < 200; i++) {
@@ -2190,7 +2192,10 @@ static void test_system_damage_severity(void) {
         ship.energy = ENERGY_MAX;
         ship.lost = 0;
         n = 0;
-        trek_take_hit(600, ev, &n, 16);
+        /* The measured turn: 860 units across three hits. */
+        trek_take_hit(430, ev, &n, 16);
+        trek_take_hit(430, ev, &n, 16);
+        trek_combat_damage(ev, &n, 16);
         for (j = 0; j < n; j++)
             if (ev[j].kind == EV_SYSTEM_HIT) {
                 hits++;
@@ -2200,16 +2205,86 @@ static void test_system_damage_severity(void) {
         if (hits >= 2) turns_with_two++;
     }
 
-    /* Roughly three turns in five do any damage at all. */
-    ok(turns_damaged > 200 * 2 / 5 && turns_damaged < 200 * 4 / 5,
-       "a penetrating hit damages something about three times in five");
-    /* And when it does it is usually a wreck: MEASURED 8 of 11, which is
-       0.727, so the assertion is a clear majority rather than that figure to
-       the decimal -- eleven observations do not pin it that finely. */
+    /* 860 units is Round(860/350) + 1 = 3 rounds, each sparing the ship one
+       time in three, so a quiet turn is (1/3)^3 -- rare, not the usual case
+       the old test asserted. */
+    ok(turns_damaged > 200 * 4 / 5,
+       "860 units of hits damages something on nearly every turn");
+    /* MEASURED: zero eight times in eleven. That is not a special case in the
+       original, it is what `hits * 0.5 / (2..5)` does to a 0..100 scale at
+       this size -- the amount clears 100 for most of the divisor's range. */
     ok(wrecked * 3 > dented * 5,
        "the result is 0% far more often than not (measured 8 in 11)");
-    ok(turns_with_two > 0 && turns_with_two < turns_damaged / 2,
-       "two systems go in one turn sometimes, and not usually");
+    /* And TWO systems in a turn, seen twice in the original, is ordinary at
+       three rounds rather than the rarity the old model made of it. */
+    ok(turns_with_two > turns_damaged / 3,
+       "two systems in one turn is common at 860 units, not a rarity");
+
+    /* THE COUNT SCALES WITH THE TURN'S TOTAL. This is the discriminator
+       against the old per-hit model, which had no such dependence: the number
+       of rounds is the only place the hit size enters the count. */
+    trek_new_game(3, 4243);
+    ship.shields_up = 0;
+    for (i = 0; i < 100; i++) {
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX; ship.lost = 0;
+        n = 0; trek_take_hit(200, ev, &n, 16); trek_combat_damage(ev, &n, 16);
+        for (j = 0; j < n; j++) if (ev[j].kind == EV_SYSTEM_HIT) hits_small++;
+
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX; ship.lost = 0;
+        n = 0; trek_take_hit(1400, ev, &n, 16); trek_combat_damage(ev, &n, 16);
+        for (j = 0; j < n; j++) if (ev[j].kind == EV_SYSTEM_HIT) hits_big++;
+    }
+    ok(hits_big > hits_small * 2,
+       "a 1400-unit turn wrecks far more than a 200-unit one");
+
+    /* RAISED BUT EMPTY SHIELDS ARE THE WORST PLACE TO BE -- the factor is
+       1.25 with them up and flat against 0.5 with them down. Counter-
+       intuitive enough that it is worth a test that would catch the sign
+       being flipped back. */
+    trek_new_game(3, 4244);
+    for (i = 0; i < 100; i++) {
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX; ship.lost = 0; ship.shields = 0;
+        ship.shields_up = 1;
+        n = 0; trek_take_hit(300, ev, &n, 16); trek_combat_damage(ev, &n, 16);
+        for (j = 0; j < n; j++)
+            if (ev[j].kind == EV_SYSTEM_HIT && ev[j].amount == 0) up_empty++;
+
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX; ship.lost = 0; ship.shields = 0;
+        ship.shields_up = 0;
+        n = 0; trek_take_hit(300, ev, &n, 16); trek_combat_damage(ev, &n, 16);
+        for (j = 0; j < n; j++)
+            if (ev[j].kind == EV_SYSTEM_HIT && ev[j].amount == 0) down++;
+    }
+    ok(up_empty > down,
+       "raised but empty shields wreck MORE than no shields at all");
+
+    /* Round(Sign(hits - 500)) * Random(10): under 500 in a turn costs nobody. */
+    trek_new_game(3, 4245);
+    ship.shields_up = 0;
+    for (i = 0; i < 100; i++) {
+        for (j = 0; j < SYS_COUNT; j++) ship.sys[j] = 100;
+        ship.energy = ENERGY_MAX; ship.lost = 0;
+        n = 0; trek_take_hit(400, ev, &n, 16); trek_combat_damage(ev, &n, 16);
+    }
+    ok(ship.casualties == 0,
+       "a turn that never passed 500 units costs no lives");
+
+    /* The shield SYSTEM wears from what the POOL stopped, graded rather than
+       wrecked: 1500 absorbed is (1500-700)/10 = 80 points. */
+    trek_new_game(3, 4246);
+    ship.shields_up = 1;
+    ship.shields = SHIELD_MAX; ship.energy = ENERGY_MAX;
+    ship.sys[SYS_SHIELDS] = 100;
+    n = 0; trek_take_hit(1500, ev, &n, 16);
+    ok(ship.sys[SYS_SHIELDS] == 100,
+       "the shield system is untouched until the turn is resolved");
+    trek_combat_damage(ev, &n, 16);
+    ok(ship.sys[SYS_SHIELDS] == 20,
+       "1500 absorbed takes the shield system to 20%, not to zero");
 }
 
 static void test_manual_movement(void) {

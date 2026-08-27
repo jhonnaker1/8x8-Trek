@@ -590,9 +590,10 @@ Still open from those runs:
   which both surviving measurements hold, and `charge/3100` turns out to have
   been approximating 2500/0.8 = 3125. The sweep recorded as invalidated was
   measuring the pool drain correctly all along.
-- **`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.** Systems died on roughly three
-  turns in five once a few hundred units reached energy, and never while the
-  shields absorbed everything. No clean edge yet.
+- ~~**`SYSTEM_DAMAGE_THRESHOLD`'s actual edge.**~~ **CLOSED 2026-08-26, and
+  there is no edge.** `fn 0x0213AD` rolls per TURN, `Round(hits/350) + 1`
+  times at two in three, and never tests how much got through. "Three turns
+  in five" was this loop seen from outside. MEASURED.md has the law.
 - **Supply and Research docking quantities.** A StarBase restocks energy and
   shields to full in one 0.1-stardate turn; the other two types were never
   found. ~~Wants the base-type array located in memory~~ -- **there is no such
@@ -1198,11 +1199,16 @@ DECODED so far, with what each gave:
     0x15C07   3  the SPY            1/150, one system down 10..99
     0x16844   2  damage/shields     absorb = dmg * charge * sys%, pool x0.8
     0x0F1D4   -  STATE OF REPAIR    (identified; locates the systems array)
+    0x20DCE   7  DAMAGE REPORT      the severity law, casualties, the chart
+                                    erasure; and there is NO threshold
+    0x213AD   2  the damage gate    Round(hits/350)+1 rounds at 2/3 each
+    0x213F3   3  WEAR AND TEAR      an unbuilt mechanic, fully specified
+    0x1C015   -  max(n-1, 0)        a for-loop the compiler did not fold
+    0x1F4B8   -  Sign(x)
 
 STILL TO READ, with the open item each would close:
 
-    0x20DCE   7  damage reports     SYSTEM_DAMAGE_THRESHOLD, severity
-    0x15D6E   2  department damage   "     "
+    0x15D6E   2  department damage  called from the turn loop at 0x005954
     0x0A8C8   4  TORPEDO damage     falloff; "Torpedo triggers nova" (item 9's
                                     stars @ -5); the two black hole cases
     0x09563   2  torpedo firing     TORP_BASE, TORP_SPREAD
@@ -1246,9 +1252,15 @@ than the routine list (2026-08-26):
     event is scheduled, and that is a question about the shape of the core,
     not about a number.
 
-NOT gettable this way: screen layouts, how the MAIN VIEWER cycles, and
-[0x1DF0] -- the V that scales the enemy count and the StarBase count. V wants
-one emulator run: start a game at a known level and read one word.
+NOT gettable this way: screen layouts, and how the MAIN VIEWER cycles.
+
+~~and [0x1DF0] -- the V that scales the enemy count and the StarBase count.
+V wants one emulator run.~~ **WRONG, and wrong in a way worth keeping.**
+`[0x1DF0]` is `command level + 4`, read straight off the setup prompt at
+0x015050 that validates 1..5 and adds four. It never wanted an emulator run;
+it wanted a reference scan for the ONE site that writes it, which takes a
+second. Twice now a value has been filed as "needs the emulator" when what it
+needed was to look at who writes it. See MEASURED.md, 2026-08-26.
 
 Two corrections this map forced on earlier notes in this file:
 
@@ -1301,7 +1313,8 @@ measured by playing). The queue:
   * the planet class distribution
   * black hole placement and behaviour
   * the reinforcement rate
-  * `SYSTEM_DAMAGE_THRESHOLD` and the shield law's system term
+  * ~~`SYSTEM_DAMAGE_THRESHOLD`~~ -- DONE, and there was no threshold: the
+    roll is per TURN, `Round(hits/350) + 1` times at two in three
   * and the four already queued: the enemy-count formula, `TORP_BASE`/
     `TORP_SPREAD`, the long-range falloff slope, the score kill-rate term
 
@@ -1861,6 +1874,9 @@ Not missing features -- implemented things that do not match the original.
    beats standing up one that never has.
 
    ### The one surviving PROVISIONAL, and the shortcut to it
+
+   **[CLOSED 2026-08-26 -- kept because the reasoning below is the reasoning
+   that worked. `SYSTEM_DAMAGE_THRESHOLD` did not exist; see MEASURED.md.]**
 
        /* PROVISIONAL: a hit that gets past the shields can wreck a system. */
        #define SYSTEM_DAMAGE_THRESHOLD  100
@@ -4432,6 +4448,9 @@ taken at an arbitrary moment catches it mid-climb -- that is what made the
 same 400-unit volley read 26 pixels once and 6 another time.
 
 ### Run 3 -- damage, with the systems array pinned
+
+**[SUPERSEDED 2026-08-26: read out of the binary instead. The two samples do
+not disagree -- they are two draws of a per-turn loop.]**
 
 `SYSTEM_DAMAGE_THRESHOLD` has two samples that disagree: two hits took a
 system straight to 0% with casualties, one hit did nothing. Pin energy,

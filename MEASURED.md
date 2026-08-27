@@ -3110,6 +3110,10 @@ test instead of moving the band with it.
 
 ### 2. SYSTEM_DAMAGE_THRESHOLD -- PARTIAL, two samples
 
+**[SUPERSEDED 2026-08-26 by the binary. There is no threshold; the roll is
+per turn. Both samples below are consistent with it. See the damage-report
+section at the end of this file.]**
+
     860 units across 3 hits  ->  Shields 100% -> 0%   (3 casualties)
                                  Transporter 100% -> 0% (8 casualties)
     495 units across 2 hits  ->  nothing damaged
@@ -4231,6 +4235,10 @@ EnergyConverter with Warp Engines.
 wrong: the count is not always one, and the severity is not a modest bite --
 it is usually annihilation.
 
+**[RETRACTED 2026-08-26. It is NOT that shape -- the original never tests
+what got through. The reading below of WHAT HAPPENS is right and the reading
+of WHY is wrong.]**
+
 The trigger is consistent with our `through >= SYSTEM_DAMAGE_THRESHOLD` shape:
 no system was ever damaged while the shields absorbed the whole hit, and
 systems were damaged on roughly three hits in five once a few hundred units
@@ -4729,3 +4737,222 @@ just above warp 5 -- cost goes as warp^3 and the refill as 1/warp^2 -- so the
 manual's "faster than you can regenerate it" starts at cruising speed. Below
 it, energy is cheap and TIME is the price: one quadrant at warp 1.0 costs 11
 stardates out of a 30-stardate mission.
+
+---
+
+## Everything the damage report knows, read out of the binary (2026-08-26)
+
+Pointed at `fn 0x020DCE`, seven `Random()` sites, to close
+`SYSTEM_DAMAGE_THRESHOLD`. There was no threshold to close. The routine and
+its two callers gave the whole of combat system damage, two mechanics this
+port does not have, and the value of `[0x1DF0]`, which three earlier sessions
+left open.
+
+Segment base **0x1BD60**, solved on thirteen `mov di, imm16` and scoring
+twelve disjoint Pascal strings:
+
+    DAMAGE REPORT:\n        %. There are            on F Deck.
+     damaged. Now at         casualties reported     in Engineering.
+     failing. Now at        %.                       on K Deck.
+                                                     by Weapons Officer.
+                                                     on Q Deck.
+                                                     on T and U Decks.
+                                                     on R Deck.
+
+### The tool work that made the rest readable
+
+**The Turbo Pascal real operators, identified from their stubs** rather than
+guessed. Every one of them is a five-byte thunk in segment 0x2692, and each
+gives itself away in its first instruction:
+
+| offset | file | what it is | the tell |
+|---|---|---|---|
+| 0x0C93 | 0x2C3B3 | real ADD | falls into 0x2C0AF |
+| 0x0C99 | 0x2C3B9 | real SUBTRACT | `xor di, 0x8000` first, then the same |
+| 0x0CA5 | 0x2C3C5 | real MULTIPLY | |
+| 0x0CAB | 0x2C3CB | real DIVIDE | `or cl,cl / je` -- a zero-divisor check |
+| 0x0CB5 | 0x2C3D5 | real COMPARE | sets flags, callers use `ja`/`jae` |
+| 0x0CB9 | 0x2C3D9 | longint -> real | |
+| 0x0CC5 | 0x2C3E5 | real -> longint, ROUND | `mov ch,1`, then 0x2C357 |
+
+The SUBTRACT stub is the one that pays twice: it flips **bit 15 of `di`**,
+which is bit 7 of the sixth byte, and that is the sign bit. So it also
+CONFIRMS the `cx:si:di` byte order the constant decoding depends on.
+
+Two small helpers, both worth naming because they look like something else:
+
+  * **`fn 0x01C015` is `max(n - 1, 0)`** -- a Pascal `for i := 1 to n-1 do
+    inc(c)` the compiler did not fold. Every `f(Random(k) + 1)` in the damage
+    routine is just `Random(k)`.
+  * **`fn 0x01F4B8` is `Sign(x)`** -- returns 1.0, 0.0 or -1.0.
+
+And **DS maps to file offset by adding 0x2D820**, from "EnergyConverter" at
+DS:0x1188 landing on file 0x2E9A8. That converts every data address in the
+back catalogue into something readable without an emulator.
+
+### `[0x1DF0]` IS THE COMMAND LEVEL PLUS FOUR. Settled.
+
+    0x015050  if ([0x1DF0] <= 0) ask again
+    0x015057  if ([0x1DF0] >= 6) ask again
+    0x015061  [0x1DF0] = [0x1DF0] + 4
+
+The setup prompt takes 1..5 and adds four. Fourteen lines later it indexes a
+rank-name table at DS:0x102E by `(V - 4) * 14`, and that table reads
+
+    Lt. Commander  Commander  Captain  Commodore  Admiral
+
+so V = 5 is level 1. Two independent confirmations in one routine.
+
+Everything that was pending on V falls out:
+
+  * `11 - V` StarBases at 0x0053C5 -- **six at level 1, two at level 5**.
+    `STARBASES_AT_LEVEL` moves from FITTED to BINARY.
+  * `cmp V, 9` at 0x005482 is a level-5 test.
+  * `V > 7` gating the spy is "level 4 and up".
+  * `V >= 6` twice below is "level 2 and up".
+
+The note in trek.h said "one emulator run settles V and both constants with
+it". No emulator run was needed. The prompt that READS the value was thirty
+lines from a `mov di, 0x1DF0` that a reference scan finds in a second.
+
+**It does NOT touch `CRYSTAL_V`.** That one is `[0x1DCC]`, a different word --
+and a reference scan shows `[0x1DCC]` is written by thirty-eight sites all
+over the binary as a shared `for` counter, including inside `fn 0x01C015`.
+Nothing in the USE path sets it, so **the crystal's multiplier is whatever the
+last loop left behind**. That is a bug in the original, not a constant, and it
+is why the measurement could not be reconciled with the level. planet.h's
+caveat stands and gets sharper: reproducing the one reading is the right call,
+and a second reading would probably disagree with it.
+
+### System damage is decided ONCE A TURN, on the turn's total
+
+`fn 0x0213AD`, called from the main loop at 0x005993, inside this:
+
+    n = Round([0x1DC8] / 350.0) + 1        ; 0x00595E
+    for r = 1 to n: CombatDamageGate()
+    WearAndTear()                          ; fn 0x0213F3
+
+and the gate itself:
+
+    if ([0x26DE] != 0)              goto roll     ; enemies fired this turn
+    if ([0x1DF0] < 6)               return        ; level < 2
+    if ([0x1DC6] > 700)             goto roll     ; absorbed this turn
+    if (Random([0x1DC8]) <= 175)    return        ; raw hits this turn
+  roll:
+    if (Random(3) == 0)             return
+    DamageReport(2)
+
+`[0x1DC8]` and `[0x1DC6]` are the turn's raw hits and the turn's absorbed,
+both zeroed on entry to the fire routine at 0x0165B5. `[0x26DE]` is cleared at
+the top of every turn at 0x0058F5 and set at 0x01671B by the fire routine
+whenever enemies engaged -- **the same routine that writes the other two.** So
+the level and threshold branches below it can never be reached with anything
+in `[0x1DC8]` to test, and what actually happens is:
+
+> **If enemies fired at you, roll `Round(hits/350) + 1` times, and each roll
+> damages one system two times in three.**
+
+860 units across three hits -- the run-3 measurement -- is three rounds. Two
+systems went that turn. The port's `through >= SYSTEM_DAMAGE_THRESHOLD` was
+invented, its "about three in five" was the shadow of this loop, and its
+"a second system, rarely" was the shadow of the third round.
+
+### How hard, and it is in HIT UNITS
+
+From 0x020E37..0x020FA7. `rnd` is Turbo Pascal's argument-less `Random`, a
+real in [0,1):
+
+    shields up:    sys -= Round(hits * (1.25 - charge/2500) / (2 + 3*rnd))
+    shields down:  sys -= Round(hits * 0.5                  / (2 + 3*rnd))
+    sys -= Random(5)
+    if (sys > 90) sys -= 10 + Random(10)
+    if (sys < 0)  sys = 0
+
+3.0, 2.0, 2500.0, 1.25 and 0.5 all decode as exact round numbers, which is the
+check on the decoding.
+
+**The subtraction is in hit units against a 0..100 scale.** That is the whole
+explanation of "zero eight times in eleven" -- there is no annihilation case,
+only a number that usually clears 100. At 860 units and shields down the
+amount runs 86..215 and clears 100 for about three quarters of the divisor's
+range: 8 in 11 to the accuracy eleven observations support.
+
+And the first line says something the port would never have guessed:
+**raised but empty shields are the worst place to be.** The factor is 0.25 at
+a full 2500 and 1.25 at zero charge -- two and a half times worse than
+dropping them. There is now a test for it, because it is exactly the kind of
+sign a later edit would "fix".
+
+Casualties, at 0x021006, are `Round(Sign(hits - 500)) * Random(10)`: a turn
+whose hits never passed 500 costs nobody, and one that did costs 0..9. The
+total accumulates at `[0x1DDE]`, which is what the Top Secret report prints.
+
+### Which systems each kind can touch
+
+`DamageReport` takes one argument, and the three call sites pass 1, 2 and 3:
+
+| kind | system chosen | reads |
+|---|---|---|
+| 1 | `Random(6)` -- Converter..Warp Engines | "X failing. Now at N%." |
+| 2 | `Random(11)` -- everything but the Shuttlecraft | "X damaged. Now at N%." |
+| 3 | index 0, the EnergyConverter | "X failing. Now at N%." |
+
+Combat is kind 2, so **the Shuttlecraft can never be damaged by enemy fire**,
+and the "on R Deck." string that names it is unreachable. Kinds 1 and 3 are
+wear and tear, below.
+
+If the chosen system is already at 0%, the routine returns without a word.
+
+### The shield SYSTEM wears from what the POOL stops
+
+`fn 0x016844` at 0x0171CC, once per turn on the turn's total absorbed:
+
+    if (absorbed > 800 && shield_sys > 0)
+        shield_sys -= Round((absorbed - 700) / 10.0)      ; floored at 0
+
+800 absorbed costs 10 points, 1500 costs 80. `SHIELD_SYS_HIT_MIN 600` was
+fitted from one reading and wrecked the system outright; it is now three
+BINARY constants and a graded reduction.
+
+### NOT BUILT: wear and tear
+
+`fn 0x0213F3`, the second call from the turn loop, and a mechanic this port
+does not have at all. `[0x1D36]` is the stardate of the last wear event:
+
+    if (stardate <= 3503.0)   return          ; nothing breaks in three days
+    if (level + 4 < 6)        return          ; nothing breaks at level 1
+    e = Round((level + 3) * (stardate - last_event))
+
+    if (Random(100) > 98 - e):
+        if (average of all twelve systems > 95):
+            DamageReport(1)                   ; a random one of the first six
+            last_event = stardate
+    else if (Random(100) > 97 - e):
+        DamageReport(3)                       ; the EnergyConverter
+        last_event = stardate
+
+So roughly `(1 + e)/100` per turn, rising with elapsed time since the last
+one and with the command level. Note what the 95% test does: **the random
+breakdown only fires on a ship that is in near-perfect repair.** Let something
+else be broken and the game stops inventing faults, and drops through to the
+EnergyConverter check instead.
+
+Not built here because it needs `last_event` in the save record, which is a
+version bump. Fully specified when it is wanted.
+
+### NOT BUILT: a damaged Computer eats the star chart
+
+The tail of `fn 0x020DCE`, at 0x02134D, and only when the damaged system is
+index 9. It walks all sixty-four cells of an 8x8 word array at DS:0x2372 --
+which is NOT the galaxy at DS:0x2560, it is the RECORDED chart -- and for
+each one:
+
+    if (computer% < 30)                        erase it
+    else if (Random(10) < 5 && computer% < 70) erase it
+    else                                       leave it
+
+So above 70% nothing is lost, below 30% the chart goes entirely, and in
+between **each cell is an independent coin flip** -- you get a chart with
+holes in it, not a blank one. That is a better feature than anything this port
+would have invented, and it wants the chart to be a separate array from the
+galaxy, which it already is.
