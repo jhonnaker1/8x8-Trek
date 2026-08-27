@@ -96,10 +96,10 @@ uint8_t trek_free_sector(void) {
 
 static uint16_t enemy_strength(uint8_t type) {
     switch (type) {
-        case SEC_BATTLESHIP: return HP_BATTLESHIP;
-        case SEC_COMMAND:    return HP_COMMAND;
-        case SEC_SCOUT:      return HP_SCOUT;
-        case SEC_SUPPLY:     return HP_SUPPLY;
+        case SEC_BATTLESHIP: return HP_BATTLESHIP_AT(ship.level);
+        case SEC_COMMAND:    return HP_COMMAND_AT(ship.level);
+        case SEC_SCOUT:      return HP_SCOUT_AT(ship.level);
+        case SEC_SUPPLY:     return HP_SUPPLY_AT(ship.level);
         default:             return 0;
     }
 }
@@ -1656,45 +1656,128 @@ uint16_t trek_bearing(uint8_t sy, uint8_t sx) {
 
 /* ---------------------------------------------------------------- torps */
 
+/* sqrt of a 16-bit square, bit by bit, ROUNDED to nearest. Only the torpedo
+   needs it, and only for the graze term -- the direct/graze/through decisions
+   are squared compares that need no root at all.
+
+   The rounding is not cosmetic. Truncating puts the smallest graze at 250,
+   and 250 is a damage figure the original cannot produce: the graze term is
+   (1 - d) * base with d >= 0.3 exactly, so it tops out at 248. See the hole
+   in the damage table in trek.h. */
+static uint16_t isqrt16(uint16_t n) {
+    uint16_t r = 0, b = (uint16_t)1u << 14, t, keep = n;
+    while (b > n) b >>= 2;
+    while (b) {
+        t = (uint16_t)(r + b);
+        r >>= 1;
+        if (n >= t) { n = (uint16_t)(n - t); r = (uint16_t)(r + b); }
+        b >>= 2;
+    }
+    if ((uint16_t)(keep - r * r) > r) r++;
+    return r;
+}
+
+/* THE TORPEDO RAY-MARCHES. See trek.h above TORP_DAMAGE_AT_LEVEL for the law
+   and where it was read; this is that, in 8.8 fixed point.
+
+   Held ONE-BASED, like the original, so `y & 0xFF` is exactly Turbo Pascal's
+   Frac and `(y + 128) >> 8` is exactly its Round. Doing it zero-based would
+   put the ship's own row at y = 0, where Frac of a slightly negative number
+   stops meaning what the 0.3 and 0.6 tests assume. */
 uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
-    uint8_t  cell, whole;
-    uint16_t d, dmg;
+    int16_t  y, x, stepy, stepx;
+    uint8_t  m, cy, cx, cell, c;
+    uint16_t fy, fx, q, base, dmg, wobble;
 
     if (damage) *damage = 0;
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return TORP_BAD_COORDS;
     if (ship.torps == 0) return TORP_NONE_LEFT;
 
     ship.torps--;
-    cell = (uint8_t)((sy << 3) | sx);
 
-    if (sector[cell] == SEC_STAR) return TORP_ABSORBED;
-    if (!SEC_IS_ENEMY(sector[cell])) return TORP_MISS;
+    /* Aiming at our own cell leaves the original's step scalar uninitialised,
+       so there is nothing to reproduce. Refuse it. */
+    if (sy == ship.sec_y && sx == ship.sec_x) return TORP_MISS;
 
-    d     = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
-    whole = (uint8_t)(d >> 8);
+    y = (int16_t)((ship.sec_y + 1) << 8);
+    x = (int16_t)((ship.sec_x + 1) << 8);
 
-    /* Certain inside the sure range, then degrading. MEASURED: 6/6, 6/6, 4/7
-       at ranges 2.24, 5.00 and 7.62. */
-    if (whole > TORP_SURE_DIST) {
-        uint8_t miss = (uint8_t)((whole - TORP_SURE_DIST) * TORP_MISS_PCT_PER_UNIT);
-        if (miss > 90) miss = 90;
-        if (trek_rand_n(100) < miss) return TORP_MISS;
+    /* "Firing torpedos through the shields tends to throw them somewhat off
+       course" (manual). It is charge/25000 of a cell, once, at launch -- so a
+       full 2500 buys a tenth of a cell of error and a flat pool buys none. */
+    if (ship.shields_up) {
+        wobble = (uint16_t)(ship.shields / TORP_DEFLECT_DEN);
+        if (wobble) {
+            y = (int16_t)(y + (int16_t)trek_rand_n16((uint16_t)(wobble + 1)));
+            x = (int16_t)(x + (int16_t)trek_rand_n16((uint16_t)(wobble + 1)));
+        }
     }
 
-    /* Same falloff the lasers use, at full efficiency -- torpedoes carry their
-       own charge, so the ship's laser heat and battle damage do not enter. */
-    dmg = trek_laser_damage(TORP_BASE, 100, d);
-    dmg = (uint16_t)(dmg + trek_rand_n(TORP_SPREAD));
-    if (dmg > TORP_MAX_DAMAGE) dmg = TORP_MAX_DAMAGE;
+    /* step = 1/max(|dy|,|dx|), so the dominant axis advances exactly one cell
+       a step. Kept UNSIGNED and negated afterwards: a signed 16-bit divide
+       costs the C128 image several hundred bytes and this needs none. */
+    {
+        uint8_t ay = (uint8_t)(sy > ship.sec_y ? sy - ship.sec_y : ship.sec_y - sy);
+        uint8_t ax = (uint8_t)(sx > ship.sec_x ? sx - ship.sec_x : ship.sec_x - sx);
+        m = (uint8_t)(ay > ax ? ay : ax);
+        stepy = (int16_t)((uint16_t)((uint16_t)ay << 8) / m);
+        stepx = (int16_t)((uint16_t)((uint16_t)ax << 8) / m);
+        if (sy < ship.sec_y) stepy = (int16_t)(-stepy);
+        if (sx < ship.sec_x) stepx = (int16_t)(-stepx);
+    }
+
+    for (;;) {
+        /* BOTH wobbles are one-sided in the original, so torpedoes drift
+           toward higher y and x the further they fly. That asymmetry IS the
+           accuracy model -- see trek.h. */
+        y = (int16_t)(y + stepy + (int16_t)trek_rand_n16(TORP_JITTER_88));
+        x = (int16_t)(x + stepx + (int16_t)trek_rand_n16(TORP_JITTER_88));
+
+        if (y < TORP_EDGE_LO_88 || y > TORP_EDGE_HI_88 ||
+            x < TORP_EDGE_LO_88 || x > TORP_EDGE_HI_88) return TORP_MISS;
+
+        cy = (uint8_t)(((y + 128) >> 8) - 1);
+        cx = (uint8_t)(((x + 128) >> 8) - 1);
+        if (cy >= QUAD_DIM || cx >= QUAD_DIM) return TORP_MISS;
+
+        cell = (uint8_t)((cy << 3) | cx);
+        c    = sector[cell];
+        /* Our own cell reads 'E' in the original and matches none of its
+           cases, so the torpedo flies over it. */
+        if (c == SEC_EMPTY || c == SEC_SHIP) continue;
+        break;
+    }
+
+    if (c == SEC_STAR)   return TORP_ABSORBED;
+    if (c == SEC_PLANET) return TORP_PLANET;
+    if (c == SEC_BASE)   return TORP_BASE_HIT;
+
+    /* How far the torpedo passed from the cell's own corner, SQUARED -- see
+       trek.h. The early-out on either fraction alone is what keeps the sum
+       inside sixteen bits without losing a bit of the boundary. */
+    fy = (uint16_t)(y & 0xFF);
+    fx = (uint16_t)(x & 0xFF);
+    if (fy > TORP_FRAC_MAX || fx > TORP_FRAC_MAX) return TORP_THROUGH;
+    q = (uint16_t)(fy * fy + fx * fx);
+
+    if (q >= TORP_GRAZE_Q) return TORP_THROUGH;
+    if (trek_rand_n(TORP_DUD_OF_N) == 0) return TORP_DUD;
+
+    base = TORP_DAMAGE_AT_LEVEL(ship.level);
+    if (q < TORP_DIRECT_Q) {
+        dmg = base;
+    } else {
+        /* Round((1 - d) * base). base is a whole number, so the rounding can
+           come off the subtrahend and the product stays inside 16 bits. */
+        uint16_t d88 = isqrt16(q);       /* d in 8.8; q is d*d in 16.16 */
+        dmg = (uint16_t)(base - (uint16_t)(((d88 * base) + 128) >> 8));
+    }
     if (damage) *damage = dmg;
 
-    /* It no longer always kills. A Commander at 695 walks away from one with
-       340 left, which is MEASURED and is the whole point of the change. */
     if (dmg < enemy_hp[cell]) {
         enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dmg);
         return TORP_OK;
     }
-
     kill_enemy(cell);
     return TORP_KILL;
 }

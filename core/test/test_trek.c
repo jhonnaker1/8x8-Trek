@@ -1482,77 +1482,174 @@ static void test_enemy_turn(void) {
     ok(ship.energy < before, "with shields down the hit reaches main energy");
 }
 
+/* Fires one torpedo into a cleared quadrant and returns the result. */
+static uint8_t torp_shot(uint8_t sy0, uint8_t sx0, uint8_t ty, uint8_t tx,
+                         uint8_t up, uint16_t *dmg) {
+    ship.sec_y = sy0; ship.sec_x = sx0;
+    clear_quadrant();
+    sector[(ty << 3) | tx] = SEC_COMMAND;
+    enemy_hp[(ty << 3) | tx] = 60000;
+    ship.torps = 9;
+    ship.shields_up = up;
+    ship.shields = up ? SHIELD_MAX : 0;
+    return trek_fire_torpedo(ty, tx, dmg);
+}
+
 static void test_torpedo(void) {
     uint8_t r;
     uint16_t dmg;
-    puts("torpedoes");
+    puts("torpedoes (BINARY: the original ray-marches)");
+
+    ok(TORP_DAMAGE_AT_LEVEL(1) == 325, "torpedo damage is 325 at level 1");
+    ok(TORP_DAMAGE_AT_LEVEL(3) == 355, "355 at level 3 -- the measured figure");
+    ok(TORP_DAMAGE_AT_LEVEL(5) == 385, "and 385 at level 5");
+    /* The SAME expression as a battleship's hit points, at every level. That
+       is why one torpedo has always killed a standard Mongol. */
+    ok(TORP_DAMAGE_AT_LEVEL(1) == HP_BATTLESHIP_AT(1) &&
+       TORP_DAMAGE_AT_LEVEL(3) == HP_BATTLESHIP_AT(3) &&
+       TORP_DAMAGE_AT_LEVEL(5) == HP_BATTLESHIP_AT(5),
+       "and is exactly a battleship's hit points at every level");
+
+    /* All four classes, read out of the binary. Each level-3 column is a
+       separate measured sighting. */
+    ok(HP_COMMAND_AT(3) == 695 && HP_BATTLESHIP_AT(3) == 355 &&
+       HP_SCOUT_AT(3) == 255 && HP_SUPPLY_AT(3) == 120,
+       "the four class strengths reproduce every level-3 sighting");
+    ok(HP_COMMAND_AT(1) == 625 && HP_BATTLESHIP_AT(1) == 325 &&
+       HP_SCOUT_AT(1) == 225 && HP_SUPPLY_AT(1) == 100,
+       "and scale down at level 1, where 325 was also measured");
 
     trek_new_game(3, 777);
     ok(ship.torps == 9, "nine torpedoes at the start");
 
-    /* Close in, where the measured cap binds every time, so the outcome is
-       deterministic and the test has no coin to flip. */
+    /* Close in, where the march has one or two steps to wander in and the
+       torpedo always arrives on the cell's own corner. MEASURED: six shots
+       inside range 2.24 all read exactly 355. */
     ship.sec_y = 4; ship.sec_x = 4;
+    clear_quadrant();
     sector[(2 << 3) | 4] = SEC_BATTLESHIP;
     enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
     ship.enemies_left = 5;
 
     r = trek_fire_torpedo(2, 4, &dmg);
     ok(r == TORP_KILL,               "one torpedo destroys a battleship up close");
-    ok(dmg == TORP_MAX_DAMAGE,       "for exactly the measured 355");
+    ok(dmg == 355,                   "for exactly the measured 355");
     ok(ship.torps == 8,              "and costs a torpedo");
     ok(sector[(2 << 3) | 4] == SEC_EMPTY, "the sector is cleared");
     ok(ship.enemies_left == 4,       "the galaxy counter drops");
     ok(ship.killed == 1,             "counted as a standard Mongol");
 
-    /* The change this measurement bought: a Commander walks away from one.
-       MEASURED on the original -- the cap is a constant, not the target's own
-       strength, so 695 - 355 = 340. */
+    /* A Commander walks away from one. 695 - 355 = 340, MEASURED. */
     trek_new_game(3, 777);
     ship.sec_y = 4; ship.sec_x = 4;
+    clear_quadrant();
     sector[(2 << 3) | 4] = SEC_COMMAND;
     enemy_hp[(2 << 3) | 4] = HP_COMMAND;
     r = trek_fire_torpedo(2, 4, &dmg);
     ok(r == TORP_OK,                 "a Commander SURVIVES a torpedo");
-    ok(dmg == TORP_MAX_DAMAGE,       "taking the same capped 355");
-    ok(enemy_hp[(2 << 3) | 4] == HP_COMMAND - TORP_MAX_DAMAGE,
-       "and is left with 340");
+    ok(dmg == 355,                   "taking the same 355");
+    ok(enemy_hp[(2 << 3) | 4] == HP_COMMAND - 355, "and is left with 340");
     ok(sector[(2 << 3) | 4] == SEC_COMMAND, "still there, still a Commander");
     ok(ship.killed_cmd == 0,         "and is not counted as a kill");
 
-    /* Accuracy: certain inside the sure range, fallible past it. */
+    /* THE HOLE IN THE DAMAGE. A direct hit is `base`; a graze is
+       `(1 - d) * base` with d in [0.3, 0.6), so at most 0.7 * 355 = 248. NO
+       VALUE BETWEEN 249 AND 354 CAN EVER COME OUT. That is the sharpest
+       consequence of the law and the one the measurement disagrees with --
+       one of nineteen shots read 296. See trek.h. */
     {
-        int i, hits = 0, far_hits = 0;
-        trek_new_game(3, 777);
-        ship.sec_y = 1; ship.sec_x = 1;
-        for (i = 0; i < 60; i++) {
-            sector[(4 << 3) | 4] = SEC_COMMAND;      /* distance 4.24 */
-            enemy_hp[(4 << 3) | 4] = 60000;
-            ship.torps = 9;
-            if (trek_fire_torpedo(4, 4, &dmg) != TORP_MISS) hits++;
-
-            /* (7,7) not (8,8): sector indices are 0..7, and 8 returns
-               TORP_BAD_COORDS, which this loop first miscounted as a hit. */
-            sector[(7 << 3) | 7] = SEC_COMMAND;      /* distance 8.49 */
-            enemy_hp[(7 << 3) | 7] = 60000;
-            ship.torps = 9;
-            if (trek_fire_torpedo(7, 7, &dmg) != TORP_MISS) far_hits++;
+        int i, in_hole = 0, direct = 0, graze = 0;
+        trek_new_game(3, 4242);
+        for (i = 0; i < 600; i++) {
+            uint8_t res = torp_shot(6, 4, 1, 4, 0, &dmg);
+            if (res != TORP_OK && res != TORP_KILL) continue;
+            if (dmg == 355) direct++;
+            else if (dmg <= 248) graze++;
+            else in_hole++;
         }
-        ok(hits == 60,      "inside the sure range a torpedo cannot miss");
-        ok(far_hits < 50,   "at long range it can");
-        ok(far_hits > 10,   "but not always");
+        ok(in_hole == 0, "no damage figure between 249 and 354 is possible");
+        ok(direct > 20,  "some shots at range 5 land dead centre for 355");
+        ok(graze > 200,  "and most graze for 248 or less");
     }
 
+    /* ACCURACY IS AN ANGLE, NOT A DISTANCE. Both wobbles are one-sided, so a
+       torpedo fired along the diagonal drifts ALONG its own line of travel
+       and barely errs, while the same range off the diagonal drifts sideways.
+       The old model had accuracy fall with distance alone and could not tell
+       these apart. */
+    {
+        int i, diag_bad = 0, off_bad = 0;
+        trek_new_game(3, 4243);
+        for (i = 0; i < 400; i++) {
+            uint8_t a = torp_shot(1, 1, 7, 7, 0, &dmg);     /* range 8.49, 45 deg */
+            uint8_t b = torp_shot(7, 1, 0, 4, 0, &dmg);     /* range 7.62, off it */
+            if (a == TORP_MISS || a == TORP_THROUGH) diag_bad++;
+            if (b == TORP_MISS || b == TORP_THROUGH) off_bad++;
+        }
+        ok(diag_bad * 4 < off_bad,
+           "a long diagonal shot is far more accurate than the same range off it");
+        ok(off_bad > 0, "and the off-diagonal one does fail sometimes");
+    }
+
+    /* Shields deflect our OWN torpedoes -- the manual says so and the binary
+       puts a charge/25000 wobble on the launch. It costs accuracy at range. */
+    {
+        int i, up_bad = 0, down_bad = 0;
+        trek_new_game(3, 4244);
+        for (i = 0; i < 400; i++) {
+            uint8_t a = torp_shot(7, 1, 0, 4, 1, &dmg);
+            uint8_t b = torp_shot(7, 1, 0, 4, 0, &dmg);
+            if (a == TORP_MISS || a == TORP_THROUGH) up_bad++;
+            if (b == TORP_MISS || b == TORP_THROUGH) down_bad++;
+        }
+        ok(up_bad > down_bad * 2,
+           "firing through raised shields throws torpedoes off course");
+    }
+
+    /* One in fifty fails to detonate -- "EnTorp fails to detonate." */
+    {
+        int i, duds = 0;
+        trek_new_game(3, 4245);
+        for (i = 0; i < 2000; i++)
+            if (torp_shot(4, 4, 2, 4, 0, &dmg) == TORP_DUD) duds++;
+        ok(duds > 20 && duds < 65, "about one torpedo in fifty is a dud");
+    }
+
+    /* A STAR IN THE PATH stops it, even though the target is beyond. That is
+       a consequence of marching that the old model could not have. */
+    {
+        int i, absorbed = 0;
+        trek_new_game(3, 4246);
+        for (i = 0; i < 50; i++) {
+            ship.sec_y = 6; ship.sec_x = 4;
+            clear_quadrant();
+            sector[(3 << 3) | 4] = SEC_STAR;
+            sector[(1 << 3) | 4] = SEC_COMMAND;
+            enemy_hp[(1 << 3) | 4] = 60000;
+            ship.torps = 9; ship.shields_up = 0;
+            if (trek_fire_torpedo(1, 4, &dmg) == TORP_ABSORBED) absorbed++;
+        }
+        ok(absorbed == 50, "a star in the flight path stops every torpedo");
+    }
+
+    /* The level scales the damage, which is the same expression as a
+       battleship's hit points -- one torpedo kills one battleship at EVERY
+       level, by construction. */
+    trek_new_game(5, 777);
+    ship.sec_y = 4; ship.sec_x = 4;
+    clear_quadrant();
+    sector[(2 << 3) | 4] = SEC_COMMAND;
+    enemy_hp[(2 << 3) | 4] = 60000;
+    ship.torps = 9; ship.shields_up = 0;
+    r = trek_fire_torpedo(2, 4, &dmg);
+    ok(r == TORP_OK && dmg == 385, "at level 5 a close hit does 385");
+
+    /* Empty space: the torpedo flies past and off the grid. Same answer as
+       before, for a completely different reason. */
     trek_new_game(3, 777);
     ship.sec_y = 4; ship.sec_x = 4;
-    /* CLEAR the target cell rather than trusting seed 777 to leave it empty.
-       It did until 2026-08-26, when the planet count went from five-to-ten up
-       to twelve-to-twenty-two and a planet landed on 7,7 -- so a test about
-       torpedoes started failing because of a constant in another file. A test
-       that depends on what a seed happens to place is a test that will break
-       for a reason it is not about. */
-    sector[(7 << 3) | 7] = SEC_EMPTY;
-    enemy_hp[(7 << 3) | 7] = 0;
+    clear_quadrant();
+    ship.shields_up = 0;
     r = trek_fire_torpedo(7, 7, &dmg);
     ok(r == TORP_MISS,   "firing at empty space misses");
     ok(dmg == 0,         "and reports no damage");

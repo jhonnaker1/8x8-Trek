@@ -2053,6 +2053,11 @@ about 3.5. Measured over nineteen shots at three ranges.
 **Open item 10, torpedo accuracy** -- certain to range 5, degrading past it.
 The original announces a miss as "Clean miss, sir!".
 
+**[BOTH RE-READ 2026-08-26. The shots are right and the model drawn from them
+was wrong. 355 is not a cap, it is `(level+4)*15 + 250`; there is no falloff;
+and accuracy is an ANGLE, not a distance, because the original ray-marches
+with a ONE-SIDED wobble. See the torpedo section at the end of this file.]**
+
 **Open item 15, are hit points fixed per class** -- YES, and every class is now
 measured: Commander 695, Battleship 355, **Scout 255**, Supply 120. The scout
 figure came from the INFO panel naming the ship, and it removes the last
@@ -4956,3 +4961,156 @@ between **each cell is an independent coin flip** -- you get a chart with
 holes in it, not a blank one. That is a better feature than anything this port
 would have invented, and it wants the chart to be a separate array from the
 galaxy, which it already is.
+
+---
+
+## The torpedo, and it does not roll for anything (2026-08-26)
+
+Went looking for `TORP_BASE`, `TORP_SPREAD` and `TORP_MISS_PCT_PER_UNIT`,
+three FITTED constants in a mechanic the player uses every combat turn. None
+of the three exists. **THE ORIGINAL RAY-MARCHES**, and the accuracy curve and
+the damage spread the port had fitted are both shadows of that march.
+
+Segment base **0x9310** for the whole weapons unit, 15 of 20 immediates
+resolving to disjoint strings. Two routines: `fn 0x00B5FD` is ENERGY TORPEDO
+CONTROL and `fn 0x00B1CE` is what happens when one arrives.
+
+### One correction to the routine map first
+
+`0x09563` was filed as "torpedo firing". It is not; it is the **PLASMA BOLT
+item** -- "Sector to fire at:", "Tracking...", `Random(3) == 0` fails to
+detonate, otherwise `fn 0x01EB48(y, x, 1000)` damages the quadrant and it
+prints "N Mongol(s) destroyed." then hits us back with " unit hit from plasma
+bolt.". That matches the "639 unit hit from plasma bolt" seen on screen and
+recorded above under "Also seen". The real torpedo code is at 0x0B5FD.
+
+### The flight
+
+    y = ship_y;  x = ship_x                       (1-based, as reals)
+    if shields up:
+        y += (charge/25000) * Random
+        x += (charge/25000) * Random
+    dy = target_y - ship_y;  dx = target_x - ship_x
+    step = 1/|dy|, or 1/|dx| when |dx| > |dy|
+    loop:
+        y += step*dy + Random*0.1
+        x += step*dx + Random*0.1
+        if y or x leaves 0.5 .. 8.5   ->  "Clean miss, sir."
+        d = Sqrt(Frac(x)^2 + Frac(y)^2)
+        case sector[Round(y)*10 + Round(x)] of
+            '.'      keep flying
+            ' '      BLACK HOLE, below
+            '*'      fn 0x00A8C8, the star
+            'P'      "Torpedo hit a planet."
+            'B'      "Are you mad? You damaged a base!"
+            'A'      "Careful! That ship is one of ours!"
+            'R'      "No damage reported."
+            C K S    fn 0x00B1CE, the hit
+
+25000.0, 0.1, 0.5, 8.5 and the 0.3/0.6 below all decode as exact round
+numbers. 0.1 is `7D CD CC CC CC 4C`, the same mantissa as the shield law's
+0.8 with a different exponent, which is a check on both.
+
+**BOTH WOBBLES ARE ONE-SIDED.** `fn 0x02C886` is Turbo Pascal's argument-less
+`Random` and it ends `and dh, 0x7f` -- the sign bit is cleared, so it is
+[0, 1) and never negative. Every torpedo therefore drifts toward higher y and
+x, and the further it flies the further it drifts. That is not an
+interpretation of a distribution; it is what the code does.
+
+The consequence is that **accuracy is an ANGLE, not a distance**. A shot along
+the 45-degree diagonal drifts along its own line of travel and barely errs; the
+same range off the diagonal drifts sideways and misses. The port's old model
+had accuracy fall with range alone and could not tell those two apart.
+
+### The hit
+
+    if (d >= 0.6)          nothing at all -- it passed through the cell
+    base = (level + 4) * 15 + 250
+    if (Random(50) == 0)   "EnTorp fails to detonate."
+    if (d < 0.3)           hp -= base                       a direct hit
+    else                   hp -= Round((1 - d) * base)      a graze
+
+**This settles the nineteen-shot measurement of 2026-08-21.** At level 3,
+`base` is 7*15 + 250 = **355 exactly**. The figure recorded as "a CAP, not the
+damage" was the damage all along, and it binds "every time up close" because
+a short flight leaves no room to wander.
+
+Reproducing the measurement in the port's own implementation, 2000 shots a row:
+
+| geometry | direct | damage | measured |
+|---|---|---|---|
+| range 1.41 and 2.24 | 100% | 355 always | 6/6 at 355 |
+| range 5.00, straight | 20% | 157..248, or 355 | 210 355 355 247 209 296 |
+| range 5.00, 3-4 | 60% | 194..248, or 355 | |
+| range 7.62, off-diagonal | 1% | 141..248, or 355; 6% no damage | 176 209 229 247 + 3 misses |
+
+### THE HOLE, and the one reading that does not fit
+
+A direct hit is `base`. A graze is `(1 - d) * base` with `d >= 0.3`, so it can
+never exceed `0.7 * base` = 248.5, which rounds to **248**. There is nothing
+in between:
+
+    ... 245  247  248        355 ...
+                  ^^^^^^^^^^^^^^ nothing here, ever
+
+A histogram of 20,000 shots at range 5 shows exactly that: a run up to 248 and
+then 355. **No level produces a value in 249..354.** One of the nineteen
+measured shots read **296**, which sits in the hole. Recorded as an open
+discrepancy rather than smoothed over. The likeliest explanations are a volley
+of more than one torpedo (the original asks "Number to fire:" first) or a
+laser in the same turn; the cheapest check is one emulator run firing many
+torpedoes at range 5 and looking for anything between 249 and 354.
+
+The long-range miss rate is the other soft spot. The model gives about 6% "no
+damage" at range 7.62 with shields down and **28% with them up**, against 3 of
+7 measured. Whether the shields were raised for that block was not recorded,
+and neither was the firing angle, which the model says matters more than the
+range. Both belong in the next measurement.
+
+### The black hole, exactly
+
+`fn 0x00AFE7`, four instructions of substance:
+
+    if (d < 0.3)  "Torpedo sucked into black hole."   and it stops
+    else          "Torpedo deflected by black hole."  and the caller
+                  SWAPS dy AND dx
+
+A 90-degree mirror about the diagonal. Not built -- this core has no black
+hole cell -- but it is now specified.
+
+### NOT BUILT: what a star really does
+
+`fn 0x00A8C8`, which the march calls on '*', is three outcomes:
+
+    Random(100) > 95        4.0%   the star goes SUPERNOVA: "Star at Y-X goes
+                                   supernova!", "Lexington blown to quad N.",
+                                   "N Mongols destroyed.", and a hit on us
+                                   that can read "Lexington destroyed."
+    then Random(100) < 40  38.4%   "Torpedo absorbed by star."
+    otherwise              57.6%   the star is DESTROYED -- the cell becomes
+                                   'N' and [0x1DF6] increments
+
+`[0x1DF6]` is where the **"Stars destroyed @ -5"** scoring line comes from.
+The port answers TORP_ABSORBED to all three, because the other two want a nova
+cell type and quadrant destruction that this core does not have.
+
+### ALL FOUR ENEMY STRENGTHS, and the level dependence
+
+Falls straight out of the same `[0x1DF0]`. Six sites, four formulas:
+
+| class | site | formula | lvl 1 | lvl 3 | lvl 5 |
+|---|---|---|---|---|---|
+| Commander | 0x016173 | `(level+4)*35 + 450` | 625 | **695** | 765 |
+| Battleship | 0x016119 | `(level+4)*15 + 250` | **325** | **355** | 385 |
+| Scout | 0x0161C7, 0x01627C | `(level+4)*15 + 150` | 225 | **255** | 285 |
+| Supply | 0x016232, 0x0162B6 | `(level+4)*10 + 50` | 100 | **120** | 140 |
+
+**Every bold figure is a separate sighting taken on a different day, and all
+six land exactly.** The fitted `310 + 15*level` for a battleship was right;
+the level-5 game that "would settle it" is not needed. Scout and supply each
+appear twice, which is the galaxy generator and the reinforcement path writing
+the same expression.
+
+And the battleship line is the SAME EXPRESSION as the torpedo's `base`. One
+torpedo kills one standard Mongol at every command level, by construction. It
+was never a coincidence and never a cap.

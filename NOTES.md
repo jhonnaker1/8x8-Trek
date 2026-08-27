@@ -1205,13 +1205,17 @@ DECODED so far, with what each gave:
     0x213F3   3  WEAR AND TEAR      an unbuilt mechanic, fully specified
     0x1C015   -  max(n-1, 0)        a for-loop the compiler did not fold
     0x1F4B8   -  Sign(x)
+    0x0B5FD   -  TORPEDO            it RAY-MARCHES; no accuracy roll, no
+                                    falloff, no spread -- all three invented
+    0x0B1CE   1  torpedo hit        base = (level+4)*15+250, direct/graze, dud
+    0x0AFE7   -  black hole vs torp sucked in under 0.3, else dy/dx SWAPPED
+    0x0A8C8   4  a star, hit        4% supernova / 38% absorbed / 58% destroyed
+    0x09563   2  PLASMA BOLT item   NOT the torpedo -- the map had this wrong
+    0x16119.. -  enemy strengths    all four classes, all level formulas
 
 STILL TO READ, with the open item each would close:
 
     0x15D6E   2  department damage  called from the turn loop at 0x005954
-    0x0A8C8   4  TORPEDO damage     falloff; "Torpedo triggers nova" (item 9's
-                                    stars @ -5); the two black hole cases
-    0x09563   2  torpedo firing     TORP_BASE, TORP_SPREAD
     0x0F022   -  DOCKING            what Supply and Research actually give
     0x15A4C   1  reinforcements     item 10
     0x1DD4F   2  death pod + score  pod damage law, score kill-rate term
@@ -1315,8 +1319,12 @@ measured by playing). The queue:
   * the reinforcement rate
   * ~~`SYSTEM_DAMAGE_THRESHOLD`~~ -- DONE, and there was no threshold: the
     roll is per TURN, `Round(hits/350) + 1` times at two in three
-  * and the four already queued: the enemy-count formula, `TORP_BASE`/
-    `TORP_SPREAD`, the long-range falloff slope, the score kill-rate term
+  * ~~`TORP_BASE`/`TORP_SPREAD`/`TORP_MISS_PCT_PER_UNIT`~~ -- DONE, and none
+    of the three exists. The original RAY-MARCHES; the accuracy curve and the
+    damage spread were both shadows of it. Damage is `(level+4)*15 + 250`,
+    which is also a battleship's hit points, at every level.
+  * and what is still queued: the enemy-count formula, `HEAT_PER_UNIT` with
+    `LASER_RANGE_ZERO` (fn 0x09CC1), the score kill-rate term (fn 0x1DD4F)
 
 The emulator keeps its job: confirming that a constant read statically
 produces the behaviour seen on screen. One run to confirm beats a hundred to
@@ -1864,8 +1872,9 @@ Not missing features -- implemented things that do not match the original.
    analysis effort belongs on the FITTED tier, not the PROVISIONAL one:
 
    - the enemy-count-per-level formula (trek.h l.76)
-   - `TORP_BASE` and `TORP_SPREAD` (l.694-701)
-   - the long-range falloff slope, 16% per unit past the first (l.707)
+   - ~~`TORP_BASE` and `TORP_SPREAD`~~ -- DONE 2026-08-26; neither exists
+   - ~~the long-range torpedo falloff slope~~ -- DONE; there is no falloff,
+     the original ray-marches and accuracy is an ANGLE not a distance
    - the score kill-rate term (l.762)
 
    The route is **not** the DOSBox-X debugger. It is `tools/dis16.py` plus

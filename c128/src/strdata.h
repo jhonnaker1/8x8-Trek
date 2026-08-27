@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 243
+#define STR_COUNT 247
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -249,6 +249,10 @@
 #define S_240  240   /* WE ARE ALREADY IN ORBIT. */
 #define S_241  241   /* WHICH ITEM DO YOU WISH TO USE? */
 #define S_242  242   /* WHICH?  */
+#define S_243  243   /* CAPTAIN! THAT WAS A BASE! */
+#define S_244  244   /* TORPEDO FAILED TO DETONATE. */
+#define S_245  245   /* TORPEDO HIT A PLANET. */
+#define S_246  246   /* TORPEDO PASSED WIDE. */
 
 extern const unsigned int str_offset[STR_COUNT];
 

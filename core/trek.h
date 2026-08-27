@@ -307,34 +307,42 @@
  * it exactly.
  *
  * SCOUT has never been observed at all. */
-/* HIT POINTS SCALE WITH COMMAND LEVEL. A battleship reads 325 in a level-1
- * game and 355 in a level-3 one -- 30 across two levels, so 15 per level:
+/* HIT POINTS SCALE WITH COMMAND LEVEL, and all four classes were read out of
+ * the binary on 2026-08-26. Every one is `(level + 4) * m + k` against
+ * [0x1DF0], which is the command level plus four:
  *
- *     battleship hp = 310 + 15 * level
+ *     Commander     0x016173   (level+4)*35 + 450    625  695  765
+ *     Battleship    0x016119   (level+4)*15 + 250    325  355  385
+ *     Scout         0x0161C7   (level+4)*15 + 150    225  255  285
+ *     Supply        0x016232   (level+4)*10 +  50    100  120  140
+ *                                             at levels 1, 3 and 5
  *
- * Both readings were confirmed as battleships in the viewer, and nine ships
- * across three level-1 quadrants all read exactly 325. Two points define a
- * line, so a level-5 game (predicting 385) would settle it.
+ * All four level-3 columns are exactly what was measured -- 695, 355, 255 and
+ * 120 -- from four separate sightings taken on different days, so this is
+ * four independent confirmations at once. The fitted `310 + 15*level` for a
+ * battleship was right, and the level-5 game that "would settle it" is not
+ * needed.
  *
- * The constants below are the LEVEL-3 values, which is what the core uses
- * today; the scaling is not modelled yet. Whether supply ships scale the same
- * way is untested -- 120 is a single level-3 reading. */
-#define HP_BATTLESHIP       355  /* read from memory, level 3 */  /*@MEASURED*/
-#define HP_SUPPLY           120  /*@MEASURED*/ /* read from memory, level 3. NOTE: this is a
-                                    SPAWN value, not the class maximum, which
-                                    INFO puts at 150 -- it showed 120 as 80%.
-                                    The other three are class maxima, all read
-                                    at 100% on 2026-08-24. */
-#define HP_COMMAND          695  /*@MEASURED*/ /* MEASURED: read from the enemy table at
-                                    level 3, for the ship the console names
-                                    the Mongol Commander. The earlier 500 was
-                                    inferred from damage arithmetic and
-                                    bracketed 441..501; it was wrong. */
-#define HP_SCOUT            255  /*@MEASURED*/ /* MEASURED 2026-08-21: the INFO panel names
-                                    the 255-hit-point ship "Mongol Scout" at
-                                    Shields 100%. This also closes the reading
-                                    that had been unexplained since the first
-                                    session -- 255 was never damage. */
+ * The scout and supply formulas each appear TWICE, which is the galaxy
+ * generator and the reinforcement path writing the same expression.
+ *
+ * And it explains why one torpedo always kills a standard Mongol:
+ * TORP_DAMAGE_AT_LEVEL is the SAME expression as the battleship line, at
+ * every level. That is a design decision, not a coincidence. */
+#define HP_AT_LEVEL(l, m, k)  ((uint16_t)((((l) + 4) * (m)) + (k)))  /*@BINARY*/
+#define HP_BATTLESHIP_AT(l)   HP_AT_LEVEL(l, 15, 250)  /*@BINARY*/
+#define HP_COMMAND_AT(l)      HP_AT_LEVEL(l, 35, 450)  /*@BINARY*/
+#define HP_SCOUT_AT(l)        HP_AT_LEVEL(l, 15, 150)  /*@BINARY*/
+#define HP_SUPPLY_AT(l)       HP_AT_LEVEL(l, 10,  50)  /*@BINARY*/
+
+/* The level-3 values, kept because the tests and the INFO panel's percentage
+   are written against them. NOTE on HP_SUPPLY: 120 is the SPAWN value and
+   INFO puts the class maximum at 150 -- it showed 120 as 80%. The binary
+   agrees that 120 is what a supply ship is created with. */
+#define HP_BATTLESHIP       355  /*@BINARY*/
+#define HP_SUPPLY           120  /*@BINARY*/
+#define HP_COMMAND          695  /*@BINARY*/
+#define HP_SCOUT            255  /*@BINARY*/
 
 /* Per-sector enemy strength, parallel to `sector` and rebuilt with it.
    Non-zero only where sector[] holds an enemy. */
@@ -1014,54 +1022,96 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 #define TORP_MISS        2  /*@ID*/
 #define TORP_NONE_LEFT   3  /*@ID*/
 #define TORP_BAD_COORDS  4  /*@ID*/
-/* MEASURED 2026-08-23: firing a torpedo AT a star answers "Torpedo absorbed by
- * star." and the star survives -- it is not a miss, and the shot is spent. A
- * star in the FLIGHT PATH is a different case entirely: it goes supernova and
- * takes the quadrant with it. This port does not ray-march yet, so only the
- * first case is modelled; the second is what the "Stars destroyed @ -5"
- * scoring line comes from. */
-#define TORP_ABSORBED    5   /* the target cell held a star */  /*@ID*/
+/* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
+ * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
+ * outcomes, not one:
+ *
+ *     Random(100) > 95        4.0%   the star goes SUPERNOVA           UNBUILT
+ *     then Random(100) < 40  38.4%   "Torpedo absorbed by star."
+ *     otherwise              57.6%   the star is DESTROYED, cell -> 'N'  UNBUILT
+ *
+ * The 57.6% case is where the "Stars destroyed @ -5" scoring line comes from:
+ * it increments [0x1DF6] and rewrites the sector map. Both unbuilt cases want
+ * things this core does not have (a nova cell type, quadrant destruction), so
+ * every star hit currently answers TORP_ABSORBED. See MEASURED.md. */
+#define TORP_ABSORBED    5   /* a star stopped it */  /*@ID*/
+#define TORP_PLANET      6   /* "Torpedo hit a planet." */  /*@BINARY*/
+#define TORP_BASE_HIT    7   /* "Are you mad? You damaged a base!" */  /*@BINARY*/
+#define TORP_DUD         8   /* "EnTorp fails to detonate." */  /*@BINARY*/
+#define TORP_THROUGH     9   /* passed through the cell, no effect */  /*@BINARY*/
 
-/* Torpedo damage. MEASURED 2026-08-21 against the original, by writing a large
- * hit-point value into the target so it SURVIVES the shot and then reading the
- * damage out of the enemy table -- the game never prints it, which is what had
- * kept this unmeasurable. Nineteen shots at three ranges:
+/* ------------------------------------------------- THE TORPEDO, as it is
  *
- *     range 1.41-2.24   6 shots   355 every time, no variance
- *     range 5.00        6 shots   210, 355, 355, 247, 209, 296
- *     range 7.62        7 shots   176, 209, 229, 247, and three misses
+ * Read out of fn 0x00B5FD and fn 0x00B1CE on 2026-08-26, and it replaced
+ * three FITTED constants and a model that was a stand-in for the real one.
+ * THE ORIGINAL RAY-MARCHES. There is no accuracy roll, no range falloff and
+ * no damage spread; all three were the visible shadow of the march.
  *
- * CONFIRMED: 355 is a CAP, not the damage. It binds every time up close --
- * which is exactly why one torpedo has always killed a 355-hit-point
- * battleship and nothing ever survived to report a figure -- binds twice in
- * six at range 5, and never at 7.6. A Commander takes 355 as well, so the cap
- * is a constant and not the target's own strength.
+ *     y = ship_y;  x = ship_x                      (1-based, as reals)
+ *     if shields up:  y += (charge/25000)*rnd;  x += (charge/25000)*rnd
+ *     dy = target_y - ship_y;  dx = target_x - ship_x
+ *     step = 1 / max(|dy|, |dx|)
+ *     loop:
+ *         y += step*dy + rnd*0.1
+ *         x += step*dx + rnd*0.1
+ *         if y or x leaves 0.5..8.5  ->  "Clean miss, sir."
+ *         d = Sqrt(Frac(x)^2 + Frac(y)^2)
+ *         look at sector[Round(y), Round(x)] and stop on anything but empty
  *
- * The tactical consequence: a Commander SURVIVES a torpedo at 695-355=340 and
- * needs two.
+ * `rnd` is Turbo Pascal's argument-less Random, a real in [0,1) -- so BOTH
+ * wobbles are ONE-SIDED. Every torpedo drifts toward higher y and x, and the
+ * further it flies the further it drifts. That is not a reading of a
+ * distribution; it is what the code does, and it is why the nineteen measured
+ * shots looked the way they did.
  *
- * FITTED: the base and the spread. 500 through the same falloff our lasers use
- * plus a 0..100 roll reproduces all three ranges -- always capped inside 2.5,
- * capped 37% of the time at range 5 against 33% observed, and 183..283 at 7.6
- * against 176..247 observed. Nineteen shots is not many for three constants,
- * and the ancestor's own 700+100*Rand() is a different base entirely. */
-#define TORP_MAX_DAMAGE      355   /* MEASURED, the cap */  /*@MEASURED*/
-#define TORP_BASE            500   /* FITTED, before falloff */  /*@FITTED*/
-#define TORP_SPREAD          101   /* FITTED, a 0..100 roll on top */  /*@FITTED*/
+ * On reaching an enemy, fn 0x00B1CE:
+ *
+ *     if (d >= 0.6)          nothing -- it passed through the cell
+ *     base = (level + 4) * 15 + 250
+ *     if (Random(50) == 0)   "EnTorp fails to detonate."
+ *     if (d < 0.3)           hp -= base                  a direct hit
+ *     else                   hp -= Round((1 - d) * base) a graze
+ *
+ * WHICH SETTLES THE MEASUREMENT. Nineteen shots read 355 at close range,
+ * 210/355/355/247/209/296 at range 5 and 176/209/229/247 with three misses at
+ * 7.62. `base` at level 3 is 7*15+250 = 355 exactly -- the "cap" was the
+ * damage all along -- and the largest possible graze is 0.7*355 = 248.5, so
+ * 248. The largest non-355 reading was 247. Eighteen of the nineteen fall
+ * inside the law; the 296 does not, and no level produces it. Recorded as an
+ * open discrepancy rather than smoothed over -- see MEASURED.md. */
+#define TORP_DAMAGE_AT_LEVEL(l)  ((uint16_t)((((l) + 4) * 15) + 250))  /*@BINARY*/
+#define TORP_DUD_OF_N            50   /* 1 in 50 fails to detonate */  /*@BINARY*/
 
-/* Accuracy, MEASURED the same day: 6/6 inside range 2.24, 6/6 at range 5.00,
- * 4/7 at 7.62. Certain out to five and degrading past it. The original
- * announces a miss as "Clean miss, sir!".
- *
- * FITTED from one long-range block, so the slope is soft: 16% per unit past
- * the sure range gives 68% at range 7 where 4/7 was seen. */
 /* Three tubes. MEASURED from the original's own refusals -- "Captain, we have
- * only three tubes." and "Captain, only N tubes are functional." -- and it
- * asks how many to fire before it asks where. */
+   only three tubes." and "Captain, only N tubes are functional." -- and it
+   asks how many to fire before it asks where. The binary agrees: the volley
+   loop at 0x00B962 runs 1..N with N read from "Number to fire: ". */
 #define TORP_TUBES             3  /*@CONFIRMED*/
 
-#define TORP_SURE_DIST         5   /* whole sectors; inside this it cannot miss */  /*@MEASURED*/
-#define TORP_MISS_PCT_PER_UNIT 16  /*@FITTED*/
+/* The march, in 8.8 fixed point and 1-BASED so Frac and Round mean what they
+   mean in the original. Everything here is a decoded real: 0.1, 25000.0, 0.5,
+   8.5, 0.3, 0.6. */
+#define TORP_JITTER_88      26    /* 0.1 of a cell, per step, per axis */  /*@BINARY*/
+#define TORP_DEFLECT_DEN    98    /* charge/25000 in 8.8 is charge/97.66 */  /*@BINARY*/
+#define TORP_EDGE_LO_88    128    /* 0.5 */  /*@BINARY*/
+#define TORP_EDGE_HI_88   2176    /* 8.5 */  /*@BINARY*/
+/* NOTE: on an 8x8 grid the rounded-cell guard in trek_fire_torpedo subsumes
+   the upper edge -- widening TORP_EDGE_HI_88 changes no test, and that was
+   checked rather than assumed. The original needs both because its sector map
+   is TEN wide with a border the torpedo may legitimately round into. Kept
+   here so the two tests read the same way in both. */
+/* d is compared SQUARED, so the direct/graze/through decisions need no square
+   root at all: (0.3*256)^2 = 5898.24 and (0.6*256)^2 = 23592.96, each rounded
+   up so a `<` test means exactly `d < 0.3` and `d < 0.6`.
+
+   The full-precision square is what makes the damage HOLE exact. An earlier
+   version halved the fractions to keep the product small and put the boundary
+   at 0.297 instead of 0.300, which let 250 out -- a value the original cannot
+   produce. Neither fraction can exceed 153 without the shot being a
+   pass-through anyway, and 2*153^2 fits in sixteen bits, so nothing is lost. */
+#define TORP_FRAC_MAX      153    /* above this on either axis it cannot hit */  /*@ID*/
+#define TORP_DIRECT_Q     5899    /* d < 0.3  -- a direct hit */  /*@BINARY*/
+#define TORP_GRAZE_Q     23593    /* d < 0.6  -- a graze; beyond it, nothing */  /*@BINARY*/
 /* `damage` receives the figure delivered; pass NULL if not wanted. */
 uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage);
 

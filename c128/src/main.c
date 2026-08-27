@@ -1106,8 +1106,6 @@ static void enemy_turn(uint8_t player_fired) {
     if (turn_sfx != 0xFF) snd_effect(turn_sfx);
 }
 
-/* One torpedo destroys a standard Mongol outright, confirmed against the
-   original -- nothing has ever survived one to report a damage figure. */
 /* One torpedo, fired and reported. Split out because the original fires a
    SALVO -- it asks how many first, then a sector per tube -- and the reporting
    is identical for each. */
@@ -1122,13 +1120,24 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
         case TORP_KILL:
             ui_dialog_line(S(S_50));
             break;
-        /* MEASURED 2026-08-23: aiming at a star spends the torpedo and does
-           nothing -- the star survives, and the original says so rather than
-           calling it a miss. A star in the FLIGHT PATH is the other case, a
-           supernova that takes the quadrant, and this port does not ray-march
-           yet, so that one is still unmodelled. */
+        /* The port DOES ray-march now (2026-08-26), so this fires on a star
+           anywhere in the flight path, not only on the aimed-at cell. The
+           original's other two star outcomes -- supernova, and the star
+           destroyed outright -- are still unbuilt; see core/trek.h. */
         case TORP_ABSORBED:
             ui_dialog_line(S(S_85));
+            break;
+        case TORP_PLANET:
+            ui_dialog_line(S(S_245));
+            break;
+        case TORP_BASE_HIT:
+            ui_dialog_line(S(S_243));
+            break;
+        case TORP_DUD:
+            ui_dialog_line(S(S_244));
+            break;
+        case TORP_THROUGH:
+            ui_dialog_line(S(S_246));
             break;
         case TORP_OK: {
             uint8_t k = put_str(linebuf, S(S_116));
