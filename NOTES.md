@@ -1223,7 +1223,15 @@ DECODED so far, with what each gave:
     0x0EA55   -  SHUP               main energy -= 50.0, exactly
     0x1696F   -  ENEMY FIRE         hp * (0.6 + rnd*0.1) * (1.5 - d/8);
                                     falloff CONFIRMED, scale conflicts by 0.8
-    0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
+    0x15A4C   ?  "REINFORCEMENTS"   SUSPECT 2026-08-27: its strings read as
+                                    ship SPECIFICATIONS -- "Class IX Ships
+                                    Specifications:", "Std. Ships Personnel:",
+                                    "Officers (command)" -- which is briefing
+                                    text, not reinforcements. And fn 0x185EA,
+                                    called from the turn loop, gates on
+                                    column 1 and <5 ships but on LEVEL >= 2,
+                                    not 5. Name it from its strings before
+                                    building anything on it.
     0x1F9D5   -  base attack/falls  the two schedule slots, with constants
     DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
     0x09CC1   1  LASERS             falloff CONFIRMED (1 - d/12); heat is a
