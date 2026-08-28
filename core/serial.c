@@ -39,7 +39,7 @@ static uint16_t get16(void) {
    and it fails at the right moment: change PLANET_MAX and this stops
    compiling until TREK_SAVE_SIZE is brought along. Everything else in the
    record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 458
+#define SAVE_FIXED_BYTES 460
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 

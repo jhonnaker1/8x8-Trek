@@ -1067,6 +1067,7 @@ uint8_t trek_shields_down(void);
 #define EV_LIFE_GONE    10   /* the reserve ran out; the ship is lost */  /*@ID*/
 #define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
+#define EV_DISTRESS     15   /* y,x = the settled quadrant; amount = deadline */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1146,8 +1147,11 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define SCHED_BASE_ATTACK    0   /* DS:0x1D90 */  /*@BINARY*/
 #define SCHED_BASE_FALLS     1   /* DS:0x1D96 */  /*@BINARY*/
 /* SCHED_DEATH_POD used to sit here at 2. The pod is a per-turn roll on an
-   object, not a scheduled event, and the slot is gone with the guess. */
-#define SCHED_COUNT          2  /*@ID*/
+   object, not a scheduled event, and the slot went with the guess. Slot 2 is
+   the settlers' distress call now, which IS one -- DS:0x1D9C, handled by
+   `fn 0x151D0` from the turn loop. */
+#define SCHED_DISTRESS       2   /* DS:0x1D9C */  /*@BINARY*/
+#define SCHED_COUNT          3  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
 

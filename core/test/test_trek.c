@@ -1439,21 +1439,52 @@ static void test_event_queue(void) {
     ok(trek_scheduled(SCHED_BASE_FALLS) > ship.stardate,
        "a huge offset saturates rather than wrapping into the past");
 
-    /* ~~Two events due in the same window both fire, oldest first.~~
-       RETIRED 2026-08-27, and NOT because the property stopped mattering.
-       The test used SCHED_DEATH_POD as an independent second slot, and the
-       pod turned out not to be a scheduled event at all -- it is a per-turn
-       roll on an object, so the slot is gone. The two slots left,
-       BASE_ATTACK and BASE_FALLS, RESCHEDULE EACH OTHER: whichever fires
-       first overwrites the other's date with one past the end of the window,
-       so they can never both be due in one call and the property cannot be
-       expressed with them.
+    /* Two events due in the same window both fire, oldest first.
+       RESTORED 2026-08-27. It was retired when the death pod's slot turned
+       out not to be a scheduled event at all, leaving only BASE_ATTACK and
+       BASE_FALLS, which reschedule each other and so can never both be due in
+       one call. SCHED_DISTRESS is a real third slot -- DS:0x1D9C, the
+       settlers' call -- and it is independent of both. */
+    trek_new_game(3, 4242);
+    trek_schedule(SCHED_BASE_ATTACK, 10);
+    trek_schedule(SCHED_DISTRESS, 20);
+    n = trek_advance(50, ev, 16);
+    {
+        int8_t first = -1, second = -1;
+        for (i = 0; i < n; i++) {
+            if (ev[i].kind == EV_BASE_ATTACKED && first < 0)  first = (int8_t)i;
+            if (ev[i].kind == EV_DISTRESS      && second < 0) second = (int8_t)i;
+        }
+        ok(first >= 0 && second >= 0, "both events in one window fire");
+        ok(first < second, "and they are reported in date order");
+    }
 
-       Restore this the moment a third INDEPENDENT slot arrives -- the hail
-       response, the boarding party's original slot, the Union-ship distress
-       call and the supernova are all real slots in the original's eight and
-       none of them is built yet. Writing a test that passes by exercising
-       one event twice would be worse than having none. */
+    /* --- THE SETTLERS' DEADLINE STARTS WITH THE CALL, NOT THE GAME --- */
+    {
+        TrekEvent ev3[8];
+        uint16_t t3;
+        uint8_t k, got = 0;
+
+        trek_new_game(3, 4242);
+        ok(planet_evac_end == SCHED_NEVER,
+              "a fresh galaxy has no evacuation deadline at all");
+        ok(!planet_settlement_lost(),
+              "so the settlement cannot be lost on turn one");
+
+        /* Run past the call and catch it. */
+        for (t3 = 0; t3 < 200 && !got; t3++) {
+            n = trek_advance(1, ev3, 8);
+            for (k = 0; k < n; k++) if (ev3[k].kind == EV_DISTRESS) got = 1;
+        }
+        ok(got, "the settlers call for help");
+        ok(ship.stardate >= STARDATE_START + DISTRESS_AT_TENTHS,
+              "and never before 3505.0");
+        ok(planet_evac_end >= ship.stardate + EVAC_WARNING_MIN_TENTHS,
+              "the deadline is a stardate or more away when it is set");
+        ok(planet_evac_end <= ship.stardate + EVAC_WARNING_MIN_TENTHS
+                              + EVAC_WARNING_SPAN_TENTHS,
+              "and four at the most");
+    }
 }
 
 static void test_bearing(void) {

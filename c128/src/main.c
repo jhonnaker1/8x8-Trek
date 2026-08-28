@@ -1173,6 +1173,17 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
                  : e->y == BOARD_LASERS      ? S(S_260)
                                         : S(S_258));
             return;
+        case EV_DISTRESS:
+            /* "COMMUNICATIONS: Planet <name>, quad <r>-<c>, requests
+               evacuation. They can only hold out until <date>." -- cs:0x00B6
+               onward, cut to the panel. */
+            k  = put_str(linebuf, "Quad ");
+            k += put_sector(linebuf + k, e->y, e->x);
+            k += put_str(linebuf + k, S(S_277));
+            k += put_tenths_str(linebuf + k, e->amount);
+            linebuf[k] = 0;
+            ui_message(S(S_16), linebuf);
+            return;
         case EV_BOARDERS_GONE:
             ui_message(S(S_262), S(S_261));
             return;

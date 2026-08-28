@@ -429,8 +429,21 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
 /* The evacuation deadline, fn 0x151D0:  stardate + 3.0*Random + 1.0, so one
    to four stardates of warning. [0x1D9C] is set to 9999.0 on the way out,
    which is this game's "never again" -- a galaxy gets ONE evacuation. */
+/* THE DEADLINE DOES NOT START AT GAME START -- BINARY 2026-08-27, fn 0x151D0.
+ * The settlers do not need help until their DISTRESS CALL fires, and that is
+ * a scheduled event of its own at DS:0x1D9C, set at 0x00589B to the real
+ * 3505.0 plus an argument-less Random times 3.0. Only when it fires does the
+ * handler set the deadline at [0x1DA2] to `stardate + 1.0 + Random*3.0` and
+ * print "COMMUNICATIONS: Planet <name>, quad <r>-<c>, requests evacuation.
+ * They can only hold out until <date>."
+ *
+ * The one-to-four stardates below were already right; this core just started
+ * counting them from turn zero, so a settlement could be lost by stardate
+ * 3501 where the original cannot lose one before 3506. */
 #define EVAC_WARNING_MIN_TENTHS   10  /*@BINARY*/
 #define EVAC_WARNING_SPAN_TENTHS  30  /*@BINARY*/
+#define DISTRESS_AT_TENTHS        50   /* 3505.0, five stardates in */  /*@BINARY*/
+#define DISTRESS_SPAN_TENTHS      30   /* plus Random*3.0 */  /*@BINARY*/
 
 /* When the settlers run out of time, as a stardate in tenths. */
 extern uint16_t planet_evac_end;

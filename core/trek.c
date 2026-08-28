@@ -382,6 +382,8 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     /* The FIRST attack is `stardate + 2 + Random(4)` in the original --
        the integer Random, so it lands on a whole stardate. Later ones use
        the continuous form. Read at 0x0054F4. */
+    trek_schedule(SCHED_DISTRESS,
+                  trek_sched_deviate(DISTRESS_AT_TENTHS, DISTRESS_SPAN_TENTHS));
     trek_schedule(SCHED_BASE_ATTACK,
                   (uint16_t)(SCHED_ATTACK_BASE_TENTHS
                              + trek_rand_n(SCHED_FIRST_ATTACK_DAYS) * 10));
@@ -737,6 +739,25 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                     ev[*n].y      = (uint8_t)(q >> 3);
                     ev[*n].x      = (uint8_t)(q & 7);
                     ev[*n].amount = sched[SCHED_BASE_FALLS];
+                    (*n)++;
+                }
+                break;
+            }
+            case SCHED_DISTRESS: {
+                /* fn 0x151D0. The slot disarms itself and the DEADLINE
+                   starts here, not at game start. */
+                uint8_t i, q = GAL_CELLS;
+                for (i = 0; i < planet_count; i++)
+                    if (planets[i].flags & PF_SETTLED) q = planets[i].quad;
+                if (q >= GAL_CELLS) break;      /* nobody left to call */
+                planet_evac_end =
+                    (uint16_t)(ship.stardate + EVAC_WARNING_MIN_TENTHS
+                               + trek_rand_n(EVAC_WARNING_SPAN_TENTHS));
+                if (ev && *n < max) {
+                    ev[*n].kind   = EV_DISTRESS;
+                    ev[*n].y      = (uint8_t)(q >> 3);
+                    ev[*n].x      = (uint8_t)(q & 7);
+                    ev[*n].amount = planet_evac_end;
                     (*n)++;
                 }
                 break;

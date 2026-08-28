@@ -30,10 +30,10 @@ void planet_new(void) {
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = 0;
     ship.orbiting = PLANET_NONE;
     ship.rescues  = 0;
-    /* One evacuation per galaxy, announced with one to four stardates of
-       warning -- see EVAC_WARNING_MIN_TENTHS. */
-    planet_evac_end = (uint16_t)(ship.stardate + EVAC_WARNING_MIN_TENTHS
-                                 + trek_rand_n(EVAC_WARNING_SPAN_TENTHS));
+    /* NOT YET IN DANGER. The deadline is set when the distress call fires,
+       not now -- see EVAC_WARNING_MIN_TENTHS. Until then the settlement
+       cannot be lost, which is what SCHED_NEVER means here. */
+    planet_evac_end = SCHED_NEVER;
 
     planet_count = (uint8_t)(PLANET_MIN + trek_rand_n(PLANET_SPREAD));
 
