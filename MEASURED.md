@@ -5114,3 +5114,104 @@ the same expression.
 And the battleship line is the SAME EXPRESSION as the torpedo's `base`. One
 torpedo kills one standard Mongol at every command level, by construction. It
 was never a coincidence and never a cap.
+
+---
+
+## The event scheduler exists, and it is the shape we guessed (2026-08-26)
+
+This was the biggest open question in the port and the only one about the
+SHAPE of the core rather than a number. Three decoded events in a row had
+turned out not to be scheduled -- the spy is a flat `Random(150)` per turn,
+the distress signal is location-triggered, wear and tear is an elapsed-time
+roll -- and NOTES.md had recorded the worry plainly: "the port may have the
+right behaviour on top of a structure the original does not have."
+
+**It does not. EGA Trek schedules events, and it does it exactly the way this
+port does.**
+
+Eight Turbo Pascal reals in a fixed array at **DS:0x1D78**, one slot per event
+type, each an absolute stardate, each tested `if (stardate > deadline)` once a
+turn. No queue, no list, no allocation. The save and restore routines at
+0x0078xx and 0x0082xx read and write all eight, so the deadlines are game
+state -- which is also how the array was found: every slot is six bytes apart
+and every one is compared against `[0x1D42]`.
+
+    DS:0x1D78   the hail response            fn 0x02066B
+    DS:0x1D7E   REINFORCEMENTS               fn 0x015A4C
+    DS:0x1D84   the boarding party           fn 0x015D6E
+    DS:0x1D8A   a Union ship's distress      fn 0x0158EC
+    DS:0x1D90   a StarBase comes under attack   fn 0x01F9D5
+    DS:0x1D96   ... and falls                   fn 0x01F9D5
+    DS:0x1D9C   the supernova                galaxy generation sets it;
+                                             both nova routines clear it
+    DS:0x1DA2   the evacuation deadline      fn 0x0151D0
+
+**9999.0 is never** -- written literally as `[slot] = 9999.0` -- which is what
+`SCHED_NEVER` already meant.
+
+### But the DEVIATE is uniform, not exponential
+
+Every reschedule in the binary is the same expression:
+
+    slot = stardate + base + spread * Random
+
+with Turbo Pascal's argument-less `Random`, flat on [0,1). The port used the
+ancestor's `expran()` -- `-mean * ln(u)` -- which has a tail reaching 4.16x
+its mean. That is a visibly different game: an exponential schedule clusters
+events and then goes quiet for a long stretch, a uniform one does not.
+
+`trek_expran` and its 32-entry -ln table are gone. The two slots that are
+genuinely the original's now carry read constants:
+
+    first attack   stardate + 2 + Random(4)    0x0054F4  -- the INTEGER
+                                                            Random, so whole
+                                                            stardates
+    next attack    stardate + 2 + Random*4     0x01FA5A
+    base falls     stardate + 2 + Random*2     0x01FB75
+
+That third line is the number the COMMUNICATIONS panel prints. "The StarBase
+in 6-6 reports that it is under attack. They can last until 3517.8" is
+`stardate + 2..4`, which is what was captured twice on screen. The port had
+`10 + Random(30)` tenths from the ancestor -- 1.0 to 3.9 stardates -- so it
+was a stardate short at the bottom.
+
+### And two of the port's four slots are not events at all
+
+**The tractor beam has no slot.** It lives inside MOVE, `fn 0x0C609`, which
+makes it action-triggered like the distress signal.
+
+**The death pod has no slot either.** `fn 0x1DD4F` does not reference any of
+the eight addresses; the only stardate comparison in it is against an
+immediate, which is the mission-elapsed test in the scoring.
+
+Both are kept in the port for now, because deleting them would remove a
+feature whose real trigger has not been read -- but their intervals are the
+port's own invention and are tagged PROVISIONAL rather than DERIVED, which is
+what they were pretending to be. Finding the pod's real trigger is what the
+rest of `fn 0x1DD4F` is for.
+
+**Four slots this core does not have at all:** the hail response, the boarding
+party, a Union ship's distress call, and the supernova.
+
+### Reinforcements, in full, and a surprise
+
+`fn 0x015A4C`, segment base 0x150C0:
+
+    if (stardate <= [0x1D7E]) return
+    find a quadrant with NO enemies
+    if there is one:
+        add (Random(4) + 2) * 100 to its galaxy word     -- 2 to 5 ships
+        "COMMUNICATIONS: Mongol reinforcements are reported in quadrant N-1."
+    [0x1D7E] = stardate + 5 + Random*4                   -- rescheduled either way
+
+**Reinforcements only happen at command level 5.** The setup code at 0x005830
+reads `if ([0x1DF0] < 9) [0x1D7E] = 9999.0` -- level+4 below nine, so below
+level five, and the slot is set to never for the whole game. At level 5 the
+first check is scheduled for `3512 + Random*5`.
+
+**And they always arrive in COLUMN 1.** The scan walks `0x2562 + 16*i` for
+i = 1..8, which is column one of the galaxy array; the write goes to the same
+address; `[0x1E08]` -- the column -- is set to the literal 1; and the message
+itself ends in a separate string that reads `-1.`, so the text can only ever
+say "quadrant N-1". Four independent places agree. Whether Anderson meant it
+is not knowable from here, but it is unambiguously what the program does.

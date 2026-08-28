@@ -313,10 +313,18 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     base_under_attack = GAL_CELLS;
     bases_lost = 0;
 
-    trek_schedule(SCHED_BASE_ATTACK, trek_expran(MISSION_TENTHS / 3));
-    trek_schedule(SCHED_DEATH_POD,   trek_expran(MISSION_TENTHS / 2));
+    /* The FIRST attack is `stardate + 2 + Random(4)` in the original --
+       the integer Random, so it lands on a whole stardate. Later ones use
+       the continuous form. Read at 0x0054F4. */
+    trek_schedule(SCHED_BASE_ATTACK,
+                  (uint16_t)(SCHED_ATTACK_BASE_TENTHS
+                             + trek_rand_n(SCHED_FIRST_ATTACK_DAYS) * 10));
+    trek_schedule(SCHED_DEATH_POD,   trek_sched_deviate(SCHED_POD_BASE_TENTHS,
+                                                        SCHED_POD_SPAN_TENTHS));
     if (level >= 3)
-        trek_schedule(SCHED_TRACTOR, trek_expran(MISSION_TENTHS / 2));
+        trek_schedule(SCHED_TRACTOR,
+                      trek_sched_deviate(SCHED_TRACTOR_BASE_TENTHS,
+                                         SCHED_TRACTOR_SPAN_TENTHS));
 }
 
 /* -------------------------------------------------------------- movement */
@@ -526,42 +534,13 @@ uint16_t trek_scheduled(uint8_t kind) {
     return (kind < SCHED_COUNT) ? sched[kind] : SCHED_NEVER;
 }
 
-/* -ln(u) * 32, for u at the midpoint of each thirty-second of (0,1).
-   Indexed by five bits of the PRNG, so the lookup is a shift and never a
-   division -- the 6502 has no divide and this runs whenever an event is
-   rescheduled. Mean of the table is 1.00 to two places, as it must be. */
-static const uint8_t neglog32[32] = {
-    133, 98, 82, 71, 63, 56, 51, 46, 42, 39, 36, 33, 30, 28, 25, 23,
-     21, 19, 18, 16, 14, 13, 11, 10,  9,  7,  6,  5,  4,  3,  2,  1
-};
-
-uint16_t trek_expran(uint16_t mean_tenths) {
-    uint16_t t = neglog32[(uint8_t)(trek_rand() >> 11)];   /* top 5 bits */
-    uint16_t hi, whole, frac;
-
-    /* mean * t / 32, staged AND saturated.
-     *
-     * Staged because `long` is forbidden here and `int` is 16 bits under cc65
-     * but 32 on the 68000 -- a version relying on promotion would compute a
-     * different schedule on the Amiga than on the C128, silently, from the
-     * same seed.
-     *
-     * Saturated because splitting is not by itself enough: the deviate can
-     * reach 4.16x its mean, so any mean above about 15750 tenths genuinely
-     * cannot be represented. Wrapping there would return a small number, and
-     * a small number is not a harmless wrong answer -- it schedules an event
-     * that should have been distant into the next few turns. No caller passes
-     * a mean that large today; this is here so that none ever can. */
-    hi = (uint16_t)(mean_tenths >> 5);
-    if (t && hi > (uint16_t)(65535U / t)) return 65535U;
-
-    whole = (uint16_t)(hi * t);
-    frac  = (uint16_t)(((uint16_t)(mean_tenths & 31) * t) >> 5);
-    {
-        uint16_t room = (uint16_t)(65535U - frac);
-        if (whole > room) return 65535U;
-    }
-    return (uint16_t)(whole + frac);
+/* The original's deviate, and it is not the ancestor's. Every reschedule in
+   the binary is `stardate + base + spread * Random`, with Turbo Pascal's
+   argument-less Random -- flat on [0,1). See trek.h for the eight slots and
+   the sites. The 32-entry -ln table this replaced is gone. */
+uint16_t trek_sched_deviate(uint16_t base_tenths, uint16_t spread_tenths) {
+    return (uint16_t)(base_tenths + (spread_tenths
+                                     ? trek_rand_n16(spread_tenths) : 0));
 }
 
 /* Fires everything due between now and `until`, in date order, and returns
@@ -588,10 +567,12 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                 uint8_t q = pick_base();
                 if (q == GAL_CELLS) break;
                 base_under_attack = q;
-                /* The ancestor gives 1 + 3*Rand() stardates before the base
-                   falls. That deadline is the number EGA Trek prints. */
+                /* `stardate + 2 + Random*2` at 0x01FB75. That deadline is
+                   the number the COMMUNICATIONS panel prints, and 2..4
+                   stardates is what the captured messages showed. */
                 trek_schedule(SCHED_BASE_FALLS,
-                              (uint16_t)(10 + trek_rand_n(30)));
+                              trek_sched_deviate(SCHED_FALLS_BASE_TENTHS,
+                                                 SCHED_FALLS_SPAN_TENTHS));
                 if (ev && *n < max) {
                     ev[*n].kind   = EV_BASE_ATTACKED;
                     ev[*n].y      = (uint8_t)(q >> 3);
@@ -615,7 +596,9 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                     (*n)++;
                 }
                 /* Another base will be attacked in due course. */
-                trek_schedule(SCHED_BASE_ATTACK, trek_expran(300));
+                trek_schedule(SCHED_BASE_ATTACK,
+                              trek_sched_deviate(SCHED_ATTACK_BASE_TENTHS,
+                                                 SCHED_ATTACK_SPAN_TENTHS));
                 break;
             }
             case SCHED_TRACTOR:
@@ -639,7 +622,9 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                         (*n)++;
                     }
                 }
-                trek_schedule(SCHED_TRACTOR, trek_expran(400));
+                trek_schedule(SCHED_TRACTOR,
+                              trek_sched_deviate(SCHED_TRACTOR_BASE_TENTHS,
+                                                 SCHED_TRACTOR_SPAN_TENTHS));
                 break;
 
             case SCHED_DEATH_POD:
@@ -664,7 +649,9 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                     }
                     trek_take_hit(hit, ev, n, max);
                 }
-                trek_schedule(SCHED_DEATH_POD, trek_expran(500));
+                trek_schedule(SCHED_DEATH_POD,
+                              trek_sched_deviate(SCHED_POD_BASE_TENTHS,
+                                                 SCHED_POD_SPAN_TENTHS));
                 break;
         }
     }

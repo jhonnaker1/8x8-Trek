@@ -1212,12 +1212,14 @@ DECODED so far, with what each gave:
     0x0A8C8   4  a star, hit        4% supernova / 38% absorbed / 58% destroyed
     0x09563   2  PLASMA BOLT item   NOT the torpedo -- the map had this wrong
     0x16119.. -  enemy strengths    all four classes, all level formulas
+    0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
+    0x1F9D5   -  base attack/falls  the two schedule slots, with constants
+    DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
 
 STILL TO READ, with the open item each would close:
 
     0x15D6E   2  department damage  called from the turn loop at 0x005954
     0x0F022   -  DOCKING            what Supply and Research actually give
-    0x15A4C   1  reinforcements     item 10
     0x1DD4F   2  death pod + score  pod damage law, score kill-rate term
     0x1ED00   3  supernova          unbuilt
     0x15F51   4  Union wreckage     unbuilt screen
@@ -1238,7 +1240,16 @@ than the routine list (2026-08-26):
     OPEN ITEM would have caught this; one organised by what the strings
     happened to turn up did not.
 
-  * **THE EVENT ARCHITECTURE IS DERIVED AND UNVERIFIED, and it is not a
+  * ~~**THE EVENT ARCHITECTURE IS DERIVED AND UNVERIFIED**~~ -- **ANSWERED
+    2026-08-26, and the structure is RIGHT.** EGA Trek keeps eight reals at
+    DS:0x1D78, one slot per event type, tested against the stardate once a
+    turn, saved with the game -- the fixed-slot design exactly. What was
+    wrong is the DEVIATE (uniform `base + spread*Random`, not exponential;
+    `trek_expran` is gone) and two of the four slots: the tractor beam and the
+    death pod are NOT scheduled in the original. The paragraph below is kept
+    because the reasoning that got here is worth keeping.
+
+    **THE EVENT ARCHITECTURE IS DERIVED AND UNVERIFIED, and it is not a
     constant.** This port schedules base attacks, death pods and tractor
     beams through `trek_expran` -- the ancestor's exponential deviate -- with
     means expressed as fractions of the mission length, and reschedules at

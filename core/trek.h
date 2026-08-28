@@ -862,34 +862,83 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 
 /* ------------------------------------------------------- scheduled events
  *
- * DERIVED from the ancestor's events.c (reference/sst2k), which is where the
- * deadline messages in EGA Trek's COMMUNICATIONS panel come from. Two seen in
- * captures, both carrying a stardate the player can still act before:
+ * THE ORIGINAL DOES HAVE A SCHEDULER, and it is this shape. Read out of the
+ * binary 2026-08-26, after three decoded events in a row turned out not to be
+ * scheduled at all and left the whole subsystem under suspicion.
  *
- *   "The StarBase in 6-6 reports that it is under attack. They can last
- *    until 3517.8."
- *   "Planet Gallista-8, quad 8-4, requests evacuation. They can only hold
- *    out until 3516.5."
+ * EGA Trek keeps **eight Turbo Pascal reals in a fixed array at DS:0x1D78**,
+ * one slot per event type, each an ABSOLUTE stardate, each tested `if
+ * (stardate > deadline)` once a turn. There is no queue, no list and no
+ * allocation -- exactly the fixed-slot design this port took from the
+ * ancestor. The array is written and read whole by the save and restore
+ * routines, so the deadlines are game state.
  *
- * That deadline IS the queue, visible from outside: something is scheduled to
- * destroy the base, and the game tells you when.
+ *     DS:0x1D78  the hail response          fn 0x02066B
+ *     DS:0x1D7E  REINFORCEMENTS             fn 0x015A4C
+ *     DS:0x1D84  the boarding party         fn 0x015D6E
+ *     DS:0x1D8A  a Union ship's distress    fn 0x0158EC
+ *     DS:0x1D90  a StarBase comes under attack   fn 0x01F9D5
+ *     DS:0x1D96  ... and falls                   fn 0x01F9D5
+ *     DS:0x1D9C  the supernova              set by galaxy generation
+ *     DS:0x1DA2  the evacuation deadline    fn 0x0151D0
  *
- * The ancestor's design, kept: a fixed slot per event type rather than a real
- * queue, so only one of each can be pending. It says so itself -- "This isn't
- * a real event queue a la BSD Trek yet". For a core that must run in 16 bits
- * on a 6502 that limitation is a feature: no allocation, no list, one array
- * of dates.
+ * **9999.0 is never**, which is what SCHED_NEVER already meant.
+ *
+ * THREE CORRECTIONS THIS FORCED:
+ *
+ *  1. **The deviate is UNIFORM, not exponential.** Every reschedule in the
+ *     binary is `stardate + base + spread * Random`, with Turbo Pascal's
+ *     argument-less Random -- a flat [0,1). The port used the ancestor's
+ *     `expran()`, an exponential with a long tail, and that is gone. The
+ *     32-entry -ln table went with it, which the C128 image was glad of.
+ *
+ *  2. **The two base slots have read constants now** (below), and the
+ *     original's INITIAL schedule uses the INTEGER `Random(4)`, so the first
+ *     attack lands on a whole stardate where later ones do not.
+ *
+ *  3. **The tractor beam and the death pod are NOT SCHEDULED.** Neither has a
+ *     slot; the tractor lives inside MOVE (fn 0x0C609), which makes it
+ *     action-triggered like the distress signal, and fn 0x1DD4F touches none
+ *     of the eight. They are kept here because removing them would delete a
+ *     feature whose real trigger has not been read yet -- but their means are
+ *     the port's own invention and are tagged as such.
+ *
+ * FOUR SLOTS THIS CORE DOES NOT HAVE: the hail response, the boarding party,
+ * a Union ship's distress call, and the supernova. All four are real events
+ * with real slots, and all four are unbuilt.
  *
  * Deliberately NOT included: the ancestor's snapshot-for-time-warp, deep
- * space probes, and supercommander movement. Those need features this core
- * does not have, and inventing them would be worse than leaving them out. */
-#define SCHED_BASE_ATTACK    0   /* a base comes under attack */  /*@DERIVED*/
-#define SCHED_BASE_FALLS     1   /* ... and is destroyed if not relieved */  /*@DERIVED*/
-#define SCHED_TRACTOR        2   /* a commander drags us across the galaxy */  /*@DERIVED*/
-#define SCHED_DEATH_POD      3   /* a Vandal death pod arrives */  /*@DERIVED*/
-#define SCHED_COUNT          4  /*@DERIVED*/
+ * space probes, and supercommander movement. */
+#define SCHED_BASE_ATTACK    0   /* DS:0x1D90 */  /*@BINARY*/
+#define SCHED_BASE_FALLS     1   /* DS:0x1D96 */  /*@BINARY*/
+#define SCHED_TRACTOR        2   /* no slot in the original; see above */  /*@PROVISIONAL*/
+#define SCHED_DEATH_POD      3   /* no slot in the original; see above */  /*@PROVISIONAL*/
+#define SCHED_COUNT          4  /*@ID*/
 
-#define SCHED_NEVER     0xFFFFU  /* the ancestor's FOREVER */  /*@DERIVED*/
+#define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
+
+/* The two slots that ARE the original's, in tenths of a stardate.
+ *
+ *     first attack   stardate + 2 + Random(4)   0x0054F4, whole days
+ *     next attack    stardate + 2 + Random*4    0x01FA5A
+ *     base falls     stardate + 2 + Random*2    0x01FB75
+ *
+ * The "they can last until" figure the COMMUNICATIONS panel prints is that
+ * third line, and 2..4 stardates is what the captured messages showed. */
+#define SCHED_ATTACK_BASE_TENTHS   20  /*@BINARY*/
+#define SCHED_ATTACK_SPAN_TENTHS   40  /*@BINARY*/
+#define SCHED_FALLS_BASE_TENTHS    20  /*@BINARY*/
+#define SCHED_FALLS_SPAN_TENTHS    20  /*@BINARY*/
+#define SCHED_FIRST_ATTACK_DAYS     4  /* Random(4) WHOLE stardates */  /*@BINARY*/
+
+/* The tractor and the pod, which the original does not schedule at all. These
+   reproduce the means this port has always used, in the uniform form the
+   original uses everywhere else. Replace them, do not tune them: what is
+   wanted is the real trigger, not a better guess at an interval. */
+#define SCHED_TRACTOR_BASE_TENTHS  100  /*@PROVISIONAL*/
+#define SCHED_TRACTOR_SPAN_TENTHS  700  /*@PROVISIONAL*/
+#define SCHED_POD_BASE_TENTHS      100  /*@PROVISIONAL*/
+#define SCHED_POD_SPAN_TENTHS      900  /*@PROVISIONAL*/
 
 void     trek_schedule(uint8_t kind, uint16_t offset_tenths);
 void     trek_unschedule(uint8_t kind);
@@ -906,17 +955,17 @@ uint16_t trek_rng_state(void);
 void     trek_rng_restore(uint16_t v);
 void     trek_sched_restore(uint8_t kind, uint16_t when);
 
-/* Exponential deviate with the given mean, both in tenths of a stardate --
- * the ancestor's expran(), which is -mean * ln(u).
+/* The original's deviate: `base + spread * Random`, in tenths of a stardate.
+ * Uniform on [base, base+spread), which is what every reschedule in the
+ * binary computes. It replaced the ancestor's exponential expran().
  *
  * Integer by necessity and by choice. The core forbids float and long, and
  * `int` is 16 bits under cc65 but 32 on the 68000, so anything relying on
  * promotion would compute different event schedules on the Amiga than on the
- * C128 -- silently. This is a table of -ln(u) indexed by five bits of the
- * PRNG, with the multiply staged so no intermediate leaves 16 bits. The whole
- * schedule is therefore reproducible from a seed on every target, which is
- * what makes the native test suite an oracle for platforms we cannot run. */
-uint16_t trek_expran(uint16_t mean_tenths);
+ * C128 -- silently. The whole schedule stays reproducible from a seed on
+ * every target, which is what makes the native test suite an oracle for
+ * platforms we cannot run. */
+uint16_t trek_sched_deviate(uint16_t base_tenths, uint16_t spread_tenths);
 
 /* Which base is under attack, as a galaxy cell index; GAL_CELLS if none.
    The UI needs it to name the base in its message, and the player needs to

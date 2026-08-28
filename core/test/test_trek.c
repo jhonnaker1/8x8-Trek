@@ -761,75 +761,70 @@ static void wall_in(uint8_t y, uint8_t x) {
 /* Bearing. The one measured point is the original's own reading: ship at 6,4,
    Commander at 5-5, viewer showing 45.0. The rest of the compass follows from
    the convention that fixes -- east zero, anticlockwise. */
-/* The exponential deviate. What matters is not that it matches libc's
-   -mean*log(u) closely -- it cannot, from 32 table entries -- but that its
-   MEAN is right, that it never leaves 16 bits, and that it is identical on
-   every target. The last is why the multiply is staged; see trek.h. */
+/* The deviate. The original's is UNIFORM -- `base + spread * Random` -- and
+   that is what these check: the range is exactly [base, base+spread), the
+   mean sits in the middle of it, there is NO long tail, and a seed reproduces
+   the sequence on every target. The exponential this replaced had a tail that
+   reached 4.16x its mean, which is a visibly different game. */
 static void test_expran(void) {
     uint16_t i, v, lo = 0xFFFF, hi = 0;
     uint32_t total = 0;              /* test-side only; the core forbids this */
 
-    puts("exponential deviate");
+    puts("the schedule deviate (BINARY: uniform, not exponential)");
 
     trek_srand(4242);
     for (i = 0; i < 4096; i++) {
-        v = trek_expran(400);        /* mean 40.0 stardates */
+        v = trek_sched_deviate(200, 400);
         total += v;
         if (v < lo) lo = v;
         if (v > hi) hi = v;
     }
+    ok(lo >= 200 && hi < 600, "every draw lands inside [base, base+spread)");
     {
         uint16_t mean = (uint16_t)(total / 4096);
-        ok(mean >= 380 && mean <= 420, "the mean of 4096 draws is the mean asked for");
+        ok(mean >= 380 && mean <= 420, "and the mean is the middle of it");
     }
-    ok(lo < 100,  "some draws are much shorter than the mean");
-    ok(hi > 1000, "and some much longer -- the tail is there");
+    ok(hi > 590, "the top of the range is reached");
+    ok(lo < 210, "and so is the bottom");
 
-    /* A large mean must not wrap. The deviate reaches 4.16x its mean, so
-       anything above ~15750 tenths cannot be represented at all -- and a
-       wrapped result is not a harmless wrong number, it is a distant event
-       rescheduled into the next few turns. Checked across many draws because
-       only the long tail of the table triggers it. */
+    /* NO TAIL. This is the property that changed, and the one a later edit
+       reaching for the ancestor's expran() again would break. */
     {
-        /* Monotonicity in the mean is the property wrapping breaks, and a
-           small result is NOT by itself evidence of it -- for a mean of 60000
-           a draw of 1875 is the honest short tail, -ln(u) = 1/32, which comes
-           up one time in thirty-two. Reseeding before each draw fixes the
-           table entry, so the only thing varying is the mean. */
-        static const uint16_t means[] = { 100, 1000, 8000, 15000, 30000, 60000 };
-        uint16_t seed, k, prev, cur, bad = 0;
-        for (seed = 1; seed < 200; seed++) {
-            prev = 0;
-            for (k = 0; k < sizeof means / sizeof means[0]; k++) {
-                trek_srand(seed);
-                cur = trek_expran(means[k]);
-                if (cur < prev) bad++;
-                prev = cur;
-            }
-        }
-        ok(bad == 0, "a bigger mean never yields a smaller draw -- no wrap");
+        uint16_t over = 0;
+        trek_srand(11);
+        for (i = 0; i < 4096; i++)
+            if (trek_sched_deviate(200, 400) >= 600) over++;
+        ok(over == 0, "nothing ever lands beyond the spread -- there is no tail");
     }
 
-    /* Just under the limit, the answer is still real rather than saturated. */
-    {
-        uint16_t any_mid = 0;
-        trek_srand(7);
-        for (i = 0; i < 512; i++) {
-            v = trek_expran(15000);
-            if (v > 1000 && v < 60000) any_mid++;
-        }
-        ok(any_mid > 0, "a mean just inside the limit still varies");
-    }
+    /* A zero spread is a fixed interval, not a divide by zero. */
+    ok(trek_sched_deviate(123, 0) == 123, "a zero spread is a fixed interval");
 
     /* Same seed, same sequence -- the property the whole cross-platform
        comparison rests on. */
     {
         uint16_t a[8], b[8];
         trek_srand(99);
-        for (i = 0; i < 8; i++) a[i] = trek_expran(250);
+        for (i = 0; i < 8; i++) a[i] = trek_sched_deviate(50, 250);
         trek_srand(99);
-        for (i = 0; i < 8; i++) b[i] = trek_expran(250);
+        for (i = 0; i < 8; i++) b[i] = trek_sched_deviate(50, 250);
         ok(memcmp(a, b, sizeof a) == 0, "a seed reproduces the sequence exactly");
+    }
+
+    /* THE TWO SLOTS THAT ARE THE ORIGINAL'S. A base under attack can last
+       between 2 and 4 stardates and no other figure -- that is the number the
+       COMMUNICATIONS panel prints, and it was captured on screen twice. */
+    {
+        uint16_t k, f, flo = 0xFFFF, fhi = 0;
+        trek_srand(5150);
+        for (k = 0; k < 2000; k++) {
+            f = trek_sched_deviate(SCHED_FALLS_BASE_TENTHS,
+                                   SCHED_FALLS_SPAN_TENTHS);
+            if (f < flo) flo = f;
+            if (f > fhi) fhi = f;
+        }
+        ok(flo == 20 && fhi == 39,
+           "a base under attack lasts 2.0 to 3.9 stardates, never longer");
     }
 }
 
