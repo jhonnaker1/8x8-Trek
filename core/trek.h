@@ -208,7 +208,19 @@
  *
  * LASER_RANGE_ZERO is in whole sectors; distances are 8.8 fixed point, so
  * comparisons against it must shift. */
-#define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */  /*@FITTED*/
+/* CONFIRMED FROM THE BINARY 2026-08-26, fn 0x09CC1 at 0x009F6C:
+ *
+ *     r      = Sqrt(((ey-sy)/8)^2 + ((ex-sx)/8)^2)      -- distance/8
+ *     damage = Round(amount * (1.5 - r) * 6.67 * lasers% / 1000)
+ *
+ * 8.0, 1.5 and 1000.0 decode exact; the fourth constant decodes 6.6700 and is
+ * plainly a typed decimal rather than 20/3. Fold them: `(1.5 - d/8) * 6.67 *
+ * pct / 1000` is `(1 - d/12) * pct/100` times 1.0005. So the linear falloff
+ * to zero at TWELVE sectors is the original's, exactly, and this port is
+ * five hundredths of a percent light -- under one unit on any shot, which is
+ * why all five measured readings reproduced. Left as is rather than carrying
+ * Anderson's rounding error into integer arithmetic that cannot express it. */
+#define LASER_RANGE_ZERO     12  /* distance at which damage would reach 0 */  /*@BINARY*/
 
 /* Full scale on the original's laser Temp gauge, whose printed scale reads
    "0 ... 1000 1500".
@@ -228,6 +240,12 @@
  * exactly what the laser falloff shows to be unsafe: Anderson rewrote that
  * one from exponential to linear. The gauge reports; nothing acts on it yet.
  *
+ * **[BOTH BULLETS BELOW RE-READ 2026-08-26. The first is wrong -- the cap is
+ * 120, at 0x009EFF. The second is right about what it saw and wrong about
+ * what it means: the overheat penalty lands AFTER the damage is computed and
+ * falls on the LASERS SYSTEM, and the rig repaired every system between
+ * turns. Heat IS a mechanic. See LASER_OVERHEAT_AT above and MEASURED.md.]**
+ *
  * MEASURED 2026-08-24 (run 2), and the decision not to implement a burn is now
  * evidence-backed rather than cautious. The original's heat IS in memory --
  * a 16-bit word driving the Temp gauge, which two earlier searches missed
@@ -241,22 +259,57 @@
  *     200 and 300 in turn, dealt 263 every single time against 262.56
  *     predicted at full effectiveness.
  *
- * So heat is a gauge and not a mechanic, and this constant is the scale of a
- * readout rather than a threshold anything crosses. See MEASURED.md, "Run 2". */
+ * ~~So heat is a gauge and not a mechanic~~ -- it is a mechanic; see above.
+ * LASER_HEAT_MAX itself survives: it is the scale of the READOUT, and with a
+ * cap of 120 drawn ten to one the bar reaches 1200 of its 1500, which is
+ * still short of the tick nothing in EGA Trek can pass. */
 #define LASER_HEAT_MAX     1500  /*@MEASURED*/
 
 /* What the game itself never lets the heat word exceed -- MEASURED, and the
    reason LASER_HEAT_MAX above is the scale of a READOUT rather than a
    threshold anything crosses. The gauge draws heat x LASER_HEAT_SCALE against
    LASER_HEAT_MAX, so a capped word fills two thirds of the bar. */
-#define LASER_HEAT_CAP      100  /*@MEASURED*/
+/* 0x78 at 0x009EFF, and the measured 100 was a floor on the observation
+   rather than the cap: nothing in run 2 fired enough in one turn to reach
+   it. */
+#define LASER_HEAT_CAP      120  /*@BINARY*/
 #define LASER_HEAT_SCALE     10  /*@MEASURED*/
 
-/* Energy per point of heat. FITTED from ONE eyeballed reading -- 1,250 units
-   fired left the gauge "around 700 of its 1500 scale", so a word near 70 --
-   and it is the weakest number in this file. Nothing but the gauge reads
-   heat, so an error here costs a picture and not a mechanic. */
-#define HEAT_PER_UNIT        18  /*@FITTED*/
+/* Energy per point of heat: `heat += amount div 15` at 0x009EEF, an INTEGER
+   divide. Was 18, fitted from one eyeballed bar position and called "the
+   weakest number in this file"; it was, and it was wrong. */
+#define HEAT_PER_UNIT        15  /*@BINARY*/
+
+/* AND HEAT IS A MECHANIC AFTER ALL. fn 0x09CC1 at 0x00A20D, straight after
+ * the damage is computed:
+ *
+ *     if (heat > 90) {
+ *         "Lasers overheat. Now running at N% efficiency."
+ *         lasers% -= damage div 120 + Random(5)        -- floored at 0
+ *     }
+ *
+ * It does not reduce the shot; it DAMAGES THE LASERS SYSTEM, which reduces
+ * every shot after it. That is why run 2 concluded "no value of heat changes
+ * the damage" -- it wrote heat, fired once, and read the damage of that same
+ * shot, which the overheat branch is downstream of. And the rig repaired all
+ * twelve systems on both sides of every turn, so the penalty it did inflict
+ * was erased before the next reading. **The measurement was not wrong about
+ * what it saw; it was blind to where the effect lands.**
+ *
+ * Two cooldowns, both floored at zero:
+ *
+ *     heat -= 20                      once per command, 0x0059BC, main loop
+ *     heat -= Round(elapsed * 360)    per stardate, 0x0201B3, with the repair
+ *
+ * Together they are why heat looked like it "cleared on leaving the quadrant":
+ * a warp jump elapses enough time to wipe it. A volley of 300 units adds 20
+ * and the turn sheds 20, so sustained fire breaks even around 300 units a
+ * turn and climbs above it. */
+#define LASER_HEAT_COOL_TURN   20  /* shed once per command */  /*@BINARY*/
+#define LASER_HEAT_COOL_DAY   360  /* and per stardate elapsed */  /*@BINARY*/
+#define LASER_OVERHEAT_AT      90  /* above this the banks take damage */  /*@BINARY*/
+#define LASER_OVERHEAT_DEN    120  /* damage div 120 ... */  /*@BINARY*/
+#define LASER_OVERHEAT_OF_N     5  /* ... plus Random(5) */  /*@BINARY*/
 
 /* A note on the provenance tags in this file, now that there is a fifth.
  *
@@ -939,6 +992,17 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define SCHED_TRACTOR_SPAN_TENTHS  700  /*@PROVISIONAL*/
 #define SCHED_POD_BASE_TENTHS      100  /*@PROVISIONAL*/
 #define SCHED_POD_SPAN_TENTHS      900  /*@PROVISIONAL*/
+
+/* End of a player's turn, whatever it was. The original sheds 20 points of
+   laser heat here, in its main loop, whether or not the turn moved the clock
+   -- so a core whose time only advances on movement needs this hook or the
+   banks never cool between volleys. The UI calls it once per turn. */
+void     trek_turn_end(void);
+
+/* Set by trek_fire_laser when the shot pushed the banks past
+   LASER_OVERHEAT_AT and cost the Lasers system some percentage. The UI reads
+   it to print the original's "Lasers overheat" line; nothing else does. */
+extern uint8_t laser_overheated;
 
 void     trek_schedule(uint8_t kind, uint16_t offset_tenths);
 void     trek_unschedule(uint8_t kind);

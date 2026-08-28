@@ -5215,3 +5215,94 @@ address; `[0x1E08]` -- the column -- is set to the literal 1; and the message
 itself ends in a separate string that reads `-1.`, so the text can only ever
 say "quadrant N-1". Four independent places agree. Whether Anderson meant it
 is not knowable from here, but it is unambiguously what the program does.
+
+---
+
+## The lasers: heat is a mechanic, and the measurement was blind to it (2026-08-26)
+
+`fn 0x09CC1`, segment base 0x9310. It owns "Amount to fire at ", "Laser
+efficiency reduced by damage.", "Lasers overheat. Now running at N%
+efficiency." and the target names. Went in for `HEAT_PER_UNIT`, which trek.h
+called "the weakest number in this file"; it was, and it was wrong, and it
+turned out not to be a gauge scale at all.
+
+### The damage law, and LASER_RANGE_ZERO confirmed
+
+At 0x009F6C:
+
+    r      = Sqrt(((ey-sy)/8)^2 + ((ex-sx)/8)^2)          -- distance/8
+    damage = Round(amount * (1.5 - r) * 6.67 * lasers% / 1000)
+
+8.0, 1.5 and 1000.0 decode exact. The fourth decodes **6.6700**, which is a
+typed decimal and not 20/3. Fold them and `(1.5 - d/8) * 6.67 * pct/1000` is
+`(1 - d/12) * pct/100` times 1.0005.
+
+**So the linear falloff to zero at TWELVE sectors is the original's, exactly**,
+and `LASER_RANGE_ZERO 12` moves from FITTED to BINARY. This port is five
+hundredths of a percent light because Anderson's constant is not quite 20/3 --
+under one unit on any shot, which is why all five measured readings reproduced
+without anyone noticing.
+
+### Heat: three constants wrong, and a mechanic missing
+
+    heat += amount div 15          0x009EEF   -- an INTEGER divide
+    if (heat > 120) heat = 120     0x009EFF
+
+`HEAT_PER_UNIT` was 18, fitted from one eyeballed bar position. `LASER_HEAT_CAP`
+was 100, and that was MEASURED -- but 100 was a floor on the observation, not
+the cap: nothing in that run fired enough in a turn to reach 120.
+
+Then, straight after the damage is computed, at 0x00A20D:
+
+    if (heat > 90) {
+        "Lasers overheat. Now running at N% efficiency."
+        lasers% -= damage div 120 + Random(5)          -- floored at 0
+    }
+
+**Heat does not weaken the shot. It DAMAGES THE LASERS SYSTEM**, which weakens
+every shot after it.
+
+### Why run 2 concluded the opposite, which is the useful part
+
+MEASURED.md has recorded since 2026-08-24: *"No value of it changes the damage.
+A fixed 400-unit volley at a fixed distance, with the word written to 0, 20,
+40, 60, 80, 100, 120, 140, 160, 200 and 300 in turn, dealt 263 every single
+time."* Every one of those readings is correct, and the conclusion drawn from
+them is wrong. Two reasons, both in the rig:
+
+  1. **The penalty lands downstream of the number that was read.** The overheat
+     branch runs AFTER the damage is computed, so the shot you are measuring is
+     always at full strength. The cost falls on the next shot.
+  2. **The rig repaired all twelve systems on both sides of every turn** -- a
+     fix adopted for an unrelated life-support problem, recorded in this same
+     file. That erased the penalty before it could be seen.
+
+So the measurement was not wrong about what it saw. It was blind to where the
+effect lands, and the instrument was actively undoing it. **A test can be
+biased, not just the code** -- and this one was biased by a change made for a
+good reason somewhere else.
+
+### And two cooldowns, which explain the other observation
+
+    heat -= 20                     once per command, 0x0059BC, in the main loop
+    heat -= Round(elapsed * 360)   per stardate, 0x0201B3, with the repair
+
+Together they are why heat looked like it "cleared on leaving the quadrant":
+a warp jump elapses far more than enough time. A 300-unit volley adds 20 and
+the turn sheds 20, so sustained fire breaks even around 300 units a turn and
+climbs above it -- which is exactly the level at which the 90 threshold starts
+to bite.
+
+The port now has all five constants, the overheat penalty, both cooldowns, and
+a `trek_turn_end()` hook for the per-command one, because a core whose clock
+only moves on movement has nowhere else to put it.
+
+### A note on the size this cost
+
+The heat mechanic took the C128 image to 158 bytes free. `trek_score_sheet` --
+1,332 bytes, reached only from the evaluation screen, which is already an
+overlay -- moved into that overlay with a one-line annotation, and the build
+is back to 1,490 bytes free with the eval overlay at 3,058 of 3,840. Worth
+recording as a pattern: **core code called from exactly one overlay belongs in
+that overlay**, and `OVL_CODE` is already a no-op off-target so core/ may use
+it without learning anything about the platform.

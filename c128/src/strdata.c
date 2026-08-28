@@ -249,4 +249,6 @@ const unsigned int str_offset[STR_COUNT] = {
      4772,
      4800,
      4822,
+     4843,
+     4857,
 };

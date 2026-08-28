@@ -627,6 +627,15 @@ static void do_lasers(void) {
                 linebuf[n] = 0;
                 ui_dialog_line(linebuf);
                 if (killed) ui_dialog_line(S(S_50));
+                /* Past 90 the banks damage themselves and the original says
+                   so, with the new percentage. */
+                if (laser_overheated) {
+                    uint8_t m = put_str(linebuf, S(S_248));
+                    m += put_u16(linebuf + m, ship.sys[SYS_LASERS]);
+                    m += put_str(linebuf + m, S(S_247));
+                    linebuf[m] = 0;
+                    ui_dialog_line(linebuf);
+                }
                 break;
             }
             case FIRE_NO_ENERGY:
@@ -1104,6 +1113,10 @@ static void enemy_turn(uint8_t player_fired) {
     }
 
     if (turn_sfx != 0xFF) snd_effect(turn_sfx);
+
+    /* The banks shed twenty points a turn whatever the turn was -- the
+       original does it here, at the bottom of its main loop. */
+    trek_turn_end();
 }
 
 /* One torpedo, fired and reported. Split out because the original fires a

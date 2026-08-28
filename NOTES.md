@@ -1215,6 +1215,8 @@ DECODED so far, with what each gave:
     0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
     0x1F9D5   -  base attack/falls  the two schedule slots, with constants
     DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
+    0x09CC1   1  LASERS             falloff CONFIRMED (1 - d/12); heat is a
+                                    MECHANIC -- over 90 it wrecks the banks
 
 STILL TO READ, with the open item each would close:
 
@@ -1225,8 +1227,6 @@ STILL TO READ, with the open item each would close:
     0x15F51   4  Union wreckage     unbuilt screen
     0x181E8   1  capture            boarding-party frequency
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
-    0x09CC1   1  LASERS             HEAT_PER_UNIT -- "Lasers overheat",
-                                    "Amount to fire at"
     rest of 0x16844                 the enemy fire law, ENEMY_FIRE_PCT
     rest of 0x04FD1                 stars, BLACK HOLE PLACEMENT, ship start
 
@@ -1334,8 +1334,9 @@ measured by playing). The queue:
     of the three exists. The original RAY-MARCHES; the accuracy curve and the
     damage spread were both shadows of it. Damage is `(level+4)*15 + 250`,
     which is also a battleship's hit points, at every level.
-  * and what is still queued: the enemy-count formula, `HEAT_PER_UNIT` with
-    `LASER_RANGE_ZERO` (fn 0x09CC1), the score kill-rate term (fn 0x1DD4F)
+  * and what is still queued: the enemy-count formula (rest of fn 0x04FD1,
+    with black hole placement), the score kill-rate term and the death pod's
+    real trigger (both in fn 0x1DD4F), and `SHIELD_RAISE_COST` (fn 0x008894)
 
 The emulator keeps its job: confirming that a constant read statically
 produces the behaviour seen on screen. One run to confirm beats a hundred to

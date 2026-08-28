@@ -537,15 +537,13 @@ static void test_laser_model(void) {
     }
 }
 
-/* Laser heat: the volley total, cleared where a volley begins. The only
-   number with evidence behind it is the 1500 full scale -- both from firing
-   700 for free in the original and from the FORTRAN ancestor's threshold --
-   so what is tested here is the accounting, not a damage rule. */
+/* LASER HEAT, rewritten 2026-08-26 against fn 0x09CC1. It is not a gauge --
+   it damages the banks. The constants are read, not fitted. */
 static void test_laser_heat(void) {
     uint16_t dealt;
     uint8_t  cell, before;
 
-    puts("laser heat");
+    puts("laser heat (BINARY: it damages the banks)");
 
     trek_new_game(3, 4242);
     ok(ship.laser_heat == 0, "a new game starts cold");
@@ -555,29 +553,22 @@ static void test_laser_heat(void) {
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
 
-    /* MEASURED 2026-08-24, and these used to assert the opposite of all
-       three: heat is on its own small scale, the game CAPS IT AT 100, and it
-       is cleared by LEAVING the quadrant rather than by starting a volley.
-       The old tests encoded heat = energy fired, reset per volley, and a
-       750-is-half-the-gauge assertion built on a scale that was never the
-       original's. See LASER_HEAT_CAP in trek.h. */
     trek_laser_begin_volley();
     trek_fire_laser(4, 5, 360, &dealt);
-    ok(ship.laser_heat == 360 / HEAT_PER_UNIT, "one shot heats by fired/18");
+    ok(ship.laser_heat == 360 / 15, "one shot heats by fired div 15");
 
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
     trek_fire_laser(4, 5, 360, &dealt);
-    ok(ship.laser_heat == 2 * (360 / HEAT_PER_UNIT),
-       "and shots accumulate");
+    ok(ship.laser_heat == 2 * (360 / 15), "and shots accumulate");
 
     trek_laser_begin_volley();
-    ok(ship.laser_heat == 2 * (360 / HEAT_PER_UNIT),
+    ok(ship.laser_heat == 2 * (360 / 15),
        "a NEW VOLLEY does not clear it -- the original accumulates across them");
 
     /* A refused shot must not heat: the original does not spend the energy
        either, and heat is energy that actually went into the banks. */
-    before = ship.laser_heat;
+    before = (uint8_t)ship.laser_heat;
     trek_fire_laser(0, 0, 500, &dealt);
     ok(ship.laser_heat == before, "firing at empty space adds no heat");
     trek_fire_laser((uint8_t)9, (uint8_t)9, 500, &dealt);
@@ -587,21 +578,99 @@ static void test_laser_heat(void) {
     trek_fire_laser(4, 5, (uint16_t)(ship.energy + 1), &dealt);
     ok(ship.laser_heat == before, "a shot refused for energy adds no heat");
 
-    /* The cap is the whole point: it is what makes LASER_HEAT_MAX the scale
-       of a readout rather than a threshold anything crosses. */
+    /* 0x78 at 0x009EFF. The measured 100 was a floor on the observation --
+       nothing in that run fired enough in a turn to reach the real cap. */
     ship.laser_heat = LASER_HEAT_CAP - 1;
     ship.energy = 60000U;
+    ship.sys[SYS_LASERS] = 100;
     sector[cell]   = SEC_BATTLESHIP;
     enemy_hp[cell] = HP_BATTLESHIP;
     trek_fire_laser(4, 5, 5000, &dealt);
-    ok(ship.laser_heat == LASER_HEAT_CAP, "heat caps at 100, it does not wrap");
-    ok((uint16_t)(ship.laser_heat * LASER_HEAT_SCALE) <= LASER_HEAT_MAX,
-       "so the drawn bar can never leave its own scale");
+    ok(LASER_HEAT_CAP == 120, "the cap is 120, not the 100 that was measured");
+    ok(ship.laser_heat == LASER_HEAT_CAP, "heat caps there, it does not wrap");
 
-    /* Cleared by leaving the quadrant, which is what Jamie watched it do.
-       The quadrant is emptied first so the warp cannot be stopped short by
-       an object standing in the departure path -- a blocked move never
-       leaves, and the test would then be asserting nothing. */
+    /* THE MECHANIC. Above 90 the banks take damage -- this is what run 2
+       could not see, because it read the damage of the same shot the penalty
+       lands after, with a rig that repaired every system between turns. */
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    clear_quadrant();
+    sector[cell] = SEC_BATTLESHIP;
+    enemy_hp[cell] = 60000U;
+    ship.energy = 60000U;
+    ship.sys[SYS_LASERS] = 100;
+    ship.laser_heat = LASER_OVERHEAT_AT;          /* exactly at, not above */
+    trek_fire_laser(4, 5, 15, &dealt);            /* +1 heat, so now 91 */
+    ok(laser_overheated == 1, "past 90 the ship is told the banks overheated");
+    /* The bite is `damage div 120 + Random(5)`, so a single hot shot can cost
+       nothing at all -- the message still prints. Degradation is asserted
+       over a run rather than on one draw. */
+    {
+        uint8_t k;
+        for (k = 0; k < 20; k++) {
+            enemy_hp[cell] = 60000U;
+            sector[cell] = SEC_BATTLESHIP;
+            ship.energy = 60000U;
+            ship.laser_heat = LASER_HEAT_CAP;
+            trek_fire_laser(4, 5, 400, &dealt);
+        }
+        ok(ship.sys[SYS_LASERS] < 60,
+           "and twenty hot volleys wreck them");
+    }
+
+    trek_new_game(3, 4242);
+    ship.sec_y = 4; ship.sec_x = 4;
+    clear_quadrant();
+    sector[cell] = SEC_BATTLESHIP;
+    enemy_hp[cell] = 60000U;
+    ship.energy = 60000U;
+    ship.sys[SYS_LASERS] = 100;
+    ship.laser_heat = 0;
+    trek_fire_laser(4, 5, 300, &dealt);
+    ok(ship.sys[SYS_LASERS] == 100, "a cold shot costs the banks nothing");
+    ok(laser_overheated == 0,       "and says nothing");
+
+    /* THE SHOT ITSELF IS AT FULL STRENGTH. The penalty lands after the
+       damage is computed, which is the whole reason it was missed. */
+    {
+        uint16_t hot, cold;
+        trek_new_game(3, 4242);
+        ship.sec_y = 4; ship.sec_x = 4;
+        clear_quadrant();
+        sector[cell] = SEC_BATTLESHIP; enemy_hp[cell] = 60000U;
+        ship.energy = 60000U; ship.sys[SYS_LASERS] = 100; ship.laser_heat = 0;
+        trek_fire_laser(4, 5, 400, &cold);
+
+        trek_new_game(3, 4242);
+        ship.sec_y = 4; ship.sec_x = 4;
+        clear_quadrant();
+        sector[cell] = SEC_BATTLESHIP; enemy_hp[cell] = 60000U;
+        ship.energy = 60000U; ship.sys[SYS_LASERS] = 100;
+        ship.laser_heat = LASER_HEAT_CAP;
+        trek_fire_laser(4, 5, 400, &hot);
+        ok(hot == cold, "heat does not weaken the shot it is measured on");
+    }
+
+    /* TWO COOLDOWNS. Twenty a command and 360 a stardate, both floored. */
+    trek_new_game(3, 4242);
+    ship.laser_heat = 100;
+    trek_turn_end();
+    ok(ship.laser_heat == 80, "a turn sheds twenty points");
+    ship.laser_heat = 10;
+    trek_turn_end();
+    ok(ship.laser_heat == 0, "and it floors at zero rather than wrapping");
+
+    ship.laser_heat = 100;
+    trek_advance_time(1);            /* 0.1 stardates -> 36 points */
+    ok(ship.laser_heat == 64, "a tenth of a stardate sheds thirty-six");
+    ship.laser_heat = 100;
+    trek_advance_time(10);
+    ok(ship.laser_heat == 0, "a whole stardate cools them completely");
+
+    /* Which is why it looked like leaving the quadrant cleared it: a warp
+       jump elapses more than enough time. */
+    trek_new_game(3, 4242);
+    ship.laser_heat = LASER_HEAT_CAP;
     clear_quadrant();
     trek_move_warp((uint8_t)((ship.quad_y + 1) & 7), ship.quad_x, 3, 3);
     ok(ship.laser_heat == 0, "changing quadrant clears it");

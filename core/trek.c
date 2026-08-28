@@ -1,5 +1,6 @@
 #include "trek.h"
 #include "planet.h"
+#include "overlay.h"   /* OVL_CODE; expands to nothing off-target */
 
 uint8_t gal_enemies[GAL_CELLS];
 uint8_t gal_base[GAL_CELLS];
@@ -181,6 +182,7 @@ void trek_sched_restore(uint8_t kind, uint16_t when) {
     if (kind < SCHED_COUNT) sched[kind] = when;
 }
 uint8_t  base_under_attack = GAL_CELLS;
+uint8_t  laser_overheated;
 uint8_t  bases_lost = 0;
 
 void trek_new_game(uint8_t level, uint16_t seed) {
@@ -332,8 +334,25 @@ void trek_new_game(uint8_t level, uint16_t seed) {
 /* The converter supplies ENERGY_PER_DAY per stardate at full repair
    (manual l.265), so a tenth of a stardate is a tenth of that. Damage is
    not modelled yet -- there is no damage system. */
+/* The original sheds this in its main loop, once per command -- see trek.h. */
+void trek_turn_end(void) {
+    ship.laser_heat = (uint16_t)(ship.laser_heat > LASER_HEAT_COOL_TURN
+                                 ? ship.laser_heat - LASER_HEAT_COOL_TURN : 0);
+}
+
 void trek_advance_time(uint16_t tenths) {
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
+
+    /* The banks cool with the clock as well as with the turn -- 360 points a
+       stardate, at 0x0201B3, applied in the same routine as the repair. The
+       clamp keeps the product inside sixteen bits; anything past two
+       stardates has already cooled them to nothing. */
+    {
+        uint16_t cool = (uint16_t)((tenths > 180 ? 180 : tenths)
+                                   * (LASER_HEAT_COOL_DAY / 10));
+        ship.laser_heat = (uint16_t)(cool >= ship.laser_heat
+                                     ? 0 : ship.laser_heat - cool);
+    }
 
     /* Repair is a FOUR-ENTRY RATE TABLE, not a stack of multipliers. Pick the
        row -- docked or not, focused or not -- and apply it. Composing the two
@@ -1230,7 +1249,7 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     if (energy > ship.energy) return FIRE_NO_ENERGY;
     ship.energy = (uint16_t)(ship.energy - energy);
 
-    /* HEAT IS ON ITS OWN SMALL SCALE AND THE GAME CAPS IT AT 100.
+    /* HEAT IS ON ITS OWN SMALL SCALE AND THE GAME CAPS IT AT 120.
      *
      * MEASURED 2026-08-24 (run 2): the original's Temp gauge is driven by a
      * 16-bit word that is neither a real nor the fired amount -- which is why
@@ -1262,6 +1281,18 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     d = trek_dist(abs_diff(sy, ship.sec_y), abs_diff(sx, ship.sec_x));
     dealt = trek_laser_damage(energy, trek_laser_eff(), d);
     if (damage) *damage = dealt;
+
+    /* OVERHEATING DAMAGES THE BANKS, it does not weaken the shot -- see
+       trek.h. It lands AFTER the damage is computed, so this volley is at
+       full strength and every one after it is not. */
+    laser_overheated = 0;
+    if (ship.laser_heat > LASER_OVERHEAT_AT) {
+        uint16_t bite = (uint16_t)(dealt / LASER_OVERHEAT_DEN
+                                   + trek_rand_n(LASER_OVERHEAT_OF_N));
+        ship.sys[SYS_LASERS] = (uint8_t)(bite >= ship.sys[SYS_LASERS]
+                                         ? 0 : ship.sys[SYS_LASERS] - bite);
+        laser_overheated = 1;
+    }
 
     if (dealt < enemy_hp[cell]) {
         enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dealt);
@@ -1820,6 +1851,10 @@ static uint16_t kill_rate_points(uint16_t kills, uint16_t tenths) {
     return (uint16_t)((uint16_t)(q * 10) + (uint16_t)((uint16_t)(r * 10) / tenths));
 }
 
+/* Only ever reached from the evaluation screen, which is itself an overlay --
+   so 1.3K of resident image was being held for a page shown once a game. The
+   macro is a no-op off-target and on any platform with room. */
+OVL_CODE("eval")
 void trek_score_sheet(ScoreSheet *s) {
     uint16_t elapsed = (uint16_t)(ship.stardate - STARDATE_START);
     uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
