@@ -2714,6 +2714,34 @@ static void test_star_and_focus(void) {
         ok(gal_known[target] == 1, "the chart learns it without a scan");
         ok(base_under_attack == GAL_CELLS, "a siege there is called off");
         ok(trek_game_state() == GAME_WON, "and it can WIN the mission");
+
+        /* A SUPERNOVA IN THE SETTLED PLANET'S QUADRANT ENDS THE SETTLEMENT.
+           The original clears [0x1E1C]/[0x1E1E] and sets the evacuation slot
+           to never -- that pair is the settled planet, which the supernova
+           write-up first mistook for a base. */
+        {
+            TrekEvent ev2[8];
+            uint16_t t2;
+            uint8_t k, sq = 0xFF;
+            trek_new_game(3, 999);
+            for (k = 0; k < planet_count; k++)
+                if (planets[k].flags & PF_SETTLED) sq = planets[k].quad;
+            ok(sq != 0xFF, "a galaxy has a settled planet");
+
+            /* Put the ship somewhere that cannot be the settled row, so the
+               row exclusion does not stop the nova landing there. */
+            ship.quad_y = (uint8_t)(((sq >> 3) + 4) & 7);
+            ship.quad_x = 0;
+            for (k = 0; k < GAL_CELLS; k++) { gal_stars[k] = 0; gal_nova[k] = 0; }
+            gal_stars[sq] = 1;
+            for (t2 = 0; t2 < 8000 && !gal_nova[sq]; t2++)
+                (void)trek_run_events(ev2, 8);
+            ok(gal_nova[sq], "the settled quadrant can be burnt");
+            for (k = 0; k < planet_count; k++)
+                if (planets[k].quad == sq)
+                    ok(!(planets[k].flags & PF_SETTLED),
+                          "and the settlement goes with it");
+        }
     }
 }
 

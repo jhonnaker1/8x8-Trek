@@ -393,6 +393,16 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
 /* When the settlers run out of time, as a stardate in tenths. */
 extern uint16_t planet_evac_end;
 
+/* A quadrant has been burnt out by a supernova. BINARY 2026-08-27: both
+   supernova routes clear the settled planet's quadrant pair [0x1E1C]/[0x1E1E]
+   and set its evacuation slot [0x1D9C] to the real 9999 -- never. That pair
+   is the SETTLED PLANET, not a base: `fn 0x0E3A1` tests the ship's quadrant
+   against it before anything else and answers "Planet settlers found..." /
+   "Evacuating settlers...", and the same two writes appear there when you
+   DO evacuate. A settlement inside a supernova is gone, and nobody is coming
+   for it. */
+void planet_quadrant_lost(uint8_t q);
+
 /* Has the settlement been lost? DERIVED, never stored -- see PF_SETTLED. */
 uint8_t planet_settlement_lost(void);
 

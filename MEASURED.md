@@ -6319,3 +6319,63 @@ The "MONGOL BASE" the map attached to it is a string at 0x23F90 -- BEFORE the
 prologue, belonging to whatever precedes it. A label taken from the nearest
 string in the file rather than from the strings the routine PUSHES. That is
 the fifth wrong entry in that map.
+
+## The planet byte, and a correction to this morning's supernova (2026-08-27)
+
+Chasing what raises `[0x24A9 + q]` past 20 settled three things at once, and
+corrected one I had got wrong the same day.
+
+### The per-quadrant planet byte, from setup at 0x0052FE
+
+    planet[q] = Random(3) + 1                  ; 1..3, the CLASS
+    d = Random(5)
+    if (planet[q] <= d) {
+        planet[q] += 10                        ; -> 11..13, ENERGIUM
+        [0x1E1C] = row;  [0x1E1E] = col        ; and it is THE settled planet
+    } else if (Random(2) == 0) {
+        planet[q] += 20                        ; -> 21..23, MONGOL SUPPLIES
+    }
+
+**This core already had it.** `PFIND_ENERGIUM_OF_N 5` and
+`PFIND_MONGOL_OF_N 2` in planet.h are these two branches, read days ago from
+the ORBIT side. The supply-capture trigger recorded this morning as "unread"
+is `find == PFIND_MONGOL`, and it has been in the port all along -- **found by
+not sweeping planet.h before writing the note.** The same failure this session
+has been recording all day, committed by me, in the same session.
+
+### The landing party's three outcomes, fn 0x0E3A1
+
+    if (planet[q] > 20)  supply capture, fn 0x181E8, and RETURN
+    if (planet[q] > 10)  "energium successfully mined.", [0x2350]++
+    else                 "Nothing found."
+
+`[0x2350]` is `DS:0x234B + 5` -- **item 5, Raw energium**. The inventory
+indices line up across three independent reads now.
+
+Note the FIRST branch returns: landing on a Mongol-supply world runs the
+capture and nothing else. This core rolls a 1-in-5 attack there and otherwise
+answers LAND_NOTHING, which belongs to the settlement branch above it, not
+this one. Recorded, not yet corrected -- the attack roll's real home is the
+part of fn 0x0E3A1 before 0x00E49C and has not been read.
+
+### [0x1E1C]/[0x1E1E] IS THE SETTLED PLANET, and this morning's write-up was wrong
+
+The spontaneous-supernova entry says of that pair: *"That second pair is NOT
+identified; this core maps the behaviour onto its own base state."* It is the
+settled planet's quadrant, and `core/planet.h` had said so for days.
+
+`fn 0x0E3A1` opens by testing the ship's quadrant against it, and if
+`[0x1DA2] > stardate` prints "Planet settlers found..." / "Evacuating
+settlers..." and sets `[0x1D9C]` to the real 9999. **So `[0x1DA2]` is the
+EVACUATION DEADLINE and `[0x1D9C]` is its schedule slot** -- planet.h's "the
+DEADLINE is not modelled yet, that wants fn 0x151D0 read" now has its address
+without that read.
+
+Both supernova routes do the same two writes. They are not cancelling a base:
+**a settlement inside a supernova is destroyed and nobody is coming for it.**
+`planet_quadrant_lost()` now clears PF_SETTLED in a burnt quadrant, called
+from both routes, and removing it fails its test.
+
+### Cost
+
+94 resident bytes, free 1,332 -> **1,238**.

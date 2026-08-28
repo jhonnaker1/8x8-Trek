@@ -99,6 +99,13 @@ void planet_place(void) {
     }
 }
 
+void planet_quadrant_lost(uint8_t q) {
+    uint8_t i;
+    for (i = 0; i < planet_count; i++)
+        if (planets[i].quad == q)
+            planets[i].flags = (uint8_t)(planets[i].flags & ~PF_SETTLED);
+}
+
 uint8_t planet_settlement_lost(void) {
     return (uint8_t)(ship.stardate > planet_evac_end);
 }

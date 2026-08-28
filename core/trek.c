@@ -833,6 +833,9 @@ static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
             base_under_attack = GAL_CELLS;
             trek_sched_restore(SCHED_BASE_FALLS, SCHED_NEVER);
         }
+        /* And the SETTLED PLANET, which is the other pair the original clears
+           here -- [0x1E1C]/[0x1E1E], with its evacuation slot set to never. */
+        planet_quadrant_lost(c);
         gal_base[c]    = BASE_NONE;
         gal_enemies[c] = 0;
         gal_stars[c]   = 0;
@@ -2007,6 +2010,7 @@ static uint8_t star_supernova(uint8_t sy, uint8_t sx, uint16_t *damage) {
     }
     if (damage) *damage = dmg;
 
+    planet_quadrant_lost(here);
     gal_enemies[here] = 0;
     gal_base[here]    = BASE_NONE;
     gal_stars[here]   = 0;
