@@ -214,7 +214,7 @@ static void report_divert(uint8_t r, uint16_t lost) {
     }
 }
 
-static void do_energy(void) {
+OVL_CODE("cmds") static void do_energy(void) {
     char line[8];
     uint16_t from, to, amount, lost = 0;
 
@@ -255,7 +255,7 @@ static void do_max_energy(void) {
     report_divert(trek_divert(POOL_MAIN, POOL_SHIELDS, amount, &lost), lost);
 }
 
-static void do_dock(void) {
+OVL_CODE("cmds") static void do_dock(void) {
     switch (trek_dock()) {
         case DOCK_OK:
             /* Name what this base actually gave us -- a research station
@@ -329,7 +329,7 @@ static const char *settle_line(void) {
                                     : "A SETTLEMENT ON THE PLANET.";
 }
 
-static void do_orbit(void) {
+OVL_CODE("planet") static void do_orbit(void) {
     const Planet *p;
     uint8_t k;
 
@@ -883,7 +883,7 @@ static void do_repair(void) {
  * STILL DERIVED: the blast itself is the ancestor's kaboom() -- see
  * SELFDESTRUCT_FACTOR in trek.h. That is the last piece of an implemented
  * command still taken from the wrong game. */
-static void do_self(void) {
+OVL_CODE("cmds") static void do_self(void) {
     char buf[9];
     uint8_t n;
 
@@ -924,7 +924,7 @@ static void do_self(void) {
    a different repair RATE for the chosen system, 60 points a stardate adrift
    and 100 docked, straight off the manual's own table. See trek.h, including
    why those two are not the undocked rates multiplied by anything. */
-static void do_fix(void) {
+OVL_CODE("cmds") static void do_fix(void) {
     char buf[8];
     /* Its own buffer, NOT the shared linebuf, which is 32 bytes -- the
        two-column list is 40 characters wide and overran it, and the overflow
@@ -1367,10 +1367,13 @@ int main(void) {
             else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
             else if (c == KB_L) { do_lasers();     enemy_turn(1); }
             else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
-            else if (c == KB_D) { do_dock();       enemy_turn(0); }
-            else if (c == KB_O) { do_orbit();      enemy_turn(0); }
-            else if (c == KB_S) do_self();     /* S)elf, per the card */
-            else if (c == KB_E) { do_energy();     enemy_turn(0); }
+            else if (c == KB_D) { ovl_load(OVL_CMDS); do_dock();
+                                  enemy_turn(0); }
+            else if (c == KB_O) { ovl_load(OVL_PLANET); do_orbit();
+                                  enemy_turn(0); }
+            else if (c == KB_S) { ovl_load(OVL_CMDS); do_self(); }  /* S)elf */
+            else if (c == KB_E) { ovl_load(OVL_CMDS); do_energy();
+                                  enemy_turn(0); }
             else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
             /* MEASURED 2026-08-24: the arrows are the ORIGINAL's primary
@@ -1380,7 +1383,7 @@ int main(void) {
             else if (c == KB_UP)   { do_shields_up();   enemy_turn(0); }
             else if (c == KB_DOWN) { do_shields_down(); enemy_turn(0); }
             else if (c == KB_C) do_chart();    /* MEASURED: costs no turn */
-            else if (c == KB_F) do_fix();      /* choosing does not cost one either */
+            else if (c == KB_F) { ovl_load(OVL_CMDS); do_fix(); }   /* no turn */
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
             /* A#, MEASURED: dismisses one message from the panel by its
                position, and a bare A dismisses all of them. The digit is

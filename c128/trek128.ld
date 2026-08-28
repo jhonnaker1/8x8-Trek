@@ -81,6 +81,7 @@ MEMORY {
     ovlimg4 (rw) : ORIGIN = 0x14000, LENGTH = 0x1000
     ovlimg5 (rw) : ORIGIN = 0x15000, LENGTH = 0x1000
     ovlimg6 (rw) : ORIGIN = 0x16000, LENGTH = 0x1000
+    ovlimg7 (rw) : ORIGIN = 0x17000, LENGTH = 0x1000
 
     /* SHORT OF $C000 ON PURPOSE.
      *
@@ -131,6 +132,7 @@ SECTIONS {
     .ovl_repair ORIGIN(window) : { *(.ovl.repair) } >window AT>ovlimg4
     .ovl_msgs   ORIGIN(window) : { *(.ovl.msgs)   } >window AT>ovlimg5
     .ovl_planet ORIGIN(window) : { *(.ovl.planet) } >window AT>ovlimg6
+    .ovl_cmds   ORIGIN(window) : { *(.ovl.cmds)   } >window AT>ovlimg7
 }
 
 /* c128/src/overlay.c takes the window's address from here rather than

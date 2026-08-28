@@ -43,7 +43,8 @@ static const char *const ovl_name[OVL_COUNT] = {
     "0:OVLINFO",
     "0:OVLREPAIR",
     "0:OVLMSGS",
-    "0:OVLPLANET"
+    "0:OVLPLANET",
+    "0:OVLCMDS"
 };
 
 static uint8_t live = OVL_NONE;

@@ -51,7 +51,12 @@ DEBUG_OUT = build/trek128-debug.prg
 # That is the whole idea, and without this lld refuses the link.
 OBJCOPY = $(HOME)/llvm-mos/bin/llvm-objcopy
 LDFLAGS = -Wl,--no-check-sections
-OVERLAYS = eval hof front info repair msgs planet
+# ONE LIST. The image-extraction rules below are generated from this by
+# $(foreach) -- they used to be seven hand-written $(call)s, and adding an
+# eighth overlay in 2026-08-27 built and linked cleanly while silently never
+# producing ovlcmds.prg, so the d64 would have shipped without it. A list
+# that only some of the build reads is a list that drifts.
+OVERLAYS = eval hof front info repair msgs planet cmds
 
 # Each overlay ships as a PRG. The two-byte header is the load address, which
 # ovl_load() discards by using secondary address 0 -- the window is where it
@@ -65,14 +70,26 @@ OVERLAYS = eval hof front info repair msgs planet
 # overflow on an overlay that fits. One number, one home.
 OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1/p' trek128.ld)
 
-define OVL_IMAGE
-	$(OBJCOPY) --dump-section=.ovl_$(1)=build/ovl_$(1).raw $(2) /dev/null
-	@python3 -c "import sys; \
-	    d = open('build/ovl_$(1).raw','rb').read(); \
-	    w = int('$(OVL_WINDOW)', 16); \
-	    open('build/ovl$(1).prg','wb').write(bytes([0x00,0x40]) + d); \
-	    print('  overlay $(1): %d bytes, window is %d' % (len(d), w)); \
-	    sys.exit('overlay $(1) does not fit the window') if len(d) > w else None"
+# $(1) = the ELF to cut every overlay out of.
+# A SHELL LOOP OVER $(OVERLAYS), not one $(call) per overlay. It used to be
+# seven hand-written calls; adding an eighth overlay linked cleanly and
+# silently never produced ovlcmds.prg, so the d64 would have shipped without
+# it. Rewriting it as $(foreach) over a multi-line define did not work
+# either -- foreach joins expansions with a SPACE, which breaks the tab that
+# must start the next recipe line, and exactly one objcopy went missing. Worse,
+# the failure hid: a stale .raw from a hand-run objcopy made the build pass.
+# This is the idiom the d64 rule below already uses, and it reads one list.
+define OVL_IMAGES
+	@for o in $(OVERLAYS); do \
+	    $(OBJCOPY) --dump-section=.ovl_$$o=build/ovl_$$o.raw $(1) /dev/null || exit 1; \
+	    python3 -c "import sys; \
+	        n = sys.argv[1]; \
+	        d = open('build/ovl_%s.raw' % n, 'rb').read(); \
+	        w = int('$(OVL_WINDOW)', 16); \
+	        open('build/ovl%s.prg' % n, 'wb').write(bytes([0x00,0x40]) + d); \
+	        print('  overlay %s: %d bytes, window is %d' % (n, len(d), w)); \
+	        sys.exit('overlay %s does not fit the window' % n) if len(d) > w else None" $$o || exit 1; \
+	done
 endef
 
 .PHONY: all run rund d64 monitor test verify music loadbench clean
@@ -135,13 +152,7 @@ $(OUT): build/trek128.elf
 	$(OBJCOPY) -O binary --remove-section=.ovl_* $< build/trek128.res
 	@python3 -c "d = open('build/trek128.res','rb').read(); \
 	    open('$(OUT)','wb').write(bytes([0x01,0x1C]) + d)"
-	$(call OVL_IMAGE,eval,build/trek128.elf)
-	$(call OVL_IMAGE,hof,build/trek128.elf)
-	$(call OVL_IMAGE,front,build/trek128.elf)
-	$(call OVL_IMAGE,info,build/trek128.elf)
-	$(call OVL_IMAGE,repair,build/trek128.elf)
-	$(call OVL_IMAGE,msgs,build/trek128.elf)
-	$(call OVL_IMAGE,planet,build/trek128.elf)
+	$(call OVL_IMAGES,build/trek128.elf)
 
 # A SEPARATE binary, deliberately. TREK_DEBUG_INPUT compiles in a byte that a
 # script can poke to fake a keypress (see src/input.h), and the release build
@@ -156,13 +167,7 @@ $(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 	    open('$(DEBUG_OUT)','wb').write(bytes([0x01,0x1C]) + d)"
 	@# The instrumented build's overlays differ from the release build's, so
 	@# they are cut from its own ELF. A debug disk needs these, not those.
-	$(call OVL_IMAGE,eval,build/trek128-debug.elf)
-	$(call OVL_IMAGE,hof,build/trek128-debug.elf)
-	$(call OVL_IMAGE,front,build/trek128-debug.elf)
-	$(call OVL_IMAGE,info,build/trek128-debug.elf)
-	$(call OVL_IMAGE,repair,build/trek128-debug.elf)
-	$(call OVL_IMAGE,msgs,build/trek128-debug.elf)
-	$(call OVL_IMAGE,planet,build/trek128-debug.elf)
+	$(call OVL_IMAGES,build/trek128-debug.elf)
 
 # The VDC picture is on x128's second window. VICE opens both the VIC-IIe and
 # VDC windows; this port drives only the VDC, so the 40-column window shows

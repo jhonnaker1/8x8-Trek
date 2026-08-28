@@ -56,8 +56,15 @@
 #define OVL_INFO   3    /* ui_info_panel */
 #define OVL_REPAIR 4    /* ui_repair_report */
 #define OVL_MSGS   5    /* ui_messages_view */
-#define OVL_PLANET 6    /* ui_planet_list */
-#define OVL_COUNT  7
+#define OVL_PLANET 6    /* ui_planet_list, and ORBIT/LAND/USE with it */
+/* The RARE MODAL COMMANDS. Added 2026-08-27 to bank resident space before
+   life support is built, not to fix anything. The test is FREQUENCY, not
+   size: the fattest resident candidate is fire_one_torpedo at 1,450 bytes
+   and it must NOT move, because an overlay swap is a disk load and firing is
+   the most frequent action in the game. These five are dialogs the player
+   opens a handful of times a game. */
+#define OVL_CMDS   7    /* D)ock, E)nergy, S)elf destruct, F)ix */
+#define OVL_COUNT  8
 
 #define OVL_NONE   0xFF
 
