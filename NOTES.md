@@ -1229,24 +1229,41 @@ DECODED so far, with what each gave:
     0x09CC1   1  LASERS             falloff CONFIRMED (1 - d/12); heat is a
                                     MECHANIC -- over 90 it wrecks the banks
 
-STILL TO READ, with the open item each would close:
+READ 2026-08-27, moved off the list below:
 
-    0x15D6E   2  department damage  called from the turn loop at 0x005954
-    0x02024E  -  REPAIR + LIFE      READ 2026-08-27. Four rates confirmed,
-                                     the docked row is StarBase-ONLY, and the
-                                     focus is a claim on the CLOCK. The life
-                                     support reserve drains here: Life Support
-                                     under 90% while undocked.
+    0x02024E  -  REPAIR + LIFE      four rates confirmed; the docked row is
+                                    StarBase-ONLY and the focus is a claim on
+                                    the CLOCK. The life support reserve drains
+                                    here -- Life Support under 90%, undocked.
     0x00F1E8  -  STATE OF REPAIR    the printed estimate carries a constant
-                                     +0.08 -- that is the 46.6-vs-50 gap.
-    0x0F022   -  DOCKING            READ 2026-08-27; see MEASURED.md.
-                                     Types 1/2/3 = StarBase/research/supply;
-                                     all three refill the life support
-                                     RESERVE [0x1D30] to 2.0 stardates.
-    0x1ED00   3  supernova          unbuilt
-    0x15F51   4  Union wreckage     unbuilt screen
+                                    +0.08 -- that is the 46.6-vs-50 gap.
+    0x0F022   -  DOCKING            types 1/2/3 = StarBase/research/supply;
+                                    all three refill the life support RESERVE
+                                    [0x1D30] to 2.0 stardates.
+
+STILL TO READ, with the open item each would close. FIVE ROUTINES, and every
+one of them is a FEATURE this core does not have -- there are no constants
+left to find:
+
+    0x15D6E   2  department damage  WEAR AND TEAR. Called from the turn loop
+                                    at 0x005954, so it runs every turn and
+                                    this core runs nothing there. Gated on
+                                    [0x1E00] > 0 at 0x015D7D. Cheapest read
+                                    with the largest behavioural difference.
+    0x1ED00   3  supernova          the EFFECT, not the trigger -- the 4%
+                                    branch of 0x0A8C8 is already read. Closes
+                                    "whether every enemy dies, where the ship
+                                    is thrown, how the damage scales", which
+                                    is currently scoped as an EMULATOR
+                                    session and does not need to be.
     0x181E8   1  capture            boarding-party frequency
+    0x15F51   4  Union wreckage     unbuilt screen
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
+
+Not on that list but still disassembler work: the caller of `fn 0x016844`,
+which is where ENEMY_FIRE_ONE_IN's real gate lives (the firing loop itself has
+no hold-fire roll), and the rest of `fn 0x1DD4F` for the death pod's real
+trigger -- the one thing that would retire the last three PROVISIONALs.
 
 TWO THINGS THIS MAP MISSED, found by auditing the provenance tiers rather
 than the routine list (2026-08-26):
