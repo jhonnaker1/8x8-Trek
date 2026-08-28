@@ -1005,13 +1005,29 @@ static void do_chart(void) {
     ui_draw_chart();
 }
 
-/* HAIL. MEASURED 2026-08-23: it costs a turn -- the stardate moved 3500.1 to
-   3500.2 -- and opens a COMMUNICATIONS box which was EMPTY, there being no
-   StarBase in range. What it says when a base IS in range has not been
-   captured, so nothing is invented here: the turn is spent and the department
-   answers with nothing, which is what was seen. */
-static void do_hail(void) {
-    ui_message(S(S_16), "");
+/* HAIL. The empty COMMUNICATIONS box the 2026-08-23 session saw was the
+   original's "No response." -- there was no StarBase in range, which is
+   exactly the case fn 0x207FD prints it for. All three replies are read now;
+   see trek.h. In OVL_CMDS because a hail is an occasional command and its
+   prose has no business resident. */
+OVL_CODE("cmds") static void do_hail(void) {
+    uint8_t qy = 0, qx = 0, k;
+
+    switch (trek_hail(&qy, &qx)) {
+        case HAIL_BLOCKED:
+            ui_message(S(S_16), S(S_274));
+            return;
+        case HAIL_RESPONDS:
+            k  = put_str(linebuf, S(S_273));
+            k += put_sector(linebuf + k, qy, qx);
+            k += put_str(linebuf + k, S(S_271));
+            linebuf[k] = 0;
+            ui_message(S(S_16), linebuf);
+            return;
+        default:
+            ui_message(S(S_16), S(S_272));
+            return;
+    }
 }
 
 /* SND, from the reference card. The original keeps a sound on/off byte that
@@ -1483,7 +1499,8 @@ int main(void) {
             if      (word_is(cmd, "SAVE")) { ovl_load(OVL_FRONT); ui_save_game(&setup); }
             else if (word_is(cmd, "MSGS")) { ovl_load(OVL_MSGS); ui_messages_view(); }
             else if (word_is(cmd, "SND"))  do_sound();
-            else if (word_is(cmd, "HAIL")) { do_hail(); enemy_turn(0); }
+            else if (word_is(cmd, "HAIL")) { ovl_load(OVL_CMDS); do_hail();
+                                             enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
             /* LAND and USE are WORDS on the original's reference card --
                "LAND      send Landing party to planet", "USE       Use a

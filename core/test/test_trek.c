@@ -2053,6 +2053,74 @@ static void test_torpedo(void) {
         ok(!seen, "and no pod means no detonation");
     }
 
+    /* --- HAIL, BINARY fn 0x207FD --- */
+    {
+        int i;
+        uint8_t r, qy, qx, blocked = 0, responds = 0, silent = 0, wrong = 0;
+
+        /* A StarBase two quadrants away answers; the roll blocks one in five,
+           so both outcomes must appear and nothing else may. */
+        for (i = 0; i < 600; i++) {
+            trek_new_game(3, (uint16_t)(200 + i));
+            { uint8_t c; for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE; }
+            ship.quad_y = 4; ship.quad_x = 4;
+            gal_base[(4 << 3) | 6] = BASE_STARBASE;     /* two columns away */
+            qy = qx = 0xFF;
+            r = trek_hail(&qy, &qx);
+            if      (r == HAIL_BLOCKED)  blocked++;
+            else if (r == HAIL_RESPONDS) { responds++;
+                                           if (qy != 4 || qx != 6) wrong++; }
+            else silent++;
+        }
+        ok(blocked > 0, "one hail in five is blocked by interference");
+        ok(responds > 0, "and a StarBase in range answers");
+        ok(silent == 0, "a base at two quadrants is never out of range");
+        ok(wrong == 0, "and the reply names the right quadrant");
+
+        /* Three quadrants away is beyond 2.0 and does NOT answer. */
+        silent = responds = 0;
+        for (i = 0; i < 600; i++) {
+            trek_new_game(3, (uint16_t)(200 + i));
+            { uint8_t c; for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE; }
+            ship.quad_y = 4; ship.quad_x = 4;
+            gal_base[(4 << 3) | 7] = BASE_STARBASE;     /* three columns away */
+            r = trek_hail(&qy, &qx);
+            if (r == HAIL_RESPONDS) responds++;
+            if (r == HAIL_SILENT)   silent++;
+        }
+        ok(responds == 0, "a base at three quadrants is out of range");
+        ok(silent > 0, "and the answer is silence, not a block every time");
+
+        /* Only a StarBase answers -- a research station in the same cell
+           must not. This is the discriminator for the type test. */
+        responds = 0;
+        for (i = 0; i < 600; i++) {
+            trek_new_game(3, (uint16_t)(200 + i));
+            { uint8_t c; for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE; }
+            ship.quad_y = 4; ship.quad_x = 4;
+            gal_base[(4 << 3) | 5] = BASE_RESEARCH;
+            gal_base[(4 << 3) | 3] = BASE_SUPPLY;
+            if (trek_hail(&qy, &qx) == HAIL_RESPONDS) responds++;
+        }
+        ok(responds == 0, "neither a research station nor a supply depot answers");
+
+        /* It costs a tenth of a stardate. */
+        trek_new_game(3, 4242);
+        { uint16_t t0 = ship.stardate;
+          (void)trek_hail(&qy, &qx);
+          ok(ship.stardate == (uint16_t)(t0 + 1), "hailing costs 0.1 stardates"); }
+
+        /* And so does docking, which had only INDIRECT cover -- removing
+           trek_advance_time(1) from both sites failed the hail case and not
+           the dock one. One line, and the pair is honest now. */
+        trek_new_game(3, 4242);
+        gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_STARBASE;
+        sector[0] = SEC_BASE; ship.sec_y = 0; ship.sec_x = 1;
+        { uint16_t t0 = ship.stardate;
+          ok(trek_dock() == DOCK_OK, "we dock");
+          ok(ship.stardate == (uint16_t)(t0 + 1), "and docking costs 0.1 too"); }
+    }
+
     /* The level scales the damage, which is the same expression as a
        battleship's hit points -- one torpedo kills one battleship at EVERY
        level, by construction. */

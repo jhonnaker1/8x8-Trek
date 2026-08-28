@@ -271,3 +271,7 @@
 268	Blown to quad 
 269	Lexington destroyed.
 270	Star goes supernova!
+271	 responds.
+272	No response.
+273	StarBase in 
+274	Subspace interference.

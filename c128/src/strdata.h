@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 271
+#define STR_COUNT 275
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -277,6 +277,10 @@
 #define S_268  268   /* Blown to quad  */
 #define S_269  269   /* Lexington destroyed. */
 #define S_270  270   /* Star goes supernova! */
+#define S_271  271   /*  responds. */
+#define S_272  272   /* No response. */
+#define S_273  273   /* StarBase in  */
+#define S_274  274   /* Subspace interference. */
 
 extern const unsigned int str_offset[STR_COUNT];
 

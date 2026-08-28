@@ -30,7 +30,14 @@
 
 /* Fetches string `id` into the next buffer and returns it. The pointer stays
    valid until STR_SLOTS further calls have been made. */
-const char *S(uint8_t id);
+/* A NAMED TYPE, so the ceiling can be asserted against it.
+   The pool passed 256 strings on 2026-08-27 and a uint8_t id silently
+   WRAPPED -- S_262 fetched string 6. The only complaint was a compiler
+   warning in a wall of them, and `make verify` had nothing to say: it checks
+   the key table and the panel widths, not this. c128/src/strpool.c now fails
+   to COMPILE if STR_COUNT outgrows this type. */
+typedef uint16_t StrId;
+const char *S(StrId id);
 
 /* Loads the pool. Returns non-zero on success; if it fails every S() returns
    an empty string and the game runs wordless rather than crashing. */

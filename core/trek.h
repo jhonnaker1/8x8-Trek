@@ -1524,6 +1524,46 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define NOVA_STAR_ABOVE    95   /* Random(100) > 95 on a star hit */  /*@BINARY*/
 #define NOVA_HIT_MAX      600   /* Random(600) */  /*@BINARY*/
 
+/* ------------------------------------------------------------------ HAIL
+ *
+ * BINARY 2026-08-27, `fn 0x207FD`, base 0x1BD60 at 5/5.
+ *
+ *     best = 8.0
+ *     for row in max(qy-4,1)..min(qy+4,8)          ; 0x02203F is max, 0x022012 min
+ *       for col in max(qx-4,1)..min(qx+4,8)
+ *         if ((galaxy[q] mod 100) div 10) != 1  skip   ; A StarBase ONLY --
+ *                                                       research stations and
+ *                                                       supply depots never
+ *                                                       answer
+ *         d = Sqrt((col-qx)^2 + (row-qy)^2)           ; 0x020906..0x020922
+ *         if (d < best) { best = d; found = row,col }
+ *
+ *     if (Random(10) < 2)   "...blocked by subspace interference."   0x020995
+ *     else if (best <= 2.0) "...open...  StarBase in R-C responds."  0x0209B6
+ *     else                  "...open...  No response."
+ *
+ * This core compares SQUARED distances throughout -- the order is the same
+ * and the sqrt is not needed on a 6502. 2.0 becomes 4, and the 8.0 the
+ * original starts from becomes 64.
+ *
+ * NOT BUILT, and deliberately: the routine ends by writing schedule slot
+ * [0x1D78] with `stardate + something * 0.5` (0x020A65). That is one of the
+ * original's eight slots and this core has two. Hailing evidently schedules
+ * SOMETHING; what it is has not been read, and a slot is not worth inventing
+ * for the second time this week. */
+#define HAIL_BOX             4   /* quadrants searched either way */  /*@BINARY*/
+#define HAIL_RANGE_Q         4   /* 2.0 quadrants, SQUARED */  /*@BINARY*/
+#define HAIL_START_Q        64   /* the original's 8.0, squared */  /*@BINARY*/
+#define HAIL_BLOCK_OF_N     10  /*@BINARY*/
+#define HAIL_BLOCK_BELOW     2   /* Random(10) < 2, so one in five */  /*@BINARY*/
+
+#define HAIL_BLOCKED     0   /* subspace interference */  /*@ID*/
+#define HAIL_RESPONDS    1   /* *qy,*qx name the StarBase */  /*@ID*/
+#define HAIL_SILENT      2   /* nothing in range answered */  /*@ID*/
+
+/* Costs a tenth of a stardate, MEASURED 2026-08-23 -- 3500.1 to 3500.2. */
+uint8_t trek_hail(uint8_t *qy, uint8_t *qx);
+
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/
 #define DOCK_ALREADY         2  /*@ID*/

@@ -6150,3 +6150,59 @@ them. Retired with the reason and a note to restore it when a third
 independent slot arrives; the hail response, the boarding party's own slot,
 the Union distress call and the supernova are all real slots in the
 original's eight.
+
+## HAIL, and a string pool that had quietly overflowed (2026-08-27)
+
+`fn 0x207FD`, base 0x1BD60 at 5/5.
+
+    best = 8.0
+    for row in max(qy-4,1)..min(qy+4,8)
+      for col in max(qx-4,1)..min(qx+4,8)
+        if ((galaxy[q] mod 100) div 10) != 1  skip      ; a StarBase ONLY
+        d = Sqrt((col-qx)^2 + (row-qy)^2)               ; 0x020906..0x020922
+        if (d < best) { best = d; found = row,col }
+
+    if (Random(10) < 2)   "...blocked by subspace interference."
+    else if (best <= 2.0) "...open...  StarBase in R-C responds."
+    else                  "...open...  No response."
+
+Three things worth having: the search box is **±4 quadrants**, only a
+**StarBase** answers -- research stations and supply depots never do, which
+follows from the base-type digit read at the dock -- and the reply threshold
+is **2.0 quadrants**, Euclidean. This core compares SQUARED distances
+throughout; the order is identical and the 6502 does not need the sqrt.
+
+**The empty COMMUNICATIONS box the 2026-08-23 session saw was "No response."**
+There was no StarBase in range, which is exactly the case this prints it for.
+That reading was right and its note said "nothing is invented here" -- which
+is why there was nothing to unpick when the routine turned up.
+
+NOT built: the routine ends by writing schedule slot [0x1D78] with
+`stardate + something * 0.5` (0x020A65). Hailing schedules SOMETHING and this
+core has two of the original's eight slots. Not invented; recorded.
+
+### THE STRING POOL HAD OVERFLOWED, and nothing said so
+
+Adding HAIL's replies took the pool past 256, and `S()` took a **uint8_t**.
+Every id from 256 up silently WRAPPED -- `S_262` fetched string 6 -- so a set
+of messages would have shown the wrong text on a disk that built, linked and
+passed `make verify` clean.
+
+**The only complaint was a compiler warning, in a wall of twenty-three of
+them.** `make verify` checks the key table, the panel widths, the overlays and
+now lowram; it had nothing to say about this because the failure is a type,
+not a layout.
+
+`StrId` is a named type now and `c128/src/strpool.c` fails to COMPILE if
+STR_COUNT outgrows it -- verified by narrowing it back to uint8_t and watching
+the build refuse. The lesson is the same one lowram taught this morning from
+the other direction: **the thing that reports is the thing that gets managed,
+and a warning nobody reads is not a report.**
+
+### Cost
+
+HAIL and the wider ids together: 266 resident bytes, leaving 1,460. Its prose
+is in OVL_CMDS. Four break-tests -- any base type answering, the range test
+removed, the block roll removed, the turn cost removed -- each failed its own
+assertion. Docking's identical 0.1-stardate cost had only INDIRECT cover and
+now has a direct assertion, which that same break found.

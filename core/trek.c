@@ -593,6 +593,40 @@ uint8_t trek_dock(void) {
     return DOCK_OK;
 }
 
+uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
+    uint8_t  lo_y, hi_y, lo_x, hi_x, y, x, c;
+    uint16_t best = HAIL_START_Q, d;
+    uint8_t  fy = 0, fx = 0, found = 0;
+
+    lo_y = (uint8_t)(ship.quad_y > HAIL_BOX ? ship.quad_y - HAIL_BOX : 0);
+    hi_y = (uint8_t)(ship.quad_y + HAIL_BOX < GAL_DIM ? ship.quad_y + HAIL_BOX
+                                                      : GAL_DIM - 1);
+    lo_x = (uint8_t)(ship.quad_x > HAIL_BOX ? ship.quad_x - HAIL_BOX : 0);
+    hi_x = (uint8_t)(ship.quad_x + HAIL_BOX < GAL_DIM ? ship.quad_x + HAIL_BOX
+                                                      : GAL_DIM - 1);
+
+    for (y = lo_y; y <= hi_y; y++) {
+        for (x = lo_x; x <= hi_x; x++) {
+            int16_t dy, dx;
+            c = (uint8_t)((y << 3) | x);
+            /* A StarBase and nothing else answers. */
+            if (gal_base[c] != BASE_STARBASE) continue;
+            dy = (int16_t)((int16_t)y - (int16_t)ship.quad_y);
+            dx = (int16_t)((int16_t)x - (int16_t)ship.quad_x);
+            d  = (uint16_t)(dy * dy + dx * dx);
+            if (d < best) { best = d; fy = y; fx = x; found = 1; }
+        }
+    }
+
+    trek_advance_time(1);
+
+    if (trek_rand_n(HAIL_BLOCK_OF_N) < HAIL_BLOCK_BELOW) return HAIL_BLOCKED;
+    if (!found || best > HAIL_RANGE_Q) return HAIL_SILENT;
+    if (qy) *qy = fy;
+    if (qx) *qx = fx;
+    return HAIL_RESPONDS;
+}
+
 void trek_undock(void) {
     ship.docked = BASE_NONE;
 }

@@ -25,7 +25,19 @@ uint8_t str_load(void) {
     return loaded;
 }
 
-const char *S(uint8_t id) {
+/* uint16_t, NOT uint8_t. The pool passed 256 strings on 2026-08-27 and every
+   id from 256 up silently WRAPPED -- S_262 fetched string 6. The build said
+   so, in a wall of -Wconstant-conversion warnings that scrolled past, and
+   `make verify` had nothing to say about it because it checks the key table
+   and the panel widths and not this. STR_COUNT is checked against the type
+   below so the next ceiling is a build failure, not a wrong word on screen. */
+/* THE NEXT CEILING IS A BUILD FAILURE, not a wrong word on screen. If StrId
+   is ever narrowed, or the pool outgrows it, the round trip stops being the
+   identity and this array gets a negative size. */
+typedef char str_id_holds_the_pool[
+    ((STR_COUNT - 1) == (int)(StrId)(STR_COUNT - 1)) ? 1 : -1];
+
+const char *S(StrId id) {
     char *dst = slot[next_slot];
     uint16_t off;
     uint8_t i;
