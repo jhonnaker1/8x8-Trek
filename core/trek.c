@@ -555,17 +555,6 @@ static uint8_t pick_base(void) {
     return GAL_CELLS;
 }
 
-/* Likewise for a quadrant holding enemies -- where a tractor beam drags you,
-   since it is an enemy doing the dragging. */
-static uint8_t pick_enemy_quadrant(void) {
-    uint8_t i, q = trek_rand_n(GAL_CELLS);
-    for (i = 0; i < GAL_CELLS; i++) {
-        if (gal_enemies[q]) return q;
-        q = (uint8_t)((q + 1) & (GAL_CELLS - 1));
-    }
-    return GAL_CELLS;
-}
-
 void trek_schedule(uint8_t kind, uint16_t offset_tenths) {
     uint16_t when;
     if (kind >= SCHED_COUNT) return;
