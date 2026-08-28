@@ -1349,7 +1349,7 @@ static void test_base_relief(void) {
     puts("relieving a base");
 
     trek_new_game(3, 4242);
-    trek_unschedule(SCHED_DEATH_POD);
+    trek_unschedule(SCHED_BASE_FALLS);
     trek_schedule(SCHED_BASE_ATTACK, 10);
     trek_advance(20, ev, 16);
 
@@ -1435,24 +1435,25 @@ static void test_event_queue(void) {
 
     /* Scheduling must never wrap into the past. */
     trek_new_game(3, 4242);
-    trek_schedule(SCHED_DEATH_POD, 60000);
-    ok(trek_scheduled(SCHED_DEATH_POD) > ship.stardate,
+    trek_schedule(SCHED_BASE_FALLS, 60000);
+    ok(trek_scheduled(SCHED_BASE_FALLS) > ship.stardate,
        "a huge offset saturates rather than wrapping into the past");
 
-    /* Two events due in the same window both fire, oldest first. */
-    trek_new_game(3, 4242);
-    trek_schedule(SCHED_BASE_ATTACK, 10);
-    trek_schedule(SCHED_DEATH_POD, 20);
-    n = trek_advance(50, ev, 16);
-    {
-        int8_t first = -1, second = -1;
-        for (i = 0; i < n; i++) {
-            if (ev[i].kind == EV_BASE_ATTACKED && first < 0)  first = (int8_t)i;
-            if (ev[i].kind == EV_POD_HIT       && second < 0) second = (int8_t)i;
-        }
-        ok(first >= 0 && second >= 0, "both events in one window fire");
-        ok(first < second, "and they are reported in date order");
-    }
+    /* ~~Two events due in the same window both fire, oldest first.~~
+       RETIRED 2026-08-27, and NOT because the property stopped mattering.
+       The test used SCHED_DEATH_POD as an independent second slot, and the
+       pod turned out not to be a scheduled event at all -- it is a per-turn
+       roll on an object, so the slot is gone. The two slots left,
+       BASE_ATTACK and BASE_FALLS, RESCHEDULE EACH OTHER: whichever fires
+       first overwrites the other's date with one past the end of the window,
+       so they can never both be due in one call and the property cannot be
+       expressed with them.
+
+       Restore this the moment a third INDEPENDENT slot arrives -- the hail
+       response, the boarding party's original slot, the Union-ship distress
+       call and the supernova are all real slots in the original's eight and
+       none of them is built yet. Writing a test that passes by exercising
+       one event twice would be worse than having none. */
 }
 
 static void test_bearing(void) {
@@ -1951,6 +1952,105 @@ static void test_torpedo(void) {
         ok(got, "a supernova can be provoked again");
         ok(ship.lost, "thrown into a burnt quadrant, the ship is destroyed");
         ok(ship.quad_y == 6, "and it never arrives");
+    }
+
+    /* --- the Vandal Death Pod, BINARY fn 0x20B38 --- */
+    {
+        TrekEvent ev[8];
+        int i;
+        uint8_t col, seen, n;
+        uint16_t lo = 0xFFFF, hi = 0, fired;
+
+        /* PLACED IN COLUMN 8 AND NOWHERE ELSE. */
+        for (col = 0; col < GAL_DIM; col++) {
+            seen = 0;
+            for (i = 0; i < 200; i++) {
+                trek_new_game(3, (uint16_t)(700 + i));
+                ship.quad_y = 2; ship.quad_x = col;
+                gal_enemies[(2 << 3) | col] = 1;
+                trek_enter_quadrant();
+                if (pod_here) seen = 1;
+            }
+            if (col == POD_QUAD_COLUMN - 1) ok(seen, "a pod appears in column 8");
+            else if (seen) ok(0, "a pod appeared outside column 8");
+        }
+        ok(1, "and in no other column");
+
+        /* Never once the quadrant is crowded. */
+        seen = 0;
+        for (i = 0; i < 400; i++) {
+            trek_new_game(3, (uint16_t)(700 + i));
+            ship.quad_y = 2; ship.quad_x = POD_QUAD_COLUMN - 1;
+            gal_enemies[(2 << 3) | (POD_QUAD_COLUMN - 1)] = POD_MAX_SHIPS;
+            trek_enter_quadrant();
+            if (pod_here) seen = 1;
+        }
+        ok(!seen, "and never with five ships already there");
+
+        /* THE HIT IS 50..99 -- the port's old band was 40..79, invented
+           around one reading of 59. Collect the extremes over many turns. */
+        fired = 0;
+        for (i = 0; i < 6000; i++) {
+            trek_new_game(3, (uint16_t)(3000 + i));
+            clear_quadrant();
+            pod_here = 1;
+            ship.shields = 60000;          /* survive, so the loop continues */
+            n = trek_run_events(ev, 8);
+            { uint8_t k; for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_POD_HIT) {
+                    fired++;
+                    if (ev[k].amount < lo) lo = ev[k].amount;
+                    if (ev[k].amount > hi) hi = ev[k].amount;
+                } }
+        }
+        ok(fired > 0, "the pod does detonate");
+        ok(lo >= 50 && hi <= 99, "its hit lands inside 50..99");
+        ok(lo < 55 && hi > 94, "and spans the band, not a corner of it");
+
+        /* It takes the SHIELD CHARGE whole, and nothing reaches energy. */
+        {
+            uint16_t e0;
+            for (i = 0; i < 6000; i++) {
+                trek_new_game(3, (uint16_t)(3000 + i));
+                clear_quadrant();
+                pod_here = 1;
+                ship.shields = 5000; e0 = ship.energy;
+                n = trek_run_events(ev, 8);
+                { uint8_t k, got = 0; for (k = 0; k < n; k++)
+                    if (ev[k].kind == EV_POD_HIT) got = 1;
+                  if (got) {
+                      ok(ship.shields == (uint16_t)(5000 - ev[0].amount)
+                         || ship.shields < 5000, "the shield charge takes it");
+                      ok(ship.energy == e0, "and main energy is untouched");
+                      break;
+                  } }
+            }
+        }
+
+        /* FLAT SHIELDS AND IT KILLS YOU. */
+        for (i = 0; i < 6000; i++) {
+            trek_new_game(3, (uint16_t)(3000 + i));
+            clear_quadrant();
+            pod_here = 1;
+            ship.shields = 0;
+            n = trek_run_events(ev, 8);
+            { uint8_t k, got = 0; for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_POD_HIT) got = 1;
+              if (got) { ok(ship.lost, "a detonation on flat shields is fatal");
+                         break; } }
+        }
+
+        /* No pod in the quadrant, nothing happens, ever. */
+        seen = 0;
+        for (i = 0; i < 4000; i++) {
+            trek_new_game(3, (uint16_t)(3000 + i));
+            clear_quadrant();
+            pod_here = 0;
+            n = trek_run_events(ev, 8);
+            { uint8_t k; for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_POD_HIT) seen = 1; }
+        }
+        ok(!seen, "and no pod means no detonation");
     }
 
     /* The level scales the damage, which is the same expression as a

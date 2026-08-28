@@ -1113,8 +1113,9 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  * space probes, and supercommander movement. */
 #define SCHED_BASE_ATTACK    0   /* DS:0x1D90 */  /*@BINARY*/
 #define SCHED_BASE_FALLS     1   /* DS:0x1D96 */  /*@BINARY*/
-#define SCHED_DEATH_POD      2   /* NOT an event at all -- see below */  /*@PROVISIONAL*/
-#define SCHED_COUNT          3  /*@ID*/
+/* SCHED_DEATH_POD used to sit here at 2. The pod is a per-turn roll on an
+   object, not a scheduled event, and the slot is gone with the guess. */
+#define SCHED_COUNT          2  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
 
@@ -1157,8 +1158,51 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *
  * These reproduce the means this port has always used, in the uniform form
  * the original uses everywhere else. Replace them, do not tune them. */
-#define SCHED_POD_BASE_TENTHS      100  /*@PROVISIONAL*/
-#define SCHED_POD_SPAN_TENTHS      900  /*@PROVISIONAL*/
+/* ------------------------------------------ THE VANDAL DEATH POD, as it is
+ *
+ * BINARY 2026-08-27, `fn 0x20B38`, found from its own strings at cs:0x4D14
+ * onward under base 0x1BD60. The scheduled stand-in that used to live here is
+ * GONE: the pod is not an event with an interval, it is a PER-TURN ROLL on an
+ * object sitting in the quadrant.
+ *
+ *     if (!pod in this quadrant)   nothing            ; [0x26E0]
+ *     n = (quadrant COLUMN > 6) ? 20 : 33             ; 0x020B4C
+ *     if (Random(n) != 0)          nothing
+ *     hit = Random(50) + 50                           ; 0x020B76, so 50..99
+ *     SHIELD CHARGE -= hit                            ; 0x020B9F, whole
+ *     every ship in the quadrant whose table type is NOT 6 loses the same
+ *     if (shield charge <= 0)  "Lexington destroyed."  ; 0x020C64
+ *
+ * FOUR THINGS THIS PORT HAD WRONG:
+ *
+ *   - the damage was `40 + Random(40)`, a band INVENTED around one measured
+ *     reading of 59. It is 50..99. That literal never reached a header, so
+ *     `make tiers` reported FITTED 0 while it sat in trek.c -- see the
+ *     randomness audit in tools/tiers.py, added the same day.
+ *   - the frequency was a scheduled interval. It is a per-turn roll, and it
+ *     is COLUMN-DEPENDENT: half as likely again in quadrant columns 7 and 8.
+ *     That is the FOURTH column/row quirk in this program, after the pod's
+ *     own placement in column 8, reinforcements in column 1, and the
+ *     spontaneous supernova's row exclusion.
+ *   - it hits the SHIELD CHARGE directly, whole, with no absorption split.
+ *   - **it kills you outright if that takes the charge to nothing.** A ship
+ *     with flat shields dies to the first detonation. That is what the code
+ *     says and it is why the thing is feared.
+ *
+ * It skips table type 6, which is itself. */
+#define POD_HIT_MIN         50  /* Random(50) + 50 */  /*@BINARY*/
+#define POD_HIT_SPAN        50  /*@BINARY*/
+#define POD_FIRE_OF_N       33  /* one turn in 33 */  /*@BINARY*/
+#define POD_FIRE_OF_N_EDGE  20  /* one in 20 where the column is 7 or 8 */  /*@BINARY*/
+#define POD_EDGE_COLUMN      6  /* `cmp [0x1DE6], 6 / jle`, 1-based */  /*@BINARY*/
+
+/* Where it is, from the quadrant fill at 0x01649D -- read 2026-08-26. */
+#define POD_QUAD_COLUMN      8  /* quadrant column 8 and nowhere else */  /*@BINARY*/
+#define POD_MAX_SHIPS        5  /* none once five ships are present */  /*@BINARY*/
+#define POD_PLACE_OF_N      10  /*@BINARY*/
+#define POD_PLACE_ABOVE      5  /* Random(10) > 5, so four in ten */  /*@BINARY*/
+
+extern uint8_t pod_here;    /* a Vandal Death Pod is in this quadrant */
 
 /* End of a player's turn, whatever it was. The original sheds 20 points of
    laser heat here, in its main loop, whether or not the turn moved the clock
@@ -1476,6 +1520,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  *
  * Unlike the spontaneous route this one does NOT write the recorded chart.
  * It does not need to: you were there. */
+#define NOVA_STAR_OF_N    100  /*@BINARY*/
 #define NOVA_STAR_ABOVE    95   /* Random(100) > 95 on a star hit */  /*@BINARY*/
 #define NOVA_HIT_MAX      600   /* Random(600) */  /*@BINARY*/
 

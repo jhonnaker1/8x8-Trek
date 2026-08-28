@@ -23,6 +23,7 @@ TIERS, strongest first:
 Fails if any #define is untagged, so a new constant cannot arrive without a
 provenance.
 """
+import glob
 import re
 import sys
 
@@ -61,6 +62,14 @@ def main():
             print("    %s" % n, file=sys.stderr)
         return 1
 
+    rolls = audit_random_literals()
+    if rolls:
+        print("tiers: %d randomness literal(s) with no named constant:"
+              % len(rolls), file=sys.stderr)
+        for where, what in rolls:
+            print("    %s: %s" % (where, what), file=sys.stderr)
+        return 1
+
     for t in ORDER:
         print("tiers: %-12s %3d" % (t, len(found[t])))
     soft = [n for t in SOFT for n in found[t]]
@@ -69,6 +78,36 @@ def main():
         for n in sorted(found[t]):
             print("    %-11s %s" % (t, n))
     return 0
+
+
+# A CONSTANT THAT NEVER REACHED A HEADER IS INVISIBLE TO THE AUDIT ABOVE.
+#
+# Added 2026-08-27, after the death pod's damage was found to be
+# `40 + trek_rand_n(40)` -- a band invented around ONE measured reading of 59,
+# sitting inline in core/trek.c since the pod's stand-in was written. The
+# audit reported FITTED 0 and DERIVED 0 the whole time and was right about
+# every constant it could see. It only reads #defines in two headers.
+#
+# The shape that matters is a bare literal in a RANDOM ROLL: that is a claim
+# about a distribution, which is exactly the kind of claim this project
+# insists on sourcing. Small ones are dimensionless -- a coin, a d6, +1 for a
+# 1-based index -- so the bar is 20, above which a number is a measurement
+# wearing a literal's clothes.
+RAND_MAX_BARE = 20
+
+def audit_random_literals():
+    bad = []
+    for f in sorted(glob.glob("core/*.c")):
+        src = open(f).read()
+        src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+        src = re.sub(r"//[^\n]*", "", src)
+        for m in re.finditer(r"trek_rand_n(?:16)?\s*\(\s*(\d+)\s*\)", src):
+            if int(m.group(1)) >= RAND_MAX_BARE:
+                bad.append((f, m.group(0)))
+        for m in re.finditer(r"(?<![\w_])(\d+)\s*\+\s*trek_rand_n", src):
+            if int(m.group(1)) >= RAND_MAX_BARE:
+                bad.append((f, m.group(0)))
+    return bad
 
 
 if __name__ == "__main__":

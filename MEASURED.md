@@ -6075,3 +6075,78 @@ The third star outcome. `fn 0x0A8C8` splits the other 96% as 38.4% "Torpedo
 absorbed by star." and 57.6% the star DESTROYED, cell -> 'N'. This core still
 answers TORP_ABSORBED for all of it, because the destroyed case wants a nova
 SECTOR code it does not have.
+
+## The Vandal Death Pod, and a guess the audit could not see (2026-08-27)
+
+`fn 0x20B38`, found from its own strings under base 0x1BD60 --
+"DAMAGE REPORT:\nVandal Death Pod enters quadrant: ", " unit hit on
+Lexington.", " Mongol ship(s) destroyed.", and "…Lexington destroyed."
+
+    if (![0x26E0])            nothing        ; a pod is in this quadrant
+    n = ([0x1DE6] > 6) ? 20 : 33             ; 0x020B4C, the quadrant COLUMN
+    if (Random(n) != 0)       nothing
+    hit = Random(50) + 50                    ; 0x020B76
+    SHIELD CHARGE [0x1D60] -= hit            ; 0x020B9F, whole, no split
+    every ship whose table type is NOT 6 loses the same   ; 0x020BDE
+    if (shield charge <= 0)   "Lexington destroyed."      ; 0x020C64
+
+### Four things this port had wrong
+
+**The damage was invented.** `40 + trek_rand_n(40)` -- a band made up around
+the single measured reading of 59, which sits inside both. It is 50..99.
+
+**The frequency was a scheduled interval**, with two PROVISIONAL constants
+holding it up. It is a per-turn roll, and it is COLUMN-DEPENDENT: half as
+likely again in quadrant columns 7 and 8. That is the FOURTH column/row quirk
+in this program, after the pod's own placement in column 8, reinforcements in
+column 1, and the spontaneous supernova's row exclusion.
+
+**It takes the shield CHARGE, whole**, with no absorption arithmetic and no
+reference to whether the shields are raised.
+
+**It kills you outright if that takes the charge to nothing.** A captain
+flying on a flat charge dies to the first detonation. That is what the code
+says, and it is why the thing is feared.
+
+### THE AUDIT COULD NOT SEE THE GUESS
+
+`make tiers` had reported `FITTED 0, DERIVED 0` for days and was right about
+every constant it could see. It reads `#define`s in two headers. The invented
+band was a bare literal inline in `core/trek.c` and had never been near a
+header, so it was not merely untagged -- it was **invisible**.
+
+`tools/tiers.py` now audits randomness literals as well: any number >= 20
+appearing as a `trek_rand_n` argument, or added to one, must be a named
+constant. The bar is 20 because below it the numbers are dimensionless -- a
+coin, a d6, +1 for a 1-based index -- while above it a literal in a random
+roll is a claim about a DISTRIBUTION, which is exactly the kind of claim this
+project sources. It found three sites: the pod's two, and `trek_rand_n(100)`
+in the supernova's star roll, now `NOVA_STAR_OF_N`.
+
+### The audit is clean
+
+**BINARY 126, CONFIRMED 16, MEASURED 15, FITTED 0, DERIVED 0, PROVISIONAL 0.**
+"0 constants NOT measured or read." The three surviving PROVISIONALs were the
+pod's stand-in and they are deleted rather than measured, which is what was
+always going to close them.
+
+Resident free went UP, 1,452 -> 1,726: deleting the scheduled stand-in cost
+more than the real roll. Save v9, 553 bytes.
+
+### What is still unbuilt here
+
+The pod as a SECTOR OBJECT. It is a per-quadrant flag; the original puts an
+'R' in a cell with enemy-table type 6, which is why a torpedo aimed at it
+answers "No damage reported." The roll and the effect are the original's; the
+cell is not there yet.
+
+### A test retired rather than faked
+
+"Two events due in the same window both fire, oldest first" used
+SCHED_DEATH_POD as an independent second slot. With the pod gone the two
+remaining slots RESCHEDULE EACH OTHER -- whichever fires first pushes the
+other past the end of the window -- so the property cannot be expressed with
+them. Retired with the reason and a note to restore it when a third
+independent slot arrives; the hail response, the boarding party's own slot,
+the Union distress call and the supernova are all real slots in the
+original's eight.

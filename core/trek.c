@@ -8,6 +8,7 @@ uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
 uint8_t gal_nova[GAL_CELLS];
 uint8_t  nova_quad;
+uint8_t  pod_here;
 uint16_t nova_kills;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
@@ -113,6 +114,18 @@ uint16_t trek_enemy_full_hp(uint8_t type) { return enemy_strength(type); }
 void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
+
+    /* A Vandal Death Pod, decided on arrival -- the quadrant fill at
+       0x01649D. Column 8 and nowhere else, never once five ships are here,
+       and then four times in ten. It is still a per-quadrant flag rather
+       than the 'R' sector object the original places: the cell, its table
+       type 6 and its immunity to a torpedo are unbuilt. The ROLL and the
+       EFFECT are the original's. */
+    pod_here = 0;
+    if (ship.quad_x + 1 == POD_QUAD_COLUMN
+        && gal_enemies[q] < POD_MAX_SHIPS
+        && trek_rand_n(POD_PLACE_OF_N) > POD_PLACE_ABOVE)
+        pod_here = 1;
 
     /* Arriving relieves a base under siege. This is the ancestor's own rule
        read the other way round: its FBATTAK will not pick a base that is in
@@ -371,8 +384,6 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     trek_schedule(SCHED_BASE_ATTACK,
                   (uint16_t)(SCHED_ATTACK_BASE_TENTHS
                              + trek_rand_n(SCHED_FIRST_ATTACK_DAYS) * 10));
-    trek_schedule(SCHED_DEATH_POD,   trek_sched_deviate(SCHED_POD_BASE_TENTHS,
-                                                        SCHED_POD_SPAN_TENTHS));
 }
 
 /* -------------------------------------------------------------- movement */
@@ -714,32 +725,6 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                                                  SCHED_ATTACK_SPAN_TENTHS));
                 break;
             }
-            case SCHED_DEATH_POD:
-                /* MEASURED: one figure, applied to the ship AND to every
-                   enemy in the quadrant. 59 units on us and 59 on each of two
-                   Mongols in the same turn. The size is not measured beyond
-                   that single reading, so it is that reading give or take. */
-                {
-                    uint16_t hit = (uint16_t)(40 + trek_rand_n(40));
-                    uint8_t  cell;
-                    for (cell = 0; cell < QUAD_CELLS; cell++) {
-                        if (!SEC_IS_ENEMY(sector[cell])) continue;
-                        if (enemy_hp[cell] > hit) enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - hit);
-                        else { enemy_hp[cell] = 0; sector[cell] = SEC_EMPTY; }
-                    }
-                    if (ev && *n < max) {
-                        ev[*n].kind   = EV_POD_HIT;
-                        ev[*n].y      = ship.sec_y;
-                        ev[*n].x      = ship.sec_x;
-                        ev[*n].amount = hit;
-                        (*n)++;
-                    }
-                    trek_take_hit(hit, ev, n, max);
-                }
-                trek_schedule(SCHED_DEATH_POD,
-                              trek_sched_deviate(SCHED_POD_BASE_TENTHS,
-                                                 SCHED_POD_SPAN_TENTHS));
-                break;
         }
     }
     return *n;
@@ -828,6 +813,41 @@ static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
+/* The Vandal Death Pod, fn 0x20B38. A per-turn roll on the object sitting in
+   the quadrant, NOT a scheduled event -- see trek.h. */
+static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t hit;
+    uint8_t  cell, odds;
+
+    if (!pod_here) return;
+
+    /* `cmp [0x1DE6], 6 / jle` on the 1-based column, so 0-based 6 and 7. */
+    odds = (uint8_t)(ship.quad_x + 1 > POD_EDGE_COLUMN ? POD_FIRE_OF_N_EDGE
+                                                       : POD_FIRE_OF_N);
+    if (trek_rand_n(odds) != 0) return;
+
+    hit = (uint16_t)(POD_HIT_MIN + trek_rand_n(POD_HIT_SPAN));
+
+    /* The SHIELD CHARGE takes it whole -- 0x020B9F, no absorption split and
+       no reference to whether the shields are raised. */
+    ship.shields = (uint16_t)(ship.shields > hit ? ship.shields - hit : 0);
+
+    /* Everything else in the quadrant takes the same figure. The pod skips
+       table type 6, which is itself. */
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+        if (enemy_hp[cell] > hit) enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - hit);
+        else { enemy_hp[cell] = 0; sector[cell] = SEC_EMPTY; }
+    }
+
+    if (*n < max) { ev[*n].kind = EV_POD_HIT; ev[*n].y = ship.sec_y;
+                    ev[*n].x = ship.sec_x; ev[*n].amount = hit; (*n)++; }
+
+    /* 0x020C64: shields at nothing and the ship is gone. A captain flying on
+       a flat charge dies to the first detonation. */
+    if (ship.shields == 0) ship.lost = 1;
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -842,6 +862,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     run_events(ship.stardate, ev, &n, max);
     run_boarders(ev, &n, max);
     run_nova(ev, &n, max);
+    run_pod(ev, &n, max);
     return n;
 }
 
@@ -2024,7 +2045,7 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
            between "absorbed" and "the star is DESTROYED, cell -> 'N'", and
            that second case wants a nova sector code this core does not have
            yet. One branch of three, and it says so. */
-        if (trek_rand_n(100) > NOVA_STAR_ABOVE)
+        if (trek_rand_n(NOVA_STAR_OF_N) > NOVA_STAR_ABOVE)
             return star_supernova(cy, cx, damage);
         return TORP_ABSORBED;
     }
