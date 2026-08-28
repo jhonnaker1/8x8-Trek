@@ -1245,11 +1245,11 @@ STILL TO READ, with the open item each would close. FIVE ROUTINES, and every
 one of them is a FEATURE this core does not have -- there are no constants
 left to find:
 
-    0x15D6E   2  department damage  WEAR AND TEAR. Called from the turn loop
-                                    at 0x005954, so it runs every turn and
-                                    this core runs nothing there. Gated on
-                                    [0x1E00] > 0 at 0x015D7D. Cheapest read
-                                    with the largest behavioural difference.
+    0x15D6E   -  THE BOARDING PARTY  READ 2026-08-27, and the map had it as
+                                    "department damage", which it is not --
+                                    the THIRD wrong label in this map. Built.
+                                    [0x1E00] is which department is held and
+                                    [0x26DC] is the shields-up flag.
     0x1ED00   3  supernova          the EFFECT, not the trigger -- the 4%
                                     branch of 0x0A8C8 is already read. Closes
                                     "whether every enemy dies, where the ship

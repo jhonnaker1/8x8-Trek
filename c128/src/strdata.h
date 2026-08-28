@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 255
+#define STR_COUNT 263
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -261,6 +261,14 @@
 #define S_252  252   /* Not on reserve life support. */
 #define S_253  253   /* RESERVE, DAYS */
 #define S_254  254   /* Replenishing reserve life support. */
+#define S_255  255   /* Boarders hold EnTorp control. */
+#define S_256  256   /* Boarders hold engineering. */
+#define S_257  257   /* Boarders hold laser control. */
+#define S_258  258   /* Boarders in EnTorp control! */
+#define S_259  259   /* Boarders in engineering! */
+#define S_260  260   /* Boarders in laser control! */
+#define S_261  261   /* Boarding party eliminated. */
+#define S_262  262   /* SECURITY: */
 
 extern const unsigned int str_offset[STR_COUNT];
 

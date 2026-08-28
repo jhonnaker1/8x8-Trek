@@ -255,3 +255,11 @@
 252	Not on reserve life support.
 253	RESERVE, DAYS
 254	Replenishing reserve life support.
+255	Boarders hold EnTorp control.
+256	Boarders hold engineering.
+257	Boarders hold laser control.
+258	Boarders in EnTorp control!
+259	Boarders in engineering!
+260	Boarders in laser control!
+261	Boarding party eliminated.
+262	SECURITY:

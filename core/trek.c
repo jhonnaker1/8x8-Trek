@@ -317,6 +317,8 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.docked       = BASE_NONE;
     ship.life_reserve = LIFE_RESERVE_MAX_TENTHS;
     ship.life_gone    = 0;
+    ship.boarders     = BOARD_NONE;
+    ship.board_until  = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.casualties   = 0;
@@ -502,6 +504,8 @@ void trek_advance_time(uint16_t tenths) {
 /* --------------------------------------------------------------- shields */
 
 uint8_t trek_shields_up(void) {
+    /* Engineering held: 0x00EA12, and it is tested BEFORE "already up". */
+    if (ship.boarders == BOARD_ENGINEERING) return SHIELD_BOARDED;
     if (ship.shields_up) return SHIELD_ALREADY;
     if (ship.energy < SHIELD_RAISE_COST) return SHIELD_NO_ENERGY;
 
@@ -742,6 +746,39 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
    this once after whatever consumed the turn -- which also means an event
    fires after the move that carried the clock past it, not in the middle of
    it, and the player sees the two in the order they happened. */
+/* The boarding party, tested every turn -- fn 0x15D6E from the turn loop at
+   0x005954. The order is the original's: an expiry is checked BEFORE a new
+   arrival is rolled, and the routine returns after reporting one, so the turn
+   they leave is never also a turn they arrive. */
+static void run_boarders(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t cell;
+
+    if (ship.boarders != BOARD_NONE) {
+        if (ship.stardate > ship.board_until) {
+            ship.boarders = BOARD_NONE;
+            if (*n < max) { ev[*n].kind = EV_BOARDERS_GONE;
+                            ev[*n].y = ev[*n].x = 0;
+                            ev[*n].amount = 0; (*n)++; }
+        }
+        return;                       /* one party at a time, either way */
+    }
+
+    if (ship.level < BOARD_MIN_LEVEL) return;
+    if (ship.shields_up)              return;   /* they beam in */
+
+    cell = gal_enemies[(ship.quad_y << 3) | ship.quad_x];
+    if (cell == 0) return;
+
+    if (trek_rand_n(BOARD_OF_N) <= BOARD_ABOVE) return;
+
+    ship.boarders    = (uint8_t)(trek_rand_n(BOARD_DEPARTMENTS) + 1);
+    ship.board_until = (uint16_t)(ship.stardate + BOARD_BASE_TENTHS
+                                  + trek_rand_n(BOARD_SPAN_TENTHS));
+    if (*n < max) { ev[*n].kind = EV_BOARDED;
+                    ev[*n].y = ship.boarders;
+                    ev[*n].x = 0; ev[*n].amount = 0; (*n)++; }
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -754,6 +791,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
         n++;
     }
     run_events(ship.stardate, ev, &n, max);
+    run_boarders(ev, &n, max);
     return n;
 }
 
@@ -1331,6 +1369,8 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     uint16_t d, dealt;
 
     if (damage) *damage = 0;
+    /* Laser control held: 0x009CD0, ahead of every other check. */
+    if (ship.boarders == BOARD_LASERS) return FIRE_BOARDED;
 
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return FIRE_BAD_COORDS;
 
@@ -1808,6 +1848,8 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     uint16_t fy, fx, q, base, dmg, wobble;
 
     if (damage) *damage = 0;
+    /* EnTorp control held: 0x00B60B, ahead of every other check. */
+    if (ship.boarders == BOARD_TUBES) return TORP_BOARDED;
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return TORP_BAD_COORDS;
     if (ship.torps == 0) return TORP_NONE_LEFT;
 

@@ -2263,6 +2263,97 @@ static void test_star_and_focus(void) {
         (void)trek_life_replenish();
         ok(ship.life_reserve == 20, "clamped at the same 2.0 ceiling");
     }
+
+    /* --- the Mongol boarding party, BINARY fn 0x15D6E --- */
+    {
+        TrekEvent ev[8];
+        uint16_t t;
+        uint8_t n, seen, cell;
+
+        /* Level 3 is never boarded: `cmp [0x1DF0],7 / jg`, and [0x1DF0] is
+           level + 4. Five hundred turns with every other gate open. */
+        trek_new_game(3, 4321);
+        cell = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+        gal_enemies[cell] = 2;
+        ship.shields_up = 0;
+        seen = 0;
+        for (t = 0; t < 500; t++) {
+            ship.boarders = BOARD_NONE;
+            (void)trek_run_events(ev, 8);
+            if (ship.boarders != BOARD_NONE) seen = 1;
+        }
+        ok(!seen, "level 3 is never boarded");
+
+        /* Level 4 is, and only with the shields down. */
+        trek_new_game(4, 4321);
+        cell = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+        gal_enemies[cell] = 2;
+        ship.shields_up = 1;
+        seen = 0;
+        for (t = 0; t < 500; t++) {
+            ship.boarders = BOARD_NONE;
+            (void)trek_run_events(ev, 8);
+            if (ship.boarders != BOARD_NONE) seen = 1;
+        }
+        ok(!seen, "raised shields keep them out");
+
+        ship.shields_up = 0;
+        seen = 0;
+        for (t = 0; t < 500; t++) {
+            ship.boarders = BOARD_NONE;
+            (void)trek_run_events(ev, 8);
+            if (ship.boarders != BOARD_NONE) seen = 1;
+        }
+        ok(seen, "with the shields down at level 4 they do board");
+
+        /* An empty quadrant keeps them out -- they come off a ship. */
+        trek_new_game(4, 4321);
+        cell = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+        gal_enemies[cell] = 0;
+        ship.shields_up = 0;
+        seen = 0;
+        for (t = 0; t < 500; t++) {
+            ship.boarders = BOARD_NONE;
+            (void)trek_run_events(ev, 8);
+            if (ship.boarders != BOARD_NONE) seen = 1;
+        }
+        ok(!seen, "an empty quadrant keeps them out");
+
+        /* What each department costs. Set directly: the roll is 4% and the
+           effect is what is being tested, not the odds. */
+        trek_new_game(4, 4321);
+        ship.boarders = BOARD_ENGINEERING;
+        ship.shields_up = 0;
+        ok(trek_shields_up() == SHIELD_BOARDED,
+              "engineering held: shields cannot be raised");
+        ok(!ship.shields_up, "and they stay down");
+
+        ship.boarders = BOARD_LASERS;
+        ok(trek_fire_laser(0, 0, 100, 0) == FIRE_BOARDED,
+              "laser control held: the lasers will not fire");
+
+        ship.boarders = BOARD_TUBES;
+        ok(trek_fire_torpedo(0, 0, 0) == TORP_BOARDED,
+              "entorp control held: the tubes will not fire");
+        ok(ship.torps == TORPS_START, "and no torpedo is spent");
+
+        /* Holding one department does not block the others. */
+        ship.boarders = BOARD_TUBES;
+        ship.shields_up = 0;
+        ok(trek_shields_up() == SHIELD_OK,
+              "holding the tubes does not stop the shields");
+
+        /* They are thrown off past the deadline, and it is reported. */
+        trek_new_game(4, 4321);
+        ship.boarders = BOARD_LASERS;
+        ship.board_until = ship.stardate;      /* not yet PAST it */
+        n = trek_run_events(ev, 8);
+        ok(ship.boarders == BOARD_LASERS, "on the deadline they are still aboard");
+        ship.board_until = (uint16_t)(ship.stardate - 1);
+        n = trek_run_events(ev, 8);
+        ok(ship.boarders == BOARD_NONE, "past it they are eliminated");
+        ok(n >= 1 && ev[0].kind == EV_BOARDERS_GONE, "and security says so");
+    }
 }
 
 /* Damage has consequences. Every threshold here is the manual's, quoted in

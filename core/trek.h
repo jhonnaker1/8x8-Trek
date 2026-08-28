@@ -454,6 +454,7 @@ extern uint8_t tractored;
 #define FIRE_BAD_COORDS   2  /*@ID*/
 #define FIRE_NO_TARGET    3   /* nothing hostile in that sector */  /*@ID*/
 #define FIRE_NO_ENERGY    4   /* main banks hold less than requested */  /*@ID*/
+#define FIRE_BOARDED      5   /* laser control is held */  /*@ID*/
 
 /* The measured laser formula, as a pure function so it can be tested against
    the readings directly. `dist` is 8.8 fixed point, as trek_dist returns;
@@ -628,6 +629,10 @@ typedef struct {
        BINARY: the real at [0x1D30]. */
     uint16_t life_reserve;
     uint8_t  life_gone;       /* depletion happened and has not been reported */
+    /* The Mongol boarding party: BOARD_NONE, or which department it holds.
+       [0x1E00] in the original, with its deadline at [0x1D84]. */
+    uint8_t  boarders;
+    uint16_t board_until;     /* tenths; they are thrown off past this */
     /* Index into planets[], or PLANET_NONE. Here rather than in planet.c
        because it is ship state -- it has to be saved, and movement has to
        break it -- and because putting it here keeps planet.h out of trek.h.
@@ -764,6 +769,7 @@ uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost);
 #define SHIELD_OK          0  /*@ID*/
 #define SHIELD_ALREADY     1  /*@ID*/
 #define SHIELD_NO_ENERGY   2   /* main banks cannot pay the raising cost */  /*@ID*/
+#define SHIELD_BOARDED     3   /* engineering is held */  /*@ID*/
 
 uint8_t trek_shields_up(void);
 uint8_t trek_shields_down(void);
@@ -1016,6 +1022,8 @@ uint8_t trek_shields_down(void);
 #define EV_TRACTORED     8   /* y,x = the quadrant we were dragged to */  /*@ID*/
 #define EV_POD_HIT       9   /* amount = damage, to us and to every enemy */  /*@ID*/
 #define EV_LIFE_GONE    10   /* the reserve ran out; the ship is lost */  /*@ID*/
+#define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
+#define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
@@ -1331,6 +1339,49 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define LIFE_PANEL_BELOW          100  /*@BINARY*/
 #define LIFE_DRAIN_BELOW           90  /*@BINARY*/
 
+/* ------------------------------------------- the Mongol boarding party
+ *
+ * BINARY 2026-08-27, `fn 0x15D6E`, segment base 0x150C0 (5/5 on disjoint
+ * spans). The routine map called this "department damage" and it is nothing
+ * of the kind -- the third label in that map to be wrong, after the plasma
+ * bolt and the main program.
+ *
+ * Called from the turn loop at 0x005954, so it is tested EVERY TURN:
+ *
+ *     if (aboard && stardate > deadline)  they are eliminated, and the
+ *                                         routine returns without rolling
+ *     if (level < 4)                      never -- `cmp [0x1DF0],7 / jg`
+ *     if (aboard)                         one party at a time
+ *     if (shields up)                     they beam in, so shields stop them
+ *     if (no enemy in the quadrant)       `cmp galaxy[q], 99 / jg`
+ *     if (Random(100) <= 95)              4 in 100
+ *     aboard   = Random(3) + 1
+ *     deadline = stardate + 0.5 + Random*0.5
+ *
+ * A REDUNDANCY WORTH RECORDING RATHER THAN BUILDING: the Engineering branch
+ * at 0x015E61 clears the shields-up flag [0x26DC]. It can never do anything,
+ * because the gate five instructions earlier already required that flag to
+ * be clear. Reading it as "taking Engineering drops your shields" would have
+ * invented a mechanic the original cannot reach.
+ *
+ * What each department costs, and the original's own words:
+ *
+ *   Engineering    SHIELDS UP refused -- "Cannot raise shields; Mongol
+ *                  boarding party controls engineering."  0x00EA12
+ *   Laser control  "Mongol boarding party controls the lasers."  0x009CD0
+ *   EnTorp control "EnTorp control is held by the Mongol boarding party."
+ *                                                          0x00B60B */
+#define BOARD_NONE          0  /*@ID*/
+#define BOARD_ENGINEERING   1  /*@BINARY*/
+#define BOARD_LASERS        2  /*@BINARY*/
+#define BOARD_TUBES         3  /*@BINARY*/
+#define BOARD_DEPARTMENTS   3   /* Random(3) + 1 */  /*@BINARY*/
+#define BOARD_MIN_LEVEL     4   /* [0x1DF0] > 7, and [0x1DF0] is level + 4 */  /*@BINARY*/
+#define BOARD_OF_N        100  /*@BINARY*/
+#define BOARD_ABOVE        95   /* Random(100) > 95, so four in a hundred */  /*@BINARY*/
+#define BOARD_BASE_TENTHS   5   /* 0.5 stardates */  /*@BINARY*/
+#define BOARD_SPAN_TENTHS   5   /* plus Random*0.5 */  /*@BINARY*/
+
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/
 #define DOCK_ALREADY         2  /*@ID*/
@@ -1364,6 +1415,7 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 #define TORP_MISS        2  /*@ID*/
 #define TORP_NONE_LEFT   3  /*@ID*/
 #define TORP_BAD_COORDS  4  /*@ID*/
+#define TORP_BOARDED     10  /* EnTorp control is held */  /*@ID*/
 /* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:

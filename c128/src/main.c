@@ -164,6 +164,9 @@ static void do_shields_up(void) {
         case SHIELD_ALREADY:
             ui_message(S(S_31), S(S_7));
             break;
+        case SHIELD_BOARDED:
+            ui_message(S(S_262), S(S_256));
+            break;
         default:
             ui_message(S(S_31), S(S_84));
             break;
@@ -596,6 +599,13 @@ static void do_lasers(void) {
     unsigned char what;
     uint16_t energy, dealt;
     char line[8];
+
+    /* Before the target sweep, as the original tests it at 0x009CD0. */
+    if (ship.boarders == BOARD_LASERS) {
+        snd_beep();
+        ui_message(S(S_262), S(S_257));
+        return;
+    }
 
     for (cell = 0; cell < QUAD_CELLS; cell++)
         if (SEC_IS_ENEMY(sector[cell])) found++;
@@ -1133,6 +1143,18 @@ static void enemy_turn(uint8_t player_fired) {
             case EV_SHIP_LOST:
                 ui_message(S(S_170), S(S_93));
                 continue;
+            case EV_BOARDED:
+                /* "SECURITY: A Mongol boarding party has transported into
+                   <department>" -- cs:0x0C4A and the three names after it,
+                   trimmed to the panel. */
+                ui_message(S(S_262),
+                           ev[i].y == BOARD_ENGINEERING ? S(S_259)
+                         : ev[i].y == BOARD_LASERS      ? S(S_260)
+                                                        : S(S_258));
+                continue;
+            case EV_BOARDERS_GONE:
+                ui_message(S(S_262), S(S_261));
+                continue;
             case EV_LIFE_GONE:
                 /* The original's own line, from cs:0x43AA -- its dialog
                    truncates it with an ellipsis and this keeps that. */
@@ -1215,6 +1237,14 @@ static void do_torpedo(const char *line) {
     uint8_t n = grab_digits(line, d, 8);
     uint8_t salvo = 1, shot;
     char buf[8];
+
+    /* Refused BEFORE the salvo is asked for, which is where the original
+       tests it -- 0x00B60B, near the top of its torpedo routine. */
+    if (ship.boarders == BOARD_TUBES) {
+        snd_beep();
+        ui_message(S(S_262), S(S_255));
+        return;
+    }
 
     if (ship.torps == 0) {
         snd_beep();

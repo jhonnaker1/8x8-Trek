@@ -5881,3 +5881,63 @@ at 34 characters it overran the 26 the message panel fits.
 405 resident bytes, leaving 2,172 free -- the overlay pass earlier today paid
 for this and left change. Save format goes to version 5, 679 bytes. Audit
 BINARY 103.
+
+## The boarding party, and a routine the map had wrong (2026-08-27)
+
+`fn 0x15D6E`, segment base **0x150C0** (5/5 on disjoint spans). The routine map
+listed it as "department damage" and it is nothing of the kind -- **the third
+label in that map to be wrong**, after the plasma bolt (0x09563) and the main
+program (0x04FD1). Its strings name it in one read:
+
+    0x0C11  'SECURITY:\nThe Mongol boarding party has been eliminated.'
+    0x0C4A  'SECURITY:\nA Mongol boarding party has transported into '
+    0x0C82  'Engineering.'   0x0C8F 'Laser control.'   0x0C9E 'EnTorp control.'
+
+### The whole mechanic, called from the turn loop at 0x005954
+
+    if (aboard && stardate > deadline)   eliminated; RETURN without rolling
+    if ([0x1DF0] <= 7)         return      ; level + 4, so level 4 and 5 only
+    if (aboard)                return      ; one party at a time
+    if ([0x26DC])              return      ; the shields-up flag: they BEAM in
+    if (galaxy[quad] <= 99)    return      ; at least one enemy in the quadrant
+    if (Random(100) <= 95)     return      ; four in a hundred
+    aboard   = Random(3) + 1               ; 1 Engineering 2 Lasers 3 EnTorps
+    deadline = stardate + 0.5 + Random*0.5
+
+0.5 decodes exact, and the Random is the argument-less one -- ONE-SIDED, so
+the stay is 0.5 to 1.0 stardates and never shorter.
+
+### What each department costs, in the original's own words
+
+    Engineering    0x00EA12  "Cannot raise shields; Mongol boarding party
+                              controls engineering."
+    Laser control  0x009CD0  "Mongol boarding party controls the lasers."
+    EnTorp control 0x00B60B  "EnTorp control is held by the Mongol boarding
+                              party."
+
+All three are tested at the TOP of their command, before it asks for anything,
+which is where this port now tests them too.
+
+### A redundancy recorded rather than built
+
+The Engineering branch at 0x015E61 clears the shields-up flag [0x26DC]. **It
+can never do anything**: the gate five instructions earlier already required
+that flag to be clear. Read as "taking Engineering drops your shields" it
+would have been a striking mechanic, and it would have been invented -- the
+original cannot reach it. Recorded in trek.h beside the constants.
+
+### [0x26DC] identified in passing
+
+It is the SHIELDS-UP flag, from SHIELDS UP at 0x00EA08: `cmp [0x26DC],0 / je`
+picks between "ENGINEERING: Shields already up." and "ENGINEERING: Raising
+shields", and the 50.0 subtraction follows. Nine other sites read it.
+
+### Cost, and a warning
+
+777 resident bytes, leaving 1,395. **The `front` overlay is now 3,994 of
+4,096 -- 102 bytes of headroom.** The save record grew again (v6, 682 bytes)
+and the string index with it, and both live in `front`. The next save-format
+change overflows it. That overlay wants splitting, or the window wants
+growing, BEFORE the next feature that touches serialisation.
+
+Audit BINARY 112.
