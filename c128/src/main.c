@@ -512,6 +512,22 @@ OVL_CODE("planet") static void do_use(void) {
     pick = (uint8_t)grab_num(buf);
     if (pick < 1 || pick > n) { ui_dialog_close(); return; }
 
+    /* The reserve life support canister. BINARY 0x009861: a whole stardate,
+       clamped at the same 2.0 the dock refills to, and refused unless the
+       ship is actually on reserve -- the original answers "Not on reserve
+       life support." and does NOT spend the item. */
+    if (slot[pick - 1] == ITEM_LIFE_SUPPORT) {
+        if (!trek_life_replenish()) {
+            ui_dialog_line(S(S_252));
+        } else {
+            inventory[ITEM_LIFE_SUPPORT]--;
+            ui_dialog_line(S(S_254));
+        }
+        ui_dialog_close();
+        ui_draw_all();
+        return;
+    }
+
     if (slot[pick - 1] != ITEM_RAW_ENERGIUM) {
         /* Named, held, and with nothing yet that uses it. Saying so is
            better than a silent no-op. */
@@ -1116,6 +1132,12 @@ static void enemy_turn(uint8_t player_fired) {
                 continue;
             case EV_SHIP_LOST:
                 ui_message(S(S_170), S(S_93));
+                continue;
+            case EV_LIFE_GONE:
+                /* The original's own line, from cs:0x43AA -- its dialog
+                   truncates it with an ellipsis and this keeps that. */
+                ui_message(S(S_251),
+                           S(S_250));
                 continue;
             default:
                 continue;

@@ -250,3 +250,8 @@
 247	% EFFICIENCY.
 248	LASERS OVERHEAT. NOW AT 
 249	CAUGHT IN TRACTOR BEAM. PULLED TO 
+250	Life support depleted.
+251	ENGINEERING:
+252	Not on reserve life support.
+253	RESERVE, DAYS
+254	Replenishing reserve life support.

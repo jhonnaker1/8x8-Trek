@@ -378,9 +378,55 @@ static unsigned char sys_color(unsigned char pct) {
     return EGA_TO_VDC(EGA_LTRED);
 }
 
+/* THE RESERVE PANEL, which replaces SYSTEMS STATUS.
+ *
+ * BINARY 2026-08-27. The console draw routine opens with
+ * `cmp word ptr [0x235E], 0x64` / `je` at 0x01FDC9 -- [0x235E] is
+ * sys[SYS_LIFE] -- so the panel is swapped the moment life support is not
+ * PERFECT. Below 100, not below the drain's 90: there is a band where the
+ * console has already changed and the countdown has not started.
+ *
+ * The region the original repaints is (160,250)-(319,349) in its 640x350
+ * space, which is columns 20..39 and rows 17..24 here -- exactly
+ * panels[P_SYSTEMS], which is how this panel was identified rather than
+ * guessed. Its own labels are "LIFE SUPPORT" and "RESERVE, DAYS", read at
+ * cs:0x403A and cs:0x4047.
+ *
+ * WHAT IS READ AND WHAT IS NOT: the trigger, the region, the two labels and
+ * the quantity are all read. The original also draws a gauge with a "0" tick
+ * at the bottom; its geometry is not read, so the bar below is this port's
+ * own and is marked as such rather than presented as measured. */
+static void draw_reserve(void) {
+    const Panel *p = &panels[P_SYSTEMS];
+    unsigned char x = (unsigned char)(p->x + 1);
+    unsigned char y = (unsigned char)(p->y + 1);
+    unsigned char b, fill, color;
+    uint16_t left = ship.life_reserve;
+
+    clear_panel(P_SYSTEMS);
+
+    scr_puts(x, y, S(S_126), COL_LABEL);
+    scr_puts(x, (unsigned char)(y + 1), S(S_253), COL_LABEL);
+
+    /* Red once under half a stardate is left -- there is no measured
+       boundary here, and half a day is the point at which the player can
+       still reach a base. */
+    color = left < 5 ? EGA_TO_VDC(EGA_LTRED)
+                     : EGA_TO_VDC(EGA_YELLOW);
+    put_tenths(x, (unsigned char)(y + 3), left, color);
+
+    fill = (unsigned char)((left * 18u + LIFE_RESERVE_MAX_TENTHS / 2)
+                           / LIFE_RESERVE_MAX_TENTHS);
+    for (b = 0; b < 18; b++)
+        scr_put((unsigned char)(x + b), (unsigned char)(y + 5),
+                SYS_BAR_GLYPH, b < fill ? color : COL_GRID);
+}
+
 void ui_draw_systems(void) {
     const Panel *p = &panels[P_SYSTEMS];
     unsigned char i, c, r, b, x, y, pct, fill, color;
+
+    if (ship.sys[SYS_LIFE] < LIFE_PANEL_BELOW) { draw_reserve(); return; }
 
     clear_panel(P_SYSTEMS);
 

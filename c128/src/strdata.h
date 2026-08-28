@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 250
+#define STR_COUNT 255
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -256,6 +256,11 @@
 #define S_247  247   /* % EFFICIENCY. */
 #define S_248  248   /* LASERS OVERHEAT. NOW AT  */
 #define S_249  249   /* CAUGHT IN TRACTOR BEAM. PULLED TO  */
+#define S_250  250   /* Life support depleted. */
+#define S_251  251   /* ENGINEERING: */
+#define S_252  252   /* Not on reserve life support. */
+#define S_253  253   /* RESERVE, DAYS */
+#define S_254  254   /* Replenishing reserve life support. */
 
 extern const unsigned int str_offset[STR_COUNT];
 

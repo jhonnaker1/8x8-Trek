@@ -5829,3 +5829,55 @@ specified.
 
 Resident code grew 193 bytes (free 1,029 -> 836) for the corrected law. Four
 constants moved MEASURED -> BINARY; the audit is **BINARY 101**.
+
+## Life support is built, and the panel identified itself (2026-08-27)
+
+The largest unbuilt feature, built from the three reads that specified it: the
+docking refill (0x00F072), the canister (0x009861), and the drain that sits
+immediately after the repair loop (0x02042E).
+
+### Two details that were verified rather than assumed, and both mattered
+
+**The drain uses the ORIGINAL elapsed time.** It subtracts `[bp-8]`, copied
+from the parameter at 0x020151 -- *before* the focus block writes a remainder
+back over `[bp+6]` at 0x02032F. So concentrating repairs does not slow the
+countdown. Taking the drain off the same variable the repair loop uses would
+have been the natural thing to write and would have been wrong.
+
+**There are TWO thresholds, not one.** The console draw routine opens
+`cmp word ptr [0x235E], 0x64` / `je` at 0x01FDC9, so the panel swaps as soon
+as Life Support is not PERFECT -- below 100. The reserve only drains below 90.
+There is a band, 90..99, where the console has already changed and the
+countdown has not started, and one threshold would have lost it.
+
+### The panel identified itself
+
+The original repaints (160,250)-(319,349) of its 640x350 screen. In this
+port's cells that is columns 20..39, rows 17..24 -- and `panels[P_SYSTEMS]` is
+`{ 20, 17, 20, 8 }`. An exact match on all four numbers, so the panel the
+original replaces was READ, not chosen. Its labels are "LIFE SUPPORT" and
+"RESERVE, DAYS" at cs:0x403A and cs:0x4047, with a "0" tick at cs:0x4055 that
+implies a gauge whose geometry is not read -- the bar in `draw_reserve()` is
+this port's own and says so.
+
+### A test that passed for the wrong reason
+
+The 90..99 band test first read: set Life Support to 95, advance ten tenths,
+expect no drain. **It passed under both thresholds and proved nothing** --
+repair runs before the drain check, and at 20 points a stardate a full day
+lifts 95 clean past 100, so neither rule drained. Caught by breaking the
+constant, which is the only reason it was caught at all. It is now 92 and ONE
+tenth, which leaves 94 inside the band, and it fails under the wrong rule.
+
+Two other things the rig nearly hid. `make` did not rebuild between four rapid
+break-tests, so three of them reported the FIRST break's failure -- the giveaway
+was that the "restored" run still showed a failure. Every break test now forces
+a clean build. And `make verify` refused the death message: the original's own
+line is already elided in the binary ("Auxiliary life support deplete...") and
+at 34 characters it overran the 26 the message panel fits.
+
+### Cost
+
+405 resident bytes, leaving 2,172 free -- the overlay pass earlier today paid
+for this and left change. Save format goes to version 5, 679 bytes. Audit
+BINARY 103.

@@ -2179,6 +2179,90 @@ static void test_star_and_focus(void) {
               "and only a StarBase gives the docked 50");
         (void)plain;
     }
+
+    /* --- the life support reserve, BINARY 0x02042E --- */
+    {
+        TrekEvent ev[8];
+        uint8_t n;
+
+        trek_new_game(3, 1234);
+        ok(ship.life_reserve == 20, "the reserve starts at 2.0 stardates");
+
+        /* Perfect life support: no drain. */
+        (void)trek_advance(10, ev, 8);
+        ok(ship.life_reserve == 20, "a healthy life support does not drain it");
+
+        /* 90..99 is the band where the PANEL has swapped and the countdown
+           has not started. One threshold would lose this.
+           ONE TENTH, not ten: repair runs BEFORE the drain check, and at 20
+           points a stardate a full day lifts 95 clean past 100, so the
+           original ten-tenth version of this test passed under BOTH
+           thresholds and proved nothing. 92 + 2 = 94 stays in the band. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 92;
+        (void)trek_advance(1, ev, 8);
+        ok(ship.sys[SYS_LIFE] == 94, "the repair leaves it inside the band");
+        ok(ship.life_reserve == 20,
+              "between 90 and 99 the reserve still does not drain");
+
+        /* Below 90, undocked: it drains by the elapsed time. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 50;
+        (void)trek_advance(5, ev, 8);
+        ok(ship.life_reserve == 15, "below 90 it drains by the elapsed time");
+
+        /* Docked at ANY base, it does not drain. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 50;
+        ship.docked = BASE_RESEARCH;
+        (void)trek_advance(10, ev, 8);
+        ok(ship.life_reserve == 20, "docked, it does not drain at all");
+
+        /* A repair focus does NOT slow the drain -- the original subtracts
+           the elapsed time it saved BEFORE the focus rewrote it. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 50;
+        ship.sys[SYS_LASERS] = 0;
+        ship.repair_focus = SYS_LASERS + 1;
+        (void)trek_advance(10, ev, 8);
+        ok(ship.life_reserve == 10,
+              "a repair focus does not slow the drain");
+
+        /* Exactly exhausted is NOT death: the original dies below zero. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 50;
+        ship.life_reserve = 5;
+        (void)trek_advance(5, ev, 8);
+        ok(ship.life_reserve == 0, "spending the last of it reaches nought");
+        ok(!ship.lost, "and nought is not yet death");
+
+        /* One more tick past nought is. */
+        n = trek_advance(1, ev, 8);
+        ok(ship.lost, "the tick past nought loses the ship");
+        ok(n >= 1 && ev[0].kind == EV_LIFE_GONE, "and it is reported");
+        ok(trek_game_state() == GAME_LOST, "the mission is over");
+
+        /* Docking at a RESEARCH STATION refills it -- its only gift. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LIFE] = 50;
+        ship.life_reserve = 3;
+        gal_base[(ship.quad_y << 3) | ship.quad_x] = BASE_RESEARCH;
+        sector[0] = SEC_BASE;
+        ship.sec_y = 0; ship.sec_x = 1;
+        ok(trek_dock() == DOCK_OK, "we can dock at a research station");
+        ok(ship.life_reserve == 20, "and it refills the reserve to 2.0");
+
+        /* The canister. Refused at perfect life support, spent otherwise. */
+        trek_new_game(3, 1234);
+        ok(trek_life_replenish() == 0, "the canister is refused off reserve");
+        ship.sys[SYS_LIFE] = 50;
+        ship.life_reserve = 4;
+        ok(trek_life_replenish() == 1, "and accepted on reserve");
+        ok(ship.life_reserve == 14, "adding one whole stardate");
+        ship.life_reserve = 15;
+        (void)trek_life_replenish();
+        ok(ship.life_reserve == 20, "clamped at the same 2.0 ceiling");
+    }
 }
 
 /* Damage has consequences. Every threshold here is the manual's, quoted in

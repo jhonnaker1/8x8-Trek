@@ -623,6 +623,11 @@ typedef struct {
     uint16_t casualties;
     uint8_t  lost;            /* ship destroyed */
     uint8_t  docked;          /* BASE_NONE, or the type docked at */
+    /* Life support's RESERVE, in tenths of a stardate, capped at 2.0. A
+       separate quantity from sys[SYS_LIFE], which is its state of repair.
+       BINARY: the real at [0x1D30]. */
+    uint16_t life_reserve;
+    uint8_t  life_gone;       /* depletion happened and has not been reported */
     /* Index into planets[], or PLANET_NONE. Here rather than in planet.c
        because it is ship state -- it has to be saved, and movement has to
        break it -- and because putting it here keeps planet.h out of trek.h.
@@ -1010,6 +1015,7 @@ uint8_t trek_shields_down(void);
 #define EV_BASE_LOST     7  /*@ID*/
 #define EV_TRACTORED     8   /* y,x = the quadrant we were dragged to */  /*@ID*/
 #define EV_POD_HIT       9   /* amount = damage, to us and to every enemy */  /*@ID*/
+#define EV_LIFE_GONE    10   /* the reserve ran out; the ship is lost */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
@@ -1284,10 +1290,10 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * which independently confirms that repair does not divide between them. */
 #define REPAIR_PER_STARDATE_DOCKED  50  /*@BINARY*/  /* Round(t*100) div 2, 0x020389 */
 
-/* ------------------------------------------- life support reserve, UNBUILT
+/* -------------------------------------------------- life support reserve
  *
- * BINARY 2026-08-27, and the reason a Research Station is not the useless
- * stop this core currently makes it. Life support is not only one of the
+ * BUILT 2026-08-27, and the reason a Research Station is not the useless
+ * stop this core used to make it. Life support is not only one of the
  * twelve repair percentages: there is a SEPARATE RESERVE, a real at
  * [0x1D30] measured in stardates, with a hard cap of 2.0.
  *
@@ -1300,15 +1306,30 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  *     set at 0x01FF4B when life support fails and cleared by both the dock
  *     and the item
  *
- * That is the two-day countdown already on the feature list, with its
- * constants read. It also makes the Research Station's single gift a real
- * one, so building this is what makes that base type worth flying to.
+ * The panel swap is at 0x01FF2F: it repaints the box at (160,250)-(319,349)
+ * and guards the repaint by reading a pixel back, which is the original's own
+ * "is this panel already swapped" test. That region is columns 20..39 and
+ * rows 17..24 in this port, which is exactly panels[P_SYSTEMS] -- so the
+ * panel the original replaces was identified rather than chosen. See
+ * draw_reserve() in c128/src/ui.c.
  *
- * The panel swap itself is at 0x01FF2F: it repaints the box at (160,250)
- * to (319,349) and guards the repaint by reading a pixel back, which is the
- * original's own "is this panel already swapped" test. */
+ * The drain lives in trek_advance_time and uses the ORIGINAL elapsed time,
+ * not the remainder a repair focus leaves. See the comment there. */
 #define LIFE_RESERVE_MAX_TENTHS    20  /* 2.0 stardates */  /*@BINARY*/
 #define LIFE_RESERVE_ITEM_TENTHS   10  /* the item adds 1.0 */  /*@BINARY*/
+
+/* TWO THRESHOLDS, AND THEY ARE NOT THE SAME NUMBER -- both read 2026-08-27.
+ *
+ *   the console panel swaps as soon as Life Support is not PERFECT. The draw
+ *   routine opens `cmp word ptr [0x235E], 0x64` / `je` at 0x01FDC9, so
+ *   anything below 100 shows the reserve panel instead of the normal one.
+ *
+ *   the reserve only DRAINS below 90, at 0x02042E, and only while undocked.
+ *
+ * So there is a band, 90..99, where the panel has already changed and the
+ * countdown has not started. Modelling it as one threshold would lose that. */
+#define LIFE_PANEL_BELOW          100  /*@BINARY*/
+#define LIFE_DRAIN_BELOW           90  /*@BINARY*/
 
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/
@@ -1316,6 +1337,10 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 
 uint8_t trek_dock(void);
 void    trek_undock(void);       /* any movement breaks the dock */
+
+/* Spend a reserve life support canister. Returns 0 if the ship is not on
+   reserve, which the UI reports as the original's own refusal. */
+uint8_t trek_life_replenish(void);
 
 /* Docked at a StarBase specifically -- the case where the base's shields
    cover us. Research stations and supply bases do not. */

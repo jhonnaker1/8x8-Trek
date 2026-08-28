@@ -315,6 +315,8 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.laser_eff    = 100;
     ship.laser_heat   = 0;
     ship.docked       = BASE_NONE;
+    ship.life_reserve = LIFE_RESERVE_MAX_TENTHS;
+    ship.life_gone    = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.casualties   = 0;
@@ -474,6 +476,27 @@ void trek_advance_time(uint16_t tenths) {
             else ship.sys[i] = (uint8_t)(ship.sys[i] + mend);
         }
     }
+
+    /* THE LIFE SUPPORT RESERVE, immediately after the repair loop and in the
+       same routine -- BINARY, 0x02042E.
+     *
+     * `tenths`, NOT `rt`. The original subtracts [bp-8], which is the elapsed
+     * time copied at 0x020151 BEFORE the focus block writes a remainder back
+     * over the parameter. So concentrating repairs does not slow the drain,
+     * and reading it off the same variable the repair used would be wrong.
+     *
+     * Death is at strictly BELOW zero (`jae` at 0x020476), so a reserve of
+     * exactly the elapsed time survives at nought and dies on the next tick.
+     * Nothing refills it but a base or the item: repairing life support past
+     * 90 stops the drain and does not give the reserve back. */
+    if (ship.sys[SYS_LIFE] < LIFE_DRAIN_BELOW && ship.docked == BASE_NONE) {
+        if (ship.life_reserve >= tenths) {
+            ship.life_reserve = (uint16_t)(ship.life_reserve - tenths);
+        } else {
+            ship.life_reserve = 0;
+            if (!ship.lost) { ship.lost = 1; ship.life_gone = 1; }
+        }
+    }
 }
 
 /* --------------------------------------------------------------- shields */
@@ -522,6 +545,11 @@ uint8_t trek_dock(void) {
     if (type == BASE_NONE) return DOCK_NO_BASE;
     ship.docked = type;
 
+    /* EVERY base type refills the reserve -- 0x00F072, ahead of the branch
+       that separates them. It is the Research Station's ONLY gift, and the
+       reason it is worth flying to at all. */
+    ship.life_reserve = LIFE_RESERVE_MAX_TENTHS;
+
     /* What each type replenishes, per the manual -- see trek.h. Life support
        supplies are not a resource in this core, so a Research Station gives
        nothing here beyond the docked repair rate. */
@@ -548,6 +576,21 @@ uint8_t trek_dock(void) {
 
 void trek_undock(void) {
     ship.docked = BASE_NONE;
+}
+
+/* The reserve life support canister. BINARY at 0x009861: it adds a whole
+   stardate and clamps to the same 2.0 ceiling docking uses, and it is REFUSED
+   unless the ship is actually on reserve -- "Not on reserve life support."
+   The original tests [0x26D6], the flag the console sets when it swaps the
+   panel, so the gate is the PANEL threshold of 100 and not the drain's 90.
+   Between 90 and 99 the canister may be spent on a countdown that has not
+   started, which is the original's behaviour and not an oversight here. */
+uint8_t trek_life_replenish(void) {
+    if (ship.sys[SYS_LIFE] >= LIFE_PANEL_BELOW) return 0;
+    ship.life_reserve = (uint16_t)(ship.life_reserve + LIFE_RESERVE_ITEM_TENTHS);
+    if (ship.life_reserve > LIFE_RESERVE_MAX_TENTHS)
+        ship.life_reserve = LIFE_RESERVE_MAX_TENTHS;
+    return 1;
 }
 
 uint8_t trek_docked_safe(void) {
@@ -701,6 +744,15 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
    it, and the player sees the two in the order they happened. */
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
+    /* Before the scheduled events: the ship is already gone, and anything the
+       schedule has to say about bases is happening to someone else. */
+    if (ship.life_gone && n < max) {
+        ship.life_gone = 0;
+        ev[n].kind = EV_LIFE_GONE;
+        ev[n].y = ev[n].x = 0;
+        ev[n].amount = 0;
+        n++;
+    }
     run_events(ship.stardate, ev, &n, max);
     return n;
 }
