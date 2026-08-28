@@ -1221,6 +1221,8 @@ DECODED so far, with what each gave:
                                     per quadrant holding a COMMANDER
     0x16133   -  enemy classes      DS:0x23E9 commanders per quadrant, STATE
     0x0EA55   -  SHUP               main energy -= 50.0, exactly
+    0x1696F   -  ENEMY FIRE         hp * (0.6 + rnd*0.1) * (1.5 - d/8);
+                                    falloff CONFIRMED, scale conflicts by 0.8
     0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
     0x1F9D5   -  base attack/falls  the two schedule slots, with constants
     DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
@@ -1235,7 +1237,6 @@ STILL TO READ, with the open item each would close:
     0x15F51   4  Union wreckage     unbuilt screen
     0x181E8   1  capture            boarding-party frequency
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
-    rest of 0x16844                 the enemy fire law, ENEMY_FIRE_PCT
 
 TWO THINGS THIS MAP MISSED, found by auditing the provenance tiers rather
 than the routine list (2026-08-26):

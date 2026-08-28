@@ -5562,3 +5562,73 @@ resident RAM one for one -- leaving 1,037 bytes free with the largest overlay
 at 3,845 of 4,096. Growing the window is the right lever when ONE overlay is
 tight and the resident region is not; moving code out is the right lever when
 the resident region is.
+
+---
+
+## The enemy's shot, and a conflict I am not resolving by fiat (2026-08-26)
+
+The last mechanic in the port whose arithmetic had not been read. `fn 0x16844`,
+segment base **0x150C0** (the same unit as reinforcements), at 0x01696F:
+
+    dy  = (ey - ship_y) / 8.0
+    dx  = (ex - ship_x) / 8.0
+    hit = hp * (0.6 + Random*0.1) * (1.5 - Sqrt(dx^2 + dy^2))
+    absorbed = hit * (charge/2500) * (shield_sys%/100)      [shields up only]
+    through  = hit - absorbed                                -- 0x016CE6
+    energy  -= through                                       -- 0x016FCF
+    shields -= absorbed * 0.8                                -- 0x01703C
+    printed  = absorbed * 0.8    "Shields absorb N unit hit from ..."  0x017077
+
+0.6, 0.1, 1.5 and 8.0 all decode exact.
+
+### What this confirms
+
+`1.5 - d/8` is identically `1.5 * (1 - d/12)`. **The falloff is linear in
+Euclidean distance and reaches zero at twelve sectors, exactly as measured** --
+the hardest part of the thirty-six-turn session, and it was right. The port's
+`through = hit - absorbed` shape is right too, read directly at 0x016CE6.
+
+### What it adds
+
+**There is a random component, and the port had none.** The shot is uniform
+across a band 15.4% wide. The measurement saw it and named it without
+identifying it: *"k came out at 0.782 with a standard deviation of 0.038 over
+all thirty-six, so the residual scatter is about 5% -- the random component,
+and small."* A uniform band of that width has a standard deviation of **4.4%**
+of its mean against the **4.9%** observed. That is the same distribution.
+
+The port now rolls the band instead of a flat percentage.
+
+### What it conflicts with, and what I did about it
+
+The binary's mean factor is `0.65 * 1.5 = 0.975` of hit points at point-blank.
+The measurement gives **0.782**. The ratio is **0.8022** -- and 0.8 is a
+constant in this very routine, applied to the shield pool drain and to the
+printed "Shields absorb N" figure. The likeliest reading is that the
+thirty-six samples measured a quantity that carries that 0.8.
+
+**I have not flipped the constant.** Thirty-six samples at eleven ranges is a
+serious measurement, and this is one instruction's worth of doubt against it;
+the rule this project has learned twice is to contest a conflicting
+measurement, not to overwrite it. The band in trek.h keeps the MEASURED centre
+of 78% and takes the BINARY's relative width, so the port is now right about
+the shape either way.
+
+**The experiment that settles it is one shot.** Shields DOWN, read main energy
+before and after a single Commander's shot at a known range. The binary
+predicts 0.90 to 1.05 of hit points times the falloff; the port predicts 0.72
+to 0.84. There is no overlap, so one reading decides it.
+
+### Two things that are not where they were assumed to be
+
+**There is no hold-fire roll in this routine.** The firing loop skips an enemy
+only when its hit points are zero (0x0168CE) or when its cell holds `'R'`
+(0x016903) -- the death pod, which never shoots. Every other ship in the
+quadrant fires every time the routine runs. `ENEMY_FIRE_ONE_IN` is a solid
+observation -- 5/10, 5/10, 7/10, 4/8 -- of a mechanism that lives somewhere
+else. Most likely the routine is not called on every turn, or a ship that
+moved does not also shoot. Kept and flagged.
+
+**The death pod does not fire lasers**, which is a second reason it needs
+building as an object rather than an event: it is skipped by the fire loop and
+has its own area effect.

@@ -1199,6 +1199,38 @@ static void test_docking(void) {
     ok(ship.docked == BASE_NONE,     "a real move does");
 }
 
+/* THE ENEMY'S SHOT IS A BAND, NOT A FLAT PERCENTAGE -- fn 0x16844 at
+   0x01696F rolls `0.6 + Random*0.1` on the hit points. */
+static void test_enemy_shot_band(void) {
+    puts("the enemy's shot (BINARY: a band, not a flat percentage)");
+    {
+        TrekEvent tev[16];
+        uint16_t lo = 0xFFFF, hi = 0;
+        uint8_t  k, tn, tcell = (4 << 3) | 5;
+        trek_new_game(3, 9001);
+        for (k = 0; k < 250; k++) {
+            uint8_t j;
+            ship.sec_y = 4; ship.sec_x = 4;
+            clear_quadrant();
+            sector[tcell] = SEC_BATTLESHIP;
+            enemy_hp[tcell] = 1000;
+            ship.energy = 60000U; ship.shields = 0; ship.shields_up = 0;
+            ship.lost = 0;
+            tn = trek_enemy_turn(tev, 16, 0);
+            for (j = 0; j < tn; j++)
+                if (tev[j].kind == EV_HIT || tev[j].kind == EV_SHIELD_HOLD) {
+                    if (tev[j].amount < lo) lo = tev[j].amount;
+                    if (tev[j].amount > hi) hi = tev[j].amount;
+                }
+        }
+        /* Range 1.0, so the falloff factor is 235/256. 1000 units of hit
+           points give 0.72*1000*235/256 = 661 up to 0.84*1000*235/256 = 771. */
+        ok(lo >= 655 && lo <= 675, "the weakest shot is about 72% of hit points");
+        ok(hi >= 760 && hi <= 780, "the strongest about 84%");
+        ok(hi - lo > 80, "and it genuinely varies -- it is not a flat figure");
+    }
+}
+
 /* THE TRACTOR BEAM, read out of fn 0x0C609 on 2026-08-26. It is not an event:
    flying PAST a Commander is what catches you. */
 static void test_tractor(void) {
@@ -3014,6 +3046,7 @@ int main(void) {
     test_event_queue();
     test_shields();
     test_docking();
+    test_enemy_shot_band();
     test_tractor();
     test_base_relief();
     test_torpedo();

@@ -763,12 +763,51 @@ uint8_t trek_shields_down(void);
  * This supersedes an earlier four-point estimate at a single range that put
  * the coefficient nearer 0.95 and suggested the curve flattened into a floor.
  * It does not flatten; that reading was one range with n=4. */
-#define ENEMY_FIRE_PCT          78   /* percent of hit points, before falloff */  /*@MEASURED*/
+/* READ OUT OF THE BINARY 2026-08-26, fn 0x16844 at 0x01696F:
+ *
+ *     hit = hp * (0.6 + Random*0.1) * (1.5 - distance/8)
+ *
+ * 0.6, 0.1, 1.5 and 8.0 all decode exact, and `1.5 - d/8` is identically
+ * `1.5 * (1 - d/12)` -- so THE FALLOFF AND ITS ZERO AT TWELVE ARE THE
+ * ORIGINAL'S, confirmed, and the thirty-six-turn measurement got the hardest
+ * part of this exactly right.
+ *
+ * IT ALSO SAYS THERE IS A RANDOM COMPONENT, which this port did not have:
+ * the shot is uniform across a band 15.4% wide. The measurement saw it --
+ * "the residual scatter is about 5% -- the random component, and small" --
+ * and a uniform band of that width has a standard deviation of 4.4% of its
+ * mean against the 4.9% observed. That is the shape, and it is now modelled.
+ *
+ * BUT THE SCALE CONFLICTS, AND IT IS NOT RESOLVED. The binary's mean factor
+ * is 0.65 * 1.5 = 0.975 of hit points at point-blank; the measurement, over
+ * thirty-six turns at eleven ranges, gives 0.782 with a standard deviation of
+ * 0.038. The ratio is 0.8022 -- and **0.8 is a constant in this very
+ * routine**, the one applied to the shield pool drain and to the printed
+ * "Shields absorb N unit hit from" figure at 0x017077. The likeliest reading
+ * is that the thirty-six samples measured a quantity carrying that 0.8.
+ *
+ * NOT RESOLVED BY FLIPPING THE CONSTANT. Thirty-six samples at eleven ranges
+ * is a serious measurement and this is one instruction's worth of doubt
+ * against it. The band below keeps the MEASURED centre and takes the
+ * BINARY's width. What settles it is one run: shields DOWN, read main energy
+ * before and after a single shot from a Commander at a known range. The
+ * binary predicts 0.9 to 1.05 of hit points times the falloff; the port
+ * predicts 0.72 to 0.84. Nothing else needs to be measured. */
+#define ENEMY_FIRE_PCT_MIN      72   /* mean 78 kept from the 36 readings */  /*@MEASURED*/
+#define ENEMY_FIRE_PCT_SPAN     13   /* 72..84, the binary's relative width */  /*@MEASURED*/
 
 /* MEASURED: enemies hold fire on about half of their turns -- 5/10, 5/10,
    7/10 and 4/8 across four blocks. Not an artefact of dropped turns: a
    dropped turn shows up as a zero followed by a doubled reading, and the
-   surviving figures were tight with no doubles. */
+   surviving figures were tight with no doubles.
+
+   AND THERE IS NO SUCH ROLL IN fn 0x16844. The firing loop skips an enemy
+   only when its hit points are zero or when the cell holds 'R', the death
+   pod, which never fires. Every other ship in the quadrant fires every time
+   the routine runs. So the half-the-turns is real and is decided somewhere
+   ELSE -- most likely the routine is not called every turn, or a ship that
+   moved does not also shoot. Kept, because the observation is solid; flagged,
+   because the mechanism is not where it was assumed to be. */
 #define ENEMY_FIRE_ONE_IN        2  /*@MEASURED*/
 
 /* SYSTEM DAMAGE FROM COMBAT -- read out of the binary 2026-08-26, and it
