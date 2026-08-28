@@ -1666,9 +1666,66 @@ static void test_enemy_turn(void) {
                would re-read last turn's shot out of the untouched tail. */
             if (fire_amount(ev, n2) > 0) fired++;
         }
-        if (fired <= 70 || fired >= 130) printf("    (fired %d of 200)\n", fired);
-        ok(fired > 70 && fired < 130,
-           "enemies fire on roughly half their turns, not every one");
+        /* STANDING STILL, EVERY ENEMY FIRES EVERY TURN. The old assertion
+           here was "roughly half", which was a MEASURED observation of a
+           mechanism somewhere else entirely -- the gate is on the whole enemy
+           turn and only applies when the ship MOVED. There is no per-ship
+           hold-fire roll in the original at all. See trek.h. */
+        if (fired != 200) printf("    (fired %d of 200)\n", fired);
+        ok(fired == 200, "standing still, every enemy fires every turn");
+    }
+
+    /* --- and moving buys a 40%% chance of no enemy turn at all --- */
+    {
+        TrekEvent ev[16];
+        int i, acted = 0;
+        trek_new_game(3, 31337);
+        ship.sec_y = 4; ship.sec_x = 4;
+        wall_in(2, 4);
+        sector[(2 << 3) | 4]   = SEC_BATTLESHIP;
+        enemy_hp[(2 << 3) | 4] = HP_BATTLESHIP;
+        ship.shields_up = 1;
+        for (i = 0; i < 400; i++) {
+            uint8_t n2;
+            ship.shields = SHIELD_MAX;
+            ship.energy  = ENERGY_MAX;
+            ship.sys[SYS_SHIELDS] = 100;
+            ship.moved = 1;                 /* as MOVE sets [0x26E3] */
+            n2 = trek_enemy_turn(ev, 16, 1);
+            if (n2 > 0) acted++;
+            ok(ship.moved == 0 || i < 0, "the flag is cleared either way");
+            break;
+        }
+        acted = 0;
+        for (i = 0; i < 400; i++) {
+            uint8_t n2;
+            ship.shields = SHIELD_MAX;
+            ship.energy  = ENERGY_MAX;
+            ship.sys[SYS_SHIELDS] = 100;
+            ship.moved = 1;
+            n2 = trek_enemy_turn(ev, 16, 1);
+            if (n2 > 0) acted++;
+        }
+        /* 60 in 100. Four hundred turns puts the expectation at 240; the band
+           is wide enough to be stable and narrow enough to fail at 100%%. */
+        if (acted < 200 || acted > 280) printf("    (acted %d of 400)\n", acted);
+        ok(acted > 200 && acted < 280,
+           "having moved, the enemy turn happens about 60 times in 100");
+
+        /* AND MOVING MUST ACTUALLY SET THE FLAG. Without this the two cases
+           above both pass with `ship.moved = 1` deleted from every movement
+           routine, because they set it by hand -- which is exactly what
+           happened when the gate was broken deliberately and nothing failed. */
+        trek_new_game(3, 31337);
+        ship.moved = 0;
+        (void)trek_move_impulse(3, 3);
+        ok(ship.moved, "impulse movement sets the flag");
+
+        trek_new_game(3, 31337);
+        ship.moved = 0;
+        ship.energy = ENERGY_MAX;
+        (void)trek_move_warp((uint8_t)((ship.quad_y + 1) & 7), ship.quad_x, 3, 3);
+        ok(ship.moved, "and so does a warp");
     }
 
     /* Movement is triggered by the player attacking, not by the turn.

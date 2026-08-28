@@ -6206,3 +6206,59 @@ is in OVL_CMDS. Four break-tests -- any base type answering, the range test
 removed, the block roll removed, the turn cost removed -- each failed its own
 assertion. Docking's identical 0.1-stardate cost had only INDIRECT cover and
 now has a direct assertion, which that same break found.
+
+## The enemy's turn is gated once, not per ship, and only if you MOVED (2026-08-27)
+
+Found by asking who CALLS `fn 0x016844`. There is exactly one caller, in the
+turn loop at 0x005917:
+
+    if ([0x1F31] == 'Y')       skip the enemy turn entirely
+    if ([0x26E3]) {                          ; the ship MOVED this turn
+        if (Random(100) >= 60) skip the enemy turn entirely
+    }
+    call 0x01658F              ; enemy MOVEMENT
+    call 0x016844              ; enemy FIRE
+    [0x26E3] = 0                             ; 0x00594A, either way
+
+### What this port had, and why it looked right
+
+`ENEMY_FIRE_ONE_IN 2` was a MEASURED observation -- 5/10, 5/10, 7/10, 4/8 --
+and it was a good one. It was implemented as a **per-ship hold-fire roll**,
+which is a mechanism the original does not have anywhere: the firing loop
+skips a ship only when its hit points are zero or its cell holds the death
+pod, as the 2026-08-26 read of that routine already said. Every ship in the
+quadrant fires, or none does.
+
+**And the gate only applies if you moved.** `[0x26E3]` is set by `fn 0x0C609`
+(MOVE) and by the supernova throw at 0x00AC9B, and cleared the instant the
+enemy turn resolves. Stand still and the enemy always acts; move and there is
+a 40% chance of getting away with it -- and it skips their MOVEMENT too, not
+just their fire.
+
+That is a real tactical rule the port did not have, and it explains the
+measured "about half" exactly: those samples were taken while flying about.
+
+### The one thing left unbuilt
+
+`[0x1F31]` is one of the setup screen's two Y/N answers -- `fn 0x14CB9` asks
+"Will you require a briefing <Y/N>?" and "Restore a saved game <Y/N>?", and
+0x014DFA upper-cases the reply into it. A 'Y' suppresses the enemy's FIRST
+turn and the loop forces it to 'N' at 0x0059CE. **Which of the two questions
+it is has not been read**, so it is not built.
+
+### A fourth test that could not fail
+
+Breaking the gate three ways, the third -- deleting `ship.moved = 1` from
+every movement routine -- failed NOTHING. Both new cases set the flag by hand,
+so neither could see whether movement sets it. The link is tested now:
+`trek_move_impulse` and `trek_move_warp` each assert the flag afterwards, and
+deleting the assignment fails both.
+
+That is the fourth time in one day a fixture bypassed the mechanism it was
+meant to exercise, and the fourth time only breaking the code found it.
+
+### Cost
+
+**128 resident bytes**, free 1,460 -> 1,332. The turn gate plus the `moved`
+flag and its two assignments cost more than the per-ship roll they replaced.
+Audit BINARY 133, and `ENEMY_FIRE_ONE_IN` is gone.

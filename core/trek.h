@@ -644,6 +644,9 @@ typedef struct {
        [0x1E00] in the original, with its deadline at [0x1D84]. */
     uint8_t  boarders;
     uint16_t board_until;     /* tenths; they are thrown off past this */
+    /* Set by any movement and by a supernova throw; cleared when the enemy
+       turn resolves. While it is set the enemy turn is only 60% likely. */
+    uint8_t  moved;
     /* Index into planets[], or PLANET_NONE. Here rather than in planet.c
        because it is ship state -- it has to be saved, and movement has to
        break it -- and because putting it here keeps planet.h out of trek.h.
@@ -873,7 +876,36 @@ uint8_t trek_shields_down(void);
    ELSE -- most likely the routine is not called every turn, or a ship that
    moved does not also shoot. Kept, because the observation is solid; flagged,
    because the mechanism is not where it was assumed to be. */
-#define ENEMY_FIRE_ONE_IN        2  /*@MEASURED*/
+/* THE GATE IS ON THE WHOLE ENEMY TURN, NOT ON EACH SHIP -- BINARY 2026-08-27,
+ * read at the ONE call site of the fire routine, in the turn loop at 0x005917:
+ *
+ *     if ([0x1F31] == 'Y')        skip the enemy turn entirely
+ *     if ([0x26E3]) {                              ; the ship MOVED this turn
+ *         if (Random(100) >= 60)  skip the enemy turn entirely
+ *     }
+ *     call 0x01658F               ; enemy MOVEMENT
+ *     call 0x016844               ; enemy FIRE
+ *     [0x26E3] = 0
+ *
+ * `ENEMY_FIRE_ONE_IN 2` was a MEASURED observation -- 5/10, 5/10, 7/10, 4/8 --
+ * of a mechanism in a different place and of a different shape, and this core
+ * implemented it as a PER-SHIP hold-fire roll. There is no per-ship roll: the
+ * firing loop skips a ship only when its hit points are zero or its cell holds
+ * the death pod. Every ship in the quadrant fires, or none does.
+ *
+ * AND IT ONLY APPLIES IF YOU MOVED. [0x26E3] is set by `fn 0x0C609` (MOVE) and
+ * by the supernova throw at 0x00AC9B, and cleared the moment the enemy turn
+ * finishes. Stand still and the enemy always acts; move and there is a 40%
+ * chance of getting away with it. That is a real tactical rule this port did
+ * not have, and it explains the measured "about half" exactly.
+ *
+ * [0x1F31] is one of the setup screen's two Y/N answers (`fn 0x14CB9` asks
+ * "Will you require a briefing <Y/N>?" and "Restore a saved game <Y/N>?"),
+ * upper-cased and stored. A 'Y' suppresses the enemy's FIRST turn and the
+ * loop then forces it to 'N' at 0x0059CE. Which of the two questions it is
+ * has not been read, so it is NOT built. */
+#define ENEMY_TURN_OF_N        100  /*@BINARY*/
+#define ENEMY_TURN_AFTER_MOVE   60   /* Random(100) < 60 */  /*@BINARY*/
 
 /* SYSTEM DAMAGE FROM COMBAT -- read out of the binary 2026-08-26, and it
  * replaced a threshold that never existed.

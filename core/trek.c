@@ -335,6 +335,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.life_reserve = LIFE_RESERVE_MAX_TENTHS;
     ship.life_gone    = 0;
     ship.boarders     = BOARD_NONE;
+    ship.moved        = 0;
     ship.board_until  = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
@@ -1175,6 +1176,10 @@ static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
 }
 
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
+    /* [0x26E3] in fn 0x0C609: moving buys a 40%% chance the enemy turn is
+       skipped. Set on every path that actually moves the ship. */
+    ship.moved = 1;
+
     uint16_t d16, cost;
     uint8_t blocked;
 
@@ -1295,6 +1300,10 @@ static uint16_t warp_hundredths(uint16_t d16) {
 }
 
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
+    /* [0x26E3] in fn 0x0C609: moving buys a 40%% chance the enemy turn is
+       skipped. Set on every path that actually moves the ship. */
+    ship.moved = 1;
+
     uint16_t d16, cost;
     uint8_t ay1, ax1;
 
@@ -1829,6 +1838,17 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
 
+    /* THE WHOLE TURN IS GATED, and only when the ship moved -- 0x005917.
+       Cleared either way, exactly as the original clears [0x26E3] at 0x00594A
+       whether the turn ran or was skipped. */
+    {
+        uint8_t skip = (uint8_t)(ship.moved
+                                 && trek_rand_n(ENEMY_TURN_OF_N)
+                                        >= ENEMY_TURN_AFTER_MOVE);
+        ship.moved = 0;
+        if (skip) return 0;
+    }
+
     /* The turn's tally starts here and is read once, at the bottom. Anything
        a scheduled event put in it before now is discarded, which is what the
        original does: [0x1DC8] and [0x1DC6] are zeroed on entry to the fire
@@ -1853,8 +1873,6 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
            This is per enemy and per turn, so a quadrant full of them still
            delivers something most turns -- it is the single duel that goes
            quiet, which is where it was measured. */
-        if (trek_rand_n(ENEMY_FIRE_ONE_IN)) continue;
-
         d = trek_dist(abs_diff((uint8_t)(cell >> 3), ship.sec_y),
                       abs_diff((uint8_t)(cell & 7), ship.sec_x));
         energy = enemy_fire_energy(enemy_hp[cell]);
@@ -1994,7 +2012,8 @@ static uint8_t star_supernova(uint8_t sy, uint8_t sx, uint16_t *damage) {
     gal_stars[here]   = 0;
     gal_nova[here]    = 1;
 
-    nova_quad = dest;
+    nova_quad  = dest;
+    ship.moved = 1;          /* 0x00AC9B -- being thrown counts as moving */
 
     /* Thrown into a quadrant that is already burnt: "Lexington destroyed."
        0x00AC2F, and it is why the "blown to quad" line is suppressed there --
