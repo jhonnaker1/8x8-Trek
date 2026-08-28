@@ -963,7 +963,7 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define SCHED_BASE_ATTACK    0   /* DS:0x1D90 */  /*@BINARY*/
 #define SCHED_BASE_FALLS     1   /* DS:0x1D96 */  /*@BINARY*/
 #define SCHED_TRACTOR        2   /* no slot in the original; see above */  /*@PROVISIONAL*/
-#define SCHED_DEATH_POD      3   /* no slot in the original; see above */  /*@PROVISIONAL*/
+#define SCHED_DEATH_POD      3   /* NOT an event at all -- see below */  /*@PROVISIONAL*/
 #define SCHED_COUNT          4  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
@@ -982,10 +982,31 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define SCHED_FALLS_SPAN_TENTHS    20  /*@BINARY*/
 #define SCHED_FIRST_ATTACK_DAYS     4  /* Random(4) WHOLE stardates */  /*@BINARY*/
 
-/* The tractor and the pod, which the original does not schedule at all. These
-   reproduce the means this port has always used, in the uniform form the
-   original uses everywhere else. Replace them, do not tune them: what is
-   wanted is the real trigger, not a better guess at an interval. */
+/* The tractor and the pod, which the original does not schedule at all.
+ *
+ * THE DEATH POD IS AN OBJECT, NOT AN EVENT -- found 2026-08-26 in the
+ * quadrant fill at 0x01649D. On entering a quadrant:
+ *
+ *     if (ships_here >= 5)          no pod
+ *     if (quadrant COLUMN != 8)     no pod          <-- yes, really
+ *     if (Random(10) <= 5)          no pod          -- so 4 in 10
+ *     place 'R' in a free sector, enemy table type 6
+ *
+ * It is a sector object with a table entry, which is why a torpedo aimed at
+ * it answers "No damage reported." rather than killing it. Rebuilding it that
+ * way needs a sector code and its own turn behaviour, so the scheduled
+ * stand-in below stays until then -- but it is a stand-in for a mechanic of a
+ * completely different shape, not a mistuned interval.
+ *
+ * The COLUMN 8 condition is extraordinary and is recorded as read: the
+ * instruction is `cmp word ptr [0x1DE6], 8` reached from a verified jump
+ * target, and [0x1DE6] is the quadrant column everywhere else in the binary.
+ * It is the second such quirk in this program -- reinforcements only ever
+ * arrive in column 1, which the message text itself confirms. One emulator
+ * run flying column 8 repeatedly would settle it; nothing else needs to.
+ *
+ * These reproduce the means this port has always used, in the uniform form
+ * the original uses everywhere else. Replace them, do not tune them. */
 #define SCHED_TRACTOR_BASE_TENTHS  100  /*@PROVISIONAL*/
 #define SCHED_TRACTOR_SPAN_TENTHS  700  /*@PROVISIONAL*/
 #define SCHED_POD_BASE_TENTHS      100  /*@PROVISIONAL*/
@@ -1279,12 +1300,12 @@ uint8_t trek_game_state(void);
 /* MEASURED off the Detailed Evaluation's own rubric, and reachable at last:
    settlements evacuated, at 200 apiece. See core/planet.h for what produces
    them. */
-#define SCORE_PER_RESCUE       200  /*@MEASURED*/
+#define SCORE_PER_RESCUE       200  /*@BINARY*/
 #define SCORE_PER_MONGOL        10  /*@MEASURED*/
 #define SCORE_PER_COMMANDER     20  /*@MEASURED*/
 #define SCORE_PER_ENEMY_BASE    50  /*@MEASURED*/
-#define SCORE_PER_KILL_DAY     500  /*@FITTED*/
-#define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */  /*@MEASURED*/
+#define SCORE_PER_KILL_DAY     500  /*@BINARY*/
+#define SCORE_BASE_LOST       (-200)   /* "Bases hit", i.e. ours, lost */  /*@BINARY*/
 #define SCORE_INCOMPLETE      (-300)  /*@MEASURED*/
 
 /* MEASURED 2026-08-24 off two loss sheets, combat and self-destruct alike. It
@@ -1325,12 +1346,21 @@ uint8_t trek_game_state(void);
    An earlier SCORE_SHIP_LOST (-200) here was invented and double-counted. */
 #define CREW_COMPLEMENT        430  /*@MEASURED*/
 
-/* Minimum elapsed time for the rate term, in tenths -- the ancestor's five
-   stardates. It applies unconditionally here, where the ancestor applies it
-   only when time is zero or enemies remain; with the term gated on a finished
-   mission, its other trigger cannot fire. Without a floor a win at 0.1
-   stardates would compute 500 x kills x 10, which leaves 16 bits. */
-#define SCORE_MIN_TENTHS        50  /*@DERIVED*/
+/* THE GATE ON THE RATE TERM, read out of fn 0x1DD4F at 0x01E270:
+ *
+ *     if (stardate < 3503.0)  rate = 0
+ *     else                    rate = kills / (stardate - 3500.0)
+ *
+ * A hard zero below THREE stardates, and no floor above it -- not the
+ * ancestor's five-stardate clamp, which this port had been applying always.
+ * And **it is not gated on finishing the mission**, which is the other half
+ * of what this port invented: the rate is computed whether or not enemies
+ * remain, and only the -300 incomplete penalty depends on that.
+ *
+ * This is the "something gates it that we do not understand" from
+ * 2026-08-21. The sheet printed 0.00 against two kills in 1.2 stardates
+ * because 3501.2 is under 3503, full stop. */
+#define SCORE_MIN_TENTHS        30   /* under 3.0 stardates the term is zero */  /*@BINARY*/
 
 int16_t trek_score(void);
 
@@ -1339,10 +1369,18 @@ int16_t trek_score(void);
    this and derives trek_score() from its total, so the sheet the player reads
    and the number recorded can never disagree.
  *
- * Three items have no mechanism behind them yet and are always zero: rescues,
- * enemy bases destroyed, and stars destroyed. They are kept as fields rather
- * than omitted because the original prints all nine rows whatever happened,
- * and because their absence is a to-do rather than a design choice. */
+ * Two items have no mechanism behind them yet and are always zero: enemy
+ * bases destroyed, and stars destroyed -- the latter is [0x1DF6] in the
+ * original, at -5 each, incremented by a torpedo that destroys a star, which
+ * is a mechanic this core does not have. Rescues DO count now, and note that
+ * they are forfeit with the ship: the binary credits them in the same branch
+ * that applies the -200 (0x01E3A0). Bases hit counts OUR bases lost to ANY
+ * cause including our own torpedo (0x00B10C), where this port counts only
+ * the ones a siege takes.
+ *
+ * All nine rows are kept as fields whatever happened, because the original
+ * prints all nine, and because an absence is a to-do rather than a design
+ * choice. */
 typedef struct {
     uint16_t rescues;        int16_t rescue_pts;
                              int16_t incomplete_pts;

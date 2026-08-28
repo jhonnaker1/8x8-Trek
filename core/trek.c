@@ -1843,21 +1843,20 @@ uint8_t trek_game_state(void) {
     return GAME_ON;
 }
 
-/* MEASURED: every weight comes off the original's evaluation screen, and the
-   arithmetic on that sheet closed exactly. The kill/day term is deliberately
-   absent -- it printed 0.00 against two kills in 1.2 stardates, so something
-   gates it that we do not understand, and implementing a guess would be
-   worse than leaving it out. */
 /* 500 x kills / elapsed_stardates, in integers and without leaving 16 bits.
+ * The 500 and the three-stardate gate are both read from fn 0x1DD4F -- see
+ * SCORE_MIN_TENTHS in trek.h.
  *
  * Done as (500 * kills) * 10 / tenths rather than 5000 * kills / tenths: the
  * first product is at most 500 x 64 = 32000 and fits, while 5000 x 64 does
  * not. The remainder is carried so a fractional stardate is not simply
- * dropped -- at the five-stardate floor, dropping it would cost up to 18%. */
+ * dropped -- at the gate, dropping it would cost up to 30%. */
 static uint16_t kill_rate_points(uint16_t kills, uint16_t tenths) {
     uint16_t a, q, r;
 
-    if (tenths < SCORE_MIN_TENTHS) tenths = SCORE_MIN_TENTHS;
+    /* A HARD ZERO under three stardates, not a clamp. The original gives no
+       credit at all before then, and no floor after it. */
+    if (tenths < SCORE_MIN_TENTHS) return 0;
     if (kills > 64) kills = 64;          /* keeps `a` inside 16 bits */
 
     a = (uint16_t)(SCORE_PER_KILL_DAY * kills);
@@ -1883,13 +1882,20 @@ void trek_score_sheet(ScoreSheet *s) {
     /* Mechanisms that do not exist yet. Written out rather than left to a
        memset so it is obvious they are zero by absence, not by outcome. */
     s->rescues     = ship.rescues;
-    s->rescue_pts  = (int16_t)(ship.rescues * SCORE_PER_RESCUE);
+    s->rescue_pts  = ship.lost ? 0
+                   : (int16_t)(ship.rescues * SCORE_PER_RESCUE);
     s->enemy_bases = 0; s->enemy_base_pts = 0;
     s->stars       = 0; s->star_pts      = 0;
 
-    /* MEASURED: a flat -200 for losing the ship, separate from the crew.
-       Absent from a surviving ship's sheet, present on both a combat loss and
-       a self-destruction. */
+    /* A flat -200 for losing the ship, separate from the crew. The binary
+       decides it by testing whether the SHIELD REAL is still above zero --
+       the game zeroes it when the ship dies (0x00A6FF, 0x016FA3) and uses it
+       as the survival flag at 0x01E3A0. `ship.lost` is the same thing said
+       properly.
+
+       AND IT IS THE SAME BRANCH AS THE RESCUES: `if (survived) score +=
+       rescues*200 else score -= 200`. Lose the ship and the people you
+       rescued earn you nothing. */
     s->ship_lost_pts = ship.lost ? SCORE_SHIP_LOST : 0;
 
     s->mongols       = ship.killed;
@@ -1901,17 +1907,18 @@ void trek_score_sheet(ScoreSheet *s) {
     s->bases_hit     = bases_lost;
     s->bases_hit_pts = (int16_t)(bases_lost * SCORE_BASE_LOST);
 
-    /* The rate term credits only on a finished mission, and the penalty only
-       on an unfinished one -- they are the two halves of one condition. */
-    if (ship.enemies_left) {
-        s->incomplete_pts  = SCORE_INCOMPLETE;
+    /* THE TWO ARE INDEPENDENT. The -300 depends on enemies remaining; the
+       rate term depends only on the clock. This port used to pair them, so a
+       captain who ran out of time scored nothing for the ships he did kill.
+       The original credits him. */
+    s->incomplete_pts  = ship.enemies_left ? SCORE_INCOMPLETE : 0;
+    if (elapsed < SCORE_MIN_TENTHS) {
         s->rate_hundredths = 0;
         s->rate_pts        = 0;
     } else {
-        uint16_t t = elapsed < SCORE_MIN_TENTHS ? SCORE_MIN_TENTHS : elapsed;
-        s->incomplete_pts  = 0;
         /* kills per stardate, x100, staged to stay inside 16 bits. */
-        s->rate_hundredths = (uint16_t)((uint16_t)((kills > 64 ? 64 : kills) * 1000u) / t);
+        s->rate_hundredths =
+            (uint16_t)((uint16_t)((kills > 64 ? 64 : kills) * 1000u) / elapsed);
         s->rate_pts        = (int16_t)kill_rate_points(kills, elapsed);
     }
 

@@ -5397,3 +5397,95 @@ The same routine draws stars at 0x016490, and just before it:
 `DS:0x24E9` is a per-quadrant count of destroyed stars, incremented by the
 torpedo-into-a-star path at 0x00AD3E. So novas persist for the rest of the
 game, and the quadrant fill redraws them every time you come back.
+
+---
+
+## The score sheet, and what actually gated the kill rate (2026-08-26)
+
+`fn 0x1DD4F`, segment base 0x1BD60, 3,058 bytes. It owns the whole Top Secret
+report -- every loss message ("destroyed by Vandal death pod", "pulled into
+black hole & destroyed", "The cowardly captain... surrendered his ship"), the
+Detailed Evaluation and the promotion line.
+
+### The gate, which has been open since 2026-08-21
+
+trek.h has carried this since the score sheet was first built: *"The kill/day
+term is deliberately absent -- it printed 0.00 against two kills in 1.2
+stardates, so something gates it that we do not understand, and implementing
+a guess would be worse than leaving it out."*
+
+At 0x01E270:
+
+    stardays in action = stardate - 3500.0
+    if (stardate < 3503.0)  rate = 0
+    else                    rate = (total - remaining) / (stardate - 3500.0)
+    score += Round(500.0 * rate)
+
+**The gate is three stardates on the clock, and nothing else.** 3501.2 is under
+3503, so the sheet printed 0.00; the unfinished mission it was attributed to
+had nothing to do with it. 3500.0, 3503.0 and 500.0 all decode exact.
+
+Two things the port had wrong follow:
+
+  1. **It is not gated on finishing.** This port paired the rate term with the
+     -300 incomplete penalty as "two halves of one condition", so a captain
+     who ran out of time scored nothing for the ships he killed. The original
+     pays him. Only the -300 depends on enemies remaining.
+  2. **There is no five-stardate floor.** The port carried the ancestor's
+     clamp and applied it always, which paid out for a win at 0.1 stardates.
+     The original pays nothing at all below 3.0 and divides by the real
+     elapsed time above it.
+
+`SCORE_PER_KILL_DAY 500` was FITTED and is confirmed exactly.
+
+### The rest of the sheet, and one rule nobody had
+
+    if (shields [0x1D60] > 0.0)   score += rescues * 200
+    else                          score -= 200
+    score -= casualties [0x1DDE]
+    score -= stars_destroyed [0x1DF6] * 5
+    score -= bases_hit [0x1DF8] * 200
+
+**The ship-survived test is the SHIELD REAL being above zero** -- the game
+zeroes it when the ship dies (0x00A6FF, 0x016FA3) and reuses it as the flag.
+And the rescue credit is in the *same branch*: **lose the ship and the people
+you rescued earn you nothing.** The port credited them unconditionally.
+
+`[0x1DF6]` is the stars-destroyed counter the torpedo-into-a-star path
+increments, and `[0x1DF8]` counts OUR bases lost to any cause -- including a
+torpedo of our own, at 0x00B10C, which is where "Are you mad? You damaged a
+base!" leads. Four separate sites increment the rescue counter; this port has
+one of them.
+
+### THE DEATH POD IS NOT AN EVENT
+
+`fn 0x1DD4F` was on the routine map as "death pod + score" because it prints
+the pod's loss message. The pod itself is in the QUADRANT FILL, at 0x01649D,
+and it is an object:
+
+    if (ships already here >= 5)     no pod
+    if (quadrant COLUMN != 8)        no pod
+    if (Random(10) <= 5)             no pod        -- so four times in ten
+    place 'R' in a free sector, enemy table type 6
+
+That explains why a torpedo aimed at it answers "No damage reported." rather
+than destroying it: it is an enemy-table entry with its own rules.
+
+So `SCHED_DEATH_POD` is not a mistuned interval, it is a stand-in for a
+mechanic of a completely different shape. Kept -- rebuilding it needs a sector
+code and its own turn behaviour -- but tagged for what it is.
+
+**The COLUMN 8 condition is extraordinary and is recorded as read.** The
+instruction is `cmp word ptr [0x1DE6], 8`, reached from a verified jump target,
+and `[0x1DE6]` is the quadrant column everywhere else in the binary. It is the
+**second** such quirk here: reinforcements only ever arrive in column 1, and
+that one the message text itself confirms by ending in a separate `-1.`
+string. Two independent one-column rules make each other more credible, not
+less. One emulator run flying column 8 repeatedly would settle it.
+
+### Where the tiers stand after this
+
+**FITTED: 0. DERIVED: 0.** Every constant in `core/trek.h` and
+`core/planet.h` is now BINARY, CONFIRMED, MEASURED or ID, except seven
+PROVISIONAL entries -- and all seven are the tractor-beam and death-pod
+stand-ins, whose real shapes are now known and unbuilt rather than unknown.

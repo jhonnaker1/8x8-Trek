@@ -1875,36 +1875,71 @@ static void test_game_state_and_score(void) {
     bases_lost = 2;
     ok(trek_score() == -300 + 2 * SCORE_BASE_LOST, "each base lost costs 200");
 
-    /* The rate term. Gated on a finished mission -- the whole point of open
-       item 13, where the original printed 0.00 with kills on the board. */
+    /* THE RATE TERM IS GATED ON THE CLOCK, NOT ON FINISHING -- fn 0x1DD4F at
+       0x01E270 tests `stardate < 3503.0` and nothing else. The 0.00 the
+       original printed against two kills in 1.2 stardates was that gate, not
+       the unfinished mission it was attributed to. */
     trek_new_game(3, 4242);
     ship.enemies_left = 3;
     ship.killed = 2;
     ship.stardate = (uint16_t)(STARDATE_START + 12);   /* 1.2 stardates */
     ok(trek_score() == 2 * 10 - 300,
-       "unfinished: the rate term contributes nothing, as the original printed");
+       "under three stardates the rate is nothing, as the original printed");
+
+    /* Same 1.2 stardates, mission FINISHED: still nothing. The old model
+       credited this and the original does not. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.killed = 2;
+    ship.stardate = (uint16_t)(STARDATE_START + 12);
+    ok(trek_score() == 2 * 10,
+       "and finishing early does not unlock it -- the gate is the clock");
+
+    /* Four stardates, mission UNFINISHED: the original PAYS. This is the
+       half the port had backwards -- a captain who ran out of time still
+       scores for the ships he killed. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 3;
+    ship.killed = 2;
+    ship.stardate = (uint16_t)(STARDATE_START + 40);   /* 4 stardates */
+    ok(trek_score() == 2 * 10 - 300 + 250,
+       "an unfinished mission still earns the rate term");
 
     trek_new_game(3, 4242);
     ship.enemies_left = 0;
     ship.killed = 2;
     ship.stardate = (uint16_t)(STARDATE_START + 100);  /* 10 stardates */
     ok(trek_score() == 2 * 10 + 100,
-       "finished: 2 kills in 10 stardates is 0.2/day, worth 100");
+       "2 kills in 10 stardates is 0.2/day, worth 100");
 
-    /* The five-stardate floor, which stops an instant win paying out
-       absurdly -- and stops the arithmetic leaving 16 bits. */
+    /* No division by zero at the boundary, and none below it. */
     trek_new_game(3, 4242);
     ship.enemies_left = 0;
     ship.killed = 2;
     ship.stardate = STARDATE_START;                    /* no time at all */
-    ok(trek_score() == 2 * 10 + 200,
-       "no elapsed time is floored at five stardates, not divided by zero");
+    ok(trek_score() == 2 * 10, "no elapsed time scores nothing, and does not divide by zero");
 
     trek_new_game(3, 4242);
     ship.enemies_left = 0;
     ship.killed = 2;
-    ship.stardate = (uint16_t)(STARDATE_START + 10);   /* 1 stardate */
-    ok(trek_score() == 2 * 10 + 200, "and so is anything under five");
+    ship.stardate = (uint16_t)(STARDATE_START + 30);   /* exactly 3.0 */
+    ok(trek_score() == 2 * 10 + 333, "and 3.0 exactly is the first stardate that pays");
+
+    /* RESCUES ARE FORFEIT WITH THE SHIP. The binary credits them in the
+       `survived` arm of the same branch that applies the -200. */
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.rescues = 2;
+    /* The literal, not the constant -- an assertion written in terms of the
+       #define it is testing moves with it and checks nothing. */
+    ok(trek_score() == 400, "a surviving captain is paid 200 a rescue");
+    trek_new_game(3, 4242);
+    ship.enemies_left = 0;
+    ship.rescues = 2;
+    ship.lost = 1;
+    ship.casualties = 0;
+    ok(trek_score() == -200,
+       "and a dead one is not -- they go with the ship");
 
     /* A fractional stardate must not be dropped: 4 kills in 7.5 days is
        0.533/day = 266, where truncating to 7 days would say 285 and

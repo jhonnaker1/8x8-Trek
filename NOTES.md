@@ -1214,6 +1214,9 @@ DECODED so far, with what each gave:
     0x16119.. -  enemy strengths    all four classes, all level formulas
     0x0160xx  -  QUADRANT FILL      black holes 1 quadrant in 4; novas persist
     0x05181   2  enemy count        (level+1)*8 shaved 0..9%, +Random(10), +3
+    0x1DD4F   2  THE SCORE SHEET    rate gated on 3 stardates, not on finishing
+    0x1649D   1  the DEATH POD      an OBJECT in the quadrant fill, not an event
+    0x1857E   2  free sector        Random(8)+1 twice until the cell is '.'
     0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
     0x1F9D5   -  base attack/falls  the two schedule slots, with constants
     DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
@@ -1224,7 +1227,6 @@ STILL TO READ, with the open item each would close:
 
     0x15D6E   2  department damage  called from the turn loop at 0x005954
     0x0F022   -  DOCKING            what Supply and Research actually give
-    0x1DD4F   2  death pod + score  pod damage law, score kill-rate term
     0x1ED00   3  supernova          unbuilt
     0x15F51   4  Union wreckage     unbuilt screen
     0x181E8   1  capture            boarding-party frequency
@@ -1335,9 +1337,9 @@ measured by playing). The queue:
     of the three exists. The original RAY-MARCHES; the accuracy curve and the
     damage spread were both shadows of it. Damage is `(level+4)*15 + 250`,
     which is also a battleship's hit points, at every level.
-  * and what is still queued: the score kill-rate term and the death pod's
-    real trigger (both in fn 0x1DD4F), `SHIELD_RAISE_COST` (fn 0x008894), and
-    the enemy fire law in the rest of fn 0x16844
+  * and what is still queued: `SHIELD_RAISE_COST` (fn 0x008894), the enemy
+    fire law in the rest of fn 0x16844, and the TRACTOR BEAM's real trigger
+    inside MOVE (fn 0x0C609) -- the last PROVISIONAL pair
 
 The emulator keeps its job: confirming that a constant read statically
 produces the behaviour seen on screen. One run to confirm beats a hundred to
