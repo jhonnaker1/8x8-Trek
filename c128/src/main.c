@@ -1191,6 +1191,41 @@ static void enemy_turn(uint8_t player_fired) {
     trek_turn_end();
 }
 
+/* A supernova's four lines. In OVL_CMDS -- the rare-and-modal overlay --
+   because it is 4% of a star hit and star hits are themselves uncommon,
+   while fire_one_torpedo around it is the hottest code in the game and must
+   stay resident. Splitting it here took resident free from 178 back to a
+   workable margin. */
+OVL_CODE("cmds") static void report_nova(uint16_t dmg) {
+            /* The original's four lines, cut to the dialog's width:
+               "Star at R-C goes supernova!", "Lexington blown to quad Q.",
+               "N Mongols destroyed.", and the damage. */
+            uint8_t m;
+            ui_dialog_line(S(S_270));
+            if (nova_kills) {
+                m  = put_u16(linebuf, nova_kills);
+                m += put_str(linebuf + m, S(S_265));
+                linebuf[m] = 0;
+                ui_dialog_line(linebuf);
+            }
+            m  = put_u16(linebuf, dmg);
+            m += put_str(linebuf + m, ship.shields_up ? S(S_266)
+                                                      : S(S_267));
+            linebuf[m] = 0;
+            ui_dialog_line(linebuf);
+            if (ship.lost) {
+                ui_dialog_line(S(S_269));
+            } else {
+                m  = put_str(linebuf, S(S_268));
+                m += put_sector(linebuf + m, (uint8_t)(nova_quad >> 3),
+                                             (uint8_t)(nova_quad & 7));
+                linebuf[m++] = '.';
+                linebuf[m] = 0;
+                ui_dialog_line(linebuf);
+            }
+            snd_effect(SFX_D);
+}
+
 /* One torpedo, fired and reported. Split out because the original fires a
    SALVO -- it asks how many first, then a sector per tube -- and the reporting
    is identical for each. */
@@ -1207,10 +1242,15 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             break;
         /* The port DOES ray-march now (2026-08-26), so this fires on a star
            anywhere in the flight path, not only on the aimed-at cell. The
-           original's other two star outcomes -- supernova, and the star
-           destroyed outright -- are still unbuilt; see core/trek.h. */
+           SUPERNOVA branch is built (2026-08-27); the third outcome, the star
+           destroyed outright leaving a nova cell, still is not -- it wants a
+           sector code this port does not have. See core/trek.h. */
         case TORP_ABSORBED:
             ui_dialog_line(S(S_85));
+            break;
+        case TORP_NOVA:
+            ovl_load(OVL_CMDS);
+            report_nova(dmg);
             break;
         case TORP_PLANET:
             ui_dialog_line(S(S_245));

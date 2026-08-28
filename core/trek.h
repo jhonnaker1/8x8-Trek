@@ -448,6 +448,12 @@ extern uint8_t gal_commander[GAL_CELLS];
    reads it after MOVE_OK and clears it. */
 extern uint8_t tractored;
 
+/* Set by trek_fire_torpedo when a star went supernova: where we were thrown
+   (a galaxy cell index) and how many Mongols it took with it. Same shape as
+   `tractored` -- the torpedo returns a code and the UI needs more than one. */
+extern uint8_t  nova_quad;
+extern uint16_t nova_kills;
+
 /* Outcomes of firing. */
 #define FIRE_OK           0   /* hit, target survived */  /*@ID*/
 #define FIRE_KILL         1   /* hit, target destroyed */  /*@ID*/
@@ -1030,6 +1036,7 @@ uint8_t trek_shields_down(void);
 #define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
+#define EV_STAR_NOVA    14   /* y,x = where we were thrown; amount = damage */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
@@ -1430,6 +1437,49 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define NOVA_OF_N         100   /* Random(100) == 0 */  /*@BINARY*/
 #define NOVA_CHART_BURNT  999   /* what the chart prints for a burnt cell */  /*@BINARY*/
 
+/* ---------------------------------------- the TORPEDO's supernova, fn 0x0A8C8
+ *
+ * BINARY 2026-08-27, base 0x9310 at 10/10. THE OTHER ROUTE, and the one that
+ * can kill you -- everything the emulator saw and could not explain.
+ *
+ *     if (Random(100) <= 95) it is not a supernova     ; 4% if it is
+ *     "Star at R-C goes supernova!"
+ *
+ * WHERE THE SHIP GOES IS NOT RANDOM. It is pushed one quadrant, and the
+ * direction compares the star's SECTOR coordinate against the ship's QUADRANT
+ * coordinate -- dimensionally incoherent, and exactly what the code does:
+ *
+ *     nqy = qy;  nqx = qx
+ *     if      (star_row < qy && qy < 8)  nqy = qy + 1
+ *     else if (star_row > qy && qy > 1)  nqy = qy - 1
+ *     else if (star_col < qx && qx < 8)  nqx = qx + 1
+ *     else if (qy < 8)                   nqy = qy + 1
+ *     else                               nqy = qy - 1
+ *
+ * That reproduces the one measured observation: a star at sector 4-4 with the
+ * ship in quadrant 7-4 gives 4 < 7 and 7 < 8, so nqy = 8 -- "Lexington blown
+ * to quad 8-4", which is what the screen said.
+ *
+ *     every Mongol in the quadrant dies (the four hp slots are zeroed at
+ *         0x00AAC8) and the count drops; reaching zero WINS
+ *     damage = Random(600)
+ *         shields up   shields -= damage, whole      "unit hit absorbed"
+ *         shields down energy  -= damage, floor 0    "units of damage"
+ *                      and the damage is ADDED TO THE TURN'S HIT TALLY at
+ *                      0x00ABFE, so it can wreck systems through the ordinary
+ *                      Round(hits/350)+1 path
+ *     galaxy[here] = 999                                        0x00AC84
+ *     if (galaxy[destination] == 999)  "Lexington destroyed."    0x00AC2F
+ *
+ * THE LAST LINE IS THE STING: thrown into a quadrant that is ALREADY burnt,
+ * the ship is destroyed. It is also why the "blown to quad" message is
+ * suppressed when the destination is 999 -- you never arrive.
+ *
+ * Unlike the spontaneous route this one does NOT write the recorded chart.
+ * It does not need to: you were there. */
+#define NOVA_STAR_ABOVE    95   /* Random(100) > 95 on a star hit */  /*@BINARY*/
+#define NOVA_HIT_MAX      600   /* Random(600) */  /*@BINARY*/
+
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/
 #define DOCK_ALREADY         2  /*@ID*/
@@ -1464,6 +1514,7 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 #define TORP_NONE_LEFT   3  /*@ID*/
 #define TORP_BAD_COORDS  4  /*@ID*/
 #define TORP_BOARDED     10  /* EnTorp control is held */  /*@ID*/
+#define TORP_NOVA        11  /* the star went supernova */  /*@ID*/
 /* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:

@@ -1861,18 +1861,96 @@ static void test_torpedo(void) {
     /* A STAR IN THE PATH stops it, even though the target is beyond. That is
        a consequence of marching that the old model could not have. */
     {
-        int i, absorbed = 0;
+        int i, stopped = 0, nova = 0;
+        uint8_t r;
         trek_new_game(3, 4246);
-        for (i = 0; i < 50; i++) {
+        for (i = 0; i < 400; i++) {
+            trek_new_game(3, (uint16_t)(4246 + i));
+            ship.quad_y = 3; ship.quad_x = 3;   /* room to be thrown in any way */
             ship.sec_y = 6; ship.sec_x = 4;
             clear_quadrant();
             sector[(3 << 3) | 4] = SEC_STAR;
             sector[(1 << 3) | 4] = SEC_COMMAND;
             enemy_hp[(1 << 3) | 4] = 60000;
             ship.torps = 9; ship.shields_up = 0;
-            if (trek_fire_torpedo(1, 4, &dmg) == TORP_ABSORBED) absorbed++;
+            r = trek_fire_torpedo(1, 4, &dmg);
+            if (r == TORP_ABSORBED) stopped++;
+            else if (r == TORP_NOVA) nova++;
         }
-        ok(absorbed == 50, "a star in the flight path stops every torpedo");
+        ok(stopped + nova == 400,
+              "a star in the flight path always stops the torpedo");
+        /* fn 0x0A8C8 rolls Random(100) > 95, so four in a hundred. Four
+           hundred shots put the expectation at 16; this band is wide enough
+           to be stable and narrow enough to fail if the roll is dropped. */
+        ok(nova >= 4 && nova <= 34,
+              "and about four in a hundred send it supernova");
+    }
+
+    /* --- what a supernova does, fn 0x0A8C8 --- */
+    {
+        int i;
+        uint8_t r, got = 0;
+
+        /* The MEASURED throw: a star at sector row 3 (0-based) with the ship
+           in quadrant row 6 gives 3 < 6 and 6 < 7, so the ship goes to row 7
+           -- which in the original's 1-based numbers is "blown to quad 8-4",
+           the line the emulator captured. */
+        for (i = 0; i < 4000 && !got; i++) {
+            trek_new_game(3, (uint16_t)(1000 + i));
+            ship.quad_y = 6; ship.quad_x = 3;
+            ship.sec_y = 6; ship.sec_x = 4;
+            clear_quadrant();
+            sector[(3 << 3) | 4] = SEC_STAR;
+            ship.torps = 9; ship.shields_up = 0;
+            gal_enemies[(6 << 3) | 3] = 3;
+            ship.enemies_left = 10;
+            r = trek_fire_torpedo(1, 4, &dmg);
+            if (r == TORP_NOVA) got = 1;
+        }
+        ok(got, "a supernova can be provoked");
+        ok(ship.quad_y == 7 && ship.quad_x == 3,
+              "and the ship is thrown one quadrant, away from the star");
+        ok(gal_nova[(6 << 3) | 3], "the quadrant it left is burnt");
+        ok(nova_kills == 3, "every Mongol in it died");
+        ok(ship.enemies_left == 7, "and the count came down");
+        ok(dmg > 0 && dmg < 600, "the hit is Random(600)");
+        ok(!ship.lost, "an ordinary destination is survivable");
+
+        /* THE OTHER DIRECTION, and this is the case that actually
+           discriminates. With the star's sector row BELOW the ship's quadrant
+           row the second branch fires and the ship goes UP -- whereas the
+           first branch and the fallback both give quad_y + 1, so a test that
+           only ever exercises those cannot tell them apart. Found by
+           inverting the first condition and watching nothing fail. */
+        got = 0;
+        for (i = 0; i < 4000 && !got; i++) {
+            trek_new_game(3, (uint16_t)(1000 + i));
+            ship.quad_y = 2; ship.quad_x = 3;
+            ship.sec_y = 6; ship.sec_x = 4;
+            clear_quadrant();
+            sector[(5 << 3) | 4] = SEC_STAR;
+            ship.torps = 9; ship.shields_up = 0;
+            if (trek_fire_torpedo(1, 4, &dmg) == TORP_NOVA) got = 1;
+        }
+        ok(got, "a supernova below the ship can be provoked");
+        ok(ship.quad_y == 1 && ship.quad_x == 3,
+              "a star below the ship's row throws it UP one quadrant");
+
+        /* Thrown into a quadrant that is ALREADY burnt: destroyed. */
+        got = 0;
+        for (i = 0; i < 4000 && !got; i++) {
+            trek_new_game(3, (uint16_t)(1000 + i));
+            ship.quad_y = 6; ship.quad_x = 3;
+            ship.sec_y = 6; ship.sec_x = 4;
+            clear_quadrant();
+            sector[(3 << 3) | 4] = SEC_STAR;
+            ship.torps = 9; ship.shields_up = 0;
+            gal_nova[(7 << 3) | 3] = 1;          /* the destination */
+            if (trek_fire_torpedo(1, 4, &dmg) == TORP_NOVA) got = 1;
+        }
+        ok(got, "a supernova can be provoked again");
+        ok(ship.lost, "thrown into a burnt quadrant, the ship is destroyed");
+        ok(ship.quad_y == 6, "and it never arrives");
     }
 
     /* The level scales the damage, which is the same expression as a

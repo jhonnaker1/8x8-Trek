@@ -265,3 +265,9 @@
 262	SECURITY:
 263	COMMUNICATIONS:
 264	Supernova 
+265	 Mongols destroyed.
+266	 absorbed by shields.
+267	 units of damage.
+268	Blown to quad 
+269	Lexington destroyed.
+270	Star goes supernova!

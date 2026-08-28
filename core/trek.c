@@ -7,6 +7,8 @@ uint8_t gal_base[GAL_CELLS];
 uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
 uint8_t gal_nova[GAL_CELLS];
+uint8_t  nova_quad;
+uint16_t nova_kills;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
 Ship    ship;
@@ -1890,6 +1892,66 @@ static uint16_t isqrt16(uint16_t n) {
    Frac and `(y + 128) >> 8` is exactly its Round. Doing it zero-based would
    put the ship's own row at y = 0, where Frac of a slightly negative number
    stops meaning what the 0.3 and 0.6 tests assume. */
+/* A torpedo detonated a star. fn 0x0A8C8, and the whole shape is in trek.h.
+   The direction the ship is thrown compares the star's SECTOR row against the
+   ship's QUADRANT row, which is dimensionally incoherent and is what the
+   original does; it reproduces the one measured throw exactly. */
+static uint8_t star_supernova(uint8_t sy, uint8_t sx, uint16_t *damage) {
+    uint8_t nqy = ship.quad_y, nqx = ship.quad_x, here, dest, i;
+    uint16_t dmg;
+
+    if      (sy < ship.quad_y && ship.quad_y < GAL_DIM - 1) nqy++;
+    else if (sy > ship.quad_y && ship.quad_y > 0)           nqy--;
+    else if (sx < ship.quad_x && ship.quad_x < GAL_DIM - 1) nqx++;
+    else if (ship.quad_y < GAL_DIM - 1)                     nqy++;
+    else                                                    nqy--;
+
+    here = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    dest = (uint8_t)((nqy << 3) | nqx);
+
+    /* Everything in the quadrant goes, and the four hp slots are zeroed
+       outright at 0x00AAC8 -- there is no survival roll. */
+    nova_kills = gal_enemies[here];
+    if (nova_kills) {
+        ship.enemies_left = (uint16_t)(ship.enemies_left > nova_kills
+                                       ? ship.enemies_left - nova_kills : 0);
+        for (i = 0; i < QUAD_CELLS; i++)
+            if (SEC_IS_ENEMY(sector[i])) { sector[i] = SEC_EMPTY; enemy_hp[i] = 0; }
+    }
+    if (base_under_attack == here) {
+        base_under_attack = GAL_CELLS;
+        trek_sched_restore(SCHED_BASE_FALLS, SCHED_NEVER);
+    }
+
+    dmg = trek_rand_n16(NOVA_HIT_MAX);
+    if (ship.shields_up) {
+        ship.shields = (uint16_t)(ship.shields > dmg ? ship.shields - dmg : 0);
+    } else {
+        ship.energy = (uint16_t)(ship.energy > dmg ? ship.energy - dmg : 0);
+        /* 0x00ABFE adds it to the TURN'S hit tally, so a supernova can wreck
+           systems through the ordinary Round(hits/350)+1 path. */
+        turn_hits = (uint16_t)(turn_hits + dmg);
+    }
+    if (damage) *damage = dmg;
+
+    gal_enemies[here] = 0;
+    gal_base[here]    = BASE_NONE;
+    gal_stars[here]   = 0;
+    gal_nova[here]    = 1;
+
+    nova_quad = dest;
+
+    /* Thrown into a quadrant that is already burnt: "Lexington destroyed."
+       0x00AC2F, and it is why the "blown to quad" line is suppressed there --
+       you never arrive. */
+    if (gal_nova[dest]) { ship.lost = 1; return TORP_NOVA; }
+
+    ship.quad_y = nqy;
+    ship.quad_x = nqx;
+    trek_enter_quadrant();
+    return TORP_NOVA;
+}
+
 uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     int16_t  y, x, stepy, stepx;
     uint8_t  m, cy, cx, cell, c;
@@ -1956,7 +2018,16 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
         break;
     }
 
-    if (c == SEC_STAR)   return TORP_ABSORBED;
+    if (c == SEC_STAR) {
+        /* fn 0x0A8C8: four times in a hundred the star goes up. The other
+           96% is TORP_ABSORBED here; the original splits it 38.4/57.6
+           between "absorbed" and "the star is DESTROYED, cell -> 'N'", and
+           that second case wants a nova sector code this core does not have
+           yet. One branch of three, and it says so. */
+        if (trek_rand_n(100) > NOVA_STAR_ABOVE)
+            return star_supernova(cy, cx, damage);
+        return TORP_ABSORBED;
+    }
     if (c == SEC_PLANET) return TORP_PLANET;
     if (c == SEC_BASE)   return TORP_BASE_HIT;
 

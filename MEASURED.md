@@ -6001,3 +6001,77 @@ overwrites the lot; this core keeps the three digits apart and the sentinel
 needs somewhere to live. Save v7, 746 bytes. `front` went 3,353 -> 3,471 with
 the bigger record, which is exactly the room this morning's split bought.
 Audit BINARY 114.
+
+## The torpedo's supernova -- the route that CAN kill you (2026-08-27)
+
+`fn 0x0A8C8`, segment base **0x9310** at 10/10. Everything the 2026-08-26
+emulator session saw and could not explain is in this one routine, and its
+strings are that screenshot verbatim: 'Star at ', ' goes supernova!',
+'Lexington blown to quad ', ' Mongols destroyed.', ' unit hit absorbed by
+shields.', ' units of damage to Lexington.', 'Lexington destroyed.'
+
+### Where the ship goes is NOT random, and the rule is dimensionally odd
+
+    nqy = qy;  nqx = qx
+    if      (star_row < qy && qy < 8)  nqy = qy + 1
+    else if (star_row > qy && qy > 1)  nqy = qy - 1
+    else if (star_col < qx && qx < 8)  nqx = qx + 1
+    else if (qy < 8)                   nqy = qy + 1
+    else                               nqy = qy - 1
+
+**It compares the star's SECTOR coordinate against the ship's QUADRANT
+coordinate.** Both happen to be 1..8 so it compiles and runs; it means
+nothing physically. Recorded as read.
+
+It reproduces the measured throw exactly: star at sector 4-4 with the ship in
+quadrant 7-4 gives 4 < 7 and 7 < 8, so the ship goes to row 8 -- "Lexington
+blown to quad 8-4", which is what the screen said. That is the observation
+that had been filed for a day as needing an emulator session.
+
+### The rest
+
+    every Mongol in the quadrant dies -- the four hp slots are zeroed
+        outright at 0x00AAC8, with no survival roll; reaching zero WINS
+    damage = Random(600)
+        shields up    shields -= damage, the WHOLE hit
+        shields down  energy  -= damage, floored at 0, AND the damage is
+                      added to the turn's hit tally at 0x00ABFE -- so a
+                      supernova can wreck systems through the ordinary
+                      Round(hits/350)+1 path
+    galaxy[here] = 999                                       0x00AC84
+    if (galaxy[destination] == 999) "Lexington destroyed."   0x00AC2F
+
+**Thrown into a quadrant that is already burnt, the ship is destroyed.** That
+is also why the "blown to quad" line is suppressed when the destination is
+999 -- you never arrive. Unlike the spontaneous route this one does NOT write
+the recorded chart; it does not need to, you were there.
+
+### A test that could not fail, again
+
+The throw test first used a star ABOVE the ship, and inverting the first
+condition changed nothing -- because branch one and the fallback both give
+`qy + 1`. Only a star BELOW the ship exercises branch two, which is the one
+that differs. Caught by breaking the condition and watching nothing fail; the
+second case is in the suite now. Same shape as the life-support band test
+earlier today.
+
+### Cost, and the budget is now the constraint
+
+850 resident bytes as first written, which left **178 free**. Moving the
+four-line report into OVL_CMDS -- it is 4% of a star hit, while
+`fire_one_torpedo` around it is the hottest code in the game -- brought that
+back to **484**. Net 544 bytes for the feature.
+
+**484 is not enough for another feature.** The next one needs an overlay pass
+first. The remaining resident candidates are the second wave of `do_*`
+handlers: `do_repair`, `do_chart`, `do_planets`, `do_hail`, `do_sound`,
+`do_max_energy`, `do_shields_up/down` -- all small individually, and
+`do_repair`/`do_planets` call INTO other overlays so they cannot move without
+merging. Audit BINARY 116.
+
+### Still unbuilt from this routine
+
+The third star outcome. `fn 0x0A8C8` splits the other 96% as 38.4% "Torpedo
+absorbed by star." and 57.6% the star DESTROYED, cell -> 'N'. This core still
+answers TORP_ABSORBED for all of it, because the destroyed case wants a nova
+SECTOR code it does not have.
