@@ -109,6 +109,39 @@
 #define ENEMY_SPREAD_OF_N    10   /* plus a flat Random(10) */  /*@BINARY*/
 #define ENEMY_PER_QUADRANT    4   /* Random(4)+1 placed per quadrant, once */  /*@BINARY*/
 #define ENEMY_SIEGE           3   /* extra, at the base that starts besieged */  /*@BINARY*/
+
+/* MONGOL COMMANDERS ARE PER-QUADRANT STATE, not a roll made on arrival.
+ * `DS:0x23E9` is an 8x8 byte array and the quadrant fill at 0x016133 makes
+ * the first `commanders[q]` ships in a quadrant Commanders -- so which
+ * quadrant holds one is stable across visits, where this port re-rolled every
+ * entry. It is set during generation (0x0052A2), added to by reinforcements,
+ * and moved between quadrants by the enemy-movement code, which increments
+ * one entry and decrements another.
+ *
+ * AND THERE ARE NONE BELOW LEVEL 3: `cmp [0x1DF0], 7 / jl` guards the whole
+ * commander branch. */
+#define COMMANDER_MIN_LEVEL   3   /* below this, none exist */  /*@BINARY*/
+#define COMMANDER_IN_N        3   /* a quadrant with >1 enemy gets one ... */  /*@BINARY*/
+#define COMMANDER_OF_N        7   /* ... three times in seven */  /*@BINARY*/
+
+/* THE TRACTOR BEAM, read out of fn 0x0C609 at 0x00D83F on 2026-08-26. It is
+ * not an event and never was:
+ *
+ *     after a warp move, for every quadrant in the BOUNDING RECTANGLE of the
+ *     trip -- min(old,new) to max(old,new) on both axes --
+ *         if that quadrant holds enemies AND a Commander
+ *             if (Random(10) > 7)                    -- two times in ten
+ *                 pull the ship there, and stop looking
+ *
+ * "Lexington caught in long range tractor beam. Pulled to quadrant N-N."
+ *
+ * So flying PAST a Commander is what gets you yanked out of warp into its
+ * lap, and a long jump across a defended stretch of the galaxy is genuinely
+ * more dangerous than a short one. A scheduled event could not express that.
+ * The bounding rectangle is the original's own approximation of the path --
+ * it does not trace the line. */
+#define TRACTOR_OF_N         10   /* Random(10) ... */  /*@BINARY*/
+#define TRACTOR_ABOVE         7   /* ... must exceed 7 */  /*@BINARY*/
 #define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */  /*@CONFIRMED*/
 
 /* Stardates are carried in tenths, so these exceed cc65's 16-bit signed int
@@ -399,6 +432,15 @@
    Non-zero only where sector[] holds an enemy. */
 extern uint16_t enemy_hp[QUAD_CELLS];
 
+/* Commanders per quadrant -- the original's DS:0x23E9. Persistent state, not
+   a roll, which is what makes the tractor beam expressible. */
+extern uint8_t gal_commander[GAL_CELLS];
+
+/* Non-zero when the last warp move ended in a quadrant the captain did not
+   ask for, because a Commander in the flight path caught the ship. The UI
+   reads it after MOVE_OK and clears it. */
+extern uint8_t tractored;
+
 /* Outcomes of firing. */
 #define FIRE_OK           0   /* hit, target survived */  /*@ID*/
 #define FIRE_KILL         1   /* hit, target destroyed */  /*@ID*/
@@ -423,11 +465,13 @@ void trek_laser_begin_volley(void);
 uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
                         uint16_t *damage);
 
-/* MEASURED: the POWER DISTRIB report taken immediately after SHUP on a fresh
-   game, with nothing else having happened, showed main at 4950 of 5000. This
-   is the manual's unquantified "small amount of energy from the main energy
-   banks" (l.339-341). Lowering shields is free. */
-#define SHIELD_RAISE_COST    50  /*@PROVISIONAL*/
+/* CONFIRMED FROM THE BINARY 2026-08-26: fn at 0x00EA55 sets the shields-up
+   flag and then subtracts the real 50.0 from main energy, decoded from
+   `86 00 00 00 00 48`. The POWER DISTRIB reading that put it at 4950 of 5000
+   was exactly right, and the one thing this port had marked PROVISIONAL on a
+   single observation turns out to have been the correct reading all along.
+   Lowering shields is still free -- there is no matching subtraction. */
+#define SHIELD_RAISE_COST    50  /*@BINARY*/
 
 /* Galaxy, as four flat byte arrays rather than an array of structs. Flat
    arrays carry no padding, so the 68000 alignment tax the commodore-uno
@@ -948,11 +992,10 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *     attack lands on a whole stardate where later ones do not.
  *
  *  3. **The tractor beam and the death pod are NOT SCHEDULED.** Neither has a
- *     slot; the tractor lives inside MOVE (fn 0x0C609), which makes it
- *     action-triggered like the distress signal, and fn 0x1DD4F touches none
- *     of the eight. They are kept here because removing them would delete a
- *     feature whose real trigger has not been read yet -- but their means are
- *     the port's own invention and are tagged as such.
+ *     slot. THE TRACTOR IS NOW BUILT PROPERLY -- see TRACTOR_OF_N below, it
+ *     is action-triggered inside MOVE -- and its slot is gone from this
+ *     enum. The death pod is an OBJECT and is still a scheduled stand-in;
+ *     see SCHED_POD_BASE_TENTHS.
  *
  * FOUR SLOTS THIS CORE DOES NOT HAVE: the hail response, the boarding party,
  * a Union ship's distress call, and the supernova. All four are real events
@@ -962,9 +1005,8 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  * space probes, and supercommander movement. */
 #define SCHED_BASE_ATTACK    0   /* DS:0x1D90 */  /*@BINARY*/
 #define SCHED_BASE_FALLS     1   /* DS:0x1D96 */  /*@BINARY*/
-#define SCHED_TRACTOR        2   /* no slot in the original; see above */  /*@PROVISIONAL*/
-#define SCHED_DEATH_POD      3   /* NOT an event at all -- see below */  /*@PROVISIONAL*/
-#define SCHED_COUNT          4  /*@ID*/
+#define SCHED_DEATH_POD      2   /* NOT an event at all -- see below */  /*@PROVISIONAL*/
+#define SCHED_COUNT          3  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
 
@@ -1007,8 +1049,6 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *
  * These reproduce the means this port has always used, in the uniform form
  * the original uses everywhere else. Replace them, do not tune them. */
-#define SCHED_TRACTOR_BASE_TENTHS  100  /*@PROVISIONAL*/
-#define SCHED_TRACTOR_SPAN_TENTHS  700  /*@PROVISIONAL*/
 #define SCHED_POD_BASE_TENTHS      100  /*@PROVISIONAL*/
 #define SCHED_POD_SPAN_TENTHS      900  /*@PROVISIONAL*/
 

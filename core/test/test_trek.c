@@ -951,7 +951,9 @@ static void test_shields(void) {
     before = ship.energy;
     ok(trek_shields_up() == SHIELD_OK, "they can be raised");
     ok(ship.shields_up,               "and read as raised");
-    ok(ship.energy == before - SHIELD_RAISE_COST,
+    /* The literal: the binary subtracts the real 50.0 at 0x00EA6C. Written
+       in terms of the #define this would move with it and check nothing. */
+    ok(ship.energy == before - 50,
        "raising costs the main banks, not the shield charge");
     ok(trek_shields_up() == SHIELD_ALREADY, "raising twice is refused");
 
@@ -1197,6 +1199,116 @@ static void test_docking(void) {
     ok(ship.docked == BASE_NONE,     "a real move does");
 }
 
+/* THE TRACTOR BEAM, read out of fn 0x0C609 on 2026-08-26. It is not an event:
+   flying PAST a Commander is what catches you. */
+static void test_tractor(void) {
+    uint8_t i, caught = 0, past = 0;
+    puts("the tractor beam (BINARY: it is a move, not an event)");
+
+    /* No Commander anywhere: it can never fire. */
+    trek_new_game(3, 4242);
+    for (i = 0; i < GAL_CELLS; i++) gal_commander[i] = 0;
+    for (i = 0; i < 100; i++) {
+        ship.quad_y = 0; ship.quad_x = 0; ship.sec_y = 0; ship.sec_x = 0;
+        ship.energy = 60000U; ship.shields_up = 0;
+        clear_quadrant();
+        tractored = 0;
+        trek_move_warp(7, 7, 3, 3);
+        if (tractored) caught++;
+    }
+    ok(caught == 0, "with no Commander in the galaxy nothing ever catches us");
+
+    /* One Commander squarely in the flight path. Two in ten per quadrant, and
+       a corner-to-corner jump crosses its quadrant once. */
+    trek_new_game(3, 4242);
+    caught = 0;
+    for (i = 0; i < 200; i++) {
+        uint8_t k;
+        for (k = 0; k < GAL_CELLS; k++) { gal_commander[k] = 0; gal_enemies[k] = 0; }
+        gal_commander[(4 << 3) | 4] = 1;
+        gal_enemies[(4 << 3) | 4]   = 2;
+        ship.quad_y = 0; ship.quad_x = 0; ship.sec_y = 0; ship.sec_x = 0;
+        ship.energy = 60000U; ship.shields_up = 0;
+        clear_quadrant();
+        tractored = 0;
+        trek_move_warp(7, 7, 3, 3);
+        if (tractored) {
+            caught++;
+            /* And it pulls us to the Commander, not somewhere random. */
+            if (ship.quad_y == 4 && ship.quad_x == 4) past++;
+        }
+    }
+    ok(caught > 20 && caught < 70, "one Commander in the path catches us about two times in ten");
+    ok(past == caught, "and pulls us to ITS quadrant, not a random one");
+
+    /* THE SAME COMMANDER OUTSIDE THE BOUNDING RECTANGLE CANNOT REACH US.
+       This is the discriminator against the old scheduled model, which had no
+       geometry at all. */
+    trek_new_game(3, 4242);
+    caught = 0;
+    for (i = 0; i < 200; i++) {
+        uint8_t k;
+        for (k = 0; k < GAL_CELLS; k++) { gal_commander[k] = 0; gal_enemies[k] = 0; }
+        gal_commander[(7 << 3) | 7] = 1;      /* far corner */
+        gal_enemies[(7 << 3) | 7]   = 2;
+        ship.quad_y = 0; ship.quad_x = 0; ship.sec_y = 0; ship.sec_x = 0;
+        ship.energy = 60000U; ship.shields_up = 0;
+        clear_quadrant();
+        tractored = 0;
+        trek_move_warp(1, 1, 3, 3);           /* a short hop nowhere near it */
+        if (tractored) caught++;
+    }
+    ok(caught == 0, "a Commander outside the trip's rectangle cannot reach us");
+
+    /* Commanders are PER-QUADRANT STATE, so a quadrant that holds one holds
+       one every time you visit -- the port used to re-roll on arrival. */
+    trek_new_game(3, 4242);
+    {
+        uint8_t k, q = GAL_CELLS, seen1 = 0, seen2 = 0;
+        for (k = 0; k < GAL_CELLS; k++)
+            if (gal_commander[k] && gal_enemies[k]) { q = k; break; }
+        ok(q < GAL_CELLS, "a level-3 galaxy has Commanders in it");
+        if (q < GAL_CELLS) {
+            ship.quad_y = (uint8_t)(q >> 3); ship.quad_x = (uint8_t)(q & 7);
+            trek_enter_quadrant();
+            for (k = 0; k < QUAD_CELLS; k++) if (sector[k] == SEC_COMMAND) seen1++;
+            trek_enter_quadrant();
+            for (k = 0; k < QUAD_CELLS; k++) if (sector[k] == SEC_COMMAND) seen2++;
+            ok(seen1 >= 1 && seen1 == seen2,
+               "and the same quadrant holds the same Commanders on every visit");
+        }
+    }
+
+    /* None below level 3 -- `cmp [0x1DF0], 7 / jl` guards the whole branch. */
+    {
+        uint16_t seed;
+        int any = 0;
+        for (seed = 1; seed < 100; seed++) {
+            uint8_t k;
+            trek_new_game(2, seed);
+            for (k = 0; k < GAL_CELLS; k++) if (gal_commander[k]) any++;
+        }
+        ok(any == 0, "below level 3 there are no Commanders at all");
+    }
+
+    /* AND THEY ARE NOT EVERYWHERE. A quadrant with more than one ship gets
+       one three times in seven, so a level-3 galaxy holds a handful -- not
+       one per busy quadrant, and not only the besieged base. */
+    {
+        uint16_t seed;
+        int total = 0, busy = 0, k;
+        for (seed = 1; seed < 100; seed++) {
+            trek_new_game(3, seed);
+            for (k = 0; k < GAL_CELLS; k++) {
+                if (gal_commander[k]) total++;
+                if (gal_enemies[k] > 1) busy++;
+            }
+        }
+        ok(total * 3 < busy * 2, "commanders lead well under half the busy quadrants");
+        ok(total > 100, "but a galaxy holds several of them");
+    }
+}
+
 /* Reaching a besieged base relieves it -- the deadline is actionable. */
 static void test_base_relief(void) {
     TrekEvent ev[16];
@@ -1205,7 +1317,6 @@ static void test_base_relief(void) {
     puts("relieving a base");
 
     trek_new_game(3, 4242);
-    trek_unschedule(SCHED_TRACTOR);
     trek_unschedule(SCHED_DEATH_POD);
     trek_schedule(SCHED_BASE_ATTACK, 10);
     trek_advance(20, ev, 16);
@@ -1298,7 +1409,6 @@ static void test_event_queue(void) {
 
     /* Two events due in the same window both fire, oldest first. */
     trek_new_game(3, 4242);
-    trek_unschedule(SCHED_TRACTOR);
     trek_schedule(SCHED_BASE_ATTACK, 10);
     trek_schedule(SCHED_DEATH_POD, 20);
     n = trek_advance(50, ev, 16);
@@ -2904,6 +3014,7 @@ int main(void) {
     test_event_queue();
     test_shields();
     test_docking();
+    test_tractor();
     test_base_relief();
     test_torpedo();
     test_self_destruct();

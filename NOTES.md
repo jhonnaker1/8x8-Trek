@@ -1217,6 +1217,10 @@ DECODED so far, with what each gave:
     0x1DD4F   2  THE SCORE SHEET    rate gated on 3 stardates, not on finishing
     0x1649D   1  the DEATH POD      an OBJECT in the quadrant fill, not an event
     0x1857E   2  free sector        Random(8)+1 twice until the cell is '.'
+    0x0D83F   1  TRACTOR BEAM       the trip's bounding rectangle, 2 in 10,
+                                    per quadrant holding a COMMANDER
+    0x16133   -  enemy classes      DS:0x23E9 commanders per quadrant, STATE
+    0x0EA55   -  SHUP               main energy -= 50.0, exactly
     0x15A4C   2  REINFORCEMENTS     level 5 ONLY, and always in column 1
     0x1F9D5   -  base attack/falls  the two schedule slots, with constants
     DS:0x1D78 -  THE SCHEDULE       eight reals, one slot per event, 9999=never
@@ -1337,9 +1341,12 @@ measured by playing). The queue:
     of the three exists. The original RAY-MARCHES; the accuracy curve and the
     damage spread were both shadows of it. Damage is `(level+4)*15 + 250`,
     which is also a battleship's hit points, at every level.
-  * and what is still queued: `SHIELD_RAISE_COST` (fn 0x008894), the enemy
-    fire law in the rest of fn 0x16844, and the TRACTOR BEAM's real trigger
-    inside MOVE (fn 0x0C609) -- the last PROVISIONAL pair
+  * ~~and what is still queued~~ -- THE CONSTANT LIST IS EMPTY. FITTED 0,
+    DERIVED 0, and the three surviving PROVISIONALs are the death pod's
+    scheduled stand-in, whose real shape is known and unbuilt. What is left is
+    FEATURES, not numbers: black holes, the supernova, wear and tear, the
+    chart erasure, the boarding party, reinforcements, the hail response, and
+    the enemy fire law in the rest of fn 0x16844
 
 The emulator keeps its job: confirming that a constant read statically
 produces the behaviour seen on screen. One run to confirm beats a hundred to

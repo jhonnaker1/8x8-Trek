@@ -38,7 +38,7 @@ static uint16_t get16(void) {
    and it fails at the right moment: change PLANET_MAX and this stops
    compiling until TREK_SAVE_SIZE is brought along. Everything else in the
    record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 519
+#define SAVE_FIXED_BYTES 581
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
@@ -86,6 +86,10 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     for (i = 0; i < GAL_CELLS; i++) put8(gal_base[i]);
     for (i = 0; i < GAL_CELLS; i++) put8(gal_stars[i]);
     for (i = 0; i < GAL_CELLS; i++) put8(gal_known[i]);
+    /* Commanders per quadrant -- persistent state in the original too, and
+       the tractor beam reads it, so a reloaded game must know where they
+       are. Added in version 4. */
+    for (i = 0; i < GAL_CELLS; i++) put8(gal_commander[i]);
     for (i = 0; i < QUAD_CELLS; i++) put8(sector[i]);
     for (i = 0; i < QUAD_CELLS; i++) put16(enemy_hp[i]);
 
@@ -148,6 +152,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     for (i = 0; i < GAL_CELLS; i++) gal_base[i] = get8();
     for (i = 0; i < GAL_CELLS; i++) gal_stars[i] = get8();
     for (i = 0; i < GAL_CELLS; i++) gal_known[i] = get8();
+    for (i = 0; i < GAL_CELLS; i++) gal_commander[i] = get8();
     for (i = 0; i < QUAD_CELLS; i++) sector[i] = get8();
     for (i = 0; i < QUAD_CELLS; i++) enemy_hp[i] = get16();
 

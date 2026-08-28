@@ -152,11 +152,18 @@ void trek_enter_quadrant(void) {
     for (n = 0; n < gal_enemies[q]; n++) {
         cell = trek_free_sector();
         if (cell == 0xFF) break;
-        i = trek_rand_n(10);
-        if (i < 6)      sector[cell] = SEC_BATTLESHIP;
-        else if (i < 8) sector[cell] = SEC_SCOUT;
-        else if (i < 9) sector[cell] = SEC_SUPPLY;
-        else            sector[cell] = SEC_COMMAND;
+        /* THE FIRST `gal_commander[q]` SHIPS ARE COMMANDERS, from the
+           quadrant's own state -- 0x016133. The rest are still rolled here,
+           because the original's battleship/scout/supply split is two more
+           per-quadrant arrays this core does not carry yet. */
+        if (n < gal_commander[q]) {
+            sector[cell] = SEC_COMMAND;
+        } else {
+            i = trek_rand_n(10);
+            if (i < 7)      sector[cell] = SEC_BATTLESHIP;
+            else if (i < 9) sector[cell] = SEC_SCOUT;
+            else            sector[cell] = SEC_SUPPLY;
+        }
         enemy_hp[cell] = enemy_strength(sector[cell]);
     }
 
@@ -182,6 +189,10 @@ void trek_sched_restore(uint8_t kind, uint16_t when) {
     if (kind < SCHED_COUNT) sched[kind] = when;
 }
 uint8_t  base_under_attack = GAL_CELLS;
+uint8_t  gal_commander[GAL_CELLS];
+/* Set by a warp move that ended somewhere the captain did not choose. The
+   UI reads and clears it; nothing else does. */
+uint8_t  tractored;
 uint8_t  laser_overheated;
 uint8_t  bases_lost = 0;
 
@@ -202,6 +213,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
            earlier draft forced at least one star per quadrant. */
         gal_stars[i]   = trek_rand_n(9);
         gal_known[i]   = 0;
+        gal_commander[i] = 0;
     }
 
     /* READ OUT OF THE BINARY 2026-08-26 -- see trek.h. The level base is
@@ -225,6 +237,12 @@ void trek_new_game(uint8_t level, uint16_t seed) {
             want = (uint16_t)(1 + trek_rand_n(ENEMY_PER_QUADRANT));
             if (placed_n + want > total) want = (uint16_t)(total - placed_n);
             gal_enemies[q] = (uint8_t)want;
+            /* A quadrant that got more than one ship gets a Commander three
+               times in seven -- 0x005287, and it is persistent state, not a
+               roll made when you arrive. */
+            if (want > 1 && level >= COMMANDER_MIN_LEVEL
+                && trek_rand_n(COMMANDER_OF_N) < COMMANDER_IN_N)
+                gal_commander[q] = 1;
             placed_n = (uint16_t)(placed_n + want);
         }
     }
@@ -272,6 +290,9 @@ void trek_new_game(uint8_t level, uint16_t seed) {
         if ((placed == 0 || level == 5) && gal_enemies[q] == 0) {
             gal_enemies[q]     = ENEMY_SIEGE;
             ship.enemies_left  = (uint16_t)(ship.enemies_left + ENEMY_SIEGE);
+            /* The besieging force is led -- 0x0054E3 sets the commander byte
+               for this quadrant unconditionally. */
+            if (level >= COMMANDER_MIN_LEVEL) gal_commander[q] = 1;
         }
     }
 
@@ -344,10 +365,6 @@ void trek_new_game(uint8_t level, uint16_t seed) {
                              + trek_rand_n(SCHED_FIRST_ATTACK_DAYS) * 10));
     trek_schedule(SCHED_DEATH_POD,   trek_sched_deviate(SCHED_POD_BASE_TENTHS,
                                                         SCHED_POD_SPAN_TENTHS));
-    if (level >= 3)
-        trek_schedule(SCHED_TRACTOR,
-                      trek_sched_deviate(SCHED_TRACTOR_BASE_TENTHS,
-                                         SCHED_TRACTOR_SPAN_TENTHS));
 }
 
 /* -------------------------------------------------------------- movement */
@@ -641,32 +658,6 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                                                  SCHED_ATTACK_SPAN_TENTHS));
                 break;
             }
-            case SCHED_TRACTOR:
-                /* MEASURED that this exists -- a long range tractor beam
-                   pulled the ship into quadrant 6,5 mid-measurement and
-                   wrecked three systems on arrival (MEASURED.md). What is
-                   NOT measured is what decides the destination, so it is a
-                   random quadrant holding enemies, which is the ancestor's
-                   rule (a commander does the dragging). */
-                {
-                    uint8_t q = pick_enemy_quadrant();
-                    if (q == GAL_CELLS) break;
-                    ship.quad_y = (uint8_t)(q >> 3);
-                    ship.quad_x = (uint8_t)(q & 7);
-                    trek_enter_quadrant();
-                    if (ev && *n < max) {
-                        ev[*n].kind   = EV_TRACTORED;
-                        ev[*n].y      = ship.quad_y;
-                        ev[*n].x      = ship.quad_x;
-                        ev[*n].amount = 0;
-                        (*n)++;
-                    }
-                }
-                trek_schedule(SCHED_TRACTOR,
-                              trek_sched_deviate(SCHED_TRACTOR_BASE_TENTHS,
-                                                 SCHED_TRACTOR_SPAN_TENTHS));
-                break;
-
             case SCHED_DEATH_POD:
                 /* MEASURED: one figure, applied to the ship AND to every
                    enemy in the quadrant. 59 units on us and 59 on each of two
@@ -1155,13 +1146,38 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
 
     /* No trek_undock() here: trek_enter_quadrant() clears the dock as part
        of arriving anywhere, and calling it twice would only cost bytes. */
-    ship.quad_y = qy;
-    ship.quad_x = qx;
-    ship.sec_y  = sy;
-    ship.sec_x  = sx;
+    {
+        uint8_t oy = ship.quad_y, ox = ship.quad_x;
 
-    ship.energy = (uint16_t)(ship.energy - cost);
-    advance_hundredths(warp_hundredths(d16));
+        ship.quad_y = qy;
+        ship.quad_x = qx;
+        ship.sec_y  = sy;
+        ship.sec_x  = sx;
+
+        ship.energy = (uint16_t)(ship.energy - cost);
+        advance_hundredths(warp_hundredths(d16));
+
+        /* THE TRACTOR BEAM. Flying PAST a Commander is what gets you caught:
+           the original walks the bounding rectangle of the trip and rolls
+           two in ten for every quadrant in it that holds one. See
+           TRACTOR_OF_N in trek.h. */
+        {
+            uint8_t y0 = oy < qy ? oy : qy, y1 = oy < qy ? qy : oy;
+            uint8_t x0 = ox < qx ? ox : qx, x1 = ox < qx ? qx : ox;
+            uint8_t y, x, c;
+            for (y = y0; y <= y1; y++) {
+                for (x = x0; x <= x1; x++) {
+                    c = (uint8_t)((y << 3) | x);
+                    if (!gal_enemies[c] || !gal_commander[c]) continue;
+                    if (trek_rand_n(TRACTOR_OF_N) <= TRACTOR_ABOVE) continue;
+                    ship.quad_y = y;
+                    ship.quad_x = x;
+                    tractored = 1;
+                    y = y1; break;          /* the original stops at the first */
+                }
+            }
+        }
+    }
 
     trek_enter_quadrant();
     return MOVE_OK;

@@ -652,6 +652,18 @@ static void do_lasers(void) {
 }
 
 static void report_move(uint8_t r) {
+    /* Caught in flight. The core sets this on a warp move that ended
+       somewhere the captain did not ask for. */
+    if (tractored) {
+        uint8_t k = put_str(linebuf, S(S_249));
+        k += put_u16(linebuf + k, (uint16_t)(ship.quad_y + 1));
+        linebuf[k++] = '-';
+        k += put_u16(linebuf + k, (uint16_t)(ship.quad_x + 1));
+        linebuf[k++] = '.';
+        linebuf[k] = 0;
+        tractored = 0;
+        ui_message(S(S_167), linebuf);
+    }
     switch (r) {
         case MOVE_OK:
             break;

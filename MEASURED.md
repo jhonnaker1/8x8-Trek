@@ -5489,3 +5489,76 @@ less. One emulator run flying column 8 repeatedly would settle it.
 `core/planet.h` is now BINARY, CONFIRMED, MEASURED or ID, except seven
 PROVISIONAL entries -- and all seven are the tractor-beam and death-pod
 stand-ins, whose real shapes are now known and unbuilt rather than unknown.
+
+---
+
+## The tractor beam, and the last PROVISIONAL but three (2026-08-26)
+
+### It catches you for flying PAST a Commander
+
+`fn 0x0C609` is MOVE. At 0x00D83F, after a warp jump completes:
+
+    for qy = min(old_y, new_y) .. max(old_y, new_y)
+      for qx = min(old_x, new_x) .. max(old_x, new_x)
+        if not caught yet
+          if galaxy[qy,qx] >= 100                 -- enemies present
+            if commanders[qy,qx] > 0
+              if Random(10) > 7                   -- two times in ten
+                pull the ship to (qy, qx) and stop
+                "Lexington caught in long range tractor beam.
+                 Pulled to quadrant N-N."
+
+`fn 0x02203F` and `fn 0x022012` are max and min, which is what makes the loop
+bounds the **bounding rectangle of the trip**. So a long jump across a
+defended stretch of the galaxy is genuinely more dangerous than a short one,
+and the Commander that catches you is the one you tried to fly past. A
+scheduled event cannot express any of that -- which is why this port's version
+dragged the ship to a random quadrant holding enemies, out of the blue.
+
+`SCHED_TRACTOR` and its two invented intervals are gone from the enum.
+
+### Which needed Commanders to be state, not a roll
+
+`DS:0x23E9` is an 8x8 byte array of Commanders per quadrant. The quadrant fill
+at 0x016133 makes the **first `commanders[q]` ships in a quadrant Commanders**
+and rolls only the rest -- so which quadrant holds one is stable across
+visits, where this port re-rolled every class on every arrival. The array is
+written during generation (0x0052A2: a quadrant that got more than one ship
+gets one three times in seven; 0x0054E3: the besieged StarBase quadrant always
+does), added to by reinforcements, and moved between quadrants by the enemy
+movement code, which decrements one entry and increments another.
+
+**And there are none below command level 3** -- `cmp [0x1DF0], 7 / jl` guards
+the whole commander branch of the fill.
+
+The port now carries `gal_commander[]`, saves it (format version 4), and uses
+it for both the fill and the tractor. Two more per-quadrant arrays -- for
+battleships and scouts, at DS:0x2429 and the one after it -- are what the
+original uses to fix the whole class composition per quadrant; this core still
+rolls those two.
+
+### SHIELD_RAISE_COST was right
+
+The last PROVISIONAL that was a plain number. `fn` at 0x00EA55 sets the
+shields-up flag and subtracts the real `86 00 00 00 00 48` from main energy,
+which decodes to exactly **50.0**. The POWER DISTRIB reading that put main at
+4950 of 5000 after a single SHUP was correct, and one observation had been
+enough. Lowering shields is free -- there is no matching subtraction anywhere.
+
+### Where this leaves the audit
+
+    BINARY 92   CONFIRMED 18   MEASURED 19   FITTED 0   DERIVED 0
+    PROVISIONAL 3   ID 113
+
+**The three are the death pod's**, and they are a stand-in for a mechanic
+whose real shape is known -- an object placed by the quadrant fill -- and
+unbuilt. Nothing in the port is now a guess about a number.
+
+### A note on the C128 image
+
+The commander array and the save-format change pushed the `front` overlay five
+bytes past its window. The window went from 0x0F00 to 0x1000 -- which costs
+resident RAM one for one -- leaving 1,037 bytes free with the largest overlay
+at 3,845 of 4,096. Growing the window is the right lever when ONE overlay is
+tight and the resident region is not; moving code out is the right lever when
+the resident region is.
