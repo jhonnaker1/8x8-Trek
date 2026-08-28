@@ -1603,7 +1603,17 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define HAIL_RESPONDS    1   /* *qy,*qx name the StarBase */  /*@ID*/
 #define HAIL_SILENT      2   /* nothing in range answered */  /*@ID*/
 
-/* Costs a tenth of a stardate, MEASURED 2026-08-23 -- 3500.1 to 3500.2. */
+/* HAIL COSTS NO TIME. Jamie, 2026-08-27, and confirmed in the same session
+   under dosbox-automation: twenty-five consecutive HAILs left the stardate at
+   3500.00 exactly.
+
+   THIS IS THE SECOND TIME THE SAME WRONG CLAIM HAS BEEN BUILT ON. It came
+   from reading the message log's `3500:34` stamp as a stardate in 2026-08-23;
+   Jamie caught it on 2026-08-24 and the retraction went into MEASURED.md and
+   the memory -- but NOT into this comment, which still said "MEASURED
+   2026-08-23: it costs a turn". Building HAIL today, this file was the source
+   consulted, and the stale line was believed. A retraction that does not
+   reach every copy of the claim has not retracted it. */
 uint8_t trek_hail(uint8_t *qy, uint8_t *qx);
 
 #define DOCK_OK              0  /*@ID*/

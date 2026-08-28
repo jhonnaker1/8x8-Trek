@@ -6476,3 +6476,59 @@ dosbox-automation across a few dozen turns and note when it becomes non-zero.
 One byte, one poll per turn. If it never does, the observation belongs to some
 other routine and the pod needs re-reading from the message end; if it does,
 the setter is a pointer write and the state that precedes it says which.
+
+## Two findings from one DOSBox session (2026-08-27)
+
+### HAIL COSTS NO TIME, and this is the second time that claim has been wrong
+
+Jamie, mid-run: *"hail does not advance the stardate."* The session agrees --
+**twenty-five consecutive HAILs left the stardate at 3500.00 exactly**, with
+energy and shields untouched.
+
+The claim came from reading the message log's `3500:34` stamp as a stardate on
+2026-08-23. **Jamie caught it on 2026-08-24**, and the retraction went into
+MEASURED.md and the memory. It did NOT go into `core/trek.h`, where the
+sentence "MEASURED 2026-08-23: it costs a turn -- the stardate moved 3500.1 to
+3500.2" survived above `do_hail`. Building HAIL earlier the same day, that
+file was the source consulted, the stale line was believed, and
+`trek_advance_time(1)` went into `trek_hail()` with a test asserting it.
+
+**A retraction that does not reach every copy of the claim has not retracted
+it.** The other copies were struck; this one was the one that got read.
+Removed, with a test that now fails if the call comes back.
+
+### [0x26E0] IS SET -- and it means "the pod is alive", not "a pod is here"
+
+The static read said that byte was written only with zero and concluded the
+death pod's detonation could never fire. **One reading settles it: it is 1
+immediately after a new game**, with `[0x26DF]` at 0, no 'R' anywhere on the
+sector map, and the ship in quadrant 7-7 -- nowhere near the column-8
+placement rule.
+
+    energy at 181956, DS base 174448
+    start quadrant 7-7
+    [0x26DF] pod-here  = 0
+    [0x26E0] pod-armed = 1        <-- and 1 for all 25 turns following
+
+So the flag is initialised true and, per the disassembly, only ever CLEARED --
+at 0x01E9C3, in the branch that runs when the destroyed thing is the pod. Its
+meaning is **"the Vandal Death Pod has not been destroyed"**, galaxy-wide.
+
+That is why the message reads "Vandal Death Pod ENTERS quadrant": the
+detonation is gated on the pod being ALIVE, not on it being in the quadrant
+you are standing in. `[0x26DF]` is the per-quadrant "there is an 'R' here"
+flag and is a different thing.
+
+**The exhaustive decode was right about the instructions and wrong about the
+conclusion.** No absolute-address write of 1 exists; the initialisation is a
+pointer write or a block fill that no such search can see. This is exactly the
+shape [[negative-claims-about-egatrek]] warns about, and the one-byte
+experiment named for it cost about four minutes.
+
+**NOT CHANGED YET, deliberately.** This core gates the detonation on
+`pod_here`. Flipping it to "alive" makes the pod a galaxy-wide hazard from
+turn one -- which is what the original does, but the original also lets you
+DESTROY it, and this core has no 'R' sector object to shoot at. Shipping the
+hazard without its counter would be worse than the current approximation. The
+gate flips when the pod becomes a sector object, and that is now the reason to
+build it.

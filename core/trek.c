@@ -621,8 +621,7 @@ uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
         }
     }
 
-    trek_advance_time(1);
-
+    /* No trek_advance_time() here: hailing costs nothing. See trek.h. */
     if (trek_rand_n(HAIL_BLOCK_OF_N) < HAIL_BLOCK_BELOW) return HAIL_BLOCKED;
     if (!found || best > HAIL_RANGE_Q) return HAIL_SILENT;
     if (qy) *qy = fy;

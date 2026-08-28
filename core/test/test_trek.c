@@ -2192,11 +2192,13 @@ static void test_torpedo(void) {
         }
         ok(responds == 0, "neither a research station nor a supply depot answers");
 
-        /* It costs a tenth of a stardate. */
+        /* IT COSTS NO TIME. Twenty-five HAILs under dosbox-automation left
+           the stardate at 3500.00; the "0.1 stardates" this asserted came
+           from a claim retracted in 2026-08-24 that survived in trek.h. */
         trek_new_game(3, 4242);
         { uint16_t t0 = ship.stardate;
           (void)trek_hail(&qy, &qx);
-          ok(ship.stardate == (uint16_t)(t0 + 1), "hailing costs 0.1 stardates"); }
+          ok(ship.stardate == t0, "hailing costs no time at all"); }
 
         /* And so does docking, which had only INDIRECT cover -- removing
            trek_advance_time(1) from both sites failed the hail case and not
