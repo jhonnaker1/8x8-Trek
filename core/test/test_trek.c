@@ -3505,20 +3505,66 @@ static void test_landing(void) {
     ship.sec_y = 4; ship.sec_x = 4;
     one_planet(PFIND_MONGOL, 0, 1);
     trek_orbit();
-    /* ONE IN FIVE, so the loop -- a single landing usually comes back with
-       nothing. The old test asserted an attack on the first visit, which the
-       binary says happens a fifth of the time. */
-    while (trek_land(LAND_BY_TRANSPORTER, &cas) != LAND_ATTACKED)
-        ;
-    ok(1, "a Mongol supply station receives the landing party badly");
-    ok(cas >= LANDING_CASUALTY_MIN &&
-       cas <= LANDING_CASUALTY_MIN + LANDING_CASUALTY_SPAN - 1,
-       "the casualties are reported for the message");
-    ok(ship.casualties == cas, "and land on the ship's tally, which scores");
-    /* The claim is that the station is NOT consumed, so assert that directly
-       rather than through an outcome that is now one-in-five. */
+    /* A Mongol station hands over supplies -- BINARY 0x00E4A3, which calls
+       the capture and returns. It is not an ambush; the ambush is a separate
+       roll made on EVERY landing. */
+    ok(trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_SUPPLIES,
+       "a Mongol supply station gives up its supplies");
     ok((planets[0].flags & PF_TAKEN) == 0,
        "the station is still there on the next visit");
+
+    /* THE ATTACK IS GENERAL, and it does not replace the find. Land on a
+       BARREN world until the roll comes up: the outcome is still the find,
+       and the casualties come back through the out-param. */
+    {
+        int i;
+        uint8_t got_att = 0, got_find = 0;
+        for (i = 0; i < 4000 && !got_att; i++) {
+            trek_new_game(3, (uint16_t)(880 + i));
+            ship.sec_y = 4; ship.sec_x = 4;
+            one_planet(PFIND_NOTHING, 0, 1);
+            trek_orbit();
+            cas = 0;
+            if (trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_NOTHING
+                && cas != 0) { got_att = 1; got_find = 1; }
+        }
+        ok(got_att, "a landing party can be attacked on a barren world");
+        ok(got_find, "and the find is still reported alongside");
+        ok(cas >= LANDING_CASUALTY_MIN &&
+           cas <= LANDING_CASUALTY_MIN + LANDING_CASUALTY_SPAN - 1,
+           "the casualties are 2..6");
+        ok(ship.casualties == cas, "and land on the ship's tally, which scores");
+    }
+
+    /* The capture itself: one in four gives nothing, and any success always
+       carries two life support supplies. */
+    {
+        int i;
+        uint16_t none = 0, some = 0;
+        uint8_t  r2, bad_life = 0, bad_raw = 0;
+
+        /* ONE seed for the whole run. Reseeding per iteration measures the
+           seeding, not the distribution -- the first draw after a fresh seed
+           is not uniform across consecutive seeds, and an earlier version of
+           this test failed for that reason and not for the code's. */
+        trek_new_game(3, 5000);
+        for (i = 0; i < 2000; i++) {
+            uint8_t k;
+            for (k = 0; k < ITEM_COUNT; k++) inventory[k] = 0;
+            r2 = trek_capture_supplies();
+            if (r2 == 0) { none++; continue; }
+            some++;
+            if (!(r2 & (1u << ITEM_LIFE_SUPPORT))
+                || inventory[ITEM_LIFE_SUPPORT] != CAPTURE_LIFE_SUPPORT)
+                bad_life++;
+            if (r2 & (1u << ITEM_RAW_ENERGIUM)) bad_raw++;
+        }
+        if (none < 400 || none > 600) printf("    (none %u of 2000)\n", none);
+        ok(none > 400 && none < 600, "one capture in four yields nothing");
+        ok(some > 1400, "and the rest yield something");
+        ok(bad_life == 0, "every success carries two life support supplies");
+        ok(bad_raw == 0, "and raw energium is never captured");
+    }
 }
 
 static void test_energium(void) {

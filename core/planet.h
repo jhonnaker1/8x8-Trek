@@ -283,6 +283,36 @@ void trek_leave_orbit(void);
 #define LAND_SETTLERS        5   /* "Planet settlers found... Evacuating" */  /*@ID*/
 #define LAND_ATTACKED        6   /* "Landing party attacked... casualties." */  /*@ID*/
 #define LAND_ALREADY         7   /* this planet has already given up its find */  /*@ID*/
+#define LAND_SUPPLIES        8   /* "Mongol supplies captured..." */  /*@ID*/
+
+/* ------------------------------------------------- captured Mongol supplies
+ *
+ * BINARY 2026-08-27, `fn 0x181E8`, reached from the landing party when the
+ * planet's byte exceeds 20 -- which is `find == PFIND_MONGOL`.
+ *
+ *     print "Mongol supplies captured..."
+ *     if (Random(4) == 0) { print "none."; return }
+ *     for item in 1..3:                     ; ONE roll each, not a loop
+ *         if (Random(item + 2) <= 1) { inventory[item]++; print its name }
+ *     inventory[4] += 2                     ; life support, ALWAYS on success
+ *
+ * The original's indices are one above this core's, so its items 1..3 are
+ * ITEM_MONGOL_ENERGIUM, ITEM_PLASMA_BOLTS and ITEM_PLASMA_SHIELD, rolled at
+ * Random(3), Random(4) and Random(5) -- two in three, two in four, two in
+ * five. Raw energium is NEVER captured; life support is never rolled.
+ *
+ * The item table at DS:0x10D4 and the inventory bytes at DS:0x234B settle
+ * that mapping: [0x234F] is life support, the byte the USE item decrements,
+ * and [0x2350] is raw energium, the byte a mined planet increments. Three
+ * independent reads, one set of indices.
+ *
+ * Returns a BITMASK of the items gained, or 0 for "none." */
+#define CAPTURE_NONE_OF_N      4   /* Random(4) == 0 and you get nothing */  /*@BINARY*/
+#define CAPTURE_ITEMS          3   /* only items 0..2 are rolled */  /*@BINARY*/
+#define CAPTURE_ODDS_BASE      3   /* item i rolls Random(i + 3) */  /*@BINARY*/
+#define CAPTURE_ODDS_HIT       1   /* and a 0 or a 1 is a hit */  /*@BINARY*/
+#define CAPTURE_LIFE_SUPPORT   2   /* always, on any success */  /*@BINARY*/
+uint8_t trek_capture_supplies(void);
 
 /* `casualties` receives the losses on LAND_ATTACKED, so the UI can print the
    number the original prints. Pass NULL if the caller does not care. */
@@ -306,6 +336,12 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * case (a station raids the party one time in five) or a risk on landings
  * generally. This port keeps it on the Mongol find, where the SCIENCE line
  * puts it, and applies the roll. */
+/* THE ATTACK IS A GENERAL LANDING HAZARD, not a Mongol one -- BINARY
+ * 2026-08-27, fn 0x0E3A1 at 0x00E435. It is rolled once for every landing
+ * that is not the settlement rescue, BEFORE the find is looked at, and
+ * execution CONTINUES afterwards: you can be attacked and still come back
+ * with something. This core rolled it only inside the Mongol branch and
+ * returned, which made it both too rare and mutually exclusive with a find. */
 #define LANDING_ATTACK_OF_N    5   /* attacked when Random(5) == 0 */  /*@BINARY*/
 #define LANDING_CASUALTY_MIN   2  /*@BINARY*/
 #define LANDING_CASUALTY_SPAN  5   /* Random(5) + 2, so 2..6 */  /*@BINARY*/

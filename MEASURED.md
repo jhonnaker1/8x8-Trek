@@ -6379,3 +6379,51 @@ from both routes, and removing it fails its test.
 ### Cost
 
 94 resident bytes, free 1,332 -> **1,238**.
+
+## Supply capture built, and the landing attack was in the wrong place (2026-08-27)
+
+`fn 0x181E8`, reached from the landing party when the planet's byte exceeds
+20 -- which is `find == PFIND_MONGOL`, a thing this core has had all along.
+
+    if (Random(4) == 0) { "none."; return }
+    for item in 1..3:   if (Random(item + 2) <= 1) inventory[item]++
+    inventory[4] += 2                    ; life support, always, on a success
+
+Two in three, two in four, two in five for Mongol energium, plasma bolts and
+the plasma bolt shield. **Raw energium is never captured and life support is
+never rolled.**
+
+### The attack roll was in the wrong branch
+
+`fn 0x0E3A1` rolls `Random(5) == 0` at 0x00E435 -- once per landing, for EVERY
+landing that is not the settlement rescue, BEFORE the find is looked at -- and
+then **falls straight through**. A mauled landing party still comes back with
+whatever was there.
+
+This core rolled it only inside the Mongol branch and RETURNED, which made it
+both far too rare and mutually exclusive with a find. `LANDING_ATTACK_OF_N`
+and the 2..6 casualty band were right; only the placement was wrong. The
+casualties now come back through the out-param on any outcome and the UI
+prints them ahead of the find.
+
+### Two harness failures, and the second was the dangerous one
+
+**`timeout` does not exist on macOS.** A break-test helper written as
+`timeout 120 make test | grep FAIL` produced NO OUTPUT for all four breaks,
+which reads exactly like "no test failed". Four non-discriminating tests would
+have been recorded as verified. Every break has to be run with the command
+that actually exists.
+
+**And the capture test was reseeding the RNG every iteration.** 2,000 calls to
+`trek_new_game(3, 5000 + i)` measure the SEEDING, not the distribution: the
+first draw after consecutive seeds is not uniform, and `none` came out well
+outside the 1-in-4 band. Seeding once and looping fixed it. That is the fifth
+"test that could not do its job" today and the first that was failing rather
+than falsely passing -- which is the only reason it was caught before the
+harness bug was.
+
+### Cost
+
+4 resident bytes net, free 1,238 -> 1,234: the capture and its prose went into
+the planet overlay, and removing the attack branch paid for most of the rest.
+Audit BINARY 138.

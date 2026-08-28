@@ -450,20 +450,44 @@ OVL_CODE("planet") static void do_land(void) {
     }
 
     r = trek_land(how, &cas);
+
+    /* THE ATTACK IS REPORTED FIRST AND SEPARATELY, whatever the find was.
+       The original rolls it before looking at the planet and falls straight
+       through, so a mauled landing party can still come back with something
+       -- 0x00E435. This port used to return LAND_ATTACKED *instead of* a
+       find, which made the two mutually exclusive. */
+    if (cas) {
+        k  = put_str(linebuf, S(S_210));
+        k += put_u16(linebuf + k, cas);
+        k += put_str(linebuf + k, S(S_192));
+        linebuf[k] = 0;
+        ui_dialog_line(linebuf);
+    }
+
     switch (r) {
+        case LAND_SUPPLIES: {
+            /* "Mongol supplies captured..." then a line per item. */
+            uint8_t got = trek_capture_supplies(), j;
+            ui_dialog_line(S(S_276));
+            if (!got) {
+                ui_dialog_line(S(S_275));
+            } else {
+                for (j = 0; j < ITEM_COUNT; j++)
+                    if (got & (1u << j)) {
+                        k  = put_str(linebuf, "  ");
+                        k += put_str(linebuf + k, item_name[j]);
+                        linebuf[k] = 0;
+                        ui_dialog_line(linebuf);
+                    }
+            }
+            break;
+        }
         case LAND_ENERGIUM:
             ui_dialog_line(S(S_201));
             break;
         case LAND_SETTLERS:
             ui_dialog_line(S(S_226));
             ui_dialog_line(S(S_205));
-            break;
-        case LAND_ATTACKED:
-            k = put_str(linebuf, S(S_210));
-            k += put_u16(linebuf + k, cas);
-            k += put_str(linebuf + k, S(S_192));
-            linebuf[k] = 0;
-            ui_dialog_line(linebuf);
             break;
         case LAND_ALREADY:
             ui_dialog_line(S(S_223));

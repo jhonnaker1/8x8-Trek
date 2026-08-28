@@ -200,6 +200,17 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
        Mongol reception, which is when it hurts. */
     if (how == LAND_BY_SHUTTLE) trek_advance_time(2);
 
+    /* The attack, once per landing, before the find is looked at -- 0x00E435.
+       It does NOT return: the original falls straight through to the find
+       test, so a mauled landing party can still come back with something.
+       The caller reports *casualties whatever the outcome code says. */
+    if (trek_rand_n(LANDING_ATTACK_OF_N) == 0) {
+        lost = (uint16_t)(LANDING_CASUALTY_MIN
+                          + trek_rand_n(LANDING_CASUALTY_SPAN));
+        ship.casualties = (uint16_t)(ship.casualties + lost);
+        if (casualties) *casualties = lost;
+    }
+
     switch (p->find) {
     case PFIND_ENERGIUM:
         p->flags |= PF_TAKEN;
@@ -214,16 +225,8 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
         /* The station is not cleared by being walked into: PF_TAKEN is NOT
            set, so a second landing party can be sent to the same reception.
            That is the reading of a find the original never says you removed.
-
-           ONE IN FIVE. The binary rolls Random(5) and only a zero is an
-           attack, so most visits to a Mongol station come back empty-handed
-           rather than short-handed. */
-        if (trek_rand_n(LANDING_ATTACK_OF_N) != 0) return LAND_NOTHING;
-        lost = (uint16_t)(LANDING_CASUALTY_MIN
-                          + trek_rand_n(LANDING_CASUALTY_SPAN));
-        ship.casualties = (uint16_t)(ship.casualties + lost);
-        if (casualties) *casualties = lost;
-        return LAND_ATTACKED;
+           0x00E4A3 calls the capture and RETURNS, so nothing else follows. */
+        return LAND_SUPPLIES;
 
     default:
         p->flags |= PF_TAKEN;
@@ -232,6 +235,26 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
 }
 
 /* ------------------------------------------------------------------- USE */
+
+uint8_t trek_capture_supplies(void) {
+    uint8_t got = 0, i;
+
+    if (trek_rand_n(CAPTURE_NONE_OF_N) == 0) return 0;
+
+    for (i = 0; i < CAPTURE_ITEMS; i++)
+        if (trek_rand_n((uint8_t)(i + CAPTURE_ODDS_BASE)) <= CAPTURE_ODDS_HIT) {
+            if (inventory[i] < 255) inventory[i]++;
+            got = (uint8_t)(got | (1u << i));
+        }
+
+    /* Never rolled: two, every time, on any success. */
+    if (inventory[ITEM_LIFE_SUPPORT] <= (uint8_t)(255 - CAPTURE_LIFE_SUPPORT))
+        inventory[ITEM_LIFE_SUPPORT] =
+            (uint8_t)(inventory[ITEM_LIFE_SUPPORT] + CAPTURE_LIFE_SUPPORT);
+    got = (uint8_t)(got | (1u << ITEM_LIFE_SUPPORT));
+
+    return got;
+}
 
 uint8_t trek_energium_allowed(void) {
     /* The manual's own two conditions, and both must hold. ENERGY_MAX/5 is

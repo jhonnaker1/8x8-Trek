@@ -275,3 +275,5 @@
 272	No response.
 273	StarBase in 
 274	Subspace interference.
+275	  none.
+276	Mongol supplies captured...
