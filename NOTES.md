@@ -4631,3 +4631,56 @@ frequency wins.
 `do_info` and `do_planets` are stubs that call INTO other overlays and cannot
 move without merging them. Everything else still resident is genuinely hot:
 the console draw, movement, `read_field`, `snd_poll`, `fire_one_torpedo`.
+
+## io_buf cannot move to bank 1, and the pool that mattered was elsewhere (2026-08-27)
+
+**The move is blocked, and the reason is structural.** `put8` writes through a
+plain pointer -- `out[pos++] = v` -- and on the C128 bank 1 at $4000..$BFFF is
+not addressable that way: mapping it in would swap out the running program,
+which occupies $1C01..$AFC0. The alternatives are core/ calling a platform
+byte-sink (breaks the seam every other pool is built on) or keeping a
+746-byte resident staging buffer anyway, which defeats the point. `farmem`
+has `far_load` and `far_read` but no `far_write`, and adding one would not
+help: the blocker is the serialiser's contract, not the transport.
+
+**So the record was packed instead**, which is the only lever on that buffer
+that does not need the serialiser to reach across banks:
+
+    gal_known, gal_nova   64 bytes each -> 8   (flags)
+    gal_base              64 -> 16            (BASE_NONE..BASE_SUPPLY is 0..3)
+    gal_stars             64 -> 32            (trek_rand_n(9), so 0..8)
+
+    save record   746 -> 554        io_buf  771 -> 579
+
+`gal_enemies` and `gal_commander` are left alone: both are COUNTS with no
+stated ceiling, and gal_commander in particular reads as one at trek.c's "the
+first gal_commander[q] ships are commanders".
+
+### The pool nobody was watching
+
+The 192 bytes came out of **lowram**, `0x1300..0x1C00`, which is where all
+writable data lives -- and it had **77 bytes free**. Not the resident code
+region, which is what every conversation this week has been about, and which
+this change left exactly where it was.
+
+`make verify` now prints lowram headroom every build and fails if it overruns.
+Every other pool in this build is reported by name every time; this one was
+invisible because it is a linker region rather than an overlay.
+
+### What it cost
+
+`front` went 3,471 -> 3,760, leaving 336. The packing helpers put_bits and
+get_bits did NOT inline the way the nibble and 2-bit packers did, so they
+first landed RESIDENT at 236 bytes -- more than the packing saved. `OVL_CODE
+("front")` on those two puts them with their only callers. **front cannot be
+split further**: setup's restore path and SAVE both reach the serialiser, so
+whichever of them moved would be an overlay calling another overlay.
+
+### A fill pattern that could not fail
+
+The new round-trip cover for gal_base used `i & 3`, which looks like full
+coverage and is not: the 2-bit packer takes four cells to a byte, so slot 0 of
+every group is i = 0, 4, 8..., and `i & 3` is ZERO for all of them. Dropping
+that slot to one bit round-tripped clean. `i + (i >> 2)` walks the value
+across the slots. **Third time today a test passed for the wrong reason and
+only breaking it found out.**

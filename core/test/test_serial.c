@@ -61,7 +61,8 @@ static void test_round_trip(void) {
     uint8_t buf[TREK_SAVE_SIZE];
     uint8_t i;
     uint16_t hp_before[QUAD_CELLS];
-    uint8_t  known_before[GAL_CELLS];
+    uint8_t  known_before[GAL_CELLS], base_before[GAL_CELLS],
+            stars_before[GAL_CELLS], nova_before[GAL_CELLS];
     Planet   planets_before[PLANET_MAX];
     uint8_t  inv_before[ITEM_COUNT];
     uint8_t  count_before;
@@ -100,12 +101,35 @@ static void test_round_trip(void) {
     planets[2].sec   = 41;
     inventory[ITEM_RAW_ENERGIUM] = 2;
 
+    /* FULL-RANGE COVER FOR THE PACKED FIELDS, 2026-08-27. These four are
+       bit-packed in the record now -- flags, 2-bit and 4-bit -- and the test
+       covered only gal_known, so a packer that dropped the high bits would
+       have round-tripped clean. Fill each across its whole declared range. */
+    {
+        uint8_t i;
+        for (i = 0; i < GAL_CELLS; i++) {
+            /* The fill must not line up with the packing stride, or the
+               test cannot see a packer that loses a bit. `i & 3` looks like
+               full coverage and is not: gal_base packs four to a byte, so
+               slot 0 of every group is i=0,4,8..., and `i & 3` is ZERO for
+               every one of them. Dropping that slot to one bit round-tripped
+               clean. `i + (i >> 2)` walks the value across the slots. */
+            gal_base[i]  = (uint8_t)((i + (i >> 2)) & 3);   /* 0..3 */
+            gal_stars[i] = (uint8_t)(i % 9);               /* 0..8 */
+            gal_nova[i]  = (uint8_t)((i ^ (i >> 3)) & 1);
+            gal_known[i] = (uint8_t)(i & 1);
+        }
+    }
+
     before = ship;
     memcpy(planets_before, planets, sizeof planets_before);
     memcpy(inv_before, inventory, sizeof inv_before);
     count_before  = planet_count;
     memcpy(hp_before, enemy_hp, sizeof hp_before);
     memcpy(known_before, gal_known, sizeof known_before);
+    memcpy(base_before,  gal_base,  sizeof base_before);
+    memcpy(stars_before, gal_stars, sizeof stars_before);
+    memcpy(nova_before,  gal_nova,  sizeof nova_before);
 
     check(trek_state_save(buf, sizeof buf) == TREK_SAVE_SIZE, "save succeeds");
 
@@ -114,6 +138,9 @@ static void test_round_trip(void) {
     trek_new_game(1, 1);
     memset(enemy_hp, 0, sizeof enemy_hp);
     memset(gal_known, 0, sizeof gal_known);
+    memset(gal_base,  0, sizeof gal_base);
+    memset(gal_stars, 0, sizeof gal_stars);
+    memset(gal_nova,  0, sizeof gal_nova);
     base_under_attack = 0;
     bases_lost = 0;
     memset(planets, 0, sizeof planets);
@@ -148,6 +175,12 @@ static void test_round_trip(void) {
 
     check(memcmp(enemy_hp, hp_before, sizeof hp_before) == 0,
           "enemy hit points survive, 16 bits at a time");
+    check(memcmp(gal_base, base_before, sizeof base_before) == 0,
+          "gal_base survives the 2-bit packing across 0..3");
+    check(memcmp(gal_stars, stars_before, sizeof stars_before) == 0,
+          "gal_stars survives the 4-bit packing across 0..8");
+    check(memcmp(gal_nova, nova_before, sizeof nova_before) == 0,
+          "gal_nova survives the bitmap");
     check(memcmp(gal_known, known_before, sizeof known_before) == 0,
           "the scanned-quadrant map survives");
 

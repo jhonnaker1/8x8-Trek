@@ -50,6 +50,7 @@ DEBUG_OUT = build/trek128-debug.prg
 # --no-check-sections: the overlays deliberately overlap in the address space.
 # That is the whole idea, and without this lld refuses the link.
 OBJCOPY = $(HOME)/llvm-mos/bin/llvm-objcopy
+NM      = $(HOME)/llvm-mos/bin/llvm-nm
 LDFLAGS = -Wl,--no-check-sections
 # ONE LIST. The image-extraction rules below are generated from this by
 # $(foreach) -- they used to be seven hand-written $(call)s, and adding an
@@ -128,6 +129,20 @@ test:
 # proved that the hard way. `run` depends on this, so a binary with a PETSCII
 # key table can never reach the emulator.
 verify: $(OUT)
+	@# LOWRAM HEADROOM. Added 2026-08-27 after the save record was packed and
+	@# the 192 bytes it freed turned out to land in a pool NOBODY WAS
+	@# WATCHING: writable data lives in lowram, 0x1300..0x1C00, and it had 77
+	@# bytes left. Every other pool in this build is reported by name every
+	@# time; this one was invisible because it is a linker region and not an
+	@# overlay. It is not any more.
+	@python3 -c "import subprocess,sys; \
+	    o = subprocess.run(['$(NM)','--radix=d','build/trek128.elf'], \
+	                       capture_output=True, text=True).stdout; \
+	    e = [int(l.split()[0]) for l in o.splitlines() if l.split()[1:2] == ['B'] \
+	         and l.split()[-1] == '__bss_end'][0]; \
+	    free = 0x1C00 - e; \
+	    print('verify: lowram (writable data) %d of 2304 used, %d free' % (e - 0x1300, free)); \
+	    sys.exit('lowram is FULL -- writable data has overrun 0x1C00') if free < 0 else None"
 	python3 tools/verify_prg.py
 
 HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \

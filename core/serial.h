@@ -44,12 +44,12 @@
    test_serial aborted. Six bytes per planet slot -- if PLANET_MAX moves, this
    moves with it. See "when a constant changes, re-read everything derived
    from it". */
-#define TREK_SAVE_SIZE  746
+#define TREK_SAVE_SIZE  554
 
 /* Bumped whenever the layout changes. A load of an older version is refused
    rather than misread -- there is no upgrade path and a half-read galaxy is
    worse than no galaxy. */
-#define TREK_SAVE_VERSION 7
+#define TREK_SAVE_VERSION 8
 
 /* Bytes written, or 0 if `max` was too small. */
 uint16_t trek_state_save(uint8_t *buf, uint16_t max);

@@ -1,4 +1,5 @@
 #include "serial.h"
+#include "overlay.h"
 #include "trek.h"
 #include "planet.h"
 
@@ -38,7 +39,7 @@ static uint16_t get16(void) {
    and it fails at the right moment: change PLANET_MAX and this stops
    compiling until TREK_SAVE_SIZE is brought along. Everything else in the
    record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 651
+#define SAVE_FIXED_BYTES 459
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
@@ -56,6 +57,71 @@ typedef char save_size_tracks_planet_max[
  * So: two lists, in the same order, and the round-trip test in
  * core/test/test_serial.c is what keeps them honest. Any field that appears
  * in one and not the other fails there, on the build machine, immediately. */
+
+
+/* PACKED GALAXY FIELDS, 2026-08-27.
+ *
+ * Six 64-byte arrays were 384 bytes of a 746-byte record, and the record's
+ * size is the C128's resident save buffer one-for-one -- `io_buf` is
+ * SAVE_BYTES + 1. Shrinking the record is the only lever on that buffer that
+ * does not require the serialiser to reach into another memory bank, which it
+ * cannot: put8 writes through a plain pointer and bank 1 is not addressable
+ * that way on a machine whose program occupies the same window.
+ *
+ * Only fields whose range is DEFINITIONAL are packed. gal_known and gal_nova
+ * are flags. gal_base is BASE_NONE..BASE_SUPPLY, which is 0..3 by the
+ * #defines. gal_stars is written as trek_rand_n(9), so 0..8. gal_enemies and
+ * gal_commander are COUNTS with no stated ceiling and are left alone --
+ * gal_commander in particular reads as a count at trek.c's "the first
+ * gal_commander[q] ships are commanders", so a bitmap would have been wrong
+ * as well as lossy. */
+/* OVL_CODE because these did NOT inline into their callers the way the
+   nibble and 2-bit packers did, and an un-inlined helper in core/serial.c
+   lands RESIDENT -- 236 bytes of it, which was more than the packing saved.
+   Their only callers are trek_state_save and trek_state_load, and both reach
+   this file only from OVL_FRONT. Off-target the macro is empty. */
+OVL_CODE("front") static void put_bits(const uint8_t *a) {          /* 64 flags -> 8 bytes */
+    uint8_t i, b;
+    for (i = 0; i < GAL_CELLS; i += 8) {
+        b = 0;
+        { uint8_t k; for (k = 0; k < 8; k++) if (a[i + k]) b |= (uint8_t)(1u << k); }
+        put8(b);
+    }
+}
+OVL_CODE("front") static void get_bits(uint8_t *a) {
+    uint8_t i, b;
+    for (i = 0; i < GAL_CELLS; i += 8) {
+        b = get8();
+        { uint8_t k; for (k = 0; k < 8; k++) a[i + k] = (uint8_t)((b >> k) & 1); }
+    }
+}
+static void put_nib(const uint8_t *a) {           /* 64 values 0..15 -> 32 */
+    uint8_t i;
+    for (i = 0; i < GAL_CELLS; i += 2)
+        put8((uint8_t)((a[i] & 0x0F) | (uint8_t)(a[i + 1] << 4)));
+}
+static void get_nib(uint8_t *a) {
+    uint8_t i, b;
+    for (i = 0; i < GAL_CELLS; i += 2) {
+        b = get8();
+        a[i] = (uint8_t)(b & 0x0F);
+        a[i + 1] = (uint8_t)(b >> 4);
+    }
+}
+static void put_quad(const uint8_t *a) {          /* 64 values 0..3 -> 16 */
+    uint8_t i;
+    for (i = 0; i < GAL_CELLS; i += 4)
+        put8((uint8_t)((a[i] & 3) | (uint8_t)((a[i+1] & 3) << 2)
+                     | (uint8_t)((a[i+2] & 3) << 4) | (uint8_t)((a[i+3] & 3) << 6)));
+}
+static void get_quad(uint8_t *a) {
+    uint8_t i, b;
+    for (i = 0; i < GAL_CELLS; i += 4) {
+        b = get8();
+        a[i] = (uint8_t)(b & 3);       a[i+1] = (uint8_t)((b >> 2) & 3);
+        a[i+2] = (uint8_t)((b >> 4) & 3); a[i+3] = (uint8_t)((b >> 6) & 3);
+    }
+}
 
 uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     uint8_t i;
@@ -85,14 +151,14 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     for (i = 0; i < SYS_COUNT; i++) put8(ship.sys[i]);
 
     for (i = 0; i < GAL_CELLS; i++) put8(gal_enemies[i]);
-    for (i = 0; i < GAL_CELLS; i++) put8(gal_base[i]);
-    for (i = 0; i < GAL_CELLS; i++) put8(gal_stars[i]);
-    for (i = 0; i < GAL_CELLS; i++) put8(gal_known[i]);
+    put_quad(gal_base);
+    put_nib(gal_stars);
+    put_bits(gal_known);
     /* Commanders per quadrant -- persistent state in the original too, and
        the tractor beam reads it, so a reloaded game must know where they
        are. Added in version 4. */
     for (i = 0; i < GAL_CELLS; i++) put8(gal_commander[i]);
-    for (i = 0; i < GAL_CELLS; i++) put8(gal_nova[i]);
+    put_bits(gal_nova);
     for (i = 0; i < QUAD_CELLS; i++) put8(sector[i]);
     for (i = 0; i < QUAD_CELLS; i++) put16(enemy_hp[i]);
 
@@ -154,11 +220,11 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = get8();
 
     for (i = 0; i < GAL_CELLS; i++) gal_enemies[i] = get8();
-    for (i = 0; i < GAL_CELLS; i++) gal_base[i] = get8();
-    for (i = 0; i < GAL_CELLS; i++) gal_stars[i] = get8();
-    for (i = 0; i < GAL_CELLS; i++) gal_known[i] = get8();
+    get_quad(gal_base);
+    get_nib(gal_stars);
+    get_bits(gal_known);
     for (i = 0; i < GAL_CELLS; i++) gal_commander[i] = get8();
-    for (i = 0; i < GAL_CELLS; i++) gal_nova[i] = get8();
+    get_bits(gal_nova);
     for (i = 0; i < QUAD_CELLS; i++) sector[i] = get8();
     for (i = 0; i < QUAD_CELLS; i++) enemy_hp[i] = get16();
 
