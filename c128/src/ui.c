@@ -196,6 +196,18 @@ void ui_draw_chart(void) {
                 continue;
             }
 
+            /* A quadrant burnt out by a supernova. The original stores one
+               number per cell and writes 999 over it, so its chart prints
+               all nines and the manual says so: "Quadrants with supernovas
+               cause the scanners to overload and display all 9's." This core
+               keeps the digits apart and has to draw the sentinel itself. */
+            if (gal_nova[q]) {
+                scr_put(x, y, (unsigned char)(SC_DIGIT0 + 9), EGA_TO_VDC(EGA_LTRED));
+                scr_put((unsigned char)(x + 1), y, (unsigned char)(SC_DIGIT0 + 9), EGA_TO_VDC(EGA_LTRED));
+                scr_put((unsigned char)(x + 2), y, (unsigned char)(SC_DIGIT0 + 9), EGA_TO_VDC(EGA_LTRED));
+                continue;
+            }
+
             /* MEASURED from the manual 2026-08-24: long range scanners
                "when less than 100% repaired ... can no longer detect enemy
                ships", so the first digit becomes a dash rather than a zero.

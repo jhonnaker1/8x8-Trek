@@ -1143,6 +1143,22 @@ static void enemy_turn(uint8_t player_fired) {
             case EV_SHIP_LOST:
                 ui_message(S(S_170), S(S_93));
                 continue;
+            case EV_NOVA:
+                /* "COMMUNICATIONS: Dept. of Space warns of a star having
+                   gone supernova in quadrant R-C" and, when it took Mongols
+                   with it, ";  N Mongols reported destroyed." -- cs:0x2F28
+                   and cs:0x2F83, cut to the 26 this panel fits. */
+                k  = put_str(linebuf, S(S_264));
+                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
+                if (ev[i].amount) {
+                    k += put_str(linebuf + k, "; ");
+                    k += put_u16(linebuf + k, ev[i].amount);
+                    k += put_str(linebuf + k, " lost");
+                }
+                linebuf[k++] = '.';
+                linebuf[k] = 0;
+                ui_message(S(S_263), linebuf);
+                continue;
             case EV_BOARDED:
                 /* "SECURITY: A Mongol boarding party has transported into
                    <department>" -- cs:0x0C4A and the three names after it,

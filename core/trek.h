@@ -489,6 +489,11 @@ extern uint8_t gal_enemies[GAL_CELLS];
 extern uint8_t gal_base[GAL_CELLS];
 extern uint8_t gal_stars[GAL_CELLS];
 extern uint8_t gal_known[GAL_CELLS];   /* 0 = never scanned */
+/* Quadrants burnt out by a supernova. The original needs no such array: its
+   galaxy holds one number per cell and it writes 999 over the lot, which is
+   why the chart prints all nines. This core keeps the three digits apart, so
+   the sentinel needs somewhere of its own. */
+extern uint8_t gal_nova[GAL_CELLS];
 
 /* The current quadrant only, rebuilt on entry. Indexed [y * QUAD_DIM + x]. */
 extern uint8_t sector[QUAD_CELLS];
@@ -1024,6 +1029,7 @@ uint8_t trek_shields_down(void);
 #define EV_LIFE_GONE    10   /* the reserve ran out; the ship is lost */  /*@ID*/
 #define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
+#define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
@@ -1381,6 +1387,48 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define BOARD_ABOVE        95   /* Random(100) > 95, so four in a hundred */  /*@BINARY*/
 #define BOARD_BASE_TENTHS   5   /* 0.5 stardates */  /*@BINARY*/
 #define BOARD_SPAN_TENTHS   5   /* plus Random*0.5 */  /*@BINARY*/
+
+/* ------------------------------------------------ the SPONTANEOUS supernova
+ *
+ * BINARY 2026-08-27, `fn 0x1ED00`, segment base 0x1BD60. This is the SECOND
+ * of the two routes and it is nothing like the first: a torpedo detonating a
+ * star (the 4% branch of 0x0A8C8) throws the ship across the galaxy, and this
+ * one CANNOT TOUCH THE SHIP AT ALL. The emulator observation of being blown
+ * to quadrant 8-4 belongs to the torpedo route only.
+ *
+ *     if (Random(100) != 0)  return            ; one in a hundred, per turn
+ *     repeat
+ *         row = Random(8)+1;  col = Random(8)+1
+ *     until row != [0x1DE4]                    ; NOT the ship's quadrant ROW
+ *       and (galaxy[q] mod 10) > 0             ; the quadrant has a star
+ *       and galaxy[q] != 999                   ; and is not already burnt
+ *
+ * THE ROW EXCLUSION IS NOT A TYPO and it is the third quirk of its shape in
+ * this program, after the death pod's column 8 and reinforcements' column 1.
+ * It tests the row alone, so a supernova never occurs anywhere along the
+ * ship's own rank -- eight quadrants, not one.
+ *
+ * Then it kills what is there and tells you:
+ *
+ *     n = galaxy[q] div 100                    ; the Mongols in it
+ *     [0x1DC2] -= n                            ; enemies remaining
+ *     if ([0x1DC2] == 0) [0x26C6] = 1          ; SO IT CAN WIN THE GAME
+ *     galaxy[q] = 999                          ; 0x1EEEB
+ *     chart[q]  = 2                            ; 0x1EEFF -- the player LEARNS
+ *                                                of it without scanning
+ *
+ * and it cancels what was pending there: the base-under-attack marker at
+ * [0x1E0A]/[0x1E0C] is cleared if it names this quadrant, and a second
+ * quadrant pair at [0x1E1C]/[0x1E1E] is cleared along with its schedule slot
+ * [0x1D9C], which is set to the real 9999 -- never. That second pair is NOT
+ * identified; this core maps the behaviour onto its own base state and says
+ * so at the call site rather than guessing what the pair is.
+ *
+ * Its message is "COMMUNICATIONS:  Dept. of Space warns of a star having
+ * gone supernova in quadrant R-C", ending "." with nothing there and
+ * ";  N Mongols reported destroyed." otherwise. */
+#define NOVA_OF_N         100   /* Random(100) == 0 */  /*@BINARY*/
+#define NOVA_CHART_BURNT  999   /* what the chart prints for a burnt cell */  /*@BINARY*/
 
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/

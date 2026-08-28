@@ -6,6 +6,7 @@ uint8_t gal_enemies[GAL_CELLS];
 uint8_t gal_base[GAL_CELLS];
 uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
+uint8_t gal_nova[GAL_CELLS];
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
 Ship    ship;
@@ -213,6 +214,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
            earlier draft forced at least one star per quadrant. */
         gal_stars[i]   = trek_rand_n(9);
         gal_known[i]   = 0;
+        gal_nova[i]    = 0;
         gal_commander[i] = 0;
     }
 
@@ -779,6 +781,51 @@ static void run_boarders(TrekEvent *ev, uint8_t *n, uint8_t max) {
                     ev[*n].x = 0; ev[*n].amount = 0; (*n)++; }
 }
 
+/* The spontaneous supernova -- fn 0x1ED00, once a turn. See trek.h for the
+   whole routine; the two things that surprise are that it never fires
+   anywhere in the ship's own quadrant ROW, and that it can finish the
+   mission for you. */
+static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t row, col, c, tries, killed;
+
+    if (trek_rand_n(NOVA_OF_N) != 0) return;
+
+    /* The original loops until it finds one. Bounded here: a galaxy with no
+       unburnt star outside the ship's row would spin forever, and that state
+       is reachable near the end of a long game. */
+    for (tries = 0; tries < GAL_CELLS; tries++) {
+        row = trek_rand_n(GAL_DIM);
+        col = trek_rand_n(GAL_DIM);
+        if (row == ship.quad_y) continue;
+        c = (uint8_t)((row << 3) | col);
+        if (gal_stars[c] == 0 || gal_nova[c]) continue;
+
+        killed = gal_enemies[c];
+
+        /* What was pending there stops being pending. The original clears the
+           base-under-attack pair at [0x1E0A] and a second pair at [0x1E1C]
+           whose identity is not read; this core clears the marker it has and
+           cancels the fall that marker drives, which is the same behaviour
+           for the state this core models. */
+        if (base_under_attack == c) {
+            base_under_attack = GAL_CELLS;
+            trek_sched_restore(SCHED_BASE_FALLS, SCHED_NEVER);
+        }
+        gal_base[c]    = BASE_NONE;
+        gal_enemies[c] = 0;
+        gal_stars[c]   = 0;
+        gal_nova[c]    = 1;
+        gal_known[c]   = 1;      /* the chart learns it without a scan */
+
+        ship.enemies_left = (uint16_t)(ship.enemies_left > killed
+                                       ? ship.enemies_left - killed : 0);
+
+        if (*n < max) { ev[*n].kind = EV_NOVA; ev[*n].y = row; ev[*n].x = col;
+                        ev[*n].amount = killed; (*n)++; }
+        return;
+    }
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -792,6 +839,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     }
     run_events(ship.stardate, ev, &n, max);
     run_boarders(ev, &n, max);
+    run_nova(ev, &n, max);
     return n;
 }
 

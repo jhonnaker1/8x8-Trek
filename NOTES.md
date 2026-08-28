@@ -1250,12 +1250,12 @@ left to find:
                                     the THIRD wrong label in this map. Built.
                                     [0x1E00] is which department is held and
                                     [0x26DC] is the shields-up flag.
-    0x1ED00   3  supernova          the EFFECT, not the trigger -- the 4%
-                                    branch of 0x0A8C8 is already read. Closes
-                                    "whether every enemy dies, where the ship
-                                    is thrown, how the damage scales", which
-                                    is currently scoped as an EMULATOR
-                                    session and does not need to be.
+    0x1ED00   -  SPONTANEOUS NOVA   READ 2026-08-27 and BUILT. 1 in 100 a
+                                    turn, never in the ship's own ROW, so it
+                                    cannot touch the ship at all -- the
+                                    "blown to quad 8-4" observation is the
+                                    TORPEDO route, which is still unbuilt.
+                                    It can WIN the game.
     0x181E8   1  capture            boarding-party frequency
     0x15F51   4  Union wreckage     unbuilt screen
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50

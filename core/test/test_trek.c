@@ -2354,6 +2354,64 @@ static void test_star_and_focus(void) {
         ok(ship.boarders == BOARD_NONE, "past it they are eliminated");
         ok(n >= 1 && ev[0].kind == EV_BOARDERS_GONE, "and security says so");
     }
+
+    /* --- the spontaneous supernova, BINARY fn 0x1ED00 --- */
+    {
+        TrekEvent ev[8];
+        uint16_t t;
+        uint8_t i, k, n, novas = 0, in_row = 0, target, off_target = 0;
+
+        /* Stars everywhere, so the only thing that can steer the choice is
+           the row rule. */
+        trek_new_game(3, 999);
+        for (t = 0; t < 8000; t++) {
+            for (i = 0; i < GAL_CELLS; i++) { gal_stars[i] = 1; gal_nova[i] = 0; }
+            n = trek_run_events(ev, 8);
+            for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_NOVA) {
+                    novas++;
+                    if (ev[k].y == ship.quad_y) in_row++;
+                }
+        }
+        ok(novas > 0, "supernovae do occur");
+        ok(in_row == 0,
+              "and NEVER in the ship's own quadrant row -- eight of them");
+
+        /* A star is required. Exactly one quadrant has one, off our row. */
+        trek_new_game(3, 999);
+        target = (uint8_t)((((ship.quad_y + 3) & 7) << 3) | 2);
+        novas = 0;
+        for (t = 0; t < 8000; t++) {
+            for (i = 0; i < GAL_CELLS; i++) { gal_stars[i] = 0; gal_nova[i] = 0; }
+            gal_stars[target] = 1;
+            n = trek_run_events(ev, 8);
+            for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_NOVA) {
+                    novas++;
+                    if ((uint8_t)((ev[k].y << 3) | ev[k].x) != target) off_target++;
+                }
+        }
+        ok(novas > 0, "a starless galaxy but for one quadrant still novas");
+        ok(off_target == 0, "and only ever in the quadrant that has the star");
+
+        /* It kills what is there, and it can finish the mission. */
+        trek_new_game(3, 999);
+        target = (uint8_t)((((ship.quad_y + 3) & 7) << 3) | 2);
+        for (i = 0; i < GAL_CELLS; i++) { gal_stars[i] = 0; gal_nova[i] = 0;
+                                          gal_enemies[i] = 0; }
+        gal_stars[target]   = 1;
+        gal_enemies[target] = 5;
+        ship.enemies_left   = 5;
+        base_under_attack   = target;
+        for (t = 0; t < 8000 && ship.enemies_left; t++)
+            (void)trek_run_events(ev, 8);
+        ok(ship.enemies_left == 0, "the supernova takes the Mongols with it");
+        ok(gal_enemies[target] == 0, "the quadrant is emptied");
+        ok(gal_nova[target] == 1, "and marked burnt");
+        ok(gal_known[target] == 1, "the chart learns it without a scan");
+        ok(base_under_attack == GAL_CELLS, "a siege there is called off");
+        ok(trek_game_state() == GAME_WON, "and it can WIN the mission");
+    }
 }
 
 /* Damage has consequences. Every threshold here is the manual's, quoted in

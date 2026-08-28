@@ -263,3 +263,5 @@
 260	Boarders in laser control!
 261	Boarding party eliminated.
 262	SECURITY:
+263	COMMUNICATIONS:
+264	Supernova 

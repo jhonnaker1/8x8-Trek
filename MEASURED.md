@@ -5941,3 +5941,63 @@ change overflows it. That overlay wants splitting, or the window wants
 growing, BEFORE the next feature that touches serialisation.
 
 Audit BINARY 112.
+
+## The spontaneous supernova, which is not the torpedo one (2026-08-27)
+
+`fn 0x1ED00`, segment base **0x1BD60**. The read list called this "the
+supernova" as though there were one; there are two routes and they behave
+completely differently.
+
+    if (Random(100) != 0)  return              ; one in a hundred, per turn
+    repeat
+        row = Random(8)+1;  col = Random(8)+1
+    until row != [0x1DE4]                      ; NOT the ship's quadrant ROW
+      and (galaxy[q] mod 10) > 0               ; the quadrant holds a star
+      and galaxy[q] != 999                     ; and is not already burnt
+
+    n = galaxy[q] div 100
+    [0x1DC2] -= n                              ; enemies remaining
+    if ([0x1DC2] == 0) [0x26C6] = 1            ; the WON flag
+    galaxy[q] = 999                                            0x01EEEB
+    chart[q]  = 2                                              0x01EEFF
+
+### Three things worth pulling out
+
+**IT CANNOT TOUCH THE SHIP.** The exclusion is on the ROW alone -- eight
+quadrants, not one -- so a supernova never occurs anywhere along the ship's
+own rank. **The emulator observation of being blown to quadrant 8-4 belongs to
+the TORPEDO route** (the 4% branch of 0x0A8C8) and not to this one. Filing
+both under "the supernova" would have produced a feature that threw the ship
+about at random.
+
+That row exclusion is the third quirk of its shape in this program, after the
+death pod's column 8 and reinforcements' column 1. Recorded as read.
+
+**IT CAN WIN THE GAME.** `[0x1DC2]` is the enemies-remaining count and the
+routine sets the won flag directly when it reaches zero. A mission can end
+because a star two quadrants over happened to go up.
+
+**THE PLAYER LEARNS OF IT WITHOUT SCANNING.** `chart[q] = 2` writes the
+RECORDED chart at DS:0x2360, not the galaxy -- so a burnt quadrant appears on
+the L.R. chart having never been visited. The manual's line about scanners
+overloading and displaying all 9's is the same fact from the other side.
+
+### What it cancels, and the one thing not identified
+
+The base-under-attack pair at [0x1E0A]/[0x1E0C] is cleared when it names the
+destroyed quadrant -- [0x1E0A] is written at game setup (0x0054EB) and read by
+the base-attack scheduler `fn 0x1F9D5`, which is what identifies it. A second
+pair at [0x1E1C]/[0x1E1E] is cleared too, along with schedule slot [0x1D9C],
+which is set to the real 9999 -- never, and the same sentinel SCHED_NEVER
+already models. **That second pair is NOT identified.** This core maps the
+behaviour onto the base state it has and says so at the call site rather than
+guessing.
+
+### Cost
+
+349 resident bytes, leaving 1,028. gal_nova[] is 64 bytes of galaxy state --
+the original needs none, because its galaxy is one number per cell and 999
+overwrites the lot; this core keeps the three digits apart and the sentinel
+needs somewhere to live. Save v7, 746 bytes. `front` went 3,353 -> 3,471 with
+the bigger record, which is exactly the room this morning's split bought.
+Audit BINARY 114.
