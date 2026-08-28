@@ -85,32 +85,30 @@
    wrong. Whether the count varies by level is untested. */
 #define TORPS_START      9  /*@MEASURED*/
 
-/* Enemy count -- MEASURED 2026-08-24, and the formula is
+/* HOW MANY MONGOLS, read out of the binary 2026-08-26 at 0x005181:
  *
- *     enemies = 10 + 8 * level + rand(0..8)
+ *     total = Random(10) + ((level + 1) * 8 * (100 - Random(10))) div 100
  *
- * NINETEEN samples, all inside the predicted range, and the endpoints are hit
- * at three different levels:
+ * plus THREE for the StarBase that starts the game under attack (0x0054D0),
+ * which is base number one always and EVERY base at level five -- and only
+ * when that base's quadrant has no enemies in it already.
  *
- *     level 1   18, 21          predicted 18..26   (18 is the exact minimum)
- *     level 2   30, 32          predicted 26..34
- *     level 3   34 37 37 38 38 38 40 42 42 42   predicted 34..42
- *     level 4   42, 47          predicted 42..50   (42 is the exact minimum)
- *     level 5   53, 55          predicted 50..58
+ * THE FITTED `10 + 8*level + rand(0..8)` WAS A COINCIDENCE OF THE SAMPLE.
+ * It reproduced level 3's ten readings as exactly 34..42 because that is the
+ * span ten draws happened to occupy; the real range there is 32..44. All
+ * nineteen readings across five levels fall inside the law above, and its
+ * means track theirs. Three FITTED constants for one expression that was
+ * never quite the right shape -- which is what FITTED is supposed to warn
+ * about.
  *
- * Level 3's ten samples span 34..42 exactly -- the whole range, both ends.
- *
- * This REPLACES the earlier fit of `level*10 + rand(0..12)`, which the same
- * data also satisfies but which predicts level 3 could roll 30..33. Ten
- * samples never did, and the chance of missing four of thirteen values ten
- * times running is about one in forty. The level-1 and level-4 readings
- * landing exactly on this model's minima is the other reason to prefer it.
- *
- * The old note called it "fitted, not confirmed ... more new games at a
- * single level would tighten it". That is what happened. */
-#define ENEMY_BASE        10  /*@FITTED*/
-#define ENEMY_PER_LEVEL    8  /*@FITTED*/
-#define ENEMY_SPREAD       9     /* trek_rand_n(9) gives the observed 0..8 */  /*@FITTED*/
+ * The (100 - Random(10))/100 term is a 0-to-9 percent shave off the level
+ * base, so the count is BIASED DOWNWARD from (level+1)*8 rather than spread
+ * evenly around it. Nothing in the readings could have shown that. */
+#define ENEMY_PER_LEVEL       8   /* (level + 1) * 8 */  /*@BINARY*/
+#define ENEMY_SHAVE_OF_N     10   /* less 0..9 percent of it */  /*@BINARY*/
+#define ENEMY_SPREAD_OF_N    10   /* plus a flat Random(10) */  /*@BINARY*/
+#define ENEMY_PER_QUADRANT    4   /* Random(4)+1 placed per quadrant, once */  /*@BINARY*/
+#define ENEMY_SIEGE           3   /* extra, at the base that starts besieged */  /*@BINARY*/
 #define ENERGY_PER_DAY  400      /* manual l.265, at 100% repair */  /*@CONFIRMED*/
 
 /* Stardates are carried in tenths, so these exceed cc65's 16-bit signed int

@@ -112,60 +112,97 @@ static void test_generation(void) {
     puts("galaxy generation");
 
     trek_new_game(3, 12345);
-    expect = ENEMY_BASE + 3 * ENEMY_PER_LEVEL;  /* lower bound; rest is random */
+    expect = 0;                                  /* set per level below */
 
     for (i = 0; i < GAL_CELLS; i++) {
         enemies += gal_enemies[i];
         if (gal_stars[i] > 8) starless++;
     }
-
-    /* A range, not an equality: the original's count is random within the
-       level's band, so pinning it to one number would be asserting a
-       fiction. */
-    ok(enemies >= expect && enemies < expect + ENEMY_SPREAD,
-       "enemy total sits inside the fitted level band");
     ok(ship.enemies_left == (uint16_t)enemies,
        "enemies_left agrees with the galaxy");
 
-    /* Every level's band must start at level*10 and stay inside the spread,
-       across many seeds -- this is what would notice a base or spread that
-       drifted away from the five readings taken off the original. */
+    /* THE RANGE THE BINARY CAN PRODUCE, written out rather than derived from
+       the same constants the code uses, so a drifting constant fails here
+       instead of moving the band with the test. Lower bound is the fully
+       shaved base with no spread and no siege; upper is the unshaved base
+       with both. */
     {
-        uint8_t lvl;
-        uint16_t seed;
-        int bad = 0;
-        for (lvl = 1; lvl <= 5; lvl++) {
-            for (seed = 1; seed < 200; seed++) {
-                trek_new_game(lvl, seed);
-                if (ship.enemies_left <
-                        (uint16_t)(ENEMY_BASE + lvl * ENEMY_PER_LEVEL) ||
-                    ship.enemies_left >=
-                        (uint16_t)(ENEMY_BASE + lvl * ENEMY_PER_LEVEL + ENEMY_SPREAD))
-                    bad++;
-            }
-        }
-        ok(bad == 0, "all five levels stay in band across 199 seeds");
-    }
-
-    /* The MEASURED ranges, written out rather than derived from the same
-       constants the code uses -- so a change to ENEMY_BASE or
-       ENEMY_PER_LEVEL fails here instead of silently moving the band with
-       the test. Nineteen readings off the original sit inside these, and
-       level 3's ten samples hit both ends. See core/trek.h. */
-    {
-        static const uint16_t lo[6] = { 0, 18, 26, 34, 42, 50 };
-        static const uint16_t hi[6] = { 0, 26, 34, 42, 50, 58 };
+        static const uint16_t lo[6] = { 0, 14, 21, 29, 36, 43 };
+        static const uint16_t hi[6] = { 0, 28, 36, 44, 52, 63 };
         uint8_t lvl;
         uint16_t seed;
         int bad = 0;
         for (lvl = 1; lvl <= 5; lvl++)
-            for (seed = 1; seed < 200; seed++) {
+            for (seed = 1; seed < 300; seed++) {
                 trek_new_game(lvl, seed);
                 if (ship.enemies_left < lo[lvl] || ship.enemies_left > hi[lvl])
                     bad++;
             }
-        ok(bad == 0, "every level matches the ranges measured off the original");
+        ok(bad == 0, "every level stays inside what the formula can produce");
     }
+
+    /* AND IT REPRODUCES ALL NINETEEN READINGS taken off the original. The
+       fitted model these replaced also did -- what it could not do is
+       produce 32 or 43 at level 3, which this one can and which no
+       measurement ever ruled out. See trek.h. */
+    {
+        static const uint16_t m1[2]  = { 18, 21 };
+        static const uint16_t m2[2]  = { 30, 32 };
+        static const uint16_t m3[10] = { 34,37,37,38,38,38,40,42,42,42 };
+        static const uint16_t m4[2]  = { 42, 47 };
+        static const uint16_t m5[2]  = { 53, 55 };
+        static const uint16_t *sets[6] = { 0, m1, m2, m3, m4, m5 };
+        static const uint8_t   lens[6] = { 0, 2, 2, 10, 2, 2 };
+        uint8_t lvl, k;
+        uint16_t seed;
+        int missed = 0;
+        for (lvl = 1; lvl <= 5; lvl++) {
+            for (k = 0; k < lens[lvl]; k++) {
+                int seen = 0;
+                for (seed = 1; seed < 400 && !seen; seed++) {
+                    trek_new_game(lvl, seed);
+                    if (ship.enemies_left == sets[lvl][k]) seen = 1;
+                }
+                if (!seen) missed++;
+            }
+        }
+        ok(missed == 0, "and every one of the nineteen readings is reachable");
+    }
+
+    /* THE SIEGE: the first StarBase starts with three Mongols on it whenever
+       its quadrant is otherwise empty. Checked as a frequency because the
+       quadrant is not always empty. */
+    {
+        uint16_t seed;
+        int besieged = 0, k;
+        for (seed = 1; seed < 200; seed++) {
+            trek_new_game(3, seed);
+            for (k = 0; k < GAL_CELLS; k++)
+                if (gal_base[k] == BASE_STARBASE && gal_enemies[k] == ENEMY_SIEGE)
+                    { besieged++; break; }
+        }
+        ok(besieged > 100, "a StarBase usually starts the game under siege");
+    }
+
+    /* PLACED IN CLUMPS, not scattered. The original puts 1..4 into a quadrant
+       and never returns to it, so most quadrants are empty -- which the old
+       one-at-a-time placement could not produce. */
+    {
+        int occupied = 0, over1 = 0, k;
+        uint16_t seed;
+        for (seed = 1; seed < 60; seed++) {
+            trek_new_game(3, seed);
+            for (k = 0; k < GAL_CELLS; k++) {
+                if (gal_enemies[k]) occupied++;
+                if (gal_enemies[k] > 1) over1++;
+            }
+        }
+        ok(occupied < 60 * 25, "enemies occupy well under half the galaxy");
+        ok(over1 * 2 > occupied, "and most occupied quadrants hold more than one");
+    }
+
+    trek_new_game(3, 12345);
+    (void)expect;
 
     trek_new_game(3, 12345);   /* restore the state the rest of this test uses */
     /* TWO LOOPS, not one -- see trek.c. StarBases are 11 - V of them (the

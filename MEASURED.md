@@ -3091,6 +3091,12 @@ was and was not done rather than implying a clean sweep.
 
 ### 1. Enemy count per level -- CLOSED
 
+**[RE-OPENED AND CLOSED PROPERLY 2026-08-26. The fit below reproduces all
+nineteen readings and is still the wrong shape -- there is a percentage shave
+and a three-ship siege in it. See the enemy-count section at the end of this
+file, and note that the reasoning used here to reject the PREVIOUS fit applies
+just as well to this one.]**
+
 New readings: **level 1 = 21, level 4 = 47, level 5 = 55.** With the ten level-3
 samples and the earlier five, that is nineteen readings, and they fix the
 formula:
@@ -5306,3 +5312,88 @@ is back to 1,490 bytes free with the eval overlay at 3,058 of 3,840. Worth
 recording as a pattern: **core code called from exactly one overlay belongs in
 that overlay**, and `OVL_CODE` is already a no-op off-target so core/ may use
 it without learning anything about the platform.
+
+---
+
+## The enemy count, and a fit that was a coincidence of its own sample (2026-08-26)
+
+`fn 0x04FD1` is not "galaxy generation" -- it is the whole main program, with
+generation as its first few hundred bytes and the turn loop at 0x0058xx. The
+enemy total is computed at 0x005181:
+
+    total = Random(10) + ((level + 1) * 8 * (100 - Random(10))) div 100
+
+`[0x1DF0] - 3` is `level + 1`, `shl 3` is the times eight, and 0x279/0x294 are
+the runtime's 32-bit multiply and divide.
+
+**Plus THREE for the StarBase that starts the game under attack.** At 0x0054D0,
+inside the StarBase loop: base number one always, and EVERY base at level five
+(`[0x1DCA] == 1 || [0x1DF0] == 9`), and only when that base's quadrant has no
+enemies already -- then 300 goes into the galaxy word and 3 onto the total.
+That was the term nineteen readings could not see, because it is added after
+the count and looks like part of it.
+
+### The fitted model reproduced every reading and was still wrong
+
+`10 + 8*level + rand(0..8)` was adopted on 2026-08-24 with this reasoning,
+recorded above: *"Level 3's ten samples span exactly 34..42, both endpoints...
+This REPLACES the earlier fit of `level*10 + rand(0..12)`, which the same data
+also satisfies but which predicts level 3 could roll 30..33. Ten samples never
+did, and missing four of thirteen values ten times running is about one in
+forty."*
+
+The real range at level 3 is **32..44**. Ten draws landing on 34..42 inside it
+is entirely ordinary -- and the argument that rejected the previous fit was the
+same argument, applied to a band that was also too narrow. **A span that ten
+samples exactly fill is evidence about the samples, not about the band.**
+
+Three constants (`ENEMY_BASE`, `ENEMY_PER_LEVEL`, `ENEMY_SPREAD`) came out of
+that fit. One of them survives.
+
+| level | binary can produce | measured |
+|---|---|---|
+| 1 | 14..28 | 18, 21 |
+| 2 | 21..36 | 30, 32 |
+| 3 | 32..44 | 34 37 37 38 38 38 40 42 42 42 |
+| 4 | 36..52 | 42, 47 |
+| 5 | 43..63 | 53, 55 |
+
+All nineteen fit, and the test asserts that each one is REACHABLE rather than
+that the band happens to contain it.
+
+The `(100 - Random(10))/100` term is a nought-to-nine percent shave, so the
+count is biased DOWNWARD from `(level+1)*8` rather than spread evenly about
+it. No number of readings could have shown that shape.
+
+### And they arrive in clumps
+
+The placement loop at 0x0051CD picks a quadrant, **skips it if it already has
+enemies**, and drops `Random(4) + 1` in, clamped to what is left of the total.
+One visit per quadrant. So a galaxy holds a dozen or so busy quadrants and
+fifty empty ones, not a thin even scatter -- the port had been adding them one
+at a time with a cap of four, which is a different distribution and a
+different game to fly through.
+
+### BLACK HOLE PLACEMENT, at last
+
+Not in generation at all. It is in the QUADRANT FILL, `fn 0x0160xx..0x016562`,
+which is also where the four enemy-strength formulas live. At 0x016525:
+
+    if (Random(64) < 16)  put a black hole in a free sector
+
+**One quadrant in four gets exactly one black hole**, and the sector is chosen
+by the same free-sector helper (fn 0x01857E) everything else uses. Unbuilt --
+this core has no black hole cell -- but between this, the MOVE interaction
+already decoded (1 in 5 fatal) and the torpedo interaction (swallowed under
+0.3, otherwise dy and dx are SWAPPED), the whole feature is now specified.
+
+### Stars, and why a destroyed one stays destroyed
+
+The same routine draws stars at 0x016490, and just before it:
+
+    if (novas[quadrant] >= k)  draw 'N'      -- a star already destroyed
+    else                       draw '*'
+
+`DS:0x24E9` is a per-quadrant count of destroyed stars, incremented by the
+torpedo-into-a-star path at 0x00AD3E. So novas persist for the rest of the
+game, and the quadrant fill redraws them every time you come back.

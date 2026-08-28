@@ -204,20 +204,31 @@ void trek_new_game(uint8_t level, uint16_t seed) {
         gal_known[i]   = 0;
     }
 
-    /* Fitted from five readings of the original, one per command level --
-       see the note in trek.h. Higher levels face more ships (manual
-       l.229-232), but the count is random within a level's range rather
-       than fixed. */
-    total = (uint16_t)(ENEMY_BASE + level * ENEMY_PER_LEVEL
-                       + trek_rand_n(ENEMY_SPREAD));
-    ship.enemies_left = total;
+    /* READ OUT OF THE BINARY 2026-08-26 -- see trek.h. The level base is
+       shaved by 0 to 9 percent and a flat Random(10) added on top, which is
+       not the shape three FITTED constants had. */
+    total = (uint16_t)(trek_rand_n(ENEMY_SPREAD_OF_N)
+                       + ((uint16_t)((level + 1) * ENEMY_PER_LEVEL)
+                          * (uint16_t)(100 - trek_rand_n(ENEMY_SHAVE_OF_N)))
+                         / 100);
 
-    while (total) {
-        q = trek_rand_n(GAL_CELLS);
-        if (gal_enemies[q] >= 4) continue;    /* keep quadrants playable */
-        gal_enemies[q]++;
-        total--;
+    /* And placed 1..4 AT A TIME, into a quadrant that has none yet -- so the
+       galaxy holds a few busy quadrants and many empty ones rather than a
+       thin even scatter. The port used to add them one at a time with a cap
+       of four, which is a different distribution entirely. */
+    {
+        uint16_t placed_n = 0;
+        while (placed_n < total) {
+            uint16_t want;
+            q = trek_rand_n(GAL_CELLS);
+            if (gal_enemies[q]) continue;        /* one visit per quadrant */
+            want = (uint16_t)(1 + trek_rand_n(ENEMY_PER_QUADRANT));
+            if (placed_n + want > total) want = (uint16_t)(total - placed_n);
+            gal_enemies[q] = (uint8_t)want;
+            placed_n = (uint16_t)(placed_n + want);
+        }
     }
+    ship.enemies_left = total;
 
     /* BASES, READ OUT OF THE BINARY 2026-08-26 (fn 0x04FD1, 0x053BB and
        0x0553D). Two separate loops, and neither resembles what this port did.
@@ -252,6 +263,16 @@ void trek_new_game(uint8_t level, uint16_t seed) {
         if (tries >= 200) break;      /* the original can spin; this cannot */
         last_y = qy; last_x = qx;
         gal_base[q] = BASE_STARBASE;
+
+        /* THE SIEGE. The first StarBase -- and every one of them at level 5 --
+           starts with three Mongols on it, if its quadrant is otherwise
+           empty. 0x00547B, and the three go on the total as well as into the
+           quadrant, which is the term nineteen readings of the enemy count
+           were missing. */
+        if ((placed == 0 || level == 5) && gal_enemies[q] == 0) {
+            gal_enemies[q]     = ENEMY_SIEGE;
+            ship.enemies_left  = (uint16_t)(ship.enemies_left + ENEMY_SIEGE);
+        }
     }
 
     bases = (uint8_t)(2 + trek_rand_n(3));
