@@ -861,8 +861,30 @@ uint8_t trek_shields_down(void);
  * before and after a single shot from a Commander at a known range. The
  * binary predicts 0.9 to 1.05 of hit points times the falloff; the port
  * predicts 0.72 to 0.84. Nothing else needs to be measured. */
-#define ENEMY_FIRE_PCT_MIN      72   /* mean 78 kept from the 36 readings */  /*@MEASURED*/
-#define ENEMY_FIRE_PCT_SPAN     13   /* 72..84, the binary's relative width */  /*@MEASURED*/
+/* THE 0.8 CONFLICT IS SETTLED, AND THE BINARY WON -- 2026-08-27, eighteen
+ * shots under dosbox-automation with the board pinned.
+ *
+ * The binary is `hit = hp * (0.6 + Random*0.1) * (1.5 - d/8)`. Dividing the
+ * measured drop by `hp * (1.5 - d/8)` recovers that first factor directly:
+ *
+ *     n = 18   min 0.6042   max 0.6965   mean 0.6538
+ *     BINARY  0.600 .. 0.700   ->  18 of 18 inside
+ *     the old MEASURED 72..84  ->   0 of 18 inside
+ *
+ * WHAT MADE THE DIFFERENCE WAS PINNING THE TWELVE SYSTEM PERCENTAGES.
+ * Jamie's call, mid-run. Without it the board degrades under its own fire and
+ * the readings drift upward and scatter -- one early sample read 1.196, which
+ * is not a shot at all. The 2026-08-26 measurement that produced 0.782 and
+ * the "unresolved factor of 0.8" was measuring a decaying board.
+ *
+ * This core's falloff is `1 - d/12`, which is the binary's `1.5 - d/8` with
+ * the 1.5 divided out, so the percentage here has to carry it: 0.6 * 1.5 = 90
+ * and 0.7 * 1.5 = 105. That is where the old 72..84 came from too -- it was
+ * 0.78 carrying the same 1.5 -- and it was low by exactly the 0.8 that the
+ * printed "Shields absorb N" line also carries. One instrument fault, two
+ * symptoms, and both are now closed. */
+#define ENEMY_FIRE_PCT_MIN      90   /* 0.6 * 1.5 */  /*@BINARY*/
+#define ENEMY_FIRE_PCT_SPAN     16   /* 90..105, i.e. 0.6..0.7 times 1.5 */  /*@BINARY*/
 
 /* MEASURED: enemies hold fire on about half of their turns -- 5/10, 5/10,
    7/10 and 4/8 across four blocks. Not an artefact of dropped turns: a

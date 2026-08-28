@@ -1600,9 +1600,9 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
    83% if this constant were ever retuned to 85. */
 static uint16_t enemy_fire_energy(uint16_t hp) {
     /* A UNIFORM BAND, not a flat percentage -- the binary rolls
-       `0.6 + Random*0.1` and the thirty-six-turn measurement saw the scatter
-       it produces. See trek.h, including the unresolved factor of 0.8 in the
-       scale. */
+       `0.6 + Random*0.1`, and eighteen pinned shots put the measured factor
+       inside that band 18 times out of 18. See trek.h; the 0.8 that made the
+       old scale look wrong was the measurement, not the code. */
     uint8_t  pct   = (uint8_t)(ENEMY_FIRE_PCT_MIN
                                + trek_rand_n(ENEMY_FIRE_PCT_SPAN));
     uint16_t whole = (uint16_t)((hp / 100) * pct);

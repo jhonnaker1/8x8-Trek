@@ -6532,3 +6532,46 @@ DESTROY it, and this core has no 'R' sector object to shoot at. Shipping the
 hazard without its counter would be worse than the current approximation. The
 gate flips when the pod becomes a sector object, and that is now the reason to
 build it.
+
+## THE 0.8 CONFLICT IS SETTLED, and the binary won (2026-08-27)
+
+Eighteen shots under dosbox-automation, one enemy of 1,000 hit points poked
+into the table and onto the sector map, shields DOWN, energy and shields
+pinned before every turn -- **and the twelve system percentages written back
+to 100 before every turn, which is what made it work.**
+
+Dividing each energy drop by `hp * (1.5 - d/8)` recovers the binary's first
+factor directly:
+
+    n = 18   min 0.6042   max 0.6965   mean 0.6538
+
+    BINARY   0.6 + Random*0.1  ->  0.600 .. 0.700   18 of 18 inside
+    PORT     72..84 (MEASURED) ->  0.720 .. 0.840    0 of 18 inside
+
+### Pinning the systems is the whole story
+
+Jamie called it mid-run: *"repair the systems."* Before that the same loop
+produced 0.6387, 0.6838, 0.6973 **and 1.1964** -- and 1.1964 is not a shot at
+all. The board was degrading under its own fire and the readings drifted
+upward and scattered.
+
+**That is what the 2026-08-26 session was measuring.** Thirty-six turns at
+eleven ranges gave 0.782 with sd 0.038 and produced the "unresolved factor of
+0.8"; it was a decaying board, not a scale error in the binary. The rig fix
+that settles it is one line -- `P.write(DS+0x235A, (100).to_bytes(2,'little')*12)`
+-- and it is the same lesson as the shield-write poisoning and the pinned
+pools that made the 2026-08-20 motion result clean: **pin every input the
+game's decision reads, not just the ones the answer is about.**
+
+### What changed in the port
+
+`ENEMY_FIRE_PCT_MIN 72 / SPAN 13` becomes **90 / 16**. This core's falloff is
+`1 - d/12`, which is the binary's `1.5 - d/8` with the 1.5 divided out, so the
+percentage has to carry it: 0.6 * 1.5 = 90, 0.7 * 1.5 = 105. The old 72..84
+was 0.78 carrying the same 1.5 -- low by exactly the 0.8 the printed "Shields
+absorb N" line also carries. **One instrument fault, two symptoms, both now
+closed.** Two constants move MEASURED -> BINARY.
+
+The band test asserted 661..771. Nine of these eighteen shots were at exactly
+its range and came back 851.4 to 953.0 -- every one of them outside what the
+suite was asserting. It now asserts 826..964, which brackets them.
