@@ -1361,7 +1361,7 @@ int main(void) {
            setup screen is up. An earlier version of this let it run through
            setup, which was a guess this file admitted to at the time. */
         snd_music(MUS_TITLE);
-        ovl_load(OVL_FRONT);
+        ovl_load(OVL_TITLE);
         ui_title();
         snd_music(MUS_NONE);
         ovl_load(OVL_FRONT);

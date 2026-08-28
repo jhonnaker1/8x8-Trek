@@ -49,10 +49,17 @@
    with room ignores it entirely. Ids are indices; keep them contiguous. */
 #define OVL_EVAL   0    /* ui_evaluation, and the score sheet it draws from */
 #define OVL_HOF    1    /* ui_hall_of_fame, and all of core/hof.c with it */
-/* The front end AND the save machinery, together and not by choice: setup's
-   restore path and SAVE both reach core/serial.c, so splitting them would
-   leave the serialiser resident and save nothing. */
-#define OVL_FRONT  2    /* ui_title, ui_setup, ui_save_game, the serialiser */
+/* Setup AND the save machinery, together and not by choice: setup's restore
+   path and SAVE both reach core/serial.c, so splitting THESE TWO would leave
+   the serialiser resident and save nothing. The title screen used to be here
+   as well and was the one part that could leave -- see OVL_TITLE.
+
+   THIS IS THE OVERLAY THAT GROWS. The serialiser is inlined into
+   ui_save_game, so every field added to the save record lands here. It hit
+   3,994 of 4,096 on 2026-08-27 and the split bought it back to 3,353. When
+   it next runs out there is nothing cheap left to move, and the answer will
+   be to grow the window -- which costs resident RAM one for one. */
+#define OVL_FRONT  2    /* ui_setup, ui_save_game, the serialiser */
 #define OVL_INFO   3    /* ui_info_panel */
 #define OVL_REPAIR 4    /* ui_repair_report */
 #define OVL_MSGS   5    /* ui_messages_view */
@@ -64,7 +71,14 @@
    the most frequent action in the game. These five are dialogs the player
    opens a handful of times a game. */
 #define OVL_CMDS   7    /* D)ock, E)nergy, S)elf destruct, F)ix */
-#define OVL_COUNT  8
+/* The title screen, split out of OVL_FRONT on 2026-08-27 because front had
+   reached 3,994 of 4,096. It is the only one of front's three functions that
+   does NOT touch the serialiser -- setup restores through it and SAVE writes
+   through it, so those two cannot be separated from it or from each other.
+   Costs one extra disk load at game start, where the sequence was already
+   two ovl_load calls. */
+#define OVL_TITLE  8    /* ui_title */
+#define OVL_COUNT  9
 
 #define OVL_NONE   0xFF
 

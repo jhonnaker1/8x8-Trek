@@ -56,7 +56,7 @@ LDFLAGS = -Wl,--no-check-sections
 # eighth overlay in 2026-08-27 built and linked cleanly while silently never
 # producing ovlcmds.prg, so the d64 would have shipped without it. A list
 # that only some of the build reads is a list that drifts.
-OVERLAYS = eval hof front info repair msgs planet cmds
+OVERLAYS = eval hof front info repair msgs planet cmds title
 
 # Each overlay ships as a PRG. The two-byte header is the load address, which
 # ovl_load() discards by using secondary address 0 -- the window is where it

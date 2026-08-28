@@ -1914,7 +1914,7 @@ static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
     }
 }
 
-OVL_CODE("front")   /* Runs once before the game and never again until PLAY AGAIN */
+OVL_CODE("title")   /* Runs once before the game and never again until PLAY AGAIN */
 void ui_title(void) {
     unsigned char i, x;
 
