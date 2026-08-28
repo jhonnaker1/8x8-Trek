@@ -78,7 +78,17 @@
    Costs one extra disk load at game start, where the sequence was already
    two ovl_load calls. */
 #define OVL_TITLE  8    /* ui_title */
-#define OVL_COUNT  9
+/* THE SCHEDULED-EVENT HANDLERS. Third overlay pass, 2026-08-27: enemy_turn()
+   had grown back to 6,055 resident bytes, and the growth was `run_events`'s
+   switch being inlined into it -- a base attacked, a base falling, the
+   settlers' distress call. Those fire a handful of times in a WHOLE GAME and
+   were sitting in the hottest routine in the program.
+
+   The guard is `trek_events_due()`, which stays resident and is a scan of two
+   or three words. Nothing is loaded on a turn where nothing is due, which is
+   almost every turn. */
+#define OVL_EVENTS 9    /* run_events, the scheduled-event switch */
+#define OVL_COUNT  10
 
 #define OVL_NONE   0xFF
 

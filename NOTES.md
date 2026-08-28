@@ -4706,3 +4706,43 @@ every group is i = 0, 4, 8..., and `i & 3` is ZERO for all of them. Dropping
 that slot to one bit round-tripped clean. `i + (i >> 2)` walks the value
 across the slots. **Third time today a test passed for the wrong reason and
 only breaking it found out.**
+
+## The third overlay pass: the scheduled events (2026-08-27)
+
+Prompted by a measurement rather than a hunch. The settlers' distress call
+cost **449 resident bytes**, which was out of proportion to the mechanic, and
+the reason was visible in one `llvm-nm`: `enemy_turn()` had grown from 5,148
+back to **6,055**. The growth was `run_events`'s switch being inlined into it
+-- a base attacked, a base falling, the distress call. Those fire a handful of
+times in a WHOLE GAME and were sitting in the hottest routine in the program.
+
+    enemy_turn     6,055 -> 5,077
+    OVL_EVENTS       new,  1,411 bytes
+    resident free    785 -> 1,688
+
+So the distress call more than paid for itself: 449 spent, 903 recovered.
+
+### The guard, and why it is not the "forgot to load it" hazard
+
+`trek_events_due()` stays resident and is a scan of three words. `main.c`
+loads OVL_EVENTS only when it returns non-zero, and `trek_run_events()` tests
+**the same predicate** before dispatching -- so on a turn where nothing is due
+the overlay is neither loaded nor called, and the window can hold anything.
+The two cannot disagree because they are the same function reading the same
+array.
+
+There is exactly ONE call site into the dispatch on this platform, which is
+what makes that safe. `trek_advance()` reaches it too, and nothing on the C128
+calls `trek_advance()` -- movement uses `trek_advance_time()`, which does not
+run events.
+
+### What was left alone, and why
+
+`run_boarders`, `run_nova` and `run_pod` also run every turn and act rarely,
+but their gate IS a random roll -- a side effect. Splitting them needs the
+roll resident and the effect in an overlay, which is a bigger restructure than
+this pass warranted at 1,688 bytes free. Recorded as the next candidate if it
+gets tight again.
+
+`main` is 6,416 and mostly the command dispatcher plus the handlers that are
+too frequent to move. `fire_one_torpedo` is 2,005 and must not move.

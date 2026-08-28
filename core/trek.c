@@ -707,6 +707,7 @@ uint16_t trek_sched_deviate(uint16_t base_tenths, uint16_t spread_tenths) {
 /* Fires everything due between now and `until`, in date order, and returns
    how many were reported. The ancestor walks its array picking the earliest
    date under the horizon and repeats; so does this. */
+OVL_CODE("events")
 static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint8_t guard;
 
@@ -907,6 +908,13 @@ static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
     if (ship.shields == 0) ship.lost = 1;
 }
 
+uint8_t trek_events_due(void) {
+    uint8_t i;
+    for (i = 0; i < SCHED_COUNT; i++)
+        if (sched[i] <= ship.stardate) return 1;
+    return 0;
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -918,7 +926,10 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
         ev[n].amount = 0;
         n++;
     }
-    run_events(ship.stardate, ev, &n, max);
+    /* Only when something is due -- run_events lives in OVL_EVENTS and the
+       window holds something else the rest of the time. The platform loads it
+       on the same predicate. */
+    if (trek_events_due()) run_events(ship.stardate, ev, &n, max);
     run_boarders(ev, &n, max);
     run_nova(ev, &n, max);
     run_pod(ev, &n, max);

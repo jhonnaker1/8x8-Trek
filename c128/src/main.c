@@ -1215,6 +1215,9 @@ static void enemy_turn(uint8_t player_fired) {
        it belongs before this turn's shooting. Note the tractor beam can move
        us to another quadrant, which is exactly why the enemy turn is
        evaluated after it and not before. */
+    /* The scheduled-event handlers live in OVL_EVENTS. Nothing is loaded on
+       a turn where nothing is due, which is almost every turn. */
+    if (trek_events_due()) ovl_load(OVL_EVENTS);
     n = trek_run_events(ev, 12);
     if (n < 12)
         n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n),

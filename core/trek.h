@@ -1294,6 +1294,12 @@ uint8_t trek_advance(uint16_t tenths, TrekEvent *ev, uint8_t max);
 
 /* Fires anything now due. Movement moves the clock without an event list to
    fill, so the turn loop calls this once after whatever consumed the turn. */
+/* Is any scheduled event due right now? Resident on every platform, and the
+   gate a platform with overlays uses to decide whether to load OVL_EVENTS
+   before calling trek_run_events(). trek_run_events() tests the SAME
+   predicate before dispatching, so the two can never disagree. */
+uint8_t trek_events_due(void);
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 
 /* ---------------------------------------------------------------- docking
