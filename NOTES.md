@@ -1278,7 +1278,14 @@ left to find:
                                     is `find == PFIND_MONGOL`, which planet.h
                                     has had for days. BUILDABLE now.
     0x0E3A1   -  LANDING PARTY      named 6/6 while chasing the above.
-    0x15F51   4  Union wreckage     unbuilt screen
+    0x15F51   -  INITIAL QUADRANT   READ 2026-08-27. NOT "Union wreckage" --
+                                    SIXTH wrong label here. Clears the sector
+                                    map and builds the first quadrant; ONE
+                                    caller, at game start, skipped when
+                                    restoring. The death pod placement is
+                                    inside it, which does not square with the
+                                    port's per-entry model -- see MEASURED.md
+                                    and the [0x26E0] experiment.
     0x23FD2   -  GRAPHICS           NOT the INFO display -- no strings, blits
                                     an image via [0x26C8]. The "MONGOL BASE"
                                     the map attached is at 0x23F90, BEFORE the

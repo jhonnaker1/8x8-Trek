@@ -6427,3 +6427,52 @@ harness bug was.
 4 resident bytes net, free 1,238 -> 1,234: the capture and its prose went into
 the planet overlay, and removing the attack branch paid for most of the rest.
 Audit BINARY 138.
+
+## fn 0x15F51 is the initial quadrant build, and the death pod does not add up (2026-08-27)
+
+The last entry on the read list. The map called it "Union wreckage -- unbuilt
+screen"; it is neither. **Sixth wrong label in that map.**
+
+It clears the sector map at DS:0x2622 to '.' over a 10x10 grid, puts 'E' at
+the ship's sector from [0x1DE8]/[0x1DEA], and fills the quadrant. It has
+**exactly one caller**, at 0x0058AD in the game-start sequence, guarded by
+`[0x1F31] != 'Y'` -- so it does not run when you restore a save, which needs
+no fresh quadrant.
+
+### The death pod does not add up, and I am not resolving it by fiat
+
+The pod placement at 0x1649D..0x164E8 is INSIDE this once-only routine, and
+
+    the ONLY write of 'R' to the sector map in the whole binary is 0x164D8
+
+so on a static reading the pod is placed once, at game start, in the STARTING
+quadrant, and only when that quadrant is column 8 with fewer than five ships
+and a 4-in-10 roll. This core places it on EVERY quadrant entry.
+
+Worse, the flags do not meet:
+
+    placement    sets [0x26DF] = 1               0x0164BE
+    detonation   tests [0x26E0] != 0             0x020B58
+    destroying the pod clears BOTH               0x01E9BE, 0x01E9C3
+
+`[0x26E0]` is written **only with zero**, at one site, and tested at one site.
+An exhaustive capstone decode of every `e0 26` byte pair in the game region
+finds those two instructions and nothing else. Both bytes lie past the end of
+the load image (file is 0x2F4E0; DS:0x26E0 maps to 0x2FF00), so they are BSS
+and start at zero.
+
+Read literally, that says the detonation can never fire -- **and a screen
+observation says otherwise**: "Vandal Death Pod enters quadrant: 59 unit hit
+on Lexington", with both Mongols in the quadrant dropping by the same 59.
+
+So the read is INCOMPLETE, not the game. The likeliest gap is a write through
+a pointer, which no absolute-address search can see. **No code was changed on
+the strength of this.** The port keeps its per-quadrant placement, which
+reproduces what was actually observed, and the discrepancy is recorded with
+the experiment that settles it.
+
+**THE EXPERIMENT, and it is a small one:** watch DS:0x26E0 under
+dosbox-automation across a few dozen turns and note when it becomes non-zero.
+One byte, one poll per turn. If it never does, the observation belongs to some
+other routine and the pod needs re-reading from the message end; if it does,
+the setter is a pointer write and the state that precedes it says which.
