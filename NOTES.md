@@ -4593,3 +4593,41 @@ through all of step 1. That is Jamie's call and it is a reasonable one -- the
 measurements need the DOS original and the sound bug needs VICE, and mixing
 the two instruments in one session is how the last three confident wrong
 numbers happened.
+
+## The second overlay pass: rare events pay their own rent (2026-08-27)
+
+The first pass moved five rare COMMANDS out. This one moves rare PROSE.
+
+`enemy_turn()` was 6,103 resident bytes and most of its growth this week was
+message formatting: nine event kinds -- a base falling, a tractor beam, a
+death pod, a boarding party, a supernova, the ship lost, life support gone --
+whose CODE sits next to the enemy fire loop and whose EVENTS fire once in
+dozens of turns. Every one of them was paying rent in the hottest routine in
+the game.
+
+`report_rare_event()` takes those nine into OVL_MSGS, which was 542 bytes with
+3,554 spare and is already the message viewer. The four common kinds stay
+resident with the shared tail -- a hit, a shield hold, a system knocked out,
+an enemy moving happen most turns and must not touch the disk.
+
+    enemy_turn   6,103 -> 5,148
+    OVL_MSGS       542 -> 1,638
+    resident free  484 -> 1,453
+
+**A guard worth having:** `case EV_NONE: continue;` sits ahead of the default,
+because an empty event reaching the default would spend a DISK LOAD on
+nothing.
+
+### What was rejected, and why
+
+`trek_divert` is 359 resident bytes and its only callers are `do_energy`
+(already in OVL_CMDS) and `do_max_energy`, which is NOT. Moving it needs MAX
+to move too -- and MAX is the command you reach for while being shot at, to
+dump the banks into the shields. A disk load at that moment is the worst
+possible time, so it stays. Size said move it; frequency said do not, and
+frequency wins.
+
+`do_chart` is a one-line wrapper around the resident console draw. `do_repair`,
+`do_info` and `do_planets` are stubs that call INTO other overlays and cannot
+move without merging them. Everything else still resident is genuinely hot:
+the console draw, movement, `read_field`, `snd_poll`, `fire_one_torpedo`.

@@ -1057,6 +1057,96 @@ static void alert_check(void) {
     if (gal_enemies[q]) snd_effect(SFX_C);
 }
 
+/* THE RARE EVENTS' PROSE, in OVL_MSGS.
+ *
+ * Second overlay pass, 2026-08-27. enemy_turn() was 6,103 resident bytes and
+ * most of the growth was here: nine event kinds whose message formatting is
+ * resident and whose events fire once in dozens of turns. A base falling, a
+ * tractor beam, a boarding party, a supernova -- none of them is a hot path,
+ * and every one of them was paying rent next to the enemy fire loop.
+ *
+ * The four COMMON kinds stay resident and keep the shared tail: a hit, a
+ * shield hold, a system knocked out, an enemy moving happen most turns.
+ *
+ * OVL_MSGS rather than a tenth overlay because it is already the message
+ * viewer and had 3,554 bytes spare. Nothing here calls into another overlay;
+ * put_str, put_u16, put_sector, ui_message and linebuf are all resident. */
+OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx) {
+    uint8_t k = 0;
+    switch (e->kind) {
+        case EV_BASE_ATTACKED:
+            /* The deadline is the point of the message, as it is in the
+               original: "They can last until 3517.8." */
+            k  = put_str(linebuf, "BASE ");
+            k += put_sector(linebuf + k, e->y, e->x);
+            k += put_str(linebuf + k, S(S_160));
+            k += put_tenths_str(linebuf + k, e->amount);
+            linebuf[k] = 0;
+            ui_message(S(S_166), linebuf);
+            return;
+        case EV_BASE_LOST:
+            k  = put_str(linebuf, "BASE ");
+            k += put_sector(linebuf + k, e->y, e->x);
+            k += put_str(linebuf + k, S(S_98));
+            linebuf[k] = 0;
+            ui_message(S(S_166), linebuf);
+            return;
+        case EV_TRACTORED:
+            k  = put_str(linebuf, S(S_113));
+            k += put_sector(linebuf + k, e->y, e->x);
+            linebuf[k] = 0;
+            ui_message(S(S_170), linebuf);
+            return;
+        case EV_POD_HIT:
+            *sfx = SFX_D;      /* MEASURED: the pod has its own sound */
+            k  = put_str(linebuf, S(S_112));
+            k += put_u16(linebuf + k, e->amount);
+            k += put_str(linebuf + k, S(S_162));
+            linebuf[k] = 0;
+            ui_message(S(S_167), linebuf);
+            return;
+        case EV_SHIP_LOST:
+            ui_message(S(S_170), S(S_93));
+            return;
+        case EV_NOVA:
+            /* "COMMUNICATIONS: Dept. of Space warns of a star having
+               gone supernova in quadrant R-C" and, when it took Mongols
+               with it, ";  N Mongols reported destroyed." -- cs:0x2F28
+               and cs:0x2F83, cut to the 26 this panel fits. */
+            k  = put_str(linebuf, S(S_264));
+            k += put_sector(linebuf + k, e->y, e->x);
+            if (e->amount) {
+                k += put_str(linebuf + k, "; ");
+                k += put_u16(linebuf + k, e->amount);
+                k += put_str(linebuf + k, " lost");
+            }
+            linebuf[k++] = '.';
+            linebuf[k] = 0;
+            ui_message(S(S_263), linebuf);
+            return;
+        case EV_BOARDED:
+            /* "SECURITY: A Mongol boarding party has transported into
+               <department>" -- cs:0x0C4A and the three names after it,
+               trimmed to the panel. */
+            ui_message(S(S_262),
+                   e->y == BOARD_ENGINEERING ? S(S_259)
+                 : e->y == BOARD_LASERS      ? S(S_260)
+                                        : S(S_258));
+            return;
+        case EV_BOARDERS_GONE:
+            ui_message(S(S_262), S(S_261));
+            return;
+        case EV_LIFE_GONE:
+            /* The original's own line, from cs:0x43AA -- its dialog
+               truncates it with an ellipsis and this keeps that. */
+            ui_message(S(S_251),
+                   S(S_250));
+            return;
+        default:
+            return;
+    }
+}
+
 /* Which noise a turn makes. The effects voice is monophonic, so a turn with
    three hits in it plays one sound, not three restarts of the same one -- and
    the death pod outranks ordinary fire because in the original it has its own
@@ -1109,75 +1199,13 @@ static void enemy_turn(uint8_t player_fired) {
                 linebuf[k] = 0;
                 ui_message(S(S_176), linebuf);
                 continue;
-            case EV_BASE_ATTACKED:
-                /* The deadline is the point of the message, as it is in the
-                   original: "They can last until 3517.8." */
-                k  = put_str(linebuf, "BASE ");
-                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                k += put_str(linebuf + k, S(S_160));
-                k += put_tenths_str(linebuf + k, ev[i].amount);
-                linebuf[k] = 0;
-                ui_message(S(S_166), linebuf);
-                continue;
-            case EV_BASE_LOST:
-                k  = put_str(linebuf, "BASE ");
-                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                k += put_str(linebuf + k, S(S_98));
-                linebuf[k] = 0;
-                ui_message(S(S_166), linebuf);
-                continue;
-            case EV_TRACTORED:
-                k  = put_str(linebuf, S(S_113));
-                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                linebuf[k] = 0;
-                ui_message(S(S_170), linebuf);
-                continue;
-            case EV_POD_HIT:
-                turn_sfx = SFX_D;      /* MEASURED: the pod has its own sound */
-                k  = put_str(linebuf, S(S_112));
-                k += put_u16(linebuf + k, ev[i].amount);
-                k += put_str(linebuf + k, S(S_162));
-                linebuf[k] = 0;
-                ui_message(S(S_167), linebuf);
-                continue;
-            case EV_SHIP_LOST:
-                ui_message(S(S_170), S(S_93));
-                continue;
-            case EV_NOVA:
-                /* "COMMUNICATIONS: Dept. of Space warns of a star having
-                   gone supernova in quadrant R-C" and, when it took Mongols
-                   with it, ";  N Mongols reported destroyed." -- cs:0x2F28
-                   and cs:0x2F83, cut to the 26 this panel fits. */
-                k  = put_str(linebuf, S(S_264));
-                k += put_sector(linebuf + k, ev[i].y, ev[i].x);
-                if (ev[i].amount) {
-                    k += put_str(linebuf + k, "; ");
-                    k += put_u16(linebuf + k, ev[i].amount);
-                    k += put_str(linebuf + k, " lost");
-                }
-                linebuf[k++] = '.';
-                linebuf[k] = 0;
-                ui_message(S(S_263), linebuf);
-                continue;
-            case EV_BOARDED:
-                /* "SECURITY: A Mongol boarding party has transported into
-                   <department>" -- cs:0x0C4A and the three names after it,
-                   trimmed to the panel. */
-                ui_message(S(S_262),
-                           ev[i].y == BOARD_ENGINEERING ? S(S_259)
-                         : ev[i].y == BOARD_LASERS      ? S(S_260)
-                                                        : S(S_258));
-                continue;
-            case EV_BOARDERS_GONE:
-                ui_message(S(S_262), S(S_261));
-                continue;
-            case EV_LIFE_GONE:
-                /* The original's own line, from cs:0x43AA -- its dialog
-                   truncates it with an ellipsis and this keeps that. */
-                ui_message(S(S_251),
-                           S(S_250));
+            /* EV_NONE first: it should never reach here, and if it did the
+               default would spend a DISK LOAD on nothing. */
+            case EV_NONE:
                 continue;
             default:
+                ovl_load(OVL_MSGS);
+                report_rare_event(&ev[i], &turn_sfx);
                 continue;
         }
         linebuf[k] = 0;

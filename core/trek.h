@@ -1036,7 +1036,6 @@ uint8_t trek_shields_down(void);
 #define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
-#define EV_STAR_NOVA    14   /* y,x = where we were thrown; amount = damage */  /*@ID*/
 
 typedef struct {
     uint8_t  kind;
