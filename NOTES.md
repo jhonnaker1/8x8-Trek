@@ -1256,6 +1256,20 @@ left to find:
                                     "blown to quad 8-4" observation is the
                                     TORPEDO route, which is still unbuilt.
                                     It can WIN the game.
+    0x20B38   -  THE DEATH POD      READ 2026-08-27 and BUILT. A per-turn
+                                    roll, NOT a scheduled event: 1 in 33, or
+                                    1 in 20 where the quadrant column is 7-8.
+                                    Random(50)+50 off the SHIELD CHARGE, and
+                                    it KILLS if that reaches nothing. Closed
+                                    the last three PROVISIONALs.
+    0x207FD   -  HAIL               found while locating the pod, base
+                                    0x1BD60 at 5/5. Its three replies are
+                                    "Hailing frequencies blocked by subspace
+                                    interference.", "...open... StarBase in
+                                    R-C responds." and "...open... No
+                                    response." It ends by writing schedule
+                                    slot [0x1D78]. UNBUILT but no longer
+                                    unlocated.
     0x181E8   1  SUPPLY CAPTURE     "Mongol supplies captured..." and
                                     "none." -- base 0x150C0. The map called
                                     it "boarding-party frequency", which is
@@ -1267,8 +1281,10 @@ left to find:
 
 Not on that list but still disassembler work: the caller of `fn 0x016844`,
 which is where ENEMY_FIRE_ONE_IN's real gate lives (the firing loop itself has
-no hold-fire roll), and the rest of `fn 0x1DD4F` for the death pod's real
-trigger -- the one thing that would retire the last three PROVISIONALs.
+no hold-fire roll), ~~and the rest of `fn 0x1DD4F` for the death pod's real trigger~~ -- DONE
+2026-08-27, and the trigger was never in 0x1DD4F at all: it is `fn 0x20B38`,
+reached from the pod's own strings. The three PROVISIONALs are gone and the
+audit reads **0 constants NOT measured or read**.
 
 TWO THINGS THIS MAP MISSED, found by auditing the provenance tiers rather
 than the routine list (2026-08-26):
