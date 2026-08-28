@@ -1232,7 +1232,10 @@ DECODED so far, with what each gave:
 STILL TO READ, with the open item each would close:
 
     0x15D6E   2  department damage  called from the turn loop at 0x005954
-    0x0F022   -  DOCKING            what Supply and Research actually give
+    0x0F022   -  DOCKING            READ 2026-08-27; see MEASURED.md.
+                                     Types 1/2/3 = StarBase/research/supply;
+                                     all three refill the life support
+                                     RESERVE [0x1D30] to 2.0 stardates.
     0x1ED00   3  supernova          unbuilt
     0x15F51   4  Union wreckage     unbuilt screen
     0x181E8   1  capture            boarding-party frequency
@@ -1357,7 +1360,9 @@ estimate.
 
 `DS:0x2560` is the galaxy array, `qy*16 + qx*2`, each word holding
 **enemies*100 + bases*10 + stars** -- the chart's three digits are one
-number. And `[0x1DE4]`/`[0x1DE6]` are the ship's quadrant, which is the
+number. **CORRECTED 2026-08-27: the middle digit is a base TYPE, not a
+count** -- 1 StarBase, 2 research station, 3 supply depot, read at 0x00F04D
+and confirmed by the manual. A quadrant holds at most one base. And `[0x1DE4]`/`[0x1DE6]` are the ship's quadrant, which is the
 address that disagreed with the screen in run 6 and was never resolved.
 
 The galaxy array's location is also the best lead yet on the planet array,

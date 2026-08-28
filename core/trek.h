@@ -74,16 +74,23 @@
    maxima are confirmed values, not guesses. */
 #define ENERGY_START    5000  /*@CONFIRMED*/
 #define ENERGY_MAX      5000  /*@CONFIRMED*/
-#define IMPULSE_START    500  /*@CONFIRMED*/
-#define IMPULSE_MAX      500  /*@CONFIRMED*/
+#define IMPULSE_START    500  /*@BINARY*/   /* docking writes 500.0 flat */
+#define IMPULSE_MAX      500  /*@BINARY*/   /* USE caps [0x1D4E] here, 0x00FAF6 */
 #define SHIELD_START    2500  /*@CONFIRMED*/
 #define SHIELD_MAX      2500     /* manual l.501, confirmed on screen */  /*@CONFIRMED*/
 
 /* MEASURED at command level 3: nine, shown as a 3x3 array of red stars below
    the shields dial, one per torpedo. Firing one put it out. Three tubes and
    nine torpedoes is a coherent bit of design; an earlier guess of 10 was
-   wrong. Whether the count varies by level is untested. */
-#define TORPS_START      9  /*@MEASURED*/
+   wrong. Whether the count varies by level is untested.
+
+   BINARY 2026-08-27: docking writes `[0x1DBE] = 9` at 0x00F0FF, a flat
+   integer with no level term, which settles the "varies by level" question
+   for the resupply at least. [0x1DBE] is the torpedo count -- it is
+   decremented by the number fired at 0x00B90F, and at 0x009E93 a zero
+   picks "May I suggest that we get out of here?" over "...the use of a
+   torpedo?". */
+#define TORPS_START      9  /*@BINARY*/
 
 /* HOW MANY MONGOLS, read out of the binary 2026-08-26 at 0x005181:
  *
@@ -1162,19 +1169,56 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  *   "When docked at a StarBase its shields will protect your ship from enemy
  *    lasers." (l.440-441)
  *
- * So the three base types give different things, and only a StarBase makes a
- * quadrant safe. Life support supplies are not modelled as a resource -- this
- * core carries life support as one of the twelve repair percentages -- which
- * leaves a Research Station offering nothing but the docked repair rate. That
- * is faithful rather than useful, and is what the manual describes.
+ * READ FROM THE BINARY 2026-08-27, `fn 0x0F022`, segment base 0x9310. The
+ * manual is confirmed exactly, and this is the LAST routine on the read list.
+ * The base type is the chart's TENS DIGIT -- `(galaxy[q] mod 100) div 10` at
+ * 0x00F044, against the galaxy array at DS:0x2560 -- and the type names come
+ * out of `fn 0x01F8D1` as a literal string table:
+ *
+ *     1  StarBase        2  research station        3  supply depot
+ *
+ * Note what that means for the chart: the middle digit is a TYPE, not a
+ * COUNT. A quadrant holds at most one base, and the manual agrees --
+ * "the number indicates base type (1 is a StarBase, 2 a research station
+ * and 3 a supply depot)".
+ *
+ * What docking writes, in the order the routine writes it:
+ *
+ *     ALL THREE TYPES     life support reserve [0x1D30] = 2.0 days   0x00F072
+ *                         reserve-panel flag   [0x26D6] = 0          0x00F084
+ *     if type > 1         docked flag          [0x26DA] = 0          0x00F06D
+ *     StarBase only       impulse  [0x1D4E] = 500.0                  0x00F08F
+ *                         if (energy  < 5000) energy  = 5000         0x00F0A1
+ *                         if (shields < 2500) shields = 2500         0x00F0CD
+ *     if type != 2        torpedoes [0x1DBE] = 9                     0x00F0FF
+ *
+ * then prints "NAVIGATION: Docked." and spends 0.1 stardates (the real
+ * `7D CD CC CC CC 4C` at 0x00F160), which confirms the measured turn cost.
+ *
+ * Three things worth pulling out:
+ *
+ *   - **Energy and shields are TOP-UPS, not assignments.** This core assigns
+ *     shields and tops up energy. It makes no difference: every path that
+ *     adds to shields caps them at 2500 (0x00FB4D), so they cannot be above
+ *     it when docking runs. Energy CAN exceed 5000 -- one measured reading
+ *     went to 7435 -- which is exactly why that one had to be a top-up.
+ *   - **"energy torpedoes" is ONE noun.** The manual's "life support supplies
+ *     and energy torpedoes" reads like two gifts; the game calls the weapon
+ *     "energy torpedoes (EnTorps)" and the binary gives a supply depot no
+ *     main energy at all. This core already had it right.
+ *   - **Only a StarBase counts as docked.** [0x26DA] is cleared for types 2
+ *     and 3, and that flag is what makes the enemy skip its whole firing
+ *     routine at 0x016887 -- the manual's "when docked at a StarBase its
+ *     shields will protect your ship". trek_docked_safe() matches.
+ *
+ * OPEN, and NOT settled by this read: whether REPAIR_PER_STARDATE_DOCKED is
+ * gated on that same StarBase-only flag. This core applies the docked rate at
+ * any base. None of the nine [0x26DA] sites is the repair routine, and the
+ * rate reals are not loaded in the register form a search would find, so the
+ * next step is to locate the repair routine itself rather than to guess.
  *
  * Adjacency is the ancestor's rule and the manual's alike: any of the eight
- * neighbouring sectors, not the base's own cell.
- *
- * DERIVED, and the one number here worth checking: the ancestor repairs at
- * 1/docfac = 4x while docked. EGA Trek's own STATE OF REPAIR dialog prints
- * Docked and Undocked columns side by side, so a single screenshot with any
- * system damaged settles it. */
+ * neighbouring sectors, not the base's own cell. */
 /* SUPERSEDED 2026-08-24: this is 50, not 47, and the reasoning below is the
  * cautionary part. Every figure in it came from the STATE OF REPAIR dialog,
  * whose printed times are ESTIMATES with their own rounding -- 100 points to
@@ -1203,6 +1247,32 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * rounding, and the rate was identical with one system damaged and with three,
  * which independently confirms that repair does not divide between them. */
 #define REPAIR_PER_STARDATE_DOCKED  50  /*@MEASURED*/
+
+/* ------------------------------------------- life support reserve, UNBUILT
+ *
+ * BINARY 2026-08-27, and the reason a Research Station is not the useless
+ * stop this core currently makes it. Life support is not only one of the
+ * twelve repair percentages: there is a SEPARATE RESERVE, a real at
+ * [0x1D30] measured in stardates, with a hard cap of 2.0.
+ *
+ *   - docking at ANY of the three base types refills it to 2.0 (0x00F072)
+ *   - the reserve life support ITEM adds 1.0 and clamps to 2.0 (0x009861,
+ *     0x009888), prints "Replenishing reserve life support.", and decrements
+ *     the inventory count at [0x234F]; used when not on reserve it answers
+ *     "Not on reserve life support."
+ *   - [0x26D6] is the flag for "the console is showing the reserve panel",
+ *     set at 0x01FF4B when life support fails and cleared by both the dock
+ *     and the item
+ *
+ * That is the two-day countdown already on the feature list, with its
+ * constants read. It also makes the Research Station's single gift a real
+ * one, so building this is what makes that base type worth flying to.
+ *
+ * The panel swap itself is at 0x01FF2F: it repaints the box at (160,250)
+ * to (319,349) and guards the repaint by reading a pixel back, which is the
+ * original's own "is this panel already swapped" test. */
+#define LIFE_RESERVE_MAX_TENTHS    20  /* 2.0 stardates */  /*@BINARY*/
+#define LIFE_RESERVE_ITEM_TENTHS   10  /* the item adds 1.0 */  /*@BINARY*/
 
 #define DOCK_OK              0  /*@ID*/
 #define DOCK_NO_BASE         1   /* no base adjacent */  /*@ID*/

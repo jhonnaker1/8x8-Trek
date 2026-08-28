@@ -5632,3 +5632,98 @@ moved does not also shoot. Kept and flagged.
 **The death pod does not fire lasers**, which is a second reason it needs
 building as an object rather than an event: it is skipped by the fire loop and
 has its own area effect.
+
+## Docking, and the last routine on the read list (2026-08-27)
+
+`fn 0x0F022`, segment base **0x9310** (scored 4/5 on disjoint spans; the fifth
+candidate offset was a real, not a string). This was the one item NOTES carried
+as "still to READ" -- what Supply depots and Research stations actually give,
+because every base in every measurement session was a StarBase.
+
+### The base type is the chart's tens digit, and it is a TYPE not a COUNT
+
+    ax = galaxy[qy*16 + qx*2]          ; DS:0x2560
+    type = (ax mod 100) div 10         ; 0x00F04D..0x00F064
+
+and `fn 0x01F8D1` is a plain string table on that number:
+
+    1  'StarBase'      2  'research station'      3  'supply depot'
+    otherwise 'something'
+
+The manual says the same thing in the L.R. SCAN section -- *"the number
+indicates base type (1 is a StarBase, 2 a research station and 3 a supply
+depot)"*. **So the middle digit of `enemies*100 + bases*10 + stars` is not a
+count of bases; a quadrant holds at most one, and the digit says which kind.**
+NOTES.md has called that digit `bases` since the RAY session; it is `basetype`.
+
+### What each type gives
+
+    ALL THREE      life support reserve [0x1D30] = 2.0        0x00F072
+                   reserve-panel flag   [0x26D6] = 0          0x00F084
+    if type > 1    docked flag          [0x26DA] = 0          0x00F06D
+    StarBase       impulse [0x1D4E] = 500.0                   0x00F08F
+                   if (energy  < 5000) energy  = 5000         0x00F0A1
+                   if (shields < 2500) shields = 2500         0x00F0CD
+    if type != 2   torpedoes [0x1DBE] = 9                     0x00F0FF
+
+then "NAVIGATION: Docked.\nCOMMUNICATIONS: The administrator of <type> <column>
+greets us." and 0.1 stardates (`7D CD CC CC CC 4C`, 0x00F160), which confirms
+the measured docking turn cost. The refusal is "NAVIGATION: Not adjacent to
+base".
+
+500.0, 5000.0, 2500.0, 2.0, 9 and 0.1 all decode exact.
+
+### This read CONFIRMED the port instead of correcting it
+
+Worth saying plainly, because every mechanic read out of the binary before this
+one corrected something already shipped, and it would be easy to carry that as
+a rule. `trek_dock()` had the energy top-up, the shield maximum, nine
+torpedoes, impulse 500, the StarBase-only safety and the 0.1 stardates all
+right, from the manual. Three constants moved CONFIRMED/MEASURED -> BINARY on
+the strength of it (`IMPULSE_START`, `IMPULSE_MAX`, `TORPS_START`), taking the
+audit to **BINARY 97**.
+
+Two details it settles that the manual could not:
+
+**"energy torpedoes" is one noun.** *"Supply stations can provide life support
+supplies and energy torpedoes"* parses as two gifts, and trek.h read it that
+way. The game names the weapon "energy torpedoes (EnTorps)", and the binary
+gives a supply depot no main energy -- `[0x1D54]` is touched only under
+`type == 1`. One noun.
+
+**Energy is a top-up because it can legitimately be over its maximum.** A
+measured reading once put energy at 7435 against a 5000 ceiling. Shields cannot
+do that -- every path that adds to them clamps at 2500 (0x00FB4D) -- so this
+core's `ship.shields = SHIELD_MAX` and the binary's `if (< 2500)` are the same
+function, and the difference is not worth a branch at 3% resident free.
+
+### The Research Station is not pointless -- this core is just missing its gift
+
+`[0x1D30]` is a **life support reserve measured in stardates, capped at 2.0**,
+and it is a separate quantity from life support's repair percentage. Docking at
+ANY base refills it. The reserve life support ITEM adds 1.0 and clamps to the
+same 2.0 (0x009861, 0x009888), prints "Replenishing reserve life support.",
+decrements an inventory byte at [0x234F], and answers "Not on reserve life
+support." when used off-reserve. `[0x26D6]` is the flag for the swapped console
+panel, set at 0x01FF4B when life support fails and cleared by both the dock and
+the item; the panel repaint is the box (160,250)-(319,349) and it guards itself
+by reading a pixel back.
+
+That is the two-day countdown already on the feature list, arriving with its
+constants attached, and it is what makes a Research Station worth flying to.
+`LIFE_RESERVE_MAX_TENTHS` and `LIFE_RESERVE_ITEM_TENTHS` are in trek.h now,
+ahead of the feature.
+
+### One thing this did NOT settle, recorded as open
+
+Whether `REPAIR_PER_STARDATE_DOCKED` is gated on the StarBase-only flag. This
+core gives the 2.5x docked rate at all three base types. `[0x26DA]` is read at
+nine sites and none of them is the repair routine -- 0x016887 is the enemy
+skipping its firing turn (the manual's "its shields will protect your ship",
+and what `trek_docked_safe()` already models), 0x00FEAA picks between two
+status strings, 0x007FD3 is inside SAVE. A search for the rate reals in the
+`mov cx,exp / xor si,si / mov di,hi` form finds 50.0 and 100.0 at nine
+addresses but neither 20.0 nor 60.0, so the undocked rows are not loaded that
+way and the repair routine has to be found directly. **Not guessed at, and the
+code is unchanged.** Next step is to locate the repair routine from the STATE
+OF REPAIR dialog's strings, which print both columns.
