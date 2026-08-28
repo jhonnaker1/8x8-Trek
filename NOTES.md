@@ -1256,7 +1256,12 @@ left to find:
                                     "blown to quad 8-4" observation is the
                                     TORPEDO route, which is still unbuilt.
                                     It can WIN the game.
-    0x181E8   1  capture            boarding-party frequency
+    0x181E8   1  SUPPLY CAPTURE     "Mongol supplies captured..." and
+                                    "none." -- base 0x150C0. The map called
+                                    it "boarding-party frequency", which is
+                                    the FOURTH wrong label in this list, and
+                                    that frequency came out of 0x15D6E
+                                    anyway. Nothing to do with boarding.
     0x15F51   4  Union wreckage     unbuilt screen
     0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
 
