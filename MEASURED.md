@@ -5727,3 +5727,98 @@ addresses but neither 20.0 nor 60.0, so the undocked rows are not loaded that
 way and the repair routine has to be found directly. **Not guessed at, and the
 code is unchanged.** Next step is to locate the repair routine from the STATE
 OF REPAIR dialog's strings, which print both columns.
+
+## The repair routine, and the +0.08 that made 50 look like 46.6 (2026-08-27)
+
+Found from the STATE OF REPAIR dialog's own strings -- "STATE OF REPAIR" at
+file 0xF190 resolves under the docking segment's base 0x9310, referenced at
+0x00F20D -- and then from every writer of the twelve system percentages at
+DS:0x235A. The repair routine is `fn` at **0x02024E**, and all three
+[0x26DA] reads that the docking write-up could not place are inside it.
+
+### The four rates are confirmed, and the original stores none of them
+
+    focused:   sys[f] += Round(t * (docked ? 100.0 : 60.0))     0x02026E/0x0203B8
+    the rest:  n = Round(t * 100.0)
+               sys[i] += docked ? n div 2 : n div 5             0x020389/0x0203D3
+
+100.0 and 60.0 decode exact. **That is why a search for the reals 20.0 and
+50.0 found nothing in this routine** -- the undocked rows are an integer
+division of a single rounded product, not constants. The earlier search that
+came back empty was right about the bytes and wrong about the conclusion.
+
+At tenths granularity `n` is always a multiple of ten, so `div 2` and `div 5`
+are exact and this core's `rate * tenths / 10` is the same function.
+
+### The docked rate IS StarBase-only -- the open question from the dock read
+
+`cmp byte ptr [0x26DA], 0` at 0x02025F and 0x020367 selects the row, and
+[0x26DA] is the flag docking CLEARS for types 2 and 3. So a research station
+and a supply depot repair at the UNDOCKED rate. **This core applied the 2.5x
+docked rate at any base**; `trek_advance_time` now tests
+`ship.docked == BASE_STARBASE`. Fixed, with a test that fails when the gate is
+put back.
+
+### The focus is a claim on the CLOCK, not a rate row
+
+This is the structural half, and this core had it as a rate.
+
+    sys[f] += Round(t * focus_rate)
+    if (sys[f] <= 100)  t = 0                       ; the day is spent
+    else {
+        [0x1DBA] = 0                                ; the focus clears itself
+        t -= (sys[f] - 100) * 0.01                  ; overshoot back into time
+        sys[f] = 100
+    }
+    ; then the loop over ALL TWELVE with whatever t is left
+
+So a focus that does not finish starves everything, which is what eleven turns
+of pinned shields measured. A focus that DOES finish hands the rest of the day
+back to every system at the ordinary rate and unsets itself. The 0.01 scale is
+the DOCKED focus rate and is used whether or not the ship is docked -- read at
+0x02030E, left as it reads.
+
+### The +0.08, and a measurement finally reconciled
+
+The dialog's estimate at 0x00F37B is a different function from the mechanic:
+
+    docked   = (100 - pct) * 0.02 * f + 0.08        f = 0.5  focused, else 1.0
+    undocked = (100 - pct) * 0.05 * f + 0.08        f = 0.33 focused, else 1.0
+
+printed `Str(x:4:1)`. **A constant offset of 0.08 stardates**, and it
+reproduces the 2026-08-21 table exactly -- 2.08/5.08, 1.88/4.58, 1.26/3.03,
+0.98/2.33, 0.78/1.83 against measured 2.1/5.1, 1.9/4.6, 1.3/3.0, 1.0/2.3,
+0.8/1.8 -- once the row recorded as 60 points is read as 59, which its docked
+column already implied. Solving a rate across those readings gave 46.6 because
+the offset was being absorbed into the slope.
+
+Note the two focus factors are NOT the same number: 0.5 halves the docked
+estimate (100 against 50) and 0.33 thirds the undocked one (60 against 20).
+Both were right; they belong to different columns. `REPAIR_FOCUS_FACTOR` being
+"3, not the DERIVED 2" was true of the column it was read from.
+
+### Two things found in passing
+
+**The twelve system names, in index order**, from DS:0x1188 stride 16:
+EnergyConverter, Shields, Life Support, Lasers, EnTorp Tubes, Warp Engines,
+Impulse Engine, S.R. Scanner, L.R. Scanner, Computer, Transporter,
+Shuttlecraft. This core's SYS_* order matches.
+
+**The life support reserve drains here too**, at 0x02042E, immediately after
+the repair loop:
+
+    if (sys[2] < 90 && !docked) {
+        [0x1D30] -= t
+        if ([0x1D30] < 0) { [0x1DDE] = 430; "ENGINEERING:  Auxiliary life
+                                             support depleted..." }
+    }
+
+So the countdown starts at **Life Support below 90%, not at zero**, it runs
+only while undocked, and it kills at less than zero rather than at zero. With
+the 2.0 cap and the item from the docking read, the whole mechanic is now
+specified.
+
+### Cost
+
+Resident code grew 193 bytes (free 1,029 -> 836) for the corrected law. Four
+constants moved MEASURED -> BINARY; the audit is **BINARY 101**.

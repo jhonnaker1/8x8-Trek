@@ -400,7 +400,7 @@ void trek_advance_time(uint16_t tenths) {
        Declarations first: cc65 is C89 and rejects a statement before one,
        while the native build is C99 and does not. `make test` passing is not
        evidence that the port compiles. */
-    uint8_t  docked = (uint8_t)(ship.docked != BASE_NONE);
+    uint8_t  docked = (uint8_t)(ship.docked == BASE_STARBASE);
     uint16_t rate   = docked ? REPAIR_PER_STARDATE_DOCKED
                              : REPAIR_PER_STARDATE;
     uint16_t frate  = docked ? REPAIR_PER_STARDATE_FOCUS_DOCKED
@@ -411,8 +411,7 @@ void trek_advance_time(uint16_t tenths) {
        sixteen bits. The composed version had no such bound: it multiplied an
        already-scaled `mend` by 47 and overflowed near a hundred stardates. */
     uint16_t rt    = tenths > 100 ? 100 : tenths;
-    uint16_t mend  = (uint16_t)((rate  * rt) / 10);
-    uint16_t fmend = (uint16_t)((frate * rt) / 10);
+    uint16_t mend;
 
     uint8_t i;
 
@@ -441,22 +440,39 @@ void trek_advance_time(uint16_t tenths) {
      * exactly what the manual says: the chosen system runs at its own rate
      * and the others get NOTHING. All four rates are the manual's relatives
      * on a base of 20, confirmed against actual repair rather than against
-     * the STATE OF REPAIR dialog's rounded estimate. See trek.h. */
-    for (i = 0; i < SYS_COUNT; i++) {
-        uint16_t m;
-        if (ship.sys[i] >= 100) continue;
-        if (ship.repair_focus) {
-            /* MEASURED: a focus STARVES everything else. Shields sat at 0%
-               for eleven consecutive turns while the focused lasers climbed
-               0 to 100. Not a reduced rate -- nothing. */
-            if (ship.repair_focus != (uint8_t)(i + 1)) continue;
-            m = fmend;
+     * the STATE OF REPAIR dialog's rounded estimate. See trek.h.
+     *
+     * BINARY 2026-08-27, fn at 0x02024E: the focus is not a rate row, it is
+     * a claim on THE CLOCK. The focused system is repaired first out of the
+     * whole elapsed time; if that does not finish it the time is spent and
+     * nothing else repairs, but if it DOES finish, the overshoot converts
+     * back into leftover time at 0x020317 and every system gets that
+     * remainder at the ordinary rate -- and the focus clears itself
+     * (0x0202F6). Starving the others is the common case, not the law. */
+    if (ship.repair_focus) {
+        uint8_t  f = (uint8_t)(ship.repair_focus - 1);
+        uint16_t v = (uint16_t)(ship.sys[f] + (frate * rt) / 10);
+        if (v > 100) {
+            /* The original converts the overshoot back to time by 0.01
+               stardates a point -- the DOCKED focus scale -- whether or not
+               we are docked. Read at 0x02030E and left as it reads. */
+            uint16_t used = (uint16_t)((v - 100) / 10);
+            rt = (uint16_t)(rt > used ? rt - used : 0);
+            ship.sys[f] = 100;
+            ship.repair_focus = 0;
         } else {
-            m = mend;
+            ship.sys[f] = (uint8_t)v;
+            rt = 0;
         }
-        if (!m) continue;
-        if (ship.sys[i] + m >= 100) ship.sys[i] = 100;
-        else ship.sys[i] = (uint8_t)(ship.sys[i] + m);
+    }
+
+    mend = (uint16_t)((rate * rt) / 10);
+    if (mend) {
+        for (i = 0; i < SYS_COUNT; i++) {
+            if (ship.sys[i] >= 100) continue;
+            if (ship.sys[i] + mend >= 100) ship.sys[i] = 100;
+            else ship.sys[i] = (uint8_t)(ship.sys[i] + mend);
+        }
     }
 }
 

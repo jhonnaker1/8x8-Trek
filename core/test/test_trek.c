@@ -2131,16 +2131,52 @@ static void test_star_and_focus(void) {
         ok(ship.sys[SYS_SHIELDS] == plain,
               "with no focus every damaged system mends at the same rate");
 
+        /* A focus that does NOT finish spends the whole day: the others get
+           nothing. Lasers at 0 climb 60 in a stardate and stop short. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_LASERS] = 0;
+        ship.sys[SYS_SHIELDS] = 50;
+        ship.repair_focus = SYS_LASERS + 1;
+        { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
+        focused = ship.sys[SYS_LASERS];
+        ok(focused == 60, "an unfinished focus mends 60 in a stardate");
+        ok(ship.sys[SYS_SHIELDS] == 50,
+              "and the others get nothing -- the focus took the whole clock");
+        ok(ship.repair_focus == SYS_LASERS + 1,
+              "an unfinished focus stays set");
+
+        /* A focus that DOES finish hands the leftover time back. Lasers at 50
+           reach 100 with 10 points to spare, which is 0.1 stardates at the
+           original's 0.01-a-point scale; the remaining 0.9 mends everything
+           at 20 a stardate. Literals, not the constants under test. */
         trek_new_game(3, 1234);
         ship.sys[SYS_LASERS] = 50;
         ship.sys[SYS_SHIELDS] = 50;
         ship.repair_focus = SYS_LASERS + 1;
         { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
-        focused = ship.sys[SYS_LASERS];
-        ok(focused > ship.sys[SYS_SHIELDS],
-              "the focused system mends faster than the rest");
+        ok(ship.sys[SYS_LASERS] == 100, "a finished focus reaches exactly 100");
+        ok(ship.sys[SYS_SHIELDS] == 68,
+              "and the leftover 0.9 stardates mends the rest by 18");
+        ok(ship.repair_focus == 0, "a finished focus clears itself");
+
+        /* BINARY: the docked rate is gated on the StarBase-only flag
+           [0x26DA], which docking CLEARS for types 2 and 3. A research
+           station repairs at the undocked 20 a stardate, not 50. */
+        trek_new_game(3, 1234);
+        ship.sys[SYS_SHIELDS] = 0;
+        ship.docked = BASE_RESEARCH;
+        ship.repair_focus = 0;
+        { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
+        ok(ship.sys[SYS_SHIELDS] == 20,
+              "a research station gives the UNDOCKED repair rate");
+
+        trek_new_game(3, 1234);
+        ship.sys[SYS_SHIELDS] = 0;
+        ship.docked = BASE_STARBASE;
+        ship.repair_focus = 0;
+        { TrekEvent ev[8]; (void)trek_advance(10, ev, 8); }
         ok(ship.sys[SYS_SHIELDS] == 50,
-              "and the others do not mend at all -- MEASURED, see trek.h");
+              "and only a StarBase gives the docked 50");
         (void)plain;
     }
 }

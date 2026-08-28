@@ -1232,6 +1232,13 @@ DECODED so far, with what each gave:
 STILL TO READ, with the open item each would close:
 
     0x15D6E   2  department damage  called from the turn loop at 0x005954
+    0x02024E  -  REPAIR + LIFE      READ 2026-08-27. Four rates confirmed,
+                                     the docked row is StarBase-ONLY, and the
+                                     focus is a claim on the CLOCK. The life
+                                     support reserve drains here: Life Support
+                                     under 90% while undocked.
+    0x00F1E8  -  STATE OF REPAIR    the printed estimate carries a constant
+                                     +0.08 -- that is the 46.6-vs-50 gap.
     0x0F022   -  DOCKING            READ 2026-08-27; see MEASURED.md.
                                      Types 1/2/3 = StarBase/research/supply;
                                      all three refill the life support

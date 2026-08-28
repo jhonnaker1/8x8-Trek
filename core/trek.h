@@ -543,14 +543,50 @@ extern uint8_t sector[QUAD_CELLS];
  *     60   undocked, focused      3x, focused system ONLY
  *    100   docked,   focused      5x, focused system ONLY
  *
+ * ALL FOUR CONFIRMED FROM THE BINARY 2026-08-27, the repair routine at
+ * 0x02024E. The original stores none of them: it rounds ONE product and
+ * divides it, which is why a search for 20.0 and 60.0 as reals finds nothing.
+ *
+ *     focused:   sys[f] += Round(t * (docked ? 100.0 : 60.0))
+ *     the rest:  n = Round(t * 100.0);  sys[i] += docked ? n div 2 : n div 5
+ *
+ * At tenth-of-a-stardate granularity `n` is always a multiple of ten, so the
+ * divisions are exact and this core's `rate * tenths / 10` is the same
+ * function. Kept in the simpler form.
+ *
+ * "DOCKED" HERE IS THE StarBase-ONLY FLAG [0x26DA], tested at 0x02025F and
+ * 0x020367 -- the same flag docking CLEARS for research stations and supply
+ * depots. This core applied the docked rate at any base until 2026-08-27.
+ *
+ * AND THE FOCUS IS A CLAIM ON THE CLOCK, NOT A RATE ROW. The focused system
+ * is repaired first out of the whole elapsed time. If that does not finish
+ * it, the time is spent and nothing else repairs -- the measured starvation.
+ * But if it DOES finish, the overshoot converts back into leftover time at
+ * 0.01 stardates a point (0x02030E, and it uses that docked scale either
+ * way), the focus clears itself (0x0202F6), and every system gets the
+ * remainder at the ordinary rate. The eleven turns of starved shields were
+ * the common case, not the law.
+ *
+ * THE DIALOG'S +0.08, which is why solving it gave 46.6 instead of 50. The
+ * STATE OF REPAIR estimate at 0x00F37B is
+ *
+ *     docked   = (100 - pct) * 0.02 * focus + 0.08      focus 0.5 or 1.0
+ *     undocked = (100 - pct) * 0.05 * focus + 0.08      focus 0.33 or 1.0
+ *
+ * printed Str(x:4:1). A CONSTANT OFFSET, not a rate error -- and it
+ * reproduces all five measured rows exactly once the row recorded as 60
+ * points is read as 59: 2.08/5.08, 1.88/4.58, 1.26/3.03, 0.98/2.33,
+ * 0.78/1.83. The measurement was right about the display and the display was
+ * never the mechanic.
+ *
  * "Focused system only" is the other half of the measurement and it is a
  * different mechanic from a multiplier: while a focus is set, EVERY OTHER
  * DAMAGED SYSTEM REPAIRS AT ZERO. Shields sat at 0% for eleven consecutive
  * turns while the focused lasers climbed 0 to 100. That is the manual's "at
  * the expense of other systems" read literally, and it is why there is no
  * budget to divide -- there are four rates and a rule about who gets one. */
-#define REPAIR_PER_STARDATE_FOCUS         60  /*@MEASURED*/
-#define REPAIR_PER_STARDATE_FOCUS_DOCKED 100  /*@MEASURED*/
+#define REPAIR_PER_STARDATE_FOCUS         60  /*@BINARY*/  /* 0x0203B8 */
+#define REPAIR_PER_STARDATE_FOCUS_DOCKED 100  /*@BINARY*/  /* 0x02026E */
 
 typedef struct {
     uint8_t  quad_y, quad_x;
@@ -731,7 +767,7 @@ uint8_t trek_shields_down(void);
 /* MEASURED: floor(20 * elapsed_stardates), and it does NOT divide between
    damaged systems -- two damaged at once each repaired at the full rate. The
    manual claims the crew divide their time evenly; the original does not. */
-#define REPAIR_PER_STARDATE  20  /*@MEASURED*/
+#define REPAIR_PER_STARDATE  20  /*@BINARY*/   /* Round(t*100) div 5, 0x0203D3 */
 
 /* Short range scanner resolution, MEASURED off the original's own code:
    above 90 everything shows, at or below 50 nothing does, and in between
@@ -1246,7 +1282,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * The undocked figure confirms REPAIR_PER_STARDATE 20 to within the display's
  * rounding, and the rate was identical with one system damaged and with three,
  * which independently confirms that repair does not divide between them. */
-#define REPAIR_PER_STARDATE_DOCKED  50  /*@MEASURED*/
+#define REPAIR_PER_STARDATE_DOCKED  50  /*@BINARY*/  /* Round(t*100) div 2, 0x020389 */
 
 /* ------------------------------------------- life support reserve, UNBUILT
  *
