@@ -1270,14 +1270,19 @@ left to find:
                                     response." It ends by writing schedule
                                     slot [0x1D78]. UNBUILT but no longer
                                     unlocated.
-    0x181E8   1  SUPPLY CAPTURE     "Mongol supplies captured..." and
-                                    "none." -- base 0x150C0. The map called
-                                    it "boarding-party frequency", which is
-                                    the FOURTH wrong label in this list, and
-                                    that frequency came out of 0x15D6E
-                                    anyway. Nothing to do with boarding.
+    0x181E8   -  SUPPLY CAPTURE     READ 2026-08-27. 1 in 4 gives nothing;
+                                    otherwise items 1..3 at 2/3, 2/4, 2/5 and
+                                    life support +2 always. Reached from the
+                                    LANDING PARTY, fn 0x0E3A1. NOT BUILT: the
+                                    trigger is [0x24A9+q] > 20 and what raises
+                                    that byte past 20 is unread.
+    0x0E3A1   -  LANDING PARTY      named 6/6 while chasing the above.
     0x15F51   4  Union wreckage     unbuilt screen
-    0x23FD2   6  INFO/scan display  "MONGOL BASE" -- item 9's enemy bases @ 50
+    0x23FD2   -  GRAPHICS           NOT the INFO display -- no strings, blits
+                                    an image via [0x26C8]. The "MONGOL BASE"
+                                    the map attached is at 0x23F90, BEFORE the
+                                    prologue. FIFTH wrong label here. Nothing
+                                    this port needs; it draws its own console.
 
 Not on that list but still disassembler work: the caller of `fn 0x016844`,
 which is where ENEMY_FIRE_ONE_IN's real gate lives (the firing loop itself has

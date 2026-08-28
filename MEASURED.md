@@ -6262,3 +6262,60 @@ meant to exercise, and the fourth time only breaking the code found it.
 **128 resident bytes**, free 1,460 -> 1,332. The turn gate plus the `moved`
 flag and its two assignments cost more than the per-ship roll they replaced.
 Audit BINARY 133, and `ENEMY_FIRE_ONE_IN` is gone.
+
+## Supply capture, and the item table it settles (2026-08-27)
+
+`fn 0x181E8`, base 0x150C0. The routine map called it "capture,
+boarding-party frequency"; it is neither.
+
+    print "Mongol supplies captured..."
+    if (Random(4) == 0) { print "none."; return }      ; one in four, nothing
+    for item in 1..3:                                  ; ONE roll each
+        if (Random(item + 2) <= 1) { inventory[item]++; print its name }
+    inventory[4] += 2                                  ; ALWAYS, on a success
+    print "Life support supplies"
+
+So the odds per item are **2 in 3, 2 in 4, 2 in 5** -- diminishing by
+position, one roll apiece, not a loop that can give two of the same thing.
+
+### It settles the item table
+
+The names are at **DS:0x10D4, stride 22**, and the inventory is bytes at
+**DS:0x234B**:
+
+    1 Mongol energium      2 Plasma bolts        3 Plasma bolt shield
+    4 Life support supplies                      5 Raw energium
+
+That is this core's `item_name[]` exactly, in order, one index apart (the port
+is 0-based). It also confirms the reserve life support counter: `[0x234F]` is
+`0x234B + 4`, which is the byte the USE item decrements at 0x0098A1 -- read
+days ago from the other end and matching here without being made to.
+
+**Only items 1..3 are rolled.** Raw energium is never captured; life support
+supplies are never rolled, they are simply +2 on any success.
+
+### Where it comes from, and the one thing NOT pinned
+
+The caller is `fn 0x0E3A1`, which base.py names 6/6 as the **LANDING PARTY**:
+"Planet settlers found...", "Evacuating settlers...", "Landing party
+attacked...", " casualties.", "energium successfully mined.", "Nothing
+found." So supplies are captured by LANDING, not by destroying a supply ship.
+
+The condition is `[0x24A9 + quadrant] > 20`, a byte-per-quadrant array
+(stride 8). Setup writes `Random(3) + 1` into it at 0x00531D and then writes
+it twice more at 0x005368 and 0x0053AC. **What raises it past 20 is not
+read**, so the trigger is not built: this core would have to invent the
+predicate, which is the one thing it does not do. The mechanic above is
+complete and waiting on that single decode.
+
+## `fn 0x23FD2` is not the INFO display
+
+The map had it as "INFO/scan display -- MONGOL BASE". It has NO strings, a
+0x40A-byte frame, and blits an image through a far pointer at [0x26C8] to a
+fixed screen position; the turn loop calls it at 0x00590B when [0x26D4] is
+set. It is graphics, and this port renders its own console.
+
+The "MONGOL BASE" the map attached to it is a string at 0x23F90 -- BEFORE the
+prologue, belonging to whatever precedes it. A label taken from the nearest
+string in the file rather than from the strings the routine PUSHES. That is
+the fifth wrong entry in that map.
