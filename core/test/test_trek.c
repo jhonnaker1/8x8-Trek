@@ -2216,6 +2216,119 @@ static void test_torpedo(void) {
         { uint16_t t0 = ship.stardate;
           ok(trek_dock() == DOCK_OK, "we dock");
           ok(ship.stardate == (uint16_t)(t0 + 1), "and docking costs 0.1 too"); }
+
+    /* --- THE DEATH RAY, BINARY fn 0x07375 --- */
+    {
+        int i;
+        uint8_t  r;
+        /* uint16_t: 1200 rolls put two of these near 400 and a
+           uint8_t wrapped, which read as the odds being wrong. */
+        uint16_t worked = 0, misfire = 0, mutants = 0, fatal = 0;
+
+        /* Refused with nothing to shoot at, and it costs no turn. */
+        trek_new_game(3, 77);
+        clear_quadrant();
+        { uint16_t t0 = ship.stardate;
+          ok(trek_fire_ray() == RAY_NO_TARGET, "with no enemy the ray is refused");
+          ok(ship.stardate == t0, "and refusing costs no time"); }
+
+        /* SIX ROLLS OVER FOUR HANDLERS: 1/6, 2/6, 1/6, 2/6. */
+        trek_new_game(3, 77);
+        for (i = 0; i < 1200; i++) {
+            clear_quadrant();
+            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+            enemy_hp[(2 << 3) | 2] = 500;
+            ship.enemies_left = 40;
+            ship.lost = 0; ship.mutants = 0;
+            r = trek_fire_ray();
+            if      (r == RAY_WORKED)  worked++;
+            else if (r == RAY_MISFIRE) misfire++;
+            else if (r == RAY_MUTANTS) mutants++;
+            else if (r == RAY_FATAL)   fatal++;
+        }
+        ok(worked + misfire + mutants + fatal == 1200, "every shot has an outcome");
+        /* 200 / 400 / 200 / 400 expected; bands wide enough to be stable and
+           narrow enough to fail if two handlers were given equal odds. */
+        ok(worked  > 140 && worked  < 265, "it works one time in six");
+        ok(misfire > 320 && misfire < 480, "and misfires two times in six");
+        ok(mutants > 140 && mutants < 265, "mutants one time in six");
+        ok(fatal   > 320 && fatal   < 480, "and it kills you one time in THREE");
+        ok(misfire > worked && fatal > mutants,
+              "the paired handlers really are twice as likely");
+
+        /* What each outcome does. */
+        trek_new_game(3, 77);
+        for (i = 0; i < 400; i++) {
+            clear_quadrant();
+            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+            enemy_hp[(2 << 3) | 2] = 500;
+            sector[(5 << 3) | 5] = SEC_COMMAND;
+            enemy_hp[(5 << 3) | 5] = 900;
+            ship.enemies_left = 40; ship.lost = 0; ship.mutants = 0;
+            r = trek_fire_ray();
+            if (r == RAY_WORKED) {
+                ok(sector[(2 << 3) | 2] == SEC_EMPTY
+                   && sector[(5 << 3) | 5] == SEC_EMPTY,
+                      "a working ray kills EVERY enemy in the quadrant");
+                ok(ship.enemies_left == 38, "and both come off the count");
+                break;
+            }
+        }
+        trek_new_game(3, 77);
+        for (i = 0; i < 400; i++) {
+            clear_quadrant();
+            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+            enemy_hp[(2 << 3) | 2] = 500;
+            ship.lost = 0; ship.mutants = 0;
+            if (trek_fire_ray() == RAY_FATAL) {
+                ok(ship.lost, "the unstable apparatus destroys the ship");
+                break;
+            }
+        }
+        trek_new_game(3, 77);
+        for (i = 0; i < 400; i++) {
+            clear_quadrant();
+            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+            enemy_hp[(2 << 3) | 2] = 500;
+            ship.lost = 0; ship.mutants = 0;
+            if (trek_fire_ray() == RAY_MUTANTS) {
+                ok(ship.mutants, "and the mutants are a state the ship carries");
+                break;
+            }
+        }
+
+        /* A misfire changes nothing at all -- both variants are cosmetic. */
+        trek_new_game(3, 77);
+        for (i = 0; i < 400; i++) {
+            clear_quadrant();
+            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+            enemy_hp[(2 << 3) | 2] = 500;
+            ship.enemies_left = 40; ship.lost = 0; ship.mutants = 0;
+            if (trek_fire_ray() == RAY_MISFIRE) {
+                ok(sector[(2 << 3) | 2] == SEC_BATTLESHIP && !ship.lost
+                   && !ship.mutants && ship.enemies_left == 40,
+                      "a misfire changes nothing -- both variants are cosmetic");
+                break;
+            }
+        }
+
+        /* The mutants clear one turn in ten and report otherwise. */
+        {
+            TrekEvent ev4[8];
+            uint16_t turns = 0;
+            uint8_t k, n4, reports = 0;
+            trek_new_game(3, 77);
+            ship.mutants = 1;
+            while (ship.mutants && turns < 500) {
+                n4 = trek_run_events(ev4, 8);
+                for (k = 0; k < n4; k++)
+                    if (ev4[k].kind == EV_MUTANTS) reports++;
+                turns++;
+            }
+            ok(!ship.mutants, "the mutants do eventually clear");
+            ok(reports > 0, "and they file a report every turn until they do");
+        }
+    }
     }
 
     /* The level scales the damage, which is the same expression as a

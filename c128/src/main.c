@@ -1034,6 +1034,53 @@ static void do_chart(void) {
    exactly the case fn 0x207FD prints it for. All three replies are read now;
    see trek.h. In OVL_CMDS because a hail is an occasional command and its
    prose has no business resident. */
+/* RAY -- the twenty-fifth command, and the last one built. WEAPONS CONTROL
+   asks first, in the original's own shape: it warns that the ray is
+   experimental and prone to failures and wants a Y. Then Preparing / Firing
+   and one of four outcomes. See core/trek.h for the odds and what each does.
+
+   THE ORIGINAL'S TOP SECRET LOSS MEMO IS NOT BUILT. The fatal outcome sets
+   ending code 9 there and prints a Dept. of Space memo; here the ship is
+   simply lost and the ordinary evaluation runs. */
+OVL_CODE("cmds") static void do_ray(void) {
+    uint8_t r;
+
+    ui_dialog_open(S(S_95));
+    ui_dialog_line(S(S_286));
+    ui_dialog_line(S(S_288));
+    if (!ui_confirm(S(S_278))) {
+        ui_dialog_close();
+        return;
+    }
+    ui_dialog_line(S(S_284));
+    ui_dialog_line(S(S_280));
+
+    r = trek_fire_ray();
+    switch (r) {
+        case RAY_NO_TARGET:
+            ui_dialog_line(S(S_282));
+            break;
+        case RAY_WORKED:
+            ui_dialog_line(S(S_281));
+            snd_effect(SFX_D);
+            break;
+        case RAY_MUTANTS:
+            ui_dialog_line(S(S_283));
+            ui_dialog_line(S(S_287));
+            ui_dialog_line(S(S_289));
+            break;
+        case RAY_FATAL:
+            ui_dialog_line(S(S_285));
+            snd_effect(SFX_D);
+            break;
+        default:
+            ui_dialog_line(S(S_279));
+            break;
+    }
+    ui_dialog_close();
+    ui_draw_all();
+}
+
 OVL_CODE("cmds") static void do_hail(void) {
     uint8_t qy = 0, qx = 0, k;
 
@@ -1173,6 +1220,20 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
                  : e->y == BOARD_LASERS      ? S(S_260)
                                         : S(S_258));
             return;
+        case EV_MUTANTS: {
+            /* The original prints one of five reports a turn, in a colour it
+               also rolls for. Its prose is not transcribed; these are this
+               port's own, and there are five as there are five. */
+            static const char *const mut[5] = {
+                "Mutants loose on deck 4.",
+                "Mutants in the galley.",
+                "Security cornered a mutant.",
+                "Mutants sighted, deck 9.",
+                "The crew are unsettled."
+            };
+            ui_message(S(S_262), mut[e->amount % 5]);
+            return;
+        }
         case EV_DISTRESS:
             /* "COMMUNICATIONS: Planet <name>, quad <r>-<c>, requests
                evacuation. They can only hold out until <date>." -- cs:0x00B6
@@ -1536,6 +1597,8 @@ int main(void) {
                card gives to self destruct. */
             if      (word_is(cmd, "SAVE")) { ovl_load(OVL_FRONT); ui_save_game(&setup); }
             else if (word_is(cmd, "MSGS")) { ovl_load(OVL_MSGS); ui_messages_view(); }
+            else if (word_is(cmd, "RAY"))  { ovl_load(OVL_CMDS); do_ray();
+                                             enemy_turn(0); }
             else if (word_is(cmd, "SND"))  do_sound();
             else if (word_is(cmd, "HAIL")) { ovl_load(OVL_CMDS); do_hail();
                                              enemy_turn(0); }

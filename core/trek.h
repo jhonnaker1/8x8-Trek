@@ -647,6 +647,10 @@ typedef struct {
     /* Set by any movement and by a supernova throw; cleared when the enemy
        turn resolves. While it is set the enemy turn is only 60% likely. */
     uint8_t  moved;
+    /* Half the crew turned into mutants by a death ray misfire. [0x26D1] in
+       the original: it persists, clears one turn in ten, and carries no
+       mechanical penalty that has been found. */
+    uint8_t  mutants;
     /* Index into planets[], or PLANET_NONE. Here rather than in planet.c
        because it is ship state -- it has to be saved, and movement has to
        break it -- and because putting it here keeps planet.h out of trek.h.
@@ -1090,6 +1094,7 @@ uint8_t trek_shields_down(void);
 #define EV_BOARDED      11   /* y = which department they took */  /*@ID*/
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
 #define EV_DISTRESS     15   /* y,x = the settled quadrant; amount = deadline */  /*@ID*/
+#define EV_MUTANTS      16   /* amount = which report, 0..4 */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1620,6 +1625,52 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define HAIL_START_Q        64   /* the original's 8.0, squared */  /*@BINARY*/
 #define HAIL_BLOCK_OF_N     10  /*@BINARY*/
 #define HAIL_BLOCK_BELOW     2   /* Random(10) < 2, so one in five */  /*@BINARY*/
+
+/* --------------------------------------------------------------- THE RAY
+ *
+ * BINARY, `fn 0x07375`, segment base 24512, with the dispatch at 0x0750E.
+ * The twenty-fifth command and the last one built.
+ *
+ *     no enemy in the quadrant -> "SCIENCE: Scanners show no enemy ships in
+ *                                  this quadrant." and NO TURN is spent
+ *     otherwise WEAPONS CONTROL asks to confirm, then Random(6):
+ *
+ *     roll   handler   outcome                                      odds
+ *     0      0x7026    "It worked!" -- every enemy here dies         1/6
+ *     1, 3   0x70C0    "Death ray misfires."                         2/6
+ *     2      0x71F5    "...half the crew has turned into mutants!"   1/6
+ *     4, 5   0x7247    "The apparatus is going unstable!" SHIP LOST  2/6
+ *
+ * SIX ROLLS OVER FOUR HANDLERS, so the outcomes are not equiprobable even
+ * though the roll is: it works one time in six and kills you one time in
+ * THREE.
+ *
+ * **BOTH MISFIRES ARE COSMETIC** -- read 2026-08-27, which was the last gap.
+ * 0x70C0 prints its line, and on the arg-1 path only, draws a screen effect
+ * and delays. Neither touches game state. The two variants differ in pixels.
+ *
+ * THE MUTANTS ARE A PERSISTENT FLAG, [0x26D1], and the turn loop at 0x005B1A
+ * does the rest: one turn in ten clears it, and otherwise it prints one of
+ * five reports in a colour picked by Random(6)+2. **No mechanical penalty was
+ * found** -- it is a condition the ship carries, not damage. The five reports
+ * are the original's prose and are NOT transcribed here; this port writes its
+ * own, as it does everywhere else.
+ *
+ * The fatal outcome sets ending code 9 at [0x26C6] and prints a Top Secret
+ * loss memo. THAT SCREEN IS NOT BUILT -- the ship is lost and the ordinary
+ * evaluation runs. */
+#define RAY_OF_N            6  /*@BINARY*/
+#define MUTANT_CLEAR_OF_N  10   /* one turn in ten they are gone */  /*@BINARY*/
+
+#define RAY_NO_TARGET    0   /* refused, and no turn spent */  /*@ID*/
+#define RAY_WORKED       1  /*@ID*/
+#define RAY_MISFIRE      2  /*@ID*/
+#define RAY_MUTANTS      3  /*@ID*/
+#define RAY_FATAL        4   /* the ship is lost */  /*@ID*/
+
+/* Fires the death ray. The UI asks the confirmation question first; this is
+   called only once the captain has said yes. */
+uint8_t trek_fire_ray(void);
 
 #define HAIL_BLOCKED     0   /* subspace interference */  /*@ID*/
 #define HAIL_RESPONDS    1   /* *qy,*qx name the StarBase */  /*@ID*/

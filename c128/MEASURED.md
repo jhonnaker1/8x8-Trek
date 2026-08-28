@@ -61,3 +61,48 @@ grepping for FAIL while ignoring the exit status (a crash reads as a pass).
 449 resident bytes, free 1,234 -> **785**. That is the largest single-feature
 cost of the day for what looks like a small mechanic, and it is worth watching
 before the next one.
+
+## RAY built -- 25 of 25 commands (2026-08-27)
+
+The last command. Its odds were read on 2026-08-26 and the one gap left then
+was *"what each [misfire] does is NOT yet read"*. Read now, and both are
+COSMETIC: `fn 0x70C0` prints its line and, on the arg-1 path only, draws a
+screen effect and delays. Neither touches game state. The two variants differ
+in pixels and nothing else.
+
+    roll   handler   outcome                                      odds
+    0      0x7026    "It worked!" -- every enemy here dies         1/6
+    1, 3   0x70C0    "Death ray misfires."  (cosmetic, x2)         2/6
+    2      0x71F5    mutants -- sets [0x26D1]                      1/6
+    4, 5   0x7247    "The apparatus is going unstable!" SHIP LOST  2/6
+
+Six rolls over four handlers: **it works one time in six and kills you one
+time in THREE.**
+
+### The mutants are a condition, not damage
+
+`[0x26D1]` persists and the turn loop at 0x005B1A does the rest: one turn in
+ten clears it, otherwise it prints one of five reports in a colour chosen by
+`Random(6)+2`. **No mechanical penalty was found anywhere** -- it is a state
+the ship carries. The five reports are Anderson's prose and are NOT
+transcribed; this port writes its own five.
+
+### Not built, and said plainly
+
+The fatal outcome's **Top Secret loss memo** -- "Dept. of Space / EARTH
+HEADQUARTERS / Top Secret ... destroyed by death ray explosion this stardate,
+with loss of all aboard" -- is a screen this port does not have. Ending code 9
+becomes an ordinary loss and the usual evaluation runs.
+
+### Two test bugs, one of them mine twice over
+
+The outcome-odds test counted 1,200 rolls into **uint8_t** counters, so two of
+the four wrapped at 256 and read as the odds being wrong. Widened. And the
+whole block was verified by breaking four ways -- equal odds, killing only one
+cell, firing with no target, mutants that never clear -- each failing its own
+assertions and nothing else.
+
+### Cost
+
+RAY and the mutants together: the command and its prose are in OVL_CMDS, and
+resident free is 1,320. Save v11, 556 bytes. **BINARY 145.**

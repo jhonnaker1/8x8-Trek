@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 278
+#define STR_COUNT 290
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -284,6 +284,18 @@
 #define S_275  275   /*   none. */
 #define S_276  276   /* Mongol supplies captured... */
 #define S_277  277   /*  evac by  */
+#define S_278  278   /* Are you sure you wish to continue */
+#define S_279  279   /* Death ray misfires. */
+#define S_280  280   /* Firing! */
+#define S_281  281   /* It worked! */
+#define S_282  282   /* No enemy ships in this quadrant. */
+#define S_283  283   /* Nothing happens... reports from */
+#define S_284  284   /* Preparing death ray... */
+#define S_285  285   /* The apparatus is going unstable! */
+#define S_286  286   /* The death ray is experimental */
+#define S_287  287   /* all decks: half the crew have */
+#define S_288  288   /* and highly prone to failure. */
+#define S_289  289   /* turned into some kind of mutants! */
 
 extern const unsigned int str_offset[STR_COUNT];
 

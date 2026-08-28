@@ -278,3 +278,15 @@
 275	  none.
 276	Mongol supplies captured...
 277	 evac by 
+278	Are you sure you wish to continue
+279	Death ray misfires.
+280	Firing!
+281	It worked!
+282	No enemy ships in this quadrant.
+283	Nothing happens... reports from
+284	Preparing death ray...
+285	The apparatus is going unstable!
+286	The death ray is experimental
+287	all decks: half the crew have
+288	and highly prone to failure.
+289	turned into some kind of mutants!

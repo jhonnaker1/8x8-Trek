@@ -336,6 +336,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.life_gone    = 0;
     ship.boarders     = BOARD_NONE;
     ship.moved        = 0;
+    ship.mutants      = 0;
     ship.board_until  = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
@@ -596,6 +597,32 @@ uint8_t trek_dock(void) {
     return DOCK_OK;
 }
 
+/* THE DEATH RAY. fn 0x07375, dispatch at 0x0750E -- see trek.h. The caller
+   has already asked the confirmation question. */
+uint8_t trek_fire_ray(void) {
+    uint8_t cell, roll, any = 0;
+
+    for (cell = 0; cell < QUAD_CELLS; cell++)
+        if (SEC_IS_ENEMY(sector[cell])) { any = 1; break; }
+    if (!any) return RAY_NO_TARGET;      /* and no turn is spent */
+
+    roll = trek_rand_n(RAY_OF_N);
+
+    if (roll == 0) {
+        /* 0x7026 walks the enemy slots and kills every live one. */
+        for (cell = 0; cell < QUAD_CELLS; cell++)
+            if (SEC_IS_ENEMY(sector[cell])) {
+                sector[cell] = SEC_EMPTY;
+                enemy_hp[cell] = 0;
+                if (ship.enemies_left) ship.enemies_left--;
+            }
+        return RAY_WORKED;
+    }
+    if (roll == 2) { ship.mutants = 1; return RAY_MUTANTS; }
+    if (roll >= 4) { ship.lost = 1;    return RAY_FATAL;   }
+    return RAY_MISFIRE;                  /* rolls 1 and 3, and cosmetic */
+}
+
 uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
     uint8_t  lo_y, hi_y, lo_x, hi_x, y, x, c;
     uint16_t best = HAIL_START_Q, d;
@@ -828,6 +855,15 @@ static void run_boarders(TrekEvent *ev, uint8_t *n, uint8_t max) {
    whole routine; the two things that surprise are that it never fires
    anywhere in the ship's own quadrant ROW, and that it can finish the
    mission for you. */
+/* The mutants, once a turn -- 0x005B1A. One turn in ten they are gone;
+   otherwise the crew files another report. No mechanical penalty. */
+static void run_mutants(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    if (!ship.mutants) return;
+    if (trek_rand_n(MUTANT_CLEAR_OF_N) == 0) { ship.mutants = 0; return; }
+    if (*n < max) { ev[*n].kind = EV_MUTANTS; ev[*n].y = ev[*n].x = 0;
+                    ev[*n].amount = trek_rand_n(5); (*n)++; }
+}
+
 static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint8_t row, col, c, tries, killed;
 
@@ -932,6 +968,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     run_boarders(ev, &n, max);
     run_nova(ev, &n, max);
     run_pod(ev, &n, max);
+    run_mutants(ev, &n, max);
     return n;
 }
 
