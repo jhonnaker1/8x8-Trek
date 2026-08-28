@@ -1273,9 +1273,10 @@ left to find:
     0x181E8   -  SUPPLY CAPTURE     READ 2026-08-27. 1 in 4 gives nothing;
                                     otherwise items 1..3 at 2/3, 2/4, 2/5 and
                                     life support +2 always. Reached from the
-                                    LANDING PARTY, fn 0x0E3A1. NOT BUILT: the
-                                    trigger is [0x24A9+q] > 20 and what raises
-                                    that byte past 20 is unread.
+                                    LANDING PARTY, fn 0x0E3A1. THE TRIGGER IS
+                                    KNOWN and was never unread: [0x24A9+q]>20
+                                    is `find == PFIND_MONGOL`, which planet.h
+                                    has had for days. BUILDABLE now.
     0x0E3A1   -  LANDING PARTY      named 6/6 while chasing the above.
     0x15F51   4  Union wreckage     unbuilt screen
     0x23FD2   -  GRAPHICS           NOT the INFO display -- no strings, blits

@@ -177,8 +177,14 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * fourth per-planet find (this file's invention) and a twelve-entry table at
  * DS:0x1188 (which is the SYSTEM names). One planet, one pair of globals.
  *
- * PF_SETTLED below carries it. The DEADLINE is not modelled yet -- that wants
- * fn 0x151D0 read -- so a settlement here is never "destroyed". */
+ * PF_SETTLED below carries it. ~~The DEADLINE is not modelled yet -- that
+ * wants fn 0x151D0 read~~ -- LOCATED 2026-08-27 without that read: it is the
+ * real at [0x1DA2], and its schedule slot is [0x1D9C]. `fn 0x0E3A1` opens by
+ * testing the ship's quadrant against the pair above and, while [0x1DA2] is
+ * still ahead of the stardate, prints "Planet settlers found..." /
+ * "Evacuating settlers..." and sets that slot to 9999. Both supernova routes
+ * do the same two writes, which is why planet_quadrant_lost() exists. What
+ * remains unread is where [0x1DA2] is SET, and by how much. */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */  /*@BINARY*/
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */  /*@BINARY*/
 
