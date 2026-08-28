@@ -1161,7 +1161,14 @@ this is a direct read of the same table that gave 355 for a battleship.
 
 A second ship read 255, which matches no class we have measured -- 355
 battleship, 120 supply. Either it had already been damaged before we arrived,
-or scouts are 255. Unresolved.
+or scouts are 255. ~~Unresolved.~~
+
+**CLOSED 2026-08-27, and not by an emulator run.** `HP_SCOUT_AT(3)` is
+`(3+4)*15 + 150` = **255 exactly**. The four class formulas read out of the
+binary at 0x16119 on 2026-08-26 reproduce every reading in this session at
+level 3 -- battleship 355, Commander 695, scout 255, supply 120 -- so the
+255 ship was an undamaged SCOUT. This item had been carried on the emulator
+list for a day after the evidence that closes it was already in trek.h.
 
 ### Vandal Death Pods are an area effect
 
