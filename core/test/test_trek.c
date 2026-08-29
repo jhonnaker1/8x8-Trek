@@ -2056,41 +2056,59 @@ static void test_torpedo(void) {
         uint8_t seen, n;
         uint16_t lo = 0xFFFF, hi = 0, fired;
 
-        /* PLACED ONCE, AT NEW GAME, IN COLUMN 8 AND NOWHERE ELSE.
-           trek_new_game picks the starting quadrant itself, so this walks
-           seeds and looks at where the 'R' actually landed rather than
-           forcing a quadrant -- forcing one would test the assignment. */
+        /* PLACED ON EVERY QUADRANT ENTRY, IN COLUMN 8 AND NOWHERE ELSE.
+           MEASURED on the original 2026-08-28 and it overturned that day's
+           own reading -- see trek.h. Counted over many entries rather than
+           sampled once: the roll is four in ten, so a single look at a
+           column-8 quadrant agrees with "never placed" three times in five,
+           and the test this replaces did exactly that and passed. */
         {
-            uint16_t placed = 0, elsewhere = 0, col8 = 0, wrong_hp = 0;
-            uint8_t  cell;
-            for (i = 0; i < 800; i++) {
-                uint8_t here = QUAD_CELLS;
-                trek_new_game(3, (uint16_t)(700 + i));
-                if (ship.quad_x + 1 == POD_QUAD_COLUMN) col8++;
-                for (cell = 0; cell < QUAD_CELLS; cell++)
-                    if (sector[cell] == SEC_POD) { here = cell; break; }
-                if (here == QUAD_CELLS) continue;
-                placed++;
-                if (ship.quad_x + 1 != POD_QUAD_COLUMN) elsewhere++;
-                /* The LITERAL, not POD_HP: an assertion written in terms of
-                   the constant it tests cannot fail when the constant moves,
-                   and this one did not until it was spelled out. */
-                if (enemy_hp[here] != 900) wrong_hp++;
+            uint16_t col8 = 0, other = 0, wrong_hp = 0, crowded = 0;
+            uint8_t  col, cell;
+
+            trek_new_game(3, 4242);
+            for (col = 0; col < GAL_DIM; col++) {
+                uint8_t q = (uint8_t)((2 << 3) | col);
+                for (i = 0; i < 400; i++) {
+                    uint8_t found = QUAD_CELLS;
+                    ship.quad_y = 2; ship.quad_x = col;
+                    gal_enemies[q] = 1;
+                    trek_enter_quadrant();
+                    for (cell = 0; cell < QUAD_CELLS; cell++)
+                        if (sector[cell] == SEC_POD) { found = cell; break; }
+                    if (found == QUAD_CELLS) continue;
+                    /* The LITERAL, not POD_HP -- an assertion written in
+                       terms of the constant it tests cannot fail when the
+                       constant moves, and this one did not until it was
+                       spelled out. */
+                    if (enemy_hp[found] != 900) wrong_hp++;
+                    if (col + 1 == POD_QUAD_COLUMN) col8++; else other++;
+                }
             }
+            ok(other == 0, "a pod is never placed outside quadrant column 8");
+            ok(col8 > 0, "and column 8 does place them");
             ok(wrong_hp == 0, "every pod placed carries 900 points");
-            ok(placed > 0, "a new game can start with a Vandal in the sector");
-            ok(elsewhere == 0, "and never outside quadrant column 8");
-            /* Four in ten of the column-8 starts, and the starting quadrant
-               always has room -- trek_new_game only starts you somewhere with
-               no enemies, so POD_MAX_SHIPS never bites here. Wide band: this
-               is checking the roll is a roll, not pinning its rate. */
-            ok(col8 > 0 && placed * 10 > col8 * 2 && placed * 10 < col8 * 6,
-               "about four column-8 starts in ten carry one");
+            /* Four in ten of 400 entries. Wide band: this checks the roll is
+               a roll, not that its rate is exactly 0.4. */
+            ok(col8 > 120 && col8 < 240, "about four entries in ten carry one");
+
+            /* Never once the quadrant is crowded. */
+            {
+                uint8_t q = (uint8_t)((2 << 3) | (POD_QUAD_COLUMN - 1));
+                for (i = 0; i < 400; i++) {
+                    ship.quad_y = 2; ship.quad_x = POD_QUAD_COLUMN - 1;
+                    gal_enemies[q] = POD_MAX_SHIPS;
+                    trek_enter_quadrant();
+                    for (cell = 0; cell < QUAD_CELLS; cell++)
+                        if (sector[cell] == SEC_POD) crowded++;
+                }
+                ok(crowded == 0, "and never with five ships already there");
+            }
         }
 
-        /* ALIVE FROM TURN ONE, PLACED OR NOT. That is the whole correction:
-           [0x26E0] is initialised true and the detonation reads nothing
-           else. */
+        /* ALIVE FROM TURN ONE, PLACED OR NOT. That is the correction the
+           object was built for: [0x26E0] is initialised true and the
+           detonation reads nothing else. */
         {
             uint8_t always = 1;
             for (i = 0; i < 200; i++) {
@@ -2100,23 +2118,42 @@ static void test_torpedo(void) {
             ok(always, "the pod is alive from the first turn of every game");
         }
 
-        /* AND THE OBJECT DOES NOT FOLLOW YOU. The original's on-entry fill
-           has no 'R' in it, so leaving loses it; regenerating the quadrant
-           here does the same. */
+        /* AND RE-ENTERING RE-ROLLS IT. Both outcomes have to appear over
+           repeated entries to the SAME quadrant, or the quadrant is not
+           being rebuilt. */
         {
-            uint8_t cell, before = 0, after = 0;
-            for (i = 0; i < 800; i++) {
-                trek_new_game(3, (uint16_t)(700 + i));
-                for (cell = 0; cell < QUAD_CELLS; cell++)
-                    if (sector[cell] == SEC_POD) { before = 1; break; }
-                if (!before) continue;
+            uint8_t cell, saw_pod = 0, saw_none = 0;
+            uint8_t q = (uint8_t)((2 << 3) | (POD_QUAD_COLUMN - 1));
+            trek_new_game(3, 909);
+            for (i = 0; i < 200 && !(saw_pod && saw_none); i++) {
+                uint8_t here = 0;
+                ship.quad_y = 2; ship.quad_x = POD_QUAD_COLUMN - 1;
+                gal_enemies[q] = 1;
                 trek_enter_quadrant();
                 for (cell = 0; cell < QUAD_CELLS; cell++)
-                    if (sector[cell] == SEC_POD) after = 1;
-                break;
+                    if (sector[cell] == SEC_POD) here = 1;
+                if (here) saw_pod = 1; else saw_none = 1;
             }
-            ok(before, "found a game with a pod to leave");
-            ok(!after, "and re-entering the quadrant does not rebuild it");
+            ok(saw_pod && saw_none,
+               "re-entering a column-8 quadrant re-rolls the pod");
+        }
+
+        /* AND THE PLACEMENT DOES NOT CONSULT pod_alive. Destroying it
+           disarms the detonation for good, but 'R's keep appearing: the
+           original's placement reads [0x26DF] and never [0x26E0]. */
+        {
+            uint8_t cell, seen = 0;
+            uint8_t q = (uint8_t)((2 << 3) | (POD_QUAD_COLUMN - 1));
+            trek_new_game(3, 5150);
+            pod_alive = 0;
+            for (i = 0; i < 200 && !seen; i++) {
+                ship.quad_y = 2; ship.quad_x = POD_QUAD_COLUMN - 1;
+                gal_enemies[q] = 1;
+                trek_enter_quadrant();
+                for (cell = 0; cell < QUAD_CELLS; cell++)
+                    if (sector[cell] == SEC_POD) seen = 1;
+            }
+            ok(seen, "a destroyed pod does not stop new ones being placed");
         }
 
         /* THE HIT IS 50..99 -- the port's old band was 40..79, invented

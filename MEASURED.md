@@ -1780,7 +1780,7 @@ may already carry damage from a pod we never saw, and 255 and 320 need no
 explanation beyond that.
 
 > **PARTLY RETRACTED 2026-08-28.** "They roam" has no mechanism in the binary.
-> The pod is placed once and never moves, and the detonation's damage loop
+> The pod does not move, and the detonation's damage loop
 > walks the CURRENT quadrant's object table -- so it cannot damage ships in a
 > quadrant you are not in. The 626/286/286/286 reading stands as an
 > observation; what it shows is a detonation DURING that visit, not a pod that
@@ -3778,16 +3778,26 @@ reading the death pod, four instructions further down the same routine.** At
         ' ' into a free sector                    ; 0x016548
 
 No galaxy-level record is consulted, so the DS:0x23E9 candidate this file
-named is NOT it. And note the shape: this is the SAME once-only routine that
-places the pod, whose one caller is the new-game setup, guarded against a
-restore. Read literally, a black hole is placed once, in the starting
-quadrant, and the on-entry fill has no `' '` write of its own -- the only
-other one in the program is 0x007142, in a routine not yet identified.
+named is NOT it. **ONE QUADRANT IN FOUR, ON EVERY ENTRY** -- and the "once, in
+the starting quadrant" that stood here for about an hour was the death pod's
+mistake borrowed wholesale: the same routine, the same one-caller search, the
+same refutation. A sweep in the same session read `holes=1` in quadrant 4-7,
+flown to mid-game. See NOTES.md, 2026-08-28 (later).
 
-That last point is the open half now, and it is much narrower than "where are
-they placed": identify 0x007142's caller and the question is closed. Worth
-doing before building the hazard, because "one quadrant in four" and "the
-first quadrant, one game in four" are very different games.
+**AND 0x007142 IS THE OTHER HALF OF THE DEATH RAY.** It is not a placement at
+all. `fn 0x70C0` is reached from the RAY's outcome dispatch at 0x0074F5,
+which rolls `Random(6)`:
+
+    0  -> fn 0x7026   the ray WORKS
+    1  -> fn 0x70C0(0)   "Death ray misfires."  message only
+    2  -> fn 0x71F5   the mutants
+    3  -> fn 0x70C0(1)   "Death ray misfires."  AND every empty cell in the
+                         quadrant becomes a black hole on a coin flip
+    4,5 -> fn 0x7247  fatal
+
+so the misfire has TWO forms, and this port has both of them as one. See the
+RAY note below: `trek.h` calls rolls 1 and 3 "cosmetic", and roll 3 is the
+single most destructive thing the command can do short of killing you.
 
 ### Bases, read out of the binary (2026-08-26)
 
@@ -6477,6 +6487,12 @@ so on a static reading the pod is placed once, at game start, in the STARTING
 quadrant, and only when that quadrant is column 8 with fewer than five ships
 and a 4-in-10 roll. This core places it on EVERY quadrant entry.
 
+> **REFUTED THE SAME DAY, on the rig.** Flying to quadrant 5-8 mid-game put an
+> `'R'` on the scan and set `[0x26DF]` -- a quadrant that was not the start.
+> `fn 0x15F51` IS reached on quadrant entry by a path an absolute-address
+> caller search cannot see, exactly as the `[0x26E0]` initialiser was. The
+> pod is placed on EVERY entry. See NOTES.md, 2026-08-28 (later).
+
 Worse, the flags do not meet:
 
     placement    sets [0x26DF] = 1               0x0164BE
@@ -6610,7 +6626,8 @@ suite was asserting. It now asserts 826..964, which brackets them.
 The full read is in NOTES.md. Three things in this file depended on the old
 model and are corrected there and above:
 
-1. **"Pods roam."** They do not. One pod, placed once, never moving; the
+1. **"Pods roam."** They do not. A pod is rolled fresh on each entry to a
+   column-8 quadrant and never moves once placed; the
    detonation is a galaxy-wide roll whose damage lands on the quadrant you are
    in. Every reading in this file that CORRECTED for pod damage stays valid --
    a pod hitting us and every enemy for one figure is exactly what the binary

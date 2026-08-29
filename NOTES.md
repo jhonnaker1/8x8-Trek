@@ -1220,8 +1220,10 @@ DECODED so far, with what each gave:
                                     instructions past the pod's; novas persist
     0x05181   2  enemy count        (level+1)*8 shaved 0..9%, +Random(10), +3
     0x1DD4F   2  THE SCORE SHEET    rate gated on 3 stardates, not on finishing
-    0x1649D   1  the DEATH POD      an OBJECT in the NEW-GAME fill, not an
-                                    event, and placed ONCE -- see 2026-08-28
+    0x1649D   1  the DEATH POD      an OBJECT in the quadrant fill, not an
+                                    event, and placed ON EVERY ENTRY --
+                                    "once" was a static misread, MEASURED
+                                    away 2026-08-28
     0x1857E   2  free sector        Random(8)+1 twice until the cell is '.'
     0x0D83F   1  TRACTOR BEAM       the trip's bounding rectangle, 2 in 10,
                                     per quadrant holding a COMMANDER
@@ -4786,6 +4788,7 @@ object: `SEC_POD`, a cell, 900 hit points, and a galaxy-wide `pod_alive`.
                one caller is 0x0058AD in the new-game setup, guarded by
                `cmp byte [0x1F31], 'Y' / je` so a restore skips it. The pod
                is placed ONCE, in the starting quadrant.
+               **THIS CONCLUSION WAS WRONG -- see the correction below.**
     0x0164E8   its table type: 6.
     0x01651F   its hit points: `mov word [di+0x25F0], 0x384` -- 900.
     0x015436   the enemy MOVE loop fetches each entry's map cell and skips
@@ -4851,3 +4854,77 @@ the same wrong assertion. Two separate faults:
 
 Both faults made a non-discriminating test look like a passing one, which is
 the third and fourth way this harness has done that in a week.
+
+
+## The pod is placed on EVERY entry, and a caller search is not a proof of arity (2026-08-28, later)
+
+Shipped and pushed the same day: "the death pod is placed once, in the
+starting quadrant". One screenful of dosbox-automation refuted it. Flying to
+quadrant **5-8 mid-game** put an `'R'` on the scan and set `[0x26DF]`, in a
+quadrant that was not where the game began.
+
+The static reading was not sloppy, and that is the point. The only `'R'` write
+in the program really is 0x0164D8; it really is inside `fn 0x15F51`; and an
+exhaustive search for both near and far calls to that routine really does find
+exactly one, in the new-game setup, guarded against a restore. Every step is
+correct and the conclusion is false, because **an absolute-address caller
+search cannot see the call that matters.** That is the SECOND time the same
+blind spot has produced a confident wrong answer about this exact routine --
+the first was the write that initialises `[0x26E0]`, which no `e0 26` search
+could find either. Being wrong the same way twice about the same function is
+what makes it a rule rather than an anecdote:
+
+**A CALLER SEARCH OVER ABSOLUTE ADDRESSES IS NOT A PROOF OF ARITY.** It can
+show a routine IS called from somewhere; it cannot show it is called from
+nowhere else. Where a wrong answer changes behaviour, the emulator decides.
+
+Which path reaches `fn 0x15F51` on entry is NOT known and is deliberately not
+guessed at here.
+
+### What was right, and stays
+
+The galaxy-wide gate. `fn 0x20B38` reads `[0x26E0]` and never asks where you
+are, and the same session watched it happen: **"Vandal Death Pod enters
+quadrant: 83 unit hit on Lexington" in quadrant 1-5** -- column 5, nowhere
+near Vandal space. The correction the object was built for is confirmed; only
+the placement was wrong.
+
+Also confirmed in passing, on screen: **"Dept. of Space warns of a star having
+gone supernova in quadrant 1-5"** with `999` in that chart cell, which is
+`NOVA_CHART_BURNT` and the spontaneous nova's message doing exactly what the
+port does.
+
+### The test passed the regression, and here is why
+
+`ok(!after, "and re-entering the quadrant does not rebuild it")` took ONE
+sample of a four-in-ten event, so it agreed with the wrong model three times
+in five and was green when it shipped. The replacement counts over 400
+entries per column. The break test that would have caught it now exists, and
+the FIRST version of that break was itself a no-op -- it gated on
+`ship.stardate == STARDATE_START` in a suite that never advances the clock
+before entering a quadrant. **A break that cannot fail proves nothing about
+the test it is aimed at**, which is the same lesson as `POD_HP` being asserted
+against `POD_HP`, one day later.
+
+
+### And the death ray's misfire is not cosmetic (same session)
+
+`0x007142` -- the "other black hole write" this file wanted a caller for -- is
+not a placement at all. It is inside `fn 0x70C0`, the death ray's misfire
+handler, reached twice from the RAY dispatch at 0x0074F5 with DIFFERENT
+arguments:
+
+    Random(6) == 1  ->  fn 0x70C0(0)   "Death ray misfires."  message only
+    Random(6) == 3  ->  fn 0x70C0(1)   the same line, and then every EMPTY
+                                       cell in the quadrant becomes a black
+                                       hole on a coin flip
+
+`trek.h` has said since 2026-08-27 that **both misfires are cosmetic** and
+"differ in pixels". They differ by half the vacuum in the quadrant turning
+lethal, one RAY in six. The loop was read and called a screen effect -- the
+mechanism was on the screen and nobody looked at it, which is the exact
+failure the negative-claims rule exists for.
+
+Still merged as one outcome in the port, because there is no black-hole cell
+yet. The moment there is, roll 3 splits off, and `core/trek.c` carries that
+note at the return rather than on a list.

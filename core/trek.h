@@ -1226,22 +1226,36 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  * 0x01C69B, where both arms of the branch store the same colour: it is
  * vestigial in the shipped binary and this port does not carry it.
  *
- * IT IS PLACED ONCE, IN THE STARTING QUADRANT. The only write of 'R' to the
- * sector map in the whole program is 0x0164D8, inside fn 0x15F51, and that
- * routine has one caller -- 0x0058AD in the new-game setup, guarded by
- * `cmp byte [0x1F31], 'Y' / je` so a restored save skips it. Entering a
- * quadrant later runs a different fill that has no 'R' in it. Read literally:
+ * IT IS PLACED ON EVERY QUADRANT ENTRY, in column 8 and nowhere else:
  *
  *     if (ships already placed >= 5)  no pod        ; cmp [0x1DEC], 5
  *     if (quadrant COLUMN != 8)       no pod        ; cmp [0x1DE6], 8
  *     if (Random(10) <= 5)            no pod        ; so four in ten
  *     'R' into a free sector; table type 6; 900 hit points
  *
- * so about one game in twenty has a pod you can actually shoot at, and the
- * other nineteen have a hazard with no counter. THE MANUAL AGREES WITH THE
- * COLUMN: "The Vandal Empire ... will generally only be found near their own
- * territory" (l.214-217), and the detonation's own odds are half again
- * shorter in columns 7 and 8. Column 8 is Vandal space.
+ * THE MANUAL AGREES WITH THE COLUMN: "The Vandal Empire ... will generally
+ * only be found near their own territory" (l.214-217), and the detonation's
+ * own odds are half again shorter in columns 7 and 8. Column 8 is Vandal
+ * space.
+ *
+ * AND THIS PORT SHIPPED IT WRONG FOR ONE DAY, on a static reading. The only
+ * 'R' write in the program is 0x0164D8, inside fn 0x15F51, and an
+ * absolute-address search finds that routine exactly one caller: 0x0058AD in
+ * the new-game setup, guarded by `cmp byte [0x1F31], 'Y' / je` so a restore
+ * skips it. Read literally that says "placed once, in the starting
+ * quadrant", and that is what shipped.
+ *
+ * The original says otherwise. Flying to quadrant 5-8 mid-game, under
+ * dosbox-automation, put an 'R' on the scan and set [0x26DF] -- in a quadrant
+ * that was not where the game began. So fn 0x15F51 IS reached on entry, by a
+ * path that search cannot see. Which path is NOT yet known and is not
+ * guessed at here; the same blind spot swallowed the write that initialises
+ * [0x26E0], and being wrong the same way twice about the same routine is the
+ * reason this paragraph exists. A CALLER SEARCH OVER ABSOLUTE ADDRESSES IS
+ * NOT A PROOF OF ARITY.
+ *
+ * The placement does NOT consult [0x26E0]: destroying the pod disarms the
+ * detonation for the rest of the game, but 'R's keep appearing in column 8.
  *
  * WHAT THE OBJECT DOES, AND WHAT IT REFUSES TO DO:
  *
@@ -1686,9 +1700,23 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * though the roll is: it works one time in six and kills you one time in
  * THREE.
  *
- * **BOTH MISFIRES ARE COSMETIC** -- read 2026-08-27, which was the last gap.
- * 0x70C0 prints its line, and on the arg-1 path only, draws a screen effect
- * and delays. Neither touches game state. The two variants differ in pixels.
+ * ~~**BOTH MISFIRES ARE COSMETIC**~~ **WRONG, and corrected 2026-08-28.**
+ * The two calls to 0x70C0 pass DIFFERENT arguments and only one of them is a
+ * message. `fn 0x70C0(1)` walks the whole 8x8 quadrant and, for every cell
+ * that reads '.', turns it into a black hole on a coin flip:
+ *
+ *     for y in 1..8, x in 1..8:
+ *         if (map[y*10+x] == '.' && Random(100) > 50)   ; 0x007123
+ *             map[y*10+x] = ' '                         ; 0x007142
+ *
+ * Half the vacuum in the quadrant becomes lethal. That is roll 3 -- one turn
+ * in six of every RAY fired -- and it is the most destructive thing the
+ * command can do short of killing you outright.
+ *
+ * The 2026-08-27 read saw that loop and called it "a screen effect", which is
+ * how a negative claim gets made: the mechanism was on screen and was not
+ * looked at. This port still merges rolls 1 and 3 into RAY_MISFIRE because
+ * there is no black-hole cell yet; core/trek.c says so at the return.
  *
  * THE MUTANTS ARE A PERSISTENT FLAG, [0x26D1], and the turn loop at 0x005B1A
  * does the rest: one turn in ten clears it, and otherwise it prints one of

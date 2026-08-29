@@ -115,12 +115,6 @@ void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
 
-    /* NO POD IS PLACED HERE, and that is the reading, not an omission. The
-       'R' goes in once, in the new-game build -- see place_pod() and the
-       header. Entering a quadrant in the original runs a different fill with
-       no 'R' in it, so leaving the starting quadrant loses the object; this
-       function regenerating the sector loses it the same way. */
-
     /* Arriving relieves a base under siege. This is the ancestor's own rule
        read the other way round: its FBATTAK will not pick a base that is in
        the player's quadrant at all ("!same(baseq[j], game.quadrant)"), so
@@ -183,6 +177,31 @@ void trek_enter_quadrant(void) {
        where the ship is. */
     trek_leave_orbit();
     planet_place();
+
+    /* THE VANDAL DEATH POD, decided on arrival. MEASURED on the original
+       2026-08-28, and it overturned a reading made the same day: flying to
+       quadrant 5-8 mid-game put an 'R' on the scan and set [0x26DF], in a
+       quadrant that was not where the game started. So the quadrant fill DOES
+       run on entry and the pod IS re-rolled -- see trek.h.
+
+       The roll sits here, at the end of the fill, because that is where the
+       original has it: after the stars, the base, the ships and the planet,
+       taking a cell nothing else wanted. Note it does NOT consult pod_alive:
+       a destroyed pod disarms the detonation for good, but 'R's keep
+       appearing in column 8. That is what the binary does -- the placement
+       reads [0x26DF] and writes it, and never looks at [0x26E0]. There is no
+       pod_here here: [0x26DF] is vestigial in the original (read at one site
+       where both arms store the same colour) and sector[] already says where
+       the object is. */
+    if (ship.quad_x + 1 == POD_QUAD_COLUMN
+        && gal_enemies[q] < POD_MAX_SHIPS
+        && trek_rand_n(POD_PLACE_OF_N) > POD_PLACE_ABOVE) {
+        cell = trek_free_sector();
+        if (cell != 0xFF) {
+            sector[cell]   = SEC_POD;
+            enemy_hp[cell] = POD_HP;
+        }
+    }
 
     reveal_around(ship.quad_y, ship.quad_x);
 }
@@ -356,33 +375,15 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.sec_y  = trek_rand_n(QUAD_DIM);
     ship.sec_x  = trek_rand_n(QUAD_DIM);
 
+    /* [0x26E0] is true from the first turn, and the detonation reads nothing
+       else. Set BEFORE the first quadrant is built, which is also where the
+       first pod can be placed. */
+    pod_alive = 1;
+
     /* Before trek_enter_quadrant(), which places the planets it rolls. */
     planet_new();
 
     trek_enter_quadrant();
-
-    /* THE VANDAL DEATH POD, placed once and only here. The original's roll
-       sits at the end of the new-game quadrant build (0x01649D), after the
-       stars and the ships and the planet, which is where this is too: the
-       free cell it takes is one nothing else wanted.
-
-       Alive is set unconditionally and the placement is not. In most games
-       the flag is true and there is no 'R' anywhere, which is exactly what
-       the binary does -- the detonation reads the flag and never asks where
-       you are. */
-    pod_alive = 1;
-    {
-        uint8_t pq = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
-        if (ship.quad_x + 1 == POD_QUAD_COLUMN
-            && gal_enemies[pq] < POD_MAX_SHIPS
-            && trek_rand_n(POD_PLACE_OF_N) > POD_PLACE_ABOVE) {
-            uint8_t cell = trek_free_sector();
-            if (cell != 0xFF) {
-                sector[cell]   = SEC_POD;
-                enemy_hp[cell] = POD_HP;
-            }
-        }
-    }
 
     /* Seed the schedule. The ancestor does the same in its setup, with means
        expressed as fractions of the mission length -- so these are too, which
@@ -637,7 +638,19 @@ uint8_t trek_fire_ray(void) {
     }
     if (roll == 2) { ship.mutants = 1; return RAY_MUTANTS; }
     if (roll >= 4) { ship.lost = 1;    return RAY_FATAL;   }
-    return RAY_MISFIRE;                  /* rolls 1 and 3, and cosmetic */
+    /* Rolls 1 and 3 are BOTH "Death ray misfires.", and this port treats them
+       as one. THEY ARE NOT THE SAME: 0x0074F5 sends roll 1 to fn 0x70C0(0),
+       which prints and stops, and roll 3 to fn 0x70C0(1), which then walks
+       every cell of the quadrant and turns each EMPTY one into a black hole
+       on a coin flip -- `Random(100) > 50` at 0x007123, ' ' written at
+       0x007142. Half the vacuum you are standing in becomes lethal.
+
+       Left as one outcome ONLY because this core has no black-hole cell yet;
+       the moment it does, roll 3 splits off. It is recorded here rather than
+       on the unbuilt list because the comment that used to sit on this line
+       called both rolls "cosmetic", which is the sort of negative claim that
+       stops anyone looking. */
+    return RAY_MISFIRE;                  /* rolls 1 and 3 -- see above */
 }
 
 uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
