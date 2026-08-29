@@ -3769,10 +3769,25 @@ The `chart[q] >= 999` retry looks like a sentinel rather than a real
 threshold: the chart word packs `enemies*100 + type*10 + stars` and enemies
 cap at four, so a real quadrant never reaches 999.
 
-**Still open: where black holes are PLACED.** They are spaces written into the
-sector map when a quadrant is built, so a galaxy-level record decides which
-quadrants have them. The candidate is the byte array at DS:0x23E9, which
-generation sets to 1 for `Random(7) < 3` of something -- not yet confirmed.
+~~**Still open: where black holes are PLACED.**~~ **FOUND 2026-08-28, while
+reading the death pod, four instructions further down the same routine.** At
+0x016525, immediately after the pod's own roll in the new-game quadrant build
+`fn 0x15F51`:
+
+    if (Random(64) < 16)                          ; one quadrant in four
+        ' ' into a free sector                    ; 0x016548
+
+No galaxy-level record is consulted, so the DS:0x23E9 candidate this file
+named is NOT it. And note the shape: this is the SAME once-only routine that
+places the pod, whose one caller is the new-game setup, guarded against a
+restore. Read literally, a black hole is placed once, in the starting
+quadrant, and the on-entry fill has no `' '` write of its own -- the only
+other one in the program is 0x007142, in a routine not yet identified.
+
+That last point is the open half now, and it is much narrower than "where are
+they placed": identify 0x007142's caller and the question is closed. Worth
+doing before building the hazard, because "one quadrant in four" and "the
+first quadrant, one game in four" are very different games.
 
 ### Bases, read out of the binary (2026-08-26)
 

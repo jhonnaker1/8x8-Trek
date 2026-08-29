@@ -1214,7 +1214,10 @@ DECODED so far, with what each gave:
     0x0A8C8   4  a star, hit        4% supernova / 38% absorbed / 58% destroyed
     0x09563   2  PLASMA BOLT item   NOT the torpedo -- the map had this wrong
     0x16119.. -  enemy strengths    all four classes, all level formulas
-    0x0160xx  -  QUADRANT FILL      black holes 1 quadrant in 4; novas persist
+    0x0160xx  -  QUADRANT FILL      black holes 1 quadrant in 4 -- and the
+                                    ROLL was located 2026-08-28 at 0x016525,
+                                    in the once-only new-game build, four
+                                    instructions past the pod's; novas persist
     0x05181   2  enemy count        (level+1)*8 shaved 0..9%, +Random(10), +3
     0x1DD4F   2  THE SCORE SHEET    rate gated on 3 stardates, not on finishing
     0x1649D   1  the DEATH POD      an OBJECT in the NEW-GAME fill, not an
