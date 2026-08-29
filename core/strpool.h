@@ -7,10 +7,11 @@
  *
  * The C128 has ~42K for code and read-only data together, and 4,088 bytes of
  * it were string literals -- a tenth of the machine spent on words. Every
- * feature still to build (RAY's four outcomes and its loss report, five more
- * loss endings, the planet dialogs, the boarding-party and event messages) is
- * string-heavy, so without this each of them would cost code AND data out of
- * the same shrinking budget.
+ * feature still to build was string-heavy, so without this each of them would
+ * cost code AND data out of the same shrinking budget. (The list this
+ * paragraph used to name -- RAY's outcomes and its loss report, the loss
+ * endings, the planet dialogs, the boarding-party and event messages -- is
+ * ALL BUILT as of 2026-08-28, and the pool is why it fitted.)
  *
  * Pooled strings live in STRINGS.DAT on the game disk, are streamed into far
  * memory at startup (core/farmem.h), and are fetched one at a time into a

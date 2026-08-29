@@ -2658,7 +2658,9 @@ Notes worth having before building it:
 - The **self-destruct password** is the SELF command's confirmation. There is
   no self-destruct in the core yet, so the prompt can be collected and stored
   before the command exists.
-- The **name** is for the hall of fame in `TREK.SCR`, which is also not built.
+- The **name** is for the hall of fame in `TREK.SCR`. (Not built when this
+  was written; `core/hof.c` and the `hof` overlay have carried it since
+  2026-08-26.)
 - This is the natural home for **seeding the RNG from something varying**,
   which is open item 3 and currently blocked on there being a title screen at
   all: time the player's keystrokes through these prompts.
@@ -5030,7 +5032,8 @@ mechanism outstanding that anything currently depends on.
      `(90 + Random(10)) * (8 - d)` WHOLE off the shield charge with no
      absorption split -- so MOVING is the counter. Confirmed against five
      bolts solved out of the absorption run, one of them photographed and
-     matching to 0.03%. See MEASURED.md. UNBUILT.
+     matching to 0.03%. See MEASURED.md. **BUILT 2026-08-28** -- `bolt_cell`
+     / `bolt_quad`, save v13, verified on the C128 at 651 units.
 
   1. ~~**What reaches `fn 0x15F51` on quadrant entry.**~~ **READ 2026-08-28.
      IT IS A BACKWARD JUMP, NOT A CALL** -- see the section below. The call
