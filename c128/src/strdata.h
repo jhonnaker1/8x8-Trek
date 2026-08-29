@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 294
+#define STR_COUNT 298
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -300,6 +300,10 @@
 #define S_291  291   /* VANDAL DESTROYED! */
 #define S_292  292   /* VANDAL ACTIVATES CLOAKING DEVICE. */
 #define S_293  293   /* NO DAMAGE REPORTED. */
+#define S_294  294   /* ENTERED A BLACK HOLE */
+#define S_295  295   /* THROWN FREE IN QUADRANT  */
+#define S_296  296   /* THE SHIP DID NOT COME OUT. */
+#define S_297  297   /* TORPEDO SUCKED INTO BLACK HOLE. */
 
 extern const unsigned int str_offset[STR_COUNT];
 

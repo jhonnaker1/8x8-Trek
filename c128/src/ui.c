@@ -105,6 +105,13 @@ static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
            into the shape itself rather than passing in -- see core/ega.h. */
         case SEC_POD:        *color = EGA_TO_VDC(EGA_VANDAL);
                              return SC_LETTER('R');
+        /* A BLACK HOLE IS DRAWN AS NOTHING. The original stores ' ' where
+           vacuum is '.', and draws the difference: a dot for empty space and
+           a blank for a hole. That is the whole of its appearance, and it is
+           the point -- the cell that kills you is the one with nothing in
+           it. Not a missing glyph; the glyph IS absence. */
+        case SEC_BLACKHOLE:  *color = COL_GRID;
+                             return SC_SPACE;
         default:             *color = COL_GRID;
                              return SC_DOT;
     }

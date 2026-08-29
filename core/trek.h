@@ -33,6 +33,7 @@
 #define SEC_SCOUT       7  /*@ID*/
 #define SEC_SUPPLY      8  /*@ID*/
 #define SEC_POD         9   /* the Vandal Death Pod, 'R' */  /*@ID*/
+#define SEC_BLACKHOLE  10   /* ' ' -- drawn as nothing; see below */  /*@ID*/
 
 /* THE POD IS DELIBERATELY OUTSIDE THIS RANGE, and every loop in the core
    depends on it. The original keeps the pod in the same object table as the
@@ -694,6 +695,11 @@ extern Ship ship;
    original refuses with "ENGINEERING: Move aborted; impulse engines are too
    damaged to use" -- a hard no, not a slower move. */
 #define MOVE_NO_IMPULSE     6  /*@ID*/
+/* The path ran into a black hole. Not a refusal and not a block: the ship
+   went in. THROWN leaves it somewhere else entirely -- read ship.quad_y/x --
+   and LOST means it did not come out. */
+#define MOVE_HOLE_THROWN    7  /*@ID*/
+#define MOVE_HOLE_LOST      8  /*@ID*/
 
 /* Deterministic PRNG. Owned here rather than taken from libc so that a seed
    reproduces the same galaxy on every platform -- which is what makes a
@@ -1325,6 +1331,55 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define POD_PLACE_ABOVE      5  /* Random(10) > 5, so four in ten */  /*@BINARY*/
 #define POD_HP             900  /* `mov word [di+0x25F0], 0x384` */  /*@BINARY*/
 
+/* ---------------------------------------------------------- BLACK HOLES
+ *
+ * A BLACK HOLE IS A SPACE IN THE SECTOR MAP. Empty space is '.' (0x2E) and a
+ * black hole is ' ' (0x20); the move code tests `cmp byte [di+0x2622], 0x20`
+ * and branches, and the original DRAWS the difference -- a dot for vacuum and
+ * nothing at all for a hole. That is the whole of its appearance: the thing
+ * you cannot see is the thing that kills you.
+ *
+ * PLACED ON EVERY QUADRANT ENTRY, one quadrant in four, at 0x016525 -- four
+ * instructions past the death pod's roll in the same fill, which is how it
+ * was found:
+ *
+ *     if (Random(64) >= 16)   no hole      ; so one in four
+ *     ' ' into a free sector               ; 0x016548
+ *
+ * ENTERING ONE, at 0x0D0B6:
+ *
+ *     if (Random(5) == 0)   the ship is DESTROYED, ending code 7
+ *     else                  thrown free: quadrant and sector both uniform,
+ *                           the quadrant redrawn while the chart reads 999
+ *
+ * So it kills one time in five and otherwise throws the ship to a UNIFORMLY
+ * RANDOM quadrant AND sector -- not a nudge, the whole galaxy. Both outcomes
+ * are why it confounds anything measured by playing: the throw silently
+ * changes the quadrant, and the destruction gets attributed to whatever the
+ * player last did.
+ *
+ * The 999 retry is a sentinel, not a threshold: the chart word packs
+ * `enemies*100 + type*10 + stars` and enemies cap at four, so a real quadrant
+ * never reaches it. It means "do not throw them into a burnt quadrant", which
+ * this port has as gal_nova[].
+ *
+ * A hole is NOT an obstacle. walk_path stops at one, but the ship goes in
+ * rather than stopping short of it -- see the note on MOVE_HOLE_THROWN. */
+#define HOLE_PLACE_OF_N     64  /* Random(64) ... */  /*@BINARY*/
+#define HOLE_PLACE_BELOW    16  /* ... under 16, so one quadrant in four */  /*@BINARY*/
+#define HOLE_FATAL_OF_N      5  /* Random(5) == 0 and the ship is gone */  /*@BINARY*/
+
+/* And the DEATH RAY makes them. Roll 3 of six -- see RAY_OF_N -- walks every
+   cell of the quadrant and turns each EMPTY one into a hole on a coin flip,
+   at 0x007123. Half the vacuum you are standing in becomes lethal. */
+#define RAY_HOLE_OF_N      100  /*@BINARY*/
+#define RAY_HOLE_ABOVE      50  /* Random(100) > 50 */  /*@BINARY*/
+
+/* Set when a move ended in a black hole and the ship survived it. The UI
+   reads it to name the quadrant it was thrown to, and clears it, exactly as
+   it does for `tractored`. */
+extern uint8_t hole_threw;
+
 /* [0x26E0]: the pod has not been destroyed. Galaxy-wide, true from the first
    turn of a new game, and the ONLY thing the detonation looks at. */
 extern uint8_t pod_alive;
@@ -1722,8 +1777,8 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  *
  * The 2026-08-27 read saw that loop and called it "a screen effect", which is
  * how a negative claim gets made: the mechanism was on screen and was not
- * looked at. This port still merges rolls 1 and 3 into RAY_MISFIRE because
- * there is no black-hole cell yet; core/trek.c says so at the return.
+ * looked at. BUILT 2026-08-28, the day the black-hole cell arrived: roll 1 is
+ * RAY_MISFIRE and roll 3 is RAY_MISFIRE_HOLES, and they print the same line.
  *
  * THE MUTANTS ARE A PERSISTENT FLAG, [0x26D1], and the turn loop at 0x005B1A
  * does the rest: one turn in ten clears it, and otherwise it prints one of
@@ -1740,7 +1795,10 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 
 #define RAY_NO_TARGET    0   /* refused, and no turn spent */  /*@ID*/
 #define RAY_WORKED       1  /*@ID*/
-#define RAY_MISFIRE      2  /*@ID*/
+#define RAY_MISFIRE      2   /* roll 1: the message, and nothing else */  /*@ID*/
+/* Roll 3, which prints the SAME message and then fills the quadrant with
+   black holes. Two outcomes wearing one line of text -- see trek.c. */
+#define RAY_MISFIRE_HOLES 6  /*@ID*/
 #define RAY_MUTANTS      3  /*@ID*/
 #define RAY_FATAL        4   /* the ship is lost */  /*@ID*/
 
@@ -1804,6 +1862,11 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
    activates cloaking device." and "No damage reported.", and the torpedo is
    spent. No damage is computed and the pod's hit points are not read. */
 #define TORP_CLOAKED     12  /*@BINARY*/
+/* fn 0x0AFE7: within 0.3 of a black hole's corner the torpedo is sucked in
+   and the shot ends. Beyond it the flight is DEFLECTED -- dy and dx are
+   swapped, a ninety-degree mirror about the diagonal -- and carries on, so
+   there is no result code for that half. */
+#define TORP_SWALLOWED   13  /*@BINARY*/
 /* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:

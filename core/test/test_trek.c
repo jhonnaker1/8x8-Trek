@@ -2049,6 +2049,151 @@ static void test_torpedo(void) {
         ok(ship.quad_y == 6, "and it never arrives");
     }
 
+    /* --- BLACK HOLES, BINARY 0x016525 and fn 0x0C609 at 0x0D0B6 --- */
+    puts("black holes");
+    {
+        uint16_t entries = 0, withhole = 0, toomany = 0;
+        uint8_t  cell, col;
+        int      i;
+
+        /* ONE QUADRANT IN FOUR, on every entry. Counted rather than sampled:
+           a single look at a quadrant agrees with "never placed" three times
+           in four. */
+        trek_new_game(3, 20250828);
+        for (i = 0; i < 1600; i++) {
+            uint8_t here = 0;
+            ship.quad_y = 3; ship.quad_x = 3;
+            gal_enemies[(3 << 3) | 3] = 1;
+            trek_enter_quadrant();
+            entries++;
+            for (cell = 0; cell < QUAD_CELLS; cell++)
+                if (sector[cell] == SEC_BLACKHOLE) here++;
+            if (here) withhole++;
+            if (here > 1) toomany++;
+        }
+        ok(toomany == 0, "the fill never places more than one hole");
+        ok(withhole > 0, "a quadrant can be built with a black hole in it");
+        /* 1 in 4 of 1600 is 400. Wide band: this checks the roll is a roll. */
+        ok(withhole > 300 && withhole < 500,
+           "about one quadrant in four has one");
+
+        /* NOT column-dependent, unlike the pod -- the roll reads nothing. */
+        {
+            uint16_t seen_in[GAL_DIM];
+            uint8_t any_empty = 0;
+            for (col = 0; col < GAL_DIM; col++) {
+                seen_in[col] = 0;
+                for (i = 0; i < 200; i++) {
+                    ship.quad_y = 3; ship.quad_x = col;
+                    gal_enemies[(3 << 3) | col] = 1;
+                    trek_enter_quadrant();
+                    for (cell = 0; cell < QUAD_CELLS; cell++)
+                        if (sector[cell] == SEC_BLACKHOLE) { seen_in[col]++; break; }
+                }
+                if (!seen_in[col]) any_empty = 1;
+            }
+            ok(!any_empty, "and every column gets them, not just column 8");
+        }
+
+        /* ENTERING ONE. Put a hole next door and fly into it. */
+        {
+            uint16_t fatal = 0, thrown = 0;
+            for (i = 0; i < 900; i++) {
+                uint8_t r;
+                trek_new_game(3, (uint16_t)(600 + i));
+                ship.quad_y = 3; ship.quad_x = 3;
+                trek_enter_quadrant();
+                clear_quadrant();
+                ship.sec_y = 4; ship.sec_x = 4;
+                clear_quadrant();
+                sector[(4 << 3) | 5] = SEC_BLACKHOLE;
+                ship.impulse = IMPULSE_START; ship.lost = 0; hole_threw = 0;
+                r = trek_move_impulse(4, 5);
+                if      (r == MOVE_HOLE_LOST)   { fatal++;  ok(ship.lost, "a fatal hole loses the ship"); }
+                else if (r == MOVE_HOLE_THROWN) { thrown++; }
+                else { ok(0, "flying into a hole gave neither outcome"); break; }
+                if (fatal && thrown > 3) break;
+            }
+            ok(fatal > 0 && thrown > 0, "a hole both kills and throws");
+            /* One in five is fatal. Counted over the whole run below. */
+        }
+
+        /* THE ODDS, and the throw's reach. */
+        {
+            uint16_t fatal = 0, n = 0, moved_quad = 0;
+            for (i = 0; i < 1000; i++) {
+                uint8_t r, oy, ox;
+                trek_new_game(3, (uint16_t)(9000 + i));
+                ship.quad_y = 3; ship.quad_x = 3;
+                trek_enter_quadrant();
+                clear_quadrant();
+                ship.sec_y = 4; ship.sec_x = 4;
+                clear_quadrant();
+                sector[(4 << 3) | 5] = SEC_BLACKHOLE;
+                ship.impulse = IMPULSE_START; ship.lost = 0;
+                oy = ship.quad_y; ox = ship.quad_x;
+                r = trek_move_impulse(4, 5);
+                n++;
+                if (r == MOVE_HOLE_LOST) fatal++;
+                else if (ship.quad_y != oy || ship.quad_x != ox) moved_quad++;
+            }
+            /* 200 of 1000. The band would fail at one in four or one in six. */
+            ok(fatal > 150 && fatal < 260, "one entry in five is fatal");
+            ok(moved_quad > 700,
+               "and a survivor is thrown to another quadrant almost always");
+        }
+
+        /* A TORPEDO IS SWALLOWED OR TURNED, never simply stopped. */
+        {
+            uint16_t swallowed = 0, other = 0, dmg;
+            uint8_t  r;
+            int      k;
+            for (k = 0; k < 600; k++) {
+                trek_new_game(3, (uint16_t)(3300 + k));
+                ship.quad_y = 3; ship.quad_x = 3;
+                trek_enter_quadrant();
+                clear_quadrant();
+                ship.sec_y = 0; ship.sec_x = 0;
+                clear_quadrant();
+                sector[(3 << 3) | 3] = SEC_BLACKHOLE;
+                ship.torps = 10; ship.shields_up = 0;
+                ship.boarders = BOARD_NONE;
+                r = trek_fire_torpedo(3, 3, &dmg);
+                if (r == TORP_SWALLOWED) swallowed++; else other++;
+            }
+            ok(swallowed > 0, "a torpedo can be swallowed by a black hole");
+            ok(other > 0, "and can also survive it -- the shot is deflected");
+            /* Aimed AT the hole, so most shots pass near its corner and go
+               in; the deflected ones are the wide passes. Both halves have
+               to appear or the branch is untested. */
+            ok(swallowed > other,
+               "aimed straight at one, most are swallowed");
+        }
+
+        /* IT IS NOT AN OBSTACLE: the ship ends up IN the cell's quadrant
+           somewhere else, not stopped one short of it. */
+        {
+            uint8_t r, i2, found = 0;
+            for (i2 = 0; i2 < 60 && !found; i2++) {
+                trek_new_game(3, (uint16_t)(1234 + i2));
+                ship.quad_y = 3; ship.quad_x = 3;
+                trek_enter_quadrant();
+                clear_quadrant();
+                ship.sec_y = 0; ship.sec_x = 0;
+                clear_quadrant();
+                sector[(0 << 3) | 3] = SEC_BLACKHOLE;
+                ship.impulse = IMPULSE_START; ship.lost = 0;
+                r = trek_move_impulse(0, 6);
+                if (r == MOVE_HOLE_THROWN || r == MOVE_HOLE_LOST) {
+                    found = 1;
+                    ok(1, "a hole in the path is entered, not bumped into");
+                    ok(r != MOVE_BLOCKED, "and it never reports MOVE_BLOCKED");
+                }
+            }
+            ok(found, "the hole-in-the-path case was reached");
+        }
+    }
+
     /* --- the Vandal Death Pod, BINARY fn 0x20B38 and the 0x15F51 build --- */
     {
         TrekEvent ev[8];
@@ -2422,7 +2567,7 @@ static void test_torpedo(void) {
         uint8_t  r;
         /* uint16_t: 1200 rolls put two of these near 400 and a
            uint8_t wrapped, which read as the odds being wrong. */
-        uint16_t worked = 0, misfire = 0, mutants = 0, fatal = 0;
+        uint16_t worked = 0, misfire = 0, mutants = 0, fatal = 0, holes = 0;
 
         /* Refused with nothing to shoot at, and it costs no turn. */
         trek_new_game(3, 77);
@@ -2442,18 +2587,25 @@ static void test_torpedo(void) {
             r = trek_fire_ray();
             if      (r == RAY_WORKED)  worked++;
             else if (r == RAY_MISFIRE) misfire++;
+            else if (r == RAY_MISFIRE_HOLES) holes++;
             else if (r == RAY_MUTANTS) mutants++;
             else if (r == RAY_FATAL)   fatal++;
         }
-        ok(worked + misfire + mutants + fatal == 1200, "every shot has an outcome");
-        /* 200 / 400 / 200 / 400 expected; bands wide enough to be stable and
-           narrow enough to fail if two handlers were given equal odds. */
+        ok(worked + misfire + holes + mutants + fatal == 1200,
+           "every shot has an outcome");
+        /* FIVE outcomes over six rolls now, not four: rolls 1 and 3 print the
+           same line but only roll 3 fills the quadrant with black holes, so
+           the two "misfires" are counted apart. 200 each except the fatal
+           pair; bands wide enough to be stable and narrow enough to fail if
+           any handler were given the wrong share. */
         ok(worked  > 140 && worked  < 265, "it works one time in six");
-        ok(misfire > 320 && misfire < 480, "and misfires two times in six");
+        ok(misfire > 140 && misfire < 265, "a plain misfire one time in six");
+        ok(holes   > 140 && holes   < 265, "and a hole-making one, also one in six");
         ok(mutants > 140 && mutants < 265, "mutants one time in six");
         ok(fatal   > 320 && fatal   < 480, "and it kills you one time in THREE");
-        ok(misfire > worked && fatal > mutants,
-              "the paired handlers really are twice as likely");
+        ok(fatal > mutants, "the fatal pair really is twice as likely");
+        ok(misfire + holes > 320 && misfire + holes < 480,
+           "and the two misfires together are still two in six");
 
         /* What each outcome does. */
         trek_new_game(3, 77);
@@ -2496,19 +2648,50 @@ static void test_torpedo(void) {
             }
         }
 
-        /* A misfire changes nothing at all -- both variants are cosmetic. */
-        trek_new_game(3, 77);
-        for (i = 0; i < 400; i++) {
-            clear_quadrant();
-            sector[(2 << 3) | 2] = SEC_BATTLESHIP;
-            enemy_hp[(2 << 3) | 2] = 500;
-            ship.enemies_left = 40; ship.lost = 0; ship.mutants = 0;
-            if (trek_fire_ray() == RAY_MISFIRE) {
-                ok(sector[(2 << 3) | 2] == SEC_BATTLESHIP && !ship.lost
-                   && !ship.mutants && ship.enemies_left == 40,
-                      "a misfire changes nothing -- both variants are cosmetic");
-                break;
+        /* ROLL 1 CHANGES NOTHING. Roll 3 prints the same line and fills the
+           quadrant with black holes, which is why they are separate results
+           now -- this assertion used to say "both variants are cosmetic" and
+           was passing while being false about half the cases it named. */
+        {
+            uint8_t saw1 = 0, saw3 = 0;
+            for (i = 0; i < 600 && !(saw1 && saw3); i++) {
+                uint8_t c, before_empty = 0, after_holes = 0;
+                trek_new_game(3, (uint16_t)(77 + i));
+                clear_quadrant();
+                sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+                enemy_hp[(2 << 3) | 2] = 500;
+                ship.enemies_left = 40; ship.lost = 0; ship.mutants = 0;
+                for (c = 0; c < QUAD_CELLS; c++)
+                    if (sector[c] == SEC_EMPTY) before_empty++;
+                r = trek_fire_ray();
+                for (c = 0; c < QUAD_CELLS; c++)
+                    if (sector[c] == SEC_BLACKHOLE) after_holes++;
+
+                if (r == RAY_MISFIRE && !saw1) {
+                    saw1 = 1;
+                    ok(sector[(2 << 3) | 2] == SEC_BATTLESHIP && !ship.lost
+                       && !ship.mutants && ship.enemies_left == 40
+                       && after_holes == 0,
+                       "roll 1 misfires and changes nothing at all");
+                }
+                if (r == RAY_MISFIRE_HOLES && !saw3) {
+                    saw3 = 1;
+                    ok(after_holes > 0,
+                       "roll 3 misfires and fills the quadrant with holes");
+                    /* HALF, not "not all". `after_holes < before_empty` was
+                       the first version and it could not fail: at a 99%
+                       chance per cell one survivor still satisfies it. The
+                       flip is per cell, so with ~60 empty cells the count is
+                       binomial(60, 0.5) -- mean 30, sd 3.9 -- and a quarter
+                       to three quarters is nearly four sd either way. */
+                    ok(after_holes * 4 > before_empty
+                       && after_holes * 4 < before_empty * 3,
+                       "about half the empty cells -- a coin flip each");
+                    ok(sector[(ship.sec_y << 3) | ship.sec_x] == SEC_SHIP,
+                       "and never the cell the ship is standing in");
+                }
             }
+            ok(saw1 && saw3, "both misfire rolls were reached");
         }
 
         /* The mutants clear one turn in ten and report otherwise. */
@@ -3654,16 +3837,35 @@ static void test_system_damage_severity(void) {
 
     /* The shield SYSTEM wears from what the POOL stopped, graded rather than
        wrecked: 1500 absorbed is (1500-700)/10 = 80 points. */
-    trek_new_game(3, 4246);
-    ship.shields_up = 1;
-    ship.shields = SHIELD_MAX; ship.energy = ENERGY_MAX;
-    ship.sys[SYS_SHIELDS] = 100;
-    n = 0; trek_take_hit(1500, ev, &n, 16);
-    ok(ship.sys[SYS_SHIELDS] == 100,
-       "the shield system is untouched until the turn is resolved");
-    trek_combat_damage(ev, &n, 16);
-    ok(ship.sys[SYS_SHIELDS] == 20,
-       "1500 absorbed takes the shield system to 20%, not to zero");
+    /* SEED-ROBUST, and it was not: this asserted == 20 on one seed, and the
+       turn's own random damage rounds can wreck the shield system a SECOND
+       time, taking it to 0. Adding a Random() call to trek_enter_quadrant for
+       the black holes shifted the stream and the assertion failed -- on a
+       mechanism it was not testing. Find a turn whose rounds left the shield
+       system alone, and check the WEAR there. */
+    {
+        uint16_t seed;
+        uint8_t clean = 0, k;
+        for (seed = 4246; seed < 4346 && !clean; seed++) {
+            trek_new_game(3, seed);
+            ship.shields_up = 1;
+            ship.shields = SHIELD_MAX; ship.energy = ENERGY_MAX;
+            ship.sys[SYS_SHIELDS] = 100;
+            n = 0; trek_take_hit(1500, ev, &n, 16);
+            if (seed == 4246)
+                ok(ship.sys[SYS_SHIELDS] == 100,
+                   "the shield system is untouched until the turn is resolved");
+            trek_combat_damage(ev, &n, 16);
+            clean = 1;
+            for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_SYSTEM_HIT && ev[k].y == SYS_SHIELDS)
+                    clean = 0;
+            if (clean)
+                ok(ship.sys[SYS_SHIELDS] == 20,
+                   "1500 absorbed takes the shield system to 20%, not to zero");
+        }
+        ok(clean, "and a turn without a second hit on the shields was found");
+    }
 }
 
 static void test_manual_movement(void) {

@@ -9,6 +9,7 @@ uint8_t gal_known[GAL_CELLS];
 uint8_t gal_nova[GAL_CELLS];
 uint8_t  nova_quad;
 uint8_t  pod_alive;
+uint8_t  hole_threw;
 uint16_t nova_kills;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
@@ -201,6 +202,15 @@ void trek_enter_quadrant(void) {
             sector[cell]   = SEC_POD;
             enemy_hp[cell] = POD_HP;
         }
+    }
+
+    /* AND A BLACK HOLE, one quadrant in four -- 0x016525, four instructions
+       past the pod's roll in the same fill. It takes a free cell like
+       everything else, and from here on it is invisible: the UI draws a
+       space where vacuum draws a dot. */
+    if (trek_rand_n(HOLE_PLACE_OF_N) < HOLE_PLACE_BELOW) {
+        cell = trek_free_sector();
+        if (cell != 0xFF) sector[cell] = SEC_BLACKHOLE;
     }
 
     reveal_around(ship.quad_y, ship.quad_x);
@@ -638,19 +648,26 @@ uint8_t trek_fire_ray(void) {
     }
     if (roll == 2) { ship.mutants = 1; return RAY_MUTANTS; }
     if (roll >= 4) { ship.lost = 1;    return RAY_FATAL;   }
-    /* Rolls 1 and 3 are BOTH "Death ray misfires.", and this port treats them
-       as one. THEY ARE NOT THE SAME: 0x0074F5 sends roll 1 to fn 0x70C0(0),
-       which prints and stops, and roll 3 to fn 0x70C0(1), which then walks
-       every cell of the quadrant and turns each EMPTY one into a black hole
-       on a coin flip -- `Random(100) > 50` at 0x007123, ' ' written at
-       0x007142. Half the vacuum you are standing in becomes lethal.
 
-       Left as one outcome ONLY because this core has no black-hole cell yet;
-       the moment it does, roll 3 splits off. It is recorded here rather than
-       on the unbuilt list because the comment that used to sit on this line
-       called both rolls "cosmetic", which is the sort of negative claim that
-       stops anyone looking. */
-    return RAY_MISFIRE;                  /* rolls 1 and 3 -- see above */
+    /* ROLL 3 IS THE ONE THAT FILLS THE QUADRANT WITH BLACK HOLES. Both rolls
+       1 and 3 print "Death ray misfires.", which is why this port had them as
+       one outcome and trek.h called both COSMETIC -- but 0x0074F5 sends roll
+       1 to fn 0x70C0(0), which prints and stops, and roll 3 to fn 0x70C0(1),
+       which then walks every cell and turns each EMPTY one into a hole on a
+       coin flip. Half the vacuum you are standing in becomes lethal, one RAY
+       in six.
+
+       The ship's own cell is EMPTY of nothing -- it holds SEC_SHIP -- so the
+       loop cannot bury the ship where it stands, and the original's loop over
+       rows and columns 1..8 has the same property. */
+    if (roll == 3) {
+        for (cell = 0; cell < QUAD_CELLS; cell++)
+            if (sector[cell] == SEC_EMPTY
+                && trek_rand_n(RAY_HOLE_OF_N) > RAY_HOLE_ABOVE)
+                sector[cell] = SEC_BLACKHOLE;
+        return RAY_MISFIRE_HOLES;
+    }
+    return RAY_MISFIRE;                  /* roll 1: the message and nothing */
 }
 
 uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
@@ -1206,6 +1223,7 @@ static uint16_t path_dist(uint8_t dy, uint8_t dx) {
    to spend bytes on here. */
 static uint8_t walk_y, walk_x;      /* absolute cell the ship reaches, 0..63 */
 static uint8_t walk_dy, walk_dx;    /* truncated displacement, for billing */
+static uint8_t walk_hole;           /* the walk ended IN a black hole */
 
 uint8_t trek_block_y, trek_block_x;
 
@@ -1228,6 +1246,7 @@ static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
 
     walk_y = ay0; walk_x = ax0;
     walk_dy = 0;  walk_dx = 0;
+    walk_hole = 0;
     if (n == 0) return 0;
     rya = n; rxa = n;                         /* seeded with the +n of a round */
 
@@ -1248,6 +1267,17 @@ static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
         if ((uint8_t)(sy >> 3) != ship.quad_y ||
             (uint8_t)(sx >> 3) != ship.quad_x)
             break;
+
+        /* A BLACK HOLE IS NOT AN OBSTACLE. The path ends here either way,
+           but the ship goes IN rather than stopping one short, so the walk
+           reports it separately and the caller resolves it. */
+        if (sector[((sy & 7) << 3) | (sx & 7)] == SEC_BLACKHOLE) {
+            walk_y = sy; walk_x = sx;
+            walk_dy = (uint8_t)(upy ? ty : ty + (tya != 0));
+            walk_dx = (uint8_t)(upx ? tx : tx + (txa != 0));
+            walk_hole = 1;
+            return 1;
+        }
 
         if (sector[((sy & 7) << 3) | (sx & 7)] != SEC_EMPTY) {
             trek_block_y = (uint8_t)(sy & 7);
@@ -1276,6 +1306,43 @@ static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
     walk_dy = ady;
     walk_dx = adx;
     return 0;
+}
+
+/* THE SHIP HAS ENTERED A BLACK HOLE -- fn 0x0C609 at 0x0D0B6.
+ *
+ * One time in five it does not come out. Otherwise it is thrown to a
+ * uniformly random quadrant AND sector -- the whole galaxy, not a nudge --
+ * with burnt quadrants redrawn, which the original does by rejecting a chart
+ * word of 999.
+ *
+ * Called with the ship already standing in the hole's cell, because that is
+ * what the walk reports. Returns the MOVE_ code for the caller. */
+static uint8_t enter_black_hole(void) {
+    uint8_t q, tries;
+
+    if (trek_rand_n(HOLE_FATAL_OF_N) == 0) {
+        ship.lost = 1;
+        ship.casualties = CREW_COMPLEMENT;
+        return MOVE_HOLE_LOST;
+    }
+
+    /* Uniform over the galaxy, rejecting quadrants the chart shows burnt.
+       Bounded, because a galaxy could in principle be all nova and the
+       original's loop is not. */
+    for (tries = 0; tries < 100; tries++) {
+        q = trek_rand_n(GAL_CELLS);
+        if (!gal_nova[q]) break;
+    }
+    ship.quad_y = (uint8_t)(q >> 3);
+    ship.quad_x = (uint8_t)(q & 7);
+    ship.sec_y  = trek_rand_n(QUAD_DIM);
+    ship.sec_x  = trek_rand_n(QUAD_DIM);
+
+    /* The destination is built around wherever it put us, exactly as any
+       other arrival is. */
+    trek_enter_quadrant();
+    hole_threw = 1;
+    return MOVE_HOLE_THROWN;
 }
 
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
@@ -1330,6 +1397,10 @@ uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
        counts sixteenths of a sector, so the whole charge is 25*d16/96. The
        widest case is 25 * 158, well inside sixteen bits. */
     advance_hundredths((uint16_t)((25u * d16) / (6u * 16u)));
+
+    /* AFTER the clock and the pools, because the trip happened: the ship
+       flew that far and then fell in. */
+    if (walk_hole) return enter_black_hole();
     return blocked ? MOVE_BLOCKED : MOVE_OK;
 }
 
@@ -1453,6 +1524,10 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
         if (cost > ship.energy) cost = ship.energy;
         ship.energy = (uint16_t)(ship.energy - cost);
         advance_hundredths(warp_hundredths(d16));
+
+        /* The departure path can end in a hole just as an impulse move can,
+           and it is resolved the same way -- after the trip is paid for. */
+        if (walk_hole) return enter_black_hole();
         return MOVE_BLOCKED;
     }
 
@@ -2208,6 +2283,25 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
         /* Our own cell reads 'E' in the original and matches none of its
            cases, so the torpedo flies over it. */
         if (c == SEC_EMPTY || c == SEC_SHIP) continue;
+
+        /* A BLACK HOLE EITHER SWALLOWS THE TORPEDO OR TURNS IT -- fn 0x0AFE7.
+           Under 0.3 of the cell's corner it is sucked in and the shot is
+           over; otherwise the caller SWAPS dy and dx, which mirrors the
+           flight ninety degrees about the diagonal and lets it fly on. The
+           0.3 is the same threshold a direct hit uses, so it is the same
+           constant -- see TORP_DIRECT_Q.
+
+           This is the one case that continues the march with the STEP
+           changed, which is why it lives inside the loop rather than in the
+           dispatch below. */
+        if (c == SEC_BLACKHOLE) {
+            uint16_t hy = (uint16_t)(y & 0xFF), hx = (uint16_t)(x & 0xFF);
+            if (hy <= TORP_FRAC_MAX && hx <= TORP_FRAC_MAX
+                && (uint16_t)(hy * hy + hx * hx) < TORP_DIRECT_Q)
+                return TORP_SWALLOWED;
+            { int16_t t = stepy; stepy = stepx; stepx = t; }
+            continue;
+        }
         break;
     }
 

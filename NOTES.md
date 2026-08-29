@@ -4928,9 +4928,10 @@ lethal, one RAY in six. The loop was read and called a screen effect -- the
 mechanism was on the screen and nobody looked at it, which is the exact
 failure the negative-claims rule exists for.
 
-Still merged as one outcome in the port, because there is no black-hole cell
-yet. The moment there is, roll 3 splits off, and `core/trek.c` carries that
-note at the return rather than on a list.
+**Split 2026-08-28**, the day the black-hole cell arrived: roll 1 is
+`RAY_MISFIRE` and roll 3 is `RAY_MISFIRE_HOLES`. They still print the same
+line, because the original does -- the player is not told which they got, and
+the holes are invisible.
 
 
 ## Still to read, reopened 2026-08-28

@@ -736,6 +736,29 @@ static void report_move(uint8_t r) {
     switch (r) {
         case MOVE_OK:
             break;
+        /* A BLACK HOLE IS NOT A BLOCK. The ship went IN -- see core/trek.h --
+           and either came out somewhere else entirely or did not come out.
+           The original prints one line and then the other half of it, which
+           is why these read as a sentence continued. */
+        case MOVE_HOLE_THROWN: {
+            uint8_t k;
+            ui_message(S(S_52), S(S_294));
+            k  = put_str(linebuf, S(S_295));
+            k += put_u16(linebuf + k, (uint16_t)(ship.quad_y + 1));
+            linebuf[k++] = '-';
+            k += put_u16(linebuf + k, (uint16_t)(ship.quad_x + 1));
+            linebuf[k++] = '.';
+            linebuf[k] = 0;
+            hole_threw = 0;
+            ui_message(S(S_52), linebuf);
+            snd_effect(SFX_D);
+            break;
+        }
+        case MOVE_HOLE_LOST:
+            ui_message(S(S_52), S(S_294));
+            ui_message(S(S_52), S(S_296));
+            snd_effect(SFX_D);
+            break;
         case MOVE_BLOCKED: {
             /* MEASURED: the original names the cell, and the ship has already
                moved -- it is standing in the sector before this one. Its
@@ -1092,6 +1115,11 @@ OVL_CODE("cmds") static void do_ray(void) {
             ui_dialog_line(S(S_285));
             snd_effect(SFX_D);
             break;
+        /* RAY_MISFIRE and RAY_MISFIRE_HOLES print the SAME line, because the
+           original does: rolls 1 and 3 both reach "Death ray misfires." and
+           only one of them fills the quadrant with black holes. The player is
+           not told which they got, and the holes are invisible -- the
+           ui_draw_all() below is the only sign anything happened. */
         default:
             ui_dialog_line(S(S_279));
             break;
@@ -1425,6 +1453,9 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             break;
         case TORP_THROUGH:
             ui_dialog_line(S(S_246));
+            break;
+        case TORP_SWALLOWED:
+            ui_dialog_line(S(S_297));
             break;
         /* fn 0xB094, both lines and in this order. The torpedo is gone. */
         case TORP_CLOAKED:

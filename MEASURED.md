@@ -5131,8 +5131,9 @@ range. Both belong in the next measurement.
     else          "Torpedo deflected by black hole."  and the caller
                   SWAPS dy AND dx
 
-A 90-degree mirror about the diagonal. Not built -- this core has no black
-hole cell -- but it is now specified.
+A 90-degree mirror about the diagonal. **BUILT 2026-08-28**, and it reuses
+`TORP_DIRECT_Q` -- the 0.3 here is the same threshold, and the same constant,
+as a direct hit's.
 
 ### NOT BUILT: what a star really does
 
@@ -5432,10 +5433,10 @@ which is also where the four enemy-strength formulas live. At 0x016525:
     if (Random(64) < 16)  put a black hole in a free sector
 
 **One quadrant in four gets exactly one black hole**, and the sector is chosen
-by the same free-sector helper (fn 0x01857E) everything else uses. Unbuilt --
-this core has no black hole cell -- but between this, the MOVE interaction
-already decoded (1 in 5 fatal) and the torpedo interaction (swallowed under
-0.3, otherwise dy and dx are SWAPPED), the whole feature is now specified.
+by the same free-sector helper (fn 0x01857E) everything else uses. **BUILT
+2026-08-28** -- the placement, the MOVE interaction (1 in 5 fatal, otherwise
+thrown across the galaxy), the torpedo interaction (swallowed under 0.3,
+otherwise dy and dx SWAPPED) and the DEATH RAY's roll 3, which makes them.
 
 ### Stars, and why a destroyed one stays destroyed
 
