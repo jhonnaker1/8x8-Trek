@@ -6358,11 +6358,36 @@ attacked...", " casualties.", "energium successfully mined.", "Nothing
 found." So supplies are captured by LANDING, not by destroying a supply ship.
 
 The condition is `[0x24A9 + quadrant] > 20`, a byte-per-quadrant array
-(stride 8). Setup writes `Random(3) + 1` into it at 0x00531D and then writes
-it twice more at 0x005368 and 0x0053AC. **What raises it past 20 is not
-read**, so the trigger is not built: this core would have to invent the
-predicate, which is the one thing it does not do. The mechanic above is
-complete and waiting on that single decode.
+(stride 8). ~~**What raises it past 20 is not read**~~
+
+**IT WAS ALREADY READ, ON 2026-08-26, AND THIS FILE DID NOT KNOW.**
+`core/planet.h` has carried the generation law -- the +10/+20 branches and
+their exclusivity -- since the planet model was built. The open item here was
+a stale duplicate of a question already answered two days earlier, and it sat
+on the read list being counted as work. Grep for the CLAIM, not the file.
+
+What IS new from 2026-08-28 is the second half: **nothing raises it at
+runtime, and the only runtime writes LOWER it.** For the record, generation at
+0x0052FD:
+
+    if ([0x24A9+q] != 0)      skip            ; one planet per quadrant
+    class = Random(3) + 1                     ; 1..3, stored as-is
+    if (class <= Random(5))   += 10           ; 0x005356
+    else if (Random(2) == 0)  += 20           ; 0x00539A, one in two
+
+The two branches are EXCLUSIVE -- `ja` at 0x005341 skips the +10 and lands on
+the Random(2) test. So the byte is `class + 0`, `class + 10` or `class + 20`,
+which is why the code tests `> 20` and `> 10` rather than equality: the units
+digit is the planet's CLASS and the tens digit is what is on it.
+
+**And the only runtime writes LOWER it.** 0x00E88F and 0x00E905, both in the
+landing code, are the same instruction: `[0x24A9+q] = value mod 10`. That
+strips the tens digit and keeps the class -- which is exactly `PF_TAKEN` in
+this port's planet.h, arrived at independently.
+
+So the trigger needed no invented predicate and never did -- and the port has
+been right about this since 2026-08-26. The find is rolled when the galaxy is
+made, and collecting it clears the tens digit.
 
 ## `fn 0x23FD2` is not the INFO display
 
@@ -6869,3 +6894,35 @@ An empty quadrant has nothing to block with. The chart is at DS:0x2560, stride
 16, and empty quadrants demonstrably exist (one was found at 8,3 in an earlier
 session). Nothing in the port depends on the answer yet; the mechanic is
 unbuilt either way.
+
+
+## What HAIL schedules: the StarBase's reply is DELAYED (2026-08-28)
+
+The last thing `fn 0x207FD` does, and the last entry on the read list. Slot
+[0x1D78] is the StarBase's ANSWER, arriving after travel time:
+
+    v = 8.0                                   ; 0x020816, the "none found"
+                                              ; sentinel -- and it is the
+                                              ; port's HAIL_START_Q 64, squared
+    for each StarBase in the box:  v = min(v, sqrt(dy^2 + dx^2))   ; 0x020958
+    if (v >= 8.0)   nothing is scheduled      ; 0x02002C..0x020A31
+    [0x1D78] = stardate + (v - 1.0) * 0.5     ; 0x020A65
+
+and when the clock reaches it, at 0x0206AD:
+
+    "COMMUNICATIONS:  The StarBase in R-C is responding to our hail."
+    [0x1D78] = 9999.0                         ; 0x02071D, back to never
+
+**So a hail is a radio call with a light-lag.** The immediate reply only says
+the frequencies are open; the base's actual response arrives half a stardate
+per quadrant of distance later, minus a half. A base two quadrants off answers
+in 0.5 stardates; one at the edge of the box takes about 2.3.
+
+The 8.0 sentinel doubles as the range gate, which is why nothing is scheduled
+when no base was found -- v is still 8.0 and the compare fails. This port
+already carries that number as `HAIL_START_Q 64`, in squared form, from the
+2026-08-27 read; the constant was right and its second job was not known.
+
+**Unbuilt.** It wants a third schedule slot, an EV_ kind and one message, and
+it is the only one of the original's eight slots this core has a use for and
+lacks.

@@ -142,6 +142,12 @@ extern const char planet_class_letter[PCLASS_COUNT];
  *     if (class <= Random(5))      byte += 10     ; energium
  *     else if (Random(2) == 0)     byte += 20     ; Mongol supply station
  *
+ * AND NOTHING RAISES IT AGAIN. Read 2026-08-28: the only writes outside
+ * generation are 0x00E88F and 0x00E905, both in the landing code and both
+ * the same instruction -- `byte = byte mod 10`, stripping the find and
+ * keeping the class. That is PF_TAKEN, which this file arrived at without
+ * knowing the original does it in the same byte.
+ *
  * **THE FIND DEPENDS ON THE CLASS**, with class as 1=M, 2=N, 3=O:
  *
  *     class M   energium 4/5   Mongol 1/10   nothing 1/10

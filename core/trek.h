@@ -1732,11 +1732,28 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * and the sqrt is not needed on a 6502. 2.0 becomes 4, and the 8.0 the
  * original starts from becomes 64.
  *
- * NOT BUILT, and deliberately: the routine ends by writing schedule slot
- * [0x1D78] with `stardate + something * 0.5` (0x020A65). That is one of the
- * original's eight slots and this core has two. Hailing evidently schedules
- * SOMETHING; what it is has not been read, and a slot is not worth inventing
- * for the second time this week. */
+ * WHAT IT SCHEDULES, read 2026-08-28: THE BASE'S REPLY, DELAYED.
+ *
+ *     v = 8.0                                  ; "none found", and the gate
+ *     for each base in the box: v = min(v, sqrt(dy^2 + dx^2))
+ *     if (v >= 8.0)  nothing                   ; no base, no reply
+ *     [0x1D78] = stardate + (v - 1.0) * 0.5    ; 0x020A65
+ *
+ * and when the clock reaches it, 0x0206AD prints "COMMUNICATIONS:  The
+ * StarBase in R-C is responding to our hail." and puts the slot back to
+ * 9999.0.
+ *
+ * So a hail is a radio call with a light-lag: the immediate answer only says
+ * the frequencies are open, and the base's actual response arrives half a
+ * stardate per quadrant of distance later, less a half. That is why HAIL
+ * costs no time -- the waiting is the mechanic, not the sending.
+ *
+ * HAIL_START_Q below is that same 8.0, squared, and was read a day earlier
+ * without knowing it had a second job.
+ *
+ * STILL NOT BUILT: it wants a third schedule slot, an EV_ kind and one
+ * message. It is the only one of the original's eight slots this core both
+ * lacks and has a use for. */
 #define HAIL_BOX             4   /* quadrants searched either way */  /*@BINARY*/
 #define HAIL_RANGE_Q         4   /* 2.0 quadrants, SQUARED */  /*@BINARY*/
 #define HAIL_START_Q        64   /* the original's 8.0, squared */  /*@BINARY*/
