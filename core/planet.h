@@ -190,11 +190,12 @@ extern const char planet_class_letter[PCLASS_COUNT];
 
 #define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */  /*@ID*/
 #define PF_TAKEN       0x02      /* the find has been collected or evacuated */  /*@ID*/
-/* A settlement that was not relieved in time. Nothing sets this yet: the
-   scheduled evacuation event ("Planet Gallista-8, quad 8-4, requests
-   evacuation. They can only hold out until 3516.5.") is a separate job, the
-   twin of SCHED_BASE_ATTACK. The flag and the ruined-settlement scan line
-   exist so that job is a schedule slot and a message, not a model change. */
+/* A settlement that was not relieved in time. The scheduled evacuation event
+   ("Planet Gallista-8, quad 8-4, requests evacuation. They can only hold out
+   until 3516.5.") IS built -- SCHED_DISTRESS and EV_DISTRESS, 2026-08-27 --
+   and it is what arms planet_evac_end. It landed as a schedule slot and a
+   message with no model change, which is what this flag and the
+   ruined-settlement scan line were put here for. */
 /* NO PF_RUINED. A settlement being "destroyed" is not a stored flag: ORBIT
    computes it live, comparing the stardate at [0x1D42] against the deadline
    at [0x1DA2] and inserting "destroyed " when the deadline has passed.

@@ -567,8 +567,8 @@ Still open from those runs:
   found by LAND raises `ship.rescues` and the sheet reads it at
   `SCORE_PER_RESCUE`. What counts as a rescue is this port's answer, not a
   measured one: one per settlement taken off, and the SCHEDULED distress
-  signal that names a planet and a deadline is still unbuilt -- see the
-  planet-chain notes.
+  signal that names a planet and a deadline is BUILT -- SCHED_DISTRESS and
+  EV_DISTRESS, since 2026-08-27.
 - **Boarding-party frequency and duration.** The mechanic is in the string
   table; the numbers need elapsed play.
 - **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
@@ -1252,9 +1252,12 @@ READ 2026-08-27, moved off the list below:
                                     all three refill the life support RESERVE
                                     [0x1D30] to 2.0 stardates.
 
-STILL TO READ, with the open item each would close. FIVE ROUTINES, and every
-one of them is a FEATURE this core does not have -- there are no constants
-left to find:
+~~STILL TO READ~~ **THE READ LIST IS EMPTY, and closed 2026-08-28.** Every
+entry below is READ and every one is BUILT. It is kept as the record of what
+each turned out to be -- six of the seven had the WRONG LABEL in the routine
+map, which is why "name a routine from its strings before believing any
+label" is a rule now. There are no constants left to find and no routines
+left on this list:
 
     0x15D6E   -  THE BOARDING PARTY  READ 2026-08-27, and the map had it as
                                     "department damage", which it is not --
@@ -1281,15 +1284,15 @@ left to find:
                                     interference.", "...open... StarBase in
                                     R-C responds." and "...open... No
                                     response." It ends by writing schedule
-                                    slot [0x1D78]. UNBUILT but no longer
-                                    unlocated.
+                                    slot [0x1D78]. BUILT -- and it COSTS NO
+                                    TIME, which took Jamie two catches.
     0x181E8   -  SUPPLY CAPTURE     READ 2026-08-27. 1 in 4 gives nothing;
                                     otherwise items 1..3 at 2/3, 2/4, 2/5 and
                                     life support +2 always. Reached from the
                                     LANDING PARTY, fn 0x0E3A1. THE TRIGGER IS
                                     KNOWN and was never unread: [0x24A9+q]>20
                                     is `find == PFIND_MONGOL`, which planet.h
-                                    has had for days. BUILDABLE now.
+                                    has had for days. BUILT.
     0x0E3A1   -  LANDING PARTY      named 6/6 while chasing the above.
     0x15F51   -  INITIAL QUADRANT   READ 2026-08-27. NOT "Union wreckage" --
                                     SIXTH wrong label here. Clears the sector
