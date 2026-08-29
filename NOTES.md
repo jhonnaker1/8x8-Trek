@@ -5190,13 +5190,27 @@ short by a little over a hundred rather than by a mile.
 Note also that planet, cmds and front are nearly FULL while repair and title
 are nearly empty. New overlay work needs rebalancing, not merely space.
 
-### The real uncertainty is not the mechanics
+### ~~The real uncertainty is not the mechanics~~ -- the table was already built (swept 2026-08-29)
 
-It is **the manual's per-system effect table**, which MEASURED.md calls the
-largest specified-but-unbuilt body of work in the project. It is dozens of
-small rules spread across command handlers rather than one feature, and
-several of those handlers sit in the two nearly-full windows. It has not been
-costed and cannot be until it is read properly.
+It was said to be **the manual's per-system effect table**, which MEASURED.md
+called the largest specified-but-unbuilt body of work in the project: dozens
+of small rules across command handlers, uncostable until read properly.
+
+**Asked to cost it, and the answer is that it costs nothing, because it is
+built.** All twelve rows have an accessor in `core/trek.c` and a live caller
+-- the call sites are listed in MEASURED.md. The single exception is half of
+the computer's row: auto-nav at 100% is enforced, chart entries being lost and
+needing a re-scan is not, and that already has its own line on the build list
+at ~60 bytes.
+
+**THE LESSON IS ABOUT LOAD-BEARING CLAIMS.** This one was the project's
+standing answer to "what is the largest thing left", so it was quoted forward
+into this file, into the memory budget and into a verdict about whether the
+C128 still holds the game -- and never re-derived. It had gone stale
+incrementally, one accessor at a time, with no single commit that would have
+prompted anyone to revisit it. **The claims most worth re-checking are the
+ones other conclusions rest on**, precisely because their being quoted is what
+stops them being read.
 
 ### Verdict
 

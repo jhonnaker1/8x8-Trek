@@ -2992,12 +2992,40 @@ word does not appear), **tractor beams**, the **laser heat band's numbers**
 gate**, and the **enemy-count-per-level formula** ("higher levels must contend
 with more enemy ships"). Those stay measurement work.
 
-### The big one: eleven of twelve systems take damage that does NOTHING
+### ~~The big one: eleven of twelve systems take damage that does NOTHING~~ BUILT (swept 2026-08-29)
 
-The manual specifies an effect for every system. The port models all twelve
-repair percentages, draws them on SYSTEMS STATUS, and repairs them -- and
-`sys[SYS_CONVERTER]` is **the only one any rule consults**. Everything below is
-documented and unimplemented:
+**ALL TWELVE ROWS ARE BUILT, and one rule out of the table is not.** Every
+accessor below exists in `core/trek.c` and every one has a live caller --
+verified by walking the call sites, not by reading this heading:
+
+    trek_max_warp        trek.c:1092   <- trek.c:1139 (the warp gate)
+    trek_impulse_ok      trek.c:1100   <- trek.c:1373
+    trek_tubes_available trek.c:1104   <- main.c:1561
+    trek_srscan_level    trek.c:1112   <- ui.c:125
+    trek_lrscan_level    trek.c:1119   <- ui.c:179
+    trek_autonav_ok      trek.c:1126   <- main.c:817, 887, 918
+    trek_transporter_ok  trek.c:1127   <- planet.c:181, main.c:418, 455
+    trek_shuttle_ok      trek.c:1128   <- planet.c:179, main.c:413, 447
+    trek_laser_eff       trek.c:1130   <- trek.c:1724, ui.c:572-573
+
+plus the converter at `trek.c:477`, the shield efficiency as the second
+`scale_pct` at `trek.c:1889-1890`, `LIFE_RESERVE_MAX_TENTHS` = 20 for the
+manual's two days, and the shuttle's 0.2-stardate round trip at
+`planet.c:197`.
+
+**THE ONE ROW STILL OPEN IS HALF OF THE COMPUTER'S.** Auto-nav at 100% is
+built; **chart entries being lost and needing a re-scan is not** -- there is
+no `chart_erase` anywhere. That rule is already on the build list under its
+own name (chart erasure, ~60 bytes together with reinforcements), so the
+table below costs **nothing additional**.
+
+**This heading survived being wrong for a while, and it is worth saying why.**
+It was the project's standing answer to "what is the largest thing left", so
+it got QUOTED rather than re-checked -- into NOTES.md, into the memory budget,
+and into a verdict about whether the port still fits. A claim that is load
+bearing is the one most worth re-deriving. See the note in NOTES.md.
+
+The original text follows, as the specification it still is:
 
 | system | documented effect |
 |---|---|
