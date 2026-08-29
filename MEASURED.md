@@ -6728,3 +6728,76 @@ messages -- so this is about the instrument, not the game.
 "Life Support damaged. Now at 0%" and the SYSTEMS STATUS panel replaced by
 "LIFE SUPPORT / RESERVE, DAYS" with a bar -- which is what `draw_reserve()`
 does in this port, built from the reading rather than from a screenshot.
+
+
+## THE PLASMA BOLT, read out completely (2026-08-28)
+
+Jamie, reading the screen while an absorption run was producing numbers:
+*"mongol fires a plasma bolt"*. It had been on the "seen but unmeasured" list
+since 2026-08-20 as "a distinct enemy weapon, 619 and 639 unit hits, far above
+anything the laser law produces". It is a great deal more than that.
+
+**It is an OBJECT IN FLIGHT, not a shot.** `[0x1E28]/[0x1E2A]` are its sector,
+`[0x1E2C]/[0x1E2E]` its quadrant, and it persists across turns. Leaving the
+quadrant clears it (0x0165A7).
+
+### Fired -- fn at 0x16CF4
+
+    if ([0x1DF0] < 7)            no bolt    ; V = level+4, so LEVEL 3 AND UP
+    if ([0x1E28] != 0)           no bolt    ; ONE in flight at a time
+    if (Random(100) <= 93)       no bolt    ; 6 in 100, per enemy, per turn
+    if (type != 3 && type != 4)  no bolt    ; battleships and Commanders only
+    [0x1E28] = ship sector row + 1          ; aimed WHERE YOU ARE NOW
+    [0x1E2A] = ship sector col + 1
+    [0x1E2C], [0x1E2E] = the quadrant
+
+Scouts and supply ships never fire one. The warning message is
+"WARNING:  Mongol at R-C fires plasma bolt." -- its own line, before the hit.
+
+### Detonated -- fn 0x1658F
+
+    if (not our quadrant)     the bolt is cleared
+    if ([0x26E1] != 0)        nothing            ; the PLASMA BOLT SHIELD
+    d    = sqrt(dy^2 + dx^2)                     ; bolt to ship, 0x0165D3
+    dmg  = (90 + Random(10)) * (8 - d)           ; 0x016601..0x01662B
+    if (dmg < 0)              nothing            ; so eight sectors of reach
+    SHIELD CHARGE -= dmg                         ; 0x0166AF, WHOLE
+    "N unit hit from plasma bolt."               ; the same real, 0x0166C5
+
+**It takes the charge whole.** No absorption split, no 0.8 -- the operator at
+0x0166AF is the same call proved to be subtraction at 0x017064, where
+`shields -= absorbed * 0.8` is built. Main energy is not touched at all.
+
+**AIMED WHERE YOU WERE, WHICH MAKES MOVEMENT THE COUNTER.** The bolt takes the
+ship's sector at the moment it is fired and the damage falls off with your
+distance FROM THAT POINT, reaching zero at eight sectors. Sitting still takes
+the full `90..99 x 8`; moving away is worth about a hundred points a sector.
+That is a real tactical rule and it is the first one in this game that rewards
+manoeuvring rather than shooting.
+
+### Confirmed against the rig, on data taken before the routine was read
+
+Five bolts landed during the absorption run and were solved out of the pool
+readings on the model "the bolt lands first and takes the charge whole, then
+the ordinary shot is absorbed at the REDUCED charge":
+
+    solved damage   606  613  639  645  652        (screen record: 619, 639)
+
+The photographed one solves to **638.8 against a printed 639** -- 0.03% -- and
+639 / (8 - sqrt(2)) = **97.03**, where the roll is an integer 90..99. The law
+reproduces the screen exactly at d = sqrt(2) with a roll of 97.
+
+### Still unread, and it is small
+
+The "Plasma bolt failed to detonate." branch, whether the detonation also
+damages ENEMIES near it (NOTES has recorded since 2026-08-20 that it "can kill
+several Mongols at once", which this routine does not obviously do), and how
+`[0x26E1]` is set and spent -- it is the captured `ITEM_PLASMA_SHIELD`, and
+"Raising plasma bolt shield..." at 0x097BA belongs to using it.
+
+### UNBUILT
+
+The port has no bolt object, so nothing here is implemented. It wants what the
+death pod wanted -- a persistent position and a per-turn roll -- plus one thing
+the core has never had: an object that belongs to neither side and whose damage
+depends on where the SHIP has moved to since it was created.

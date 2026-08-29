@@ -4939,6 +4939,15 @@ The list above was declared empty in the morning. By the evening these five
 were open, four of them found by USING the port rather than reading more of
 the binary. None is a constant; all five are mechanisms.
 
+  0. ~~**The plasma bolt.**~~ **READ 2026-08-28**, prompted by Jamie reading
+     "mongol fires a plasma bolt" off the screen mid-measurement. It is an
+     object in flight, fired 6 in 100 by battleships and Commanders at level 3
+     and up, aimed at the ship's CURRENT sector, doing
+     `(90 + Random(10)) * (8 - d)` WHOLE off the shield charge with no
+     absorption split -- so MOVING is the counter. Confirmed against five
+     bolts solved out of the absorption run, one of them photographed and
+     matching to 0.03%. See MEASURED.md. UNBUILT.
+
   1. **What reaches `fn 0x15F51` on quadrant entry.** The one that cost a
      shipped regression. An absolute-address search finds a single caller in
      the new-game setup; the original demonstrably fills a quadrant on every
