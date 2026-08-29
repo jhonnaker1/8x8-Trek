@@ -1779,6 +1779,14 @@ every ship in a quadrant for one figure, and they roam. So any enemy we meet
 may already carry damage from a pod we never saw, and 255 and 320 need no
 explanation beyond that.
 
+> **PARTLY RETRACTED 2026-08-28.** "They roam" has no mechanism in the binary.
+> The pod is placed once and never moves, and the detonation's damage loop
+> walks the CURRENT quadrant's object table -- so it cannot damage ships in a
+> quadrant you are not in. The 626/286/286/286 reading stands as an
+> observation; what it shows is a detonation DURING that visit, not a pod that
+> had "been through before we arrived". 255 was separately explained below as
+> a scout at full strength. See NOTES.md, 2026-08-28.
+
 Hit points are fixed per class. Nothing observed contradicts it, and the one
 thing that appeared to has a mechanism.
 
@@ -2073,10 +2081,15 @@ unmeasured hit-point constant.
 Both readings that had ever looked anomalous are accounted for. **255 was a
 scout at full strength**, not a damaged battleship as this file previously
 guessed. The scattered values -- 610, 535, 345, 320, 230 -- are Vandal Death
-Pod damage, which hits every ship in a quadrant by the same amount and roams
-between them, so any enemy may already be carrying some when we arrive. That
+Pod damage, which hits every ship in a quadrant by the same amount. That
 mechanism was watched directly: four enemies reading 626, 286, 286, 286, each
 exactly 69 below their class figure.
+
+> **CORRECTED 2026-08-28.** This used to end "and roams between them, so any
+> enemy may already be carrying some when we arrive". The detonation damages
+> only the quadrant you are standing in, so the damage is picked up while you
+> watch, not before you arrive. The readings are unaffected; the inference
+> about unseen quadrants is withdrawn.
 
 **The docked repair rate** -- 2.35x, not the ancestor's 4x. Refuted.
 
@@ -6575,3 +6588,22 @@ closed.** Two constants move MEASURED -> BINARY.
 The band test asserted 661..771. Nine of these eighteen shots were at exactly
 its range and came back 851.4 to 953.0 -- every one of them outside what the
 suite was asserting. It now asserts 826..964, which brackets them.
+
+
+## The death pod, read out completely (2026-08-28)
+
+The full read is in NOTES.md. Three things in this file depended on the old
+model and are corrected there and above:
+
+1. **"Pods roam."** They do not. One pod, placed once, never moving; the
+   detonation is a galaxy-wide roll whose damage lands on the quadrant you are
+   in. Every reading in this file that CORRECTED for pod damage stays valid --
+   a pod hitting us and every enemy for one figure is exactly what the binary
+   does, and it is why the enemy's hit points measure the pod for us.
+2. **"A pod had been through before we arrived."** Withdrawn as an inference.
+3. **It can be killed, and killing it is worth nothing.** Lasers only, 900
+   points, and 0x01E9BE jumps clear of the scoring. A torpedo aimed at it is
+   answered with a cloaking device and spent. That asymmetry is worth knowing
+   before the next fire run: **a torpedo run in a quadrant holding an 'R' will
+   lose torpedoes to a target that cannot be damaged**, and nothing in the
+   port's own message log would have explained it before today.

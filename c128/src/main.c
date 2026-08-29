@@ -131,6 +131,9 @@ static const char *enemy_name(unsigned char c) {
         case SEC_COMMAND: return S(S_137);
         case SEC_SCOUT:   return S(S_157);
         case SEC_SUPPLY:  return S(S_158);
+        /* 0x0095A in the original's own list of hit-message subjects, which
+           runs Mongol, Commander, Base, Scout, Supply ship, Vandal. */
+        case SEC_POD:     return S(S_290);
         default:          return S(S_159);
     }
 }
@@ -631,8 +634,12 @@ static void do_lasers(void) {
         return;
     }
 
+    /* The pod counts as something to shoot at, or the command refuses before
+       the loop below ever sees it. This guard and that loop have to agree
+       about what a target is -- they did not, and "NO ENEMY SHIPS HERE" came
+       up with a Vandal on the scan. */
     for (cell = 0; cell < QUAD_CELLS; cell++)
-        if (SEC_IS_ENEMY(sector[cell])) found++;
+        if (SEC_IS_ENEMY(sector[cell]) || sector[cell] == SEC_POD) found++;
 
     if (!found) {
         snd_beep();
@@ -647,7 +654,10 @@ static void do_lasers(void) {
     ui_dialog_open(S(S_95));
 
     for (cell = 0; cell < QUAD_CELLS; cell++) {
-        if (!SEC_IS_ENEMY(sector[cell])) continue;
+        /* The officer asks about the Vandal too. The original walks the
+           quadrant's object table and the pod is IN it -- only the movement,
+           fire and accounting loops skip type 6, and this is none of them. */
+        if (!SEC_IS_ENEMY(sector[cell]) && sector[cell] != SEC_POD) continue;
 
         y = (uint8_t)(cell >> 3);
         x = (uint8_t)(cell & 7);
@@ -676,7 +686,10 @@ static void do_lasers(void) {
                 n += put_str(linebuf + n, enemy_name(what));
                 linebuf[n] = 0;
                 ui_dialog_line(linebuf);
-                if (killed) ui_dialog_line(S(S_50));
+                /* "  Vandal destroyed!" against "  Mongol destroyed!" --
+                   0x00A374 picks between them on the table type. */
+                if (killed) ui_dialog_line(what == SEC_POD ? S(S_291)
+                                                           : S(S_50));
                 /* Past 90 the banks damage themselves and the original says
                    so, with the new percentage. */
                 if (laser_overheated) {
@@ -1406,6 +1419,11 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             break;
         case TORP_THROUGH:
             ui_dialog_line(S(S_246));
+            break;
+        /* fn 0xB094, both lines and in this order. The torpedo is gone. */
+        case TORP_CLOAKED:
+            ui_dialog_line(S(S_292));
+            ui_dialog_line(S(S_293));
             break;
         case TORP_OK: {
             uint8_t k = put_str(linebuf, S(S_116));

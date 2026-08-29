@@ -8,7 +8,7 @@ uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
 uint8_t gal_nova[GAL_CELLS];
 uint8_t  nova_quad;
-uint8_t  pod_here;
+uint8_t  pod_alive;
 uint16_t nova_kills;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
@@ -115,17 +115,11 @@ void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
 
-    /* A Vandal Death Pod, decided on arrival -- the quadrant fill at
-       0x01649D. Column 8 and nowhere else, never once five ships are here,
-       and then four times in ten. It is still a per-quadrant flag rather
-       than the 'R' sector object the original places: the cell, its table
-       type 6 and its immunity to a torpedo are unbuilt. The ROLL and the
-       EFFECT are the original's. */
-    pod_here = 0;
-    if (ship.quad_x + 1 == POD_QUAD_COLUMN
-        && gal_enemies[q] < POD_MAX_SHIPS
-        && trek_rand_n(POD_PLACE_OF_N) > POD_PLACE_ABOVE)
-        pod_here = 1;
+    /* NO POD IS PLACED HERE, and that is the reading, not an omission. The
+       'R' goes in once, in the new-game build -- see place_pod() and the
+       header. Entering a quadrant in the original runs a different fill with
+       no 'R' in it, so leaving the starting quadrant loses the object; this
+       function regenerating the sector loses it the same way. */
 
     /* Arriving relieves a base under siege. This is the ancestor's own rule
        read the other way round: its FBATTAK will not pick a base that is in
@@ -366,6 +360,29 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     planet_new();
 
     trek_enter_quadrant();
+
+    /* THE VANDAL DEATH POD, placed once and only here. The original's roll
+       sits at the end of the new-game quadrant build (0x01649D), after the
+       stars and the ships and the planet, which is where this is too: the
+       free cell it takes is one nothing else wanted.
+
+       Alive is set unconditionally and the placement is not. In most games
+       the flag is true and there is no 'R' anywhere, which is exactly what
+       the binary does -- the detonation reads the flag and never asks where
+       you are. */
+    pod_alive = 1;
+    {
+        uint8_t pq = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+        if (ship.quad_x + 1 == POD_QUAD_COLUMN
+            && gal_enemies[pq] < POD_MAX_SHIPS
+            && trek_rand_n(POD_PLACE_OF_N) > POD_PLACE_ABOVE) {
+            uint8_t cell = trek_free_sector();
+            if (cell != 0xFF) {
+                sector[cell]   = SEC_POD;
+                enemy_hp[cell] = POD_HP;
+            }
+        }
+    }
 
     /* Seed the schedule. The ancestor does the same in its setup, with means
        expressed as fractions of the mission length -- so these are too, which
@@ -908,13 +925,14 @@ static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
-/* The Vandal Death Pod, fn 0x20B38. A per-turn roll on the object sitting in
-   the quadrant, NOT a scheduled event -- see trek.h. */
+/* The Vandal Death Pod, fn 0x20B38. A per-turn roll gated on the pod being
+   ALIVE -- galaxy-wide, not on it being in this quadrant. See trek.h: the
+   binary opens with `cmp byte [0x26E0], 0` and never reads the position. */
 static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t hit;
     uint8_t  cell, odds;
 
-    if (!pod_here) return;
+    if (!pod_alive) return;
 
     /* `cmp [0x1DE6], 6 / jle` on the 1-based column, so 0-based 6 and 7. */
     odds = (uint8_t)(ship.quad_x + 1 > POD_EDGE_COLUMN ? POD_FIRE_OF_N_EDGE
@@ -928,7 +946,8 @@ static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
     ship.shields = (uint16_t)(ship.shields > hit ? ship.shields - hit : 0);
 
     /* Everything else in the quadrant takes the same figure. The pod skips
-       table type 6, which is itself. */
+       table type 6, which is itself -- and SEC_IS_ENEMY excludes SEC_POD, so
+       an 'R' standing in this sector is spared without a special case. */
     for (cell = 0; cell < QUAD_CELLS; cell++) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
         if (enemy_hp[cell] > hit) enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - hit);
@@ -1560,7 +1579,11 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return FIRE_BAD_COORDS;
 
     cell = (uint8_t)((sy << 3) | sx);
-    if (!SEC_IS_ENEMY(sector[cell])) return FIRE_NO_TARGET;
+    /* The pod is a laser target and nothing else is -- see trek.h. It sits
+       outside SEC_IS_ENEMY on purpose, so the one place that may shoot it
+       has to name it. */
+    if (!SEC_IS_ENEMY(sector[cell]) && sector[cell] != SEC_POD)
+        return FIRE_NO_TARGET;
 
     /* The original refuses the shot outright rather than firing what is left
        -- "Captain, we have insufficient energy!" -- and the energy is not
@@ -1616,6 +1639,17 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
     if (dealt < enemy_hp[cell]) {
         enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dealt);
         return FIRE_OK;
+    }
+
+    /* 0x01E9BE: when the destroyed thing is the pod, both flags are cleared
+       and the routine jumps CLEAR of the accounting that follows. No galaxy
+       count, no enemies-left, no scoreboard. Nine hundred points of laser
+       fire buys you the sky back and nothing on the sheet. */
+    if (sector[cell] == SEC_POD) {
+        sector[cell]   = SEC_EMPTY;
+        enemy_hp[cell] = 0;
+        pod_alive      = 0;
+        return FIRE_KILL;
     }
 
     kill_enemy(cell);
@@ -2176,6 +2210,10 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     }
     if (c == SEC_PLANET) return TORP_PLANET;
     if (c == SEC_BASE)   return TORP_BASE_HIT;
+    /* 0x00BE93. The flight stops on the pod and nothing is computed: no
+       graze test, no dud roll, no damage, and the hit points are not even
+       read. The torpedo is already spent. */
+    if (c == SEC_POD)    return TORP_CLOAKED;
 
     /* How far the torpedo passed from the cell's own corner, SQUARED -- see
        trek.h. The early-out on either fraction alone is what keeps the sum

@@ -32,7 +32,18 @@
 #define SEC_COMMAND     6  /*@ID*/
 #define SEC_SCOUT       7  /*@ID*/
 #define SEC_SUPPLY      8  /*@ID*/
+#define SEC_POD         9   /* the Vandal Death Pod, 'R' */  /*@ID*/
 
+/* THE POD IS DELIBERATELY OUTSIDE THIS RANGE, and every loop in the core
+   depends on it. The original keeps the pod in the same object table as the
+   Mongols -- it has a position, hit points and a table type like any of them
+   -- but then excludes it, by that type, from everything the table is walked
+   for: it does not move (0x015436 skips the entry), it does not fire
+   (0x016903 skips it), it is not counted when the galaxy loses a ship
+   (0x01E9BE returns before the accounting), and its own detonation spares it
+   (`cmp [di+0x260F], 6` at 0x020BDD). Four exclusions, so the port makes it
+   not-an-enemy once and gets all four. What it IS still a target for --
+   lasers -- says so at the two places that fire. */
 #define SEC_IS_ENEMY(c) ((c) >= SEC_BATTLESHIP && (c) <= SEC_SUPPLY)  /*@ID*/
 
 /* Base types, as the long-range scanner reports them (manual l.291):
@@ -1162,12 +1173,16 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *  3. **The tractor beam and the death pod are NOT SCHEDULED.** Neither has a
  *     slot. THE TRACTOR IS NOW BUILT PROPERLY -- see TRACTOR_OF_N below, it
  *     is action-triggered inside MOVE -- and its slot is gone from this
- *     enum. The death pod is an OBJECT and is still a scheduled stand-in;
- *     see SCHED_POD_BASE_TENTHS.
+ *     enum. THE DEATH POD IS AN OBJECT TOO, now built as one: a sector cell
+ *     with hit points, plus a galaxy-wide alive flag the per-turn detonation
+ *     reads. Its stand-in slot is gone with the tractor's.
  *
- * FOUR SLOTS THIS CORE DOES NOT HAVE: the hail response, the boarding party,
- * a Union ship's distress call, and the supernova. All four are real events
- * with real slots, and all four are unbuilt.
+ * THE FOUR SLOTS THIS ENUM ONCE LACKED are all answered, and only one of them
+ * turned out to want a slot. A Union ship's distress call has SCHED_DISTRESS.
+ * The hail response costs no time at all and needs nothing. The boarding
+ * party and the supernova are PER-TURN ROLLS in trek_run_events, like the
+ * pod: the original schedules neither. Reading them decided the shape --
+ * three of the four would have been wrong as slots.
  *
  * Deliberately NOT included: the ancestor's snapshot-for-time-warp, deep
  * space probes, and supercommander movement. */
@@ -1196,39 +1211,58 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
 #define SCHED_FALLS_SPAN_TENTHS    20  /*@BINARY*/
 #define SCHED_FIRST_ATTACK_DAYS     4  /* Random(4) WHOLE stardates */  /*@BINARY*/
 
-/* The tractor and the pod, which the original does not schedule at all.
- *
- * THE DEATH POD IS AN OBJECT, NOT AN EVENT -- found 2026-08-26 in the
- * quadrant fill at 0x01649D. On entering a quadrant:
- *
- *     if (ships_here >= 5)          no pod
- *     if (quadrant COLUMN != 8)     no pod          <-- yes, really
- *     if (Random(10) <= 5)          no pod          -- so 4 in 10
- *     place 'R' in a free sector, enemy table type 6
- *
- * It is a sector object with a table entry, which is why a torpedo aimed at
- * it answers "No damage reported." rather than killing it. Rebuilding it that
- * way needs a sector code and its own turn behaviour, so the scheduled
- * stand-in below stays until then -- but it is a stand-in for a mechanic of a
- * completely different shape, not a mistuned interval.
- *
- * The COLUMN 8 condition is extraordinary and is recorded as read: the
- * instruction is `cmp word ptr [0x1DE6], 8` reached from a verified jump
- * target, and [0x1DE6] is the quadrant column everywhere else in the binary.
- * It is the second such quirk in this program -- reinforcements only ever
- * arrive in column 1, which the message text itself confirms. One emulator
- * run flying column 8 repeatedly would settle it; nothing else needs to.
- *
- * These reproduce the means this port has always used, in the uniform form
- * the original uses everywhere else. Replace them, do not tune them. */
 /* ------------------------------------------ THE VANDAL DEATH POD, as it is
  *
- * BINARY 2026-08-27, `fn 0x20B38`, found from its own strings at cs:0x4D14
- * onward under base 0x1BD60. The scheduled stand-in that used to live here is
- * GONE: the pod is not an event with an interval, it is a PER-TURN ROLL on an
- * object sitting in the quadrant.
+ * BINARY 2026-08-27 and 2026-08-28. The pod is not an event with an interval
+ * and it never was: it is a SECTOR OBJECT with a table entry, plus a
+ * galaxy-wide flag that says whether it is still out there.
  *
- *     if (!pod in this quadrant)   nothing            ; [0x26E0]
+ * TWO FLAGS, AND THEY MEAN DIFFERENT THINGS. [0x26DF] is "there is an 'R' in
+ * this quadrant" and [0x26E0] is "the pod has not been destroyed". The
+ * detonation reads the SECOND one and nothing else -- fn 0x20B38 opens with
+ * `cmp byte [0x26E0], 0 / je done` and never looks at where you are. So the
+ * hazard is galaxy-wide, from turn one, whether or not the object was ever
+ * placed anywhere you could reach. [0x26DF] is read at exactly one site,
+ * 0x01C69B, where both arms of the branch store the same colour: it is
+ * vestigial in the shipped binary and this port does not carry it.
+ *
+ * IT IS PLACED ONCE, IN THE STARTING QUADRANT. The only write of 'R' to the
+ * sector map in the whole program is 0x0164D8, inside fn 0x15F51, and that
+ * routine has one caller -- 0x0058AD in the new-game setup, guarded by
+ * `cmp byte [0x1F31], 'Y' / je` so a restored save skips it. Entering a
+ * quadrant later runs a different fill that has no 'R' in it. Read literally:
+ *
+ *     if (ships already placed >= 5)  no pod        ; cmp [0x1DEC], 5
+ *     if (quadrant COLUMN != 8)       no pod        ; cmp [0x1DE6], 8
+ *     if (Random(10) <= 5)            no pod        ; so four in ten
+ *     'R' into a free sector; table type 6; 900 hit points
+ *
+ * so about one game in twenty has a pod you can actually shoot at, and the
+ * other nineteen have a hazard with no counter. THE MANUAL AGREES WITH THE
+ * COLUMN: "The Vandal Empire ... will generally only be found near their own
+ * territory" (l.214-217), and the detonation's own odds are half again
+ * shorter in columns 7 and 8. Column 8 is Vandal space.
+ *
+ * WHAT THE OBJECT DOES, AND WHAT IT REFUSES TO DO:
+ *
+ *   - it never moves and never fires. Both enemy loops fetch the entry's map
+ *     cell and skip it when it reads 'R' -- 0x015436 and 0x016903.
+ *   - a TORPEDO cannot touch it. The torpedo's flight dispatches on the cell
+ *     it stopped in and 'R' goes to fn 0xB094, which prints "Vandal activates
+ *     cloaking device." and "No damage reported.", sets the stop flag and
+ *     ends the shot. The torpedo is spent.
+ *   - LASERS kill it, at 900 hit points (0x01651F). The kill message is
+ *     "  Vandal destroyed!" rather than "  Mongol destroyed!" -- 0x00A374
+ *     picks between the two on the table type.
+ *   - and killing it is NOT a Mongol kill. 0x01E9BE clears both flags and
+ *     jumps clear of the accounting, so the galaxy count, the enemies-left
+ *     total and the scoreboard are all untouched. You get your sky back and
+ *     nothing else.
+ *
+ * THE DETONATION, fn 0x20B38, found from its own strings at cs:0x4D14 onward
+ * under base 0x1BD60:
+ *
+ *     if (the pod is destroyed)    nothing            ; [0x26E0]
  *     n = (quadrant COLUMN > 6) ? 20 : 33             ; 0x020B4C
  *     if (Random(n) != 0)          nothing
  *     hit = Random(50) + 50                           ; 0x020B76, so 50..99
@@ -1236,7 +1270,7 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *     every ship in the quadrant whose table type is NOT 6 loses the same
  *     if (shield charge <= 0)  "Lexington destroyed."  ; 0x020C64
  *
- * FOUR THINGS THIS PORT HAD WRONG:
+ * FIVE THINGS THIS PORT HAD WRONG:
  *
  *   - the damage was `40 + Random(40)`, a band INVENTED around one measured
  *     reading of 59. It is 50..99. That literal never reached a header, so
@@ -1251,21 +1285,28 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *   - **it kills you outright if that takes the charge to nothing.** A ship
  *     with flat shields dies to the first detonation. That is what the code
  *     says and it is why the thing is feared.
+ *   - it was gated on the pod being HERE. It is gated on the pod being
+ *     ALIVE. That correction is the whole reason the object was built: the
+ *     galaxy-wide gate without a way to shoot the thing is a hazard with no
+ *     answer, which is worse than the approximation it replaces.
  *
- * It skips table type 6, which is itself. */
+ * It skips table type 6, which is itself -- SEC_IS_ENEMY does that here. */
 #define POD_HIT_MIN         50  /* Random(50) + 50 */  /*@BINARY*/
 #define POD_HIT_SPAN        50  /*@BINARY*/
 #define POD_FIRE_OF_N       33  /* one turn in 33 */  /*@BINARY*/
 #define POD_FIRE_OF_N_EDGE  20  /* one in 20 where the column is 7 or 8 */  /*@BINARY*/
 #define POD_EDGE_COLUMN      6  /* `cmp [0x1DE6], 6 / jle`, 1-based */  /*@BINARY*/
 
-/* Where it is, from the quadrant fill at 0x01649D -- read 2026-08-26. */
+/* Where it is, from the new-game quadrant build at 0x01649D. */
 #define POD_QUAD_COLUMN      8  /* quadrant column 8 and nowhere else */  /*@BINARY*/
 #define POD_MAX_SHIPS        5  /* none once five ships are present */  /*@BINARY*/
 #define POD_PLACE_OF_N      10  /*@BINARY*/
 #define POD_PLACE_ABOVE      5  /* Random(10) > 5, so four in ten */  /*@BINARY*/
+#define POD_HP             900  /* `mov word [di+0x25F0], 0x384` */  /*@BINARY*/
 
-extern uint8_t pod_here;    /* a Vandal Death Pod is in this quadrant */
+/* [0x26E0]: the pod has not been destroyed. Galaxy-wide, true from the first
+   turn of a new game, and the ONLY thing the detonation looks at. */
+extern uint8_t pod_alive;
 
 /* End of a player's turn, whatever it was. The original sheds 20 points of
    laser heat here, in its main loop, whether or not the turn moved the clock
@@ -1724,6 +1765,10 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
 #define TORP_BAD_COORDS  4  /*@ID*/
 #define TORP_BOARDED     10  /* EnTorp control is held */  /*@ID*/
 #define TORP_NOVA        11  /* the star went supernova */  /*@ID*/
+/* 'R' at 0x00BE93: the flight ends on the pod, fn 0xB094 prints "Vandal
+   activates cloaking device." and "No damage reported.", and the torpedo is
+   spent. No damage is computed and the pod's hit points are not read. */
+#define TORP_CLOAKED     12  /*@BINARY*/
 /* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:

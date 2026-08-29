@@ -2049,38 +2049,75 @@ static void test_torpedo(void) {
         ok(ship.quad_y == 6, "and it never arrives");
     }
 
-    /* --- the Vandal Death Pod, BINARY fn 0x20B38 --- */
+    /* --- the Vandal Death Pod, BINARY fn 0x20B38 and the 0x15F51 build --- */
     {
         TrekEvent ev[8];
         int i;
-        uint8_t col, seen, n;
+        uint8_t seen, n;
         uint16_t lo = 0xFFFF, hi = 0, fired;
 
-        /* PLACED IN COLUMN 8 AND NOWHERE ELSE. */
-        for (col = 0; col < GAL_DIM; col++) {
-            seen = 0;
-            for (i = 0; i < 200; i++) {
+        /* PLACED ONCE, AT NEW GAME, IN COLUMN 8 AND NOWHERE ELSE.
+           trek_new_game picks the starting quadrant itself, so this walks
+           seeds and looks at where the 'R' actually landed rather than
+           forcing a quadrant -- forcing one would test the assignment. */
+        {
+            uint16_t placed = 0, elsewhere = 0, col8 = 0, wrong_hp = 0;
+            uint8_t  cell;
+            for (i = 0; i < 800; i++) {
+                uint8_t here = QUAD_CELLS;
                 trek_new_game(3, (uint16_t)(700 + i));
-                ship.quad_y = 2; ship.quad_x = col;
-                gal_enemies[(2 << 3) | col] = 1;
-                trek_enter_quadrant();
-                if (pod_here) seen = 1;
+                if (ship.quad_x + 1 == POD_QUAD_COLUMN) col8++;
+                for (cell = 0; cell < QUAD_CELLS; cell++)
+                    if (sector[cell] == SEC_POD) { here = cell; break; }
+                if (here == QUAD_CELLS) continue;
+                placed++;
+                if (ship.quad_x + 1 != POD_QUAD_COLUMN) elsewhere++;
+                /* The LITERAL, not POD_HP: an assertion written in terms of
+                   the constant it tests cannot fail when the constant moves,
+                   and this one did not until it was spelled out. */
+                if (enemy_hp[here] != 900) wrong_hp++;
             }
-            if (col == POD_QUAD_COLUMN - 1) ok(seen, "a pod appears in column 8");
-            else if (seen) ok(0, "a pod appeared outside column 8");
+            ok(wrong_hp == 0, "every pod placed carries 900 points");
+            ok(placed > 0, "a new game can start with a Vandal in the sector");
+            ok(elsewhere == 0, "and never outside quadrant column 8");
+            /* Four in ten of the column-8 starts, and the starting quadrant
+               always has room -- trek_new_game only starts you somewhere with
+               no enemies, so POD_MAX_SHIPS never bites here. Wide band: this
+               is checking the roll is a roll, not pinning its rate. */
+            ok(col8 > 0 && placed * 10 > col8 * 2 && placed * 10 < col8 * 6,
+               "about four column-8 starts in ten carry one");
         }
-        ok(1, "and in no other column");
 
-        /* Never once the quadrant is crowded. */
-        seen = 0;
-        for (i = 0; i < 400; i++) {
-            trek_new_game(3, (uint16_t)(700 + i));
-            ship.quad_y = 2; ship.quad_x = POD_QUAD_COLUMN - 1;
-            gal_enemies[(2 << 3) | (POD_QUAD_COLUMN - 1)] = POD_MAX_SHIPS;
-            trek_enter_quadrant();
-            if (pod_here) seen = 1;
+        /* ALIVE FROM TURN ONE, PLACED OR NOT. That is the whole correction:
+           [0x26E0] is initialised true and the detonation reads nothing
+           else. */
+        {
+            uint8_t always = 1;
+            for (i = 0; i < 200; i++) {
+                trek_new_game(3, (uint16_t)(2200 + i));
+                if (!pod_alive) always = 0;
+            }
+            ok(always, "the pod is alive from the first turn of every game");
         }
-        ok(!seen, "and never with five ships already there");
+
+        /* AND THE OBJECT DOES NOT FOLLOW YOU. The original's on-entry fill
+           has no 'R' in it, so leaving loses it; regenerating the quadrant
+           here does the same. */
+        {
+            uint8_t cell, before = 0, after = 0;
+            for (i = 0; i < 800; i++) {
+                trek_new_game(3, (uint16_t)(700 + i));
+                for (cell = 0; cell < QUAD_CELLS; cell++)
+                    if (sector[cell] == SEC_POD) { before = 1; break; }
+                if (!before) continue;
+                trek_enter_quadrant();
+                for (cell = 0; cell < QUAD_CELLS; cell++)
+                    if (sector[cell] == SEC_POD) after = 1;
+                break;
+            }
+            ok(before, "found a game with a pod to leave");
+            ok(!after, "and re-entering the quadrant does not rebuild it");
+        }
 
         /* THE HIT IS 50..99 -- the port's old band was 40..79, invented
            around one reading of 59. Collect the extremes over many turns. */
@@ -2088,7 +2125,7 @@ static void test_torpedo(void) {
         for (i = 0; i < 6000; i++) {
             trek_new_game(3, (uint16_t)(3000 + i));
             clear_quadrant();
-            pod_here = 1;
+            pod_alive = 1;
             ship.shields = 60000;          /* survive, so the loop continues */
             n = trek_run_events(ev, 8);
             { uint8_t k; for (k = 0; k < n; k++)
@@ -2108,7 +2145,7 @@ static void test_torpedo(void) {
             for (i = 0; i < 6000; i++) {
                 trek_new_game(3, (uint16_t)(3000 + i));
                 clear_quadrant();
-                pod_here = 1;
+                pod_alive = 1;
                 ship.shields = 5000; e0 = ship.energy;
                 n = trek_run_events(ev, 8);
                 { uint8_t k, got = 0; for (k = 0; k < n; k++)
@@ -2126,7 +2163,7 @@ static void test_torpedo(void) {
         for (i = 0; i < 6000; i++) {
             trek_new_game(3, (uint16_t)(3000 + i));
             clear_quadrant();
-            pod_here = 1;
+            pod_alive = 1;
             ship.shields = 0;
             n = trek_run_events(ev, 8);
             { uint8_t k, got = 0; for (k = 0; k < n; k++)
@@ -2135,17 +2172,142 @@ static void test_torpedo(void) {
                          break; } }
         }
 
-        /* No pod in the quadrant, nothing happens, ever. */
+        /* A DESTROYED POD NEVER DETONATES AGAIN -- and this is the gate that
+           was wrong: it used to read "is the pod in this quadrant". */
         seen = 0;
         for (i = 0; i < 4000; i++) {
             trek_new_game(3, (uint16_t)(3000 + i));
             clear_quadrant();
-            pod_here = 0;
+            pod_alive = 0;
             n = trek_run_events(ev, 8);
             { uint8_t k; for (k = 0; k < n; k++)
                 if (ev[k].kind == EV_POD_HIT) seen = 1; }
         }
-        ok(!seen, "and no pod means no detonation");
+        ok(!seen, "a destroyed pod never detonates");
+
+        /* AND AN ALIVE ONE DETONATES WHEREVER YOU ARE. Nothing is in the
+           quadrant at all here -- no 'R', no ships. */
+        seen = 0;
+        for (i = 0; i < 4000 && !seen; i++) {
+            trek_new_game(3, (uint16_t)(3000 + i));
+            clear_quadrant();
+            pod_alive = 1;
+            ship.quad_y = 3; ship.quad_x = 0;   /* column 1, far from Vandal space */
+            ship.shields = 60000;
+            n = trek_run_events(ev, 8);
+            { uint8_t k; for (k = 0; k < n; k++)
+                if (ev[k].kind == EV_POD_HIT) seen = 1; }
+        }
+        ok(seen, "and an alive one detonates in an empty quadrant in column 1");
+
+        /* IT SPARES ITSELF and hits everything else. */
+        {
+            uint8_t podcell = (3 << 3) | 3, foecell = (5 << 3) | 5;
+            uint8_t hit = 0;
+            for (i = 0; i < 6000; i++) {
+                trek_new_game(3, (uint16_t)(3000 + i));
+                clear_quadrant();
+                pod_alive = 1;
+                sector[podcell] = SEC_POD;        enemy_hp[podcell] = POD_HP;
+                sector[foecell] = SEC_BATTLESHIP; enemy_hp[foecell] = 5000;
+                ship.shields = 60000;
+                n = trek_run_events(ev, 8);
+                { uint8_t k; for (k = 0; k < n; k++)
+                    if (ev[k].kind == EV_POD_HIT) hit = 1; }
+                if (hit) {
+                    ok(enemy_hp[podcell] == POD_HP,
+                       "its own detonation spares the pod");
+                    ok(enemy_hp[foecell] < 5000,
+                       "and takes the same figure off a Mongol");
+                    break;
+                }
+            }
+            ok(hit, "the spare-itself case was reached");
+        }
+
+        /* A TORPEDO CANNOT TOUCH IT. The shot is spent, the pod is not
+           scratched, and it is still alive. */
+        {
+            uint8_t r, cloaked = 0, tried = 0;
+            uint16_t dmg;
+            for (i = 0; i < 400 && !cloaked; i++) {
+                uint8_t podcell;
+                trek_new_game(3, (uint16_t)(4000 + i));
+                clear_quadrant();
+                ship.sec_y = 0; ship.sec_x = 0;
+                clear_quadrant();
+                podcell = (2 << 3) | 2;
+                sector[podcell] = SEC_POD; enemy_hp[podcell] = POD_HP;
+                ship.torps = 10; ship.shields_up = 0;
+                ship.boarders = BOARD_NONE;
+                tried = 1;
+                r = trek_fire_torpedo(2, 2, &dmg);
+                if (r == TORP_CLOAKED) {
+                    cloaked = 1;
+                    ok(ship.torps == 9, "the cloaked torpedo is still spent");
+                    ok(enemy_hp[podcell] == POD_HP, "the pod is not scratched");
+                    ok(sector[podcell] == SEC_POD, "and it is still there");
+                    ok(pod_alive, "and still alive");
+                    ok(dmg == 0, "and no damage is reported");
+                }
+            }
+            ok(tried, "a torpedo was fired at a pod");
+            ok(cloaked, "and it answered with the cloaking device");
+        }
+
+        /* LASERS KILL IT, AND THE KILL IS WORTH NOTHING. */
+        {
+            uint8_t podcell = (2 << 3) | 2;
+            uint16_t dealt, killed0, left0, gal0;
+            uint8_t q;
+
+            trek_new_game(3, 4321);
+            clear_quadrant();
+            ship.sec_y = 0; ship.sec_x = 0;
+            clear_quadrant();
+            sector[podcell] = SEC_POD; enemy_hp[podcell] = POD_HP;
+            ship.boarders = BOARD_NONE;
+            ship.energy = 60000; ship.laser_heat = 0;
+            for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
+            ok(trek_fire_laser(2, 2, 300, &dealt) == FIRE_OK,
+               "a laser can be aimed at the pod");
+            ok(enemy_hp[podcell] < POD_HP && enemy_hp[podcell] > 0,
+               "and wounds it");
+
+            q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+            killed0 = ship.killed; left0 = ship.enemies_left;
+            gal0 = gal_enemies[q];
+            enemy_hp[podcell] = 100;          /* one shot from dead */
+            ok(trek_fire_laser(2, 2, 4000, &dealt) == FIRE_KILL,
+               "and enough of it destroys the pod");
+            ok(sector[podcell] == SEC_EMPTY, "the cell is cleared");
+            ok(!pod_alive, "the pod is dead galaxy-wide");
+            ok(ship.killed == killed0, "and the kill is not scored");
+            ok(ship.enemies_left == left0, "the Mongols left are unchanged");
+            ok(gal_enemies[q] == gal0, "and so is the galaxy count");
+        }
+
+        /* IT IS NOT AN ENEMY: it never moves and it never fires. */
+        {
+            uint8_t podcell = (2 << 3) | 2;
+            uint8_t moved = 0, fired_at_us = 0;
+            uint16_t sh0;
+            for (i = 0; i < 400; i++) {
+                trek_new_game(3, (uint16_t)(5000 + i));
+                clear_quadrant();
+                ship.sec_y = 6; ship.sec_x = 6;
+                clear_quadrant();
+                sector[podcell] = SEC_POD; enemy_hp[podcell] = POD_HP;
+                pod_alive = 0;                /* no detonation in the way */
+                ship.shields = 60000; sh0 = ship.shields;
+                ship.moved = 0;
+                (void)trek_enemy_turn(ev, 8, 0);
+                if (sector[podcell] != SEC_POD) moved = 1;
+                if (ship.shields != sh0 || ship.energy == 0) fired_at_us = 1;
+            }
+            ok(!moved, "the pod never moves");
+            ok(!fired_at_us, "and never fires");
+        }
     }
 
     /* --- HAIL, BINARY fn 0x207FD --- */

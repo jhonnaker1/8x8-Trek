@@ -617,8 +617,10 @@ because all three are mechanics this port has no part of:
   between visits and the Mongol counter went back UP. That is the mechanic
   behind the "reinforcement warnings" string, and it is distinct from the
   message.
-- **The Vandal Death Pod's numbers.** One 87-unit hit observed, and it is known
-  to hit enemies too. Frequency and damage law unmeasured.
+- ~~**The Vandal Death Pod's numbers.**~~ READ 2026-08-27, not measured:
+  Random(50)+50, one turn in 33 (one in 20 in quadrant columns 7-8). It hits
+  every enemy in the quadrant for the same figure, which is why the enemy's
+  hit points measure it for us.
 
 **Not for the emulator:** item 5's four FITTED constants want `dis16.py`.
 
@@ -1215,7 +1217,8 @@ DECODED so far, with what each gave:
     0x0160xx  -  QUADRANT FILL      black holes 1 quadrant in 4; novas persist
     0x05181   2  enemy count        (level+1)*8 shaved 0..9%, +Random(10), +3
     0x1DD4F   2  THE SCORE SHEET    rate gated on 3 stardates, not on finishing
-    0x1649D   1  the DEATH POD      an OBJECT in the quadrant fill, not an event
+    0x1649D   1  the DEATH POD      an OBJECT in the NEW-GAME fill, not an
+                                    event, and placed ONCE -- see 2026-08-28
     0x1857E   2  free sector        Random(8)+1 twice until the cell is '.'
     0x0D83F   1  TRACTOR BEAM       the trip's bounding rectangle, 2 in 10,
                                     per quadrant holding a COMMANDER
@@ -1269,7 +1272,9 @@ left to find:
                                     1 in 20 where the quadrant column is 7-8.
                                     Random(50)+50 off the SHIELD CHARGE, and
                                     it KILLS if that reaches nothing. Closed
-                                    the last three PROVISIONALs.
+                                    the last three PROVISIONALs. Its gate is
+                                    [0x26E0], "the pod is ALIVE", galaxy-wide
+                                    -- corrected 2026-08-28.
     0x207FD   -  HAIL               found while locating the pod, base
                                     0x1BD60 at 5/5. Its three replies are
                                     "Hailing frequencies blocked by subspace
@@ -1291,9 +1296,8 @@ left to find:
                                     map and builds the first quadrant; ONE
                                     caller, at game start, skipped when
                                     restoring. The death pod placement is
-                                    inside it, which does not square with the
-                                    port's per-entry model -- see MEASURED.md
-                                    and the [0x26E0] experiment.
+                                    inside it, and the port stopped having a
+                                    per-entry model on 2026-08-28. Squares.
     0x23FD2   -  GRAPHICS           NOT the INFO display -- no strings, blits
                                     an image via [0x26C8]. The "MONGOL BASE"
                                     the map attached is at 0x23F90, BEFORE the
@@ -1323,7 +1327,9 @@ than the routine list (2026-08-26):
     turn, saved with the game -- the fixed-slot design exactly. What was
     wrong is the DEVIATE (uniform `base + spread*Random`, not exponential;
     `trek_expran` is gone) and two of the four slots: the tractor beam and the
-    death pod are NOT scheduled in the original. The paragraph below is kept
+    death pod are NOT scheduled in the original. Both are built without a
+    slot now -- the tractor inside MOVE, the pod as a sector object with a
+    per-turn roll (2026-08-28). The paragraph below is kept
     because the reasoning that got here is worth keeping.
 
     **THE EVENT ARCHITECTURE IS DERIVED AND UNVERIFIED, and it is not a
@@ -1412,10 +1418,10 @@ measured by playing). The queue:
     damage spread were both shadows of it. Damage is `(level+4)*15 + 250`,
     which is also a battleship's hit points, at every level.
   * ~~and what is still queued~~ -- THE CONSTANT LIST IS EMPTY. FITTED 0,
-    DERIVED 0, and the three surviving PROVISIONALs are the death pod's
-    scheduled stand-in, whose real shape is known and unbuilt. What is left is
-    FEATURES, not numbers: black holes, the supernova, wear and tear, the
-    chart erasure, the boarding party, reinforcements, the hail response, and
+    DERIVED 0, PROVISIONAL 0 since 2026-08-27. What is left is FEATURES, not
+    numbers, and that list has shrunk too: the supernova, the boarding party,
+    the hail response and the death pod as an object are all BUILT. Still
+    open: black holes, wear and tear, the chart erasure, reinforcements, and
     the enemy fire law in the rest of fn 0x16844
 
 The emulator keeps its job: confirming that a constant read statically
@@ -2780,8 +2786,9 @@ combat, movement, repair, events, docking and scoring. Of what remains open:
 
 - ~~Enemy hit points as rolled bands rather than constants.~~ SETTLED
   2026-08-21: they are fixed per class. Do not port SST's bands. The
-  readings that looked like variation were ships a death pod had already
-  been through.
+  readings that looked like variation were ships a death pod had gone off
+  beside. (Said "had already been through" until 2026-08-28; the pod does not
+  travel -- see MEASURED.md.)
 - Enemy counts per skill, for MEASURED open item 1.
 - `mayday()` as a rough model for `HAIL`, though the semantics differ.
 
@@ -4761,3 +4768,80 @@ gets tight again.
 
 `main` is 6,416 and mostly the command dispatcher plus the handlers that are
 too frequent to move. `fire_one_torpedo` is 2,005 and must not move.
+
+## The Vandal Death Pod is a sector object, and the gate was on the wrong flag (2026-08-28)
+
+The last open discrepancy in the core is closed. The pod is BUILT as an
+object: `SEC_POD`, a cell, 900 hit points, and a galaxy-wide `pod_alive`.
+
+**Six reads settled it, all in `reference/EGATREK_unpacked.exe`.**
+
+    0x0164D8   the ONLY 'R' write in the program; inside fn 0x15F51, whose
+               one caller is 0x0058AD in the new-game setup, guarded by
+               `cmp byte [0x1F31], 'Y' / je` so a restore skips it. The pod
+               is placed ONCE, in the starting quadrant.
+    0x0164E8   its table type: 6.
+    0x01651F   its hit points: `mov word [di+0x25F0], 0x384` -- 900.
+    0x015436   the enemy MOVE loop fetches each entry's map cell and skips
+               it when it reads 'R'.
+    0x016903   the enemy FIRE loop does the same.
+    0x01E9BE   destroy-entry: when the cell is 'R' it clears [0x26DF] and
+               [0x26E0] and jumps CLEAR of the accounting. No galaxy count,
+               no enemies-left, no scoreboard.
+    0x00BE93   the torpedo's flight dispatch sends 'R' to fn 0xB094, which
+               prints "Vandal activates cloaking device." / "No damage
+               reported." and ends the shot. The torpedo is spent.
+    0x00A374   the laser's kill message picks "  Vandal destroyed!" over
+               "  Mongol destroyed!" on the table type.
+    0x0266CB   the short-range shape. Every other drawer takes its colour as
+               an argument -- the Mongol one at 0x02668C passes [bp+6] to
+               SetColor -- and this one pushes a literal 7. The Vandal is
+               always light grey.
+
+**THE GATE WAS WRONG AND IS NOW RIGHT.** `fn 0x20B38` opens `cmp byte
+[0x26E0], 0 / je done` and never reads where you are. [0x26E0] is "the pod has
+not been destroyed", galaxy-wide, true from the first turn. [0x26DF] is the
+per-quadrant "there is an 'R' here" flag and is read at exactly one site,
+0x01C69B, where both arms of the branch store the same colour -- vestigial.
+This port does not carry it; `sector[]` says where the object is.
+
+**WHAT THAT MEANS FOR A GAME.** Column 8 is Vandal space and about one game in
+twenty starts with an 'R' you can shoot at: column 8, fewer than five ships,
+four in ten. The other nineteen have a hazard with no counter, because the
+detonation only needs the flag. The manual says the same thing in prose --
+"The Vandal Empire ... will generally only be found near their own territory"
+(l.214-217) -- and the detonation's odds are half again shorter in columns 7
+and 8. That is the fifth column/row quirk in this program.
+
+**AND THE OBJECT DOES NOT FOLLOW YOU.** The on-entry quadrant fill is a
+different routine with no 'R' in it, so leaving the starting quadrant loses
+the pod for good. That is the binary, not an approximation: this port
+regenerates the quadrant on entry and loses it the same way.
+
+### Three stale lines in this file, corrected rather than left
+
+  * "0x1649D -- an OBJECT in the quadrant fill" is right but incomplete: it is
+    the NEW-GAME fill, called once.
+  * "the death pod placement is inside it, which does not square with the
+    port's per-entry model" -- it squares now. The port stopped having a
+    per-entry model.
+  * "the three surviving PROVISIONALs are the death pod's scheduled stand-in"
+    -- gone since 2026-08-27; the audit reads PROVISIONAL 0. The feature list
+    beside it is also stale: the supernova, the boarding party, the hail
+    response and reinforcements are all built.
+
+### The break test caught the harness before it caught the code
+
+Seven deliberate breaks, and the first pass reported five of them "caught" by
+the same wrong assertion. Two separate faults:
+
+  * **`POD_HP` was asserted against `POD_HP`.** Changing the constant to 500
+    broke nothing, because the check moved with it. It reads `!= 900` now.
+  * **macOS `make` is GNU 3.81, with ONE-SECOND timestamp granularity.** A
+    source rewritten and rebuilt inside the same second is not seen as newer,
+    so every break after the first tested the PREVIOUS binary. The tell was
+    two builds with different sources producing the same SHA-1. `rm -f` the
+    target; do not trust an mtime you wrote a moment ago.
+
+Both faults made a non-discriminating test look like a passing one, which is
+the third and fourth way this harness has done that in a week.

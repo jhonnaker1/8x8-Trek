@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 290
+#define STR_COUNT 294
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -296,6 +296,10 @@
 #define S_287  287   /* all decks: half the crew have */
 #define S_288  288   /* and highly prone to failure. */
 #define S_289  289   /* turned into some kind of mutants! */
+#define S_290  290   /* VANDAL */
+#define S_291  291   /* VANDAL DESTROYED! */
+#define S_292  292   /* VANDAL ACTIVATES CLOAKING DEVICE. */
+#define S_293  293   /* NO DAMAGE REPORTED. */
 
 extern const unsigned int str_offset[STR_COUNT];
 

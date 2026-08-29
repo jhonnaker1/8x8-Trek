@@ -101,6 +101,10 @@ static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
                              return SC_LETTER('S');
         case SEC_SUPPLY:     *color = EGA_TO_VDC(EGA_MONGOL_SUPPLY);
                              return SC_LETTER('P');
+        /* The Vandal Death Pod. Its colour is the one the original hardcodes
+           into the shape itself rather than passing in -- see core/ega.h. */
+        case SEC_POD:        *color = EGA_TO_VDC(EGA_VANDAL);
+                             return SC_LETTER('R');
         default:             *color = COL_GRID;
                              return SC_DOT;
     }

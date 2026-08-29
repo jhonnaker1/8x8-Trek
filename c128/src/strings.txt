@@ -290,3 +290,7 @@
 287	all decks: half the crew have
 288	and highly prone to failure.
 289	turned into some kind of mutants!
+290	VANDAL
+291	VANDAL DESTROYED!
+292	VANDAL ACTIVATES CLOAKING DEVICE.
+293	NO DAMAGE REPORTED.

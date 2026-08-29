@@ -42,4 +42,11 @@
 #define EGA_CHART_MONGOL       EGA_RED     /* quadrants holding Mongols */
 #define EGA_CHART_BASE         EGA_BROWN   /* "orange" in the manual */
 
+/* The Vandal Death Pod, BINARY 2026-08-28. Every other short-range shape
+   takes its colour as an argument -- the Mongol drawer at 0x02668C passes
+   [bp+6] straight to SetColor -- but the Vandal's own drawer at 0x0266CB
+   pushes a literal 7 and has no colour parameter at all. It is the one
+   object on the scanner that is always the same colour. */
+#define EGA_VANDAL             EGA_LTGRAY
+
 #endif
