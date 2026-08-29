@@ -1871,14 +1871,21 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:
  *
- *     Random(100) > 95        4.0%   the star goes SUPERNOVA           UNBUILT
- *     then Random(100) < 40  38.4%   "Torpedo absorbed by star."
+ *     Random(100) > 95        4.0%   the star goes SUPERNOVA           BUILT
+ *     then Random(100) < 40  38.4%   "Torpedo absorbed by star."       BUILT
  *     otherwise              57.6%   the star is DESTROYED, cell -> 'N'  UNBUILT
  *
- * The 57.6% case is where the "Stars destroyed @ -5" scoring line comes from:
- * it increments [0x1DF6] and rewrites the sector map. Both unbuilt cases want
- * things this core does not have (a nova cell type, quadrant destruction), so
- * every star hit currently answers TORP_ABSORBED. See MEASURED.md. */
+ * The SUPERNOVA case was built on 2026-08-27 -- star_supernova() and
+ * TORP_NOVA -- and this comment went on saying UNBUILT for a day, which is
+ * the usual direction of that error.
+ *
+ * ONE CASE LEFT, and it is the majority one: 57.6% of star hits DESTROY the
+ * star, the cell becomes 'N', and [0x1DF6] increments -- which is where the
+ * "Stars destroyed @ -5" scoring line comes from. It wants a nova SECTOR code
+ * (SEC_NOVA), which is a smaller job than it was: SEC_BLACKHOLE arrived on
+ * 2026-08-28 and proved the cell-type seam takes a new member cleanly. Until
+ * then a non-supernova star hit answers TORP_ABSORBED, which is the 38.4%
+ * case standing in for both. See MEASURED.md. */
 #define TORP_ABSORBED    5   /* a star stopped it */  /*@ID*/
 #define TORP_PLANET      6   /* "Torpedo hit a planet." */  /*@BINARY*/
 #define TORP_BASE_HIT    7   /* "Are you mad? You damaged a base!" */  /*@BINARY*/
