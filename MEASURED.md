@@ -6177,12 +6177,12 @@ always going to close them.
 Resident free went UP, 1,452 -> 1,726: deleting the scheduled stand-in cost
 more than the real roll. Save v9, 553 bytes.
 
-### What is still unbuilt here
+### ~~What is still unbuilt here~~ BUILT 2026-08-28
 
-The pod as a SECTOR OBJECT. It is a per-quadrant flag; the original puts an
-'R' in a cell with enemy-table type 6, which is why a torpedo aimed at it
-answers "No damage reported." The roll and the effect are the original's; the
-cell is not there yet.
+The pod as a SECTOR OBJECT: `SEC_POD`, 900 hit points, killed by lasers only
+and never counted as a Mongol kill, with a torpedo answering the cloaking
+device. And the detonation's gate moved from "the pod is HERE" to "the pod is
+ALIVE", galaxy-wide, which is what the object was built to make survivable.
 
 ### A test retired rather than faked
 
@@ -6282,7 +6282,7 @@ just their fire.
 That is a real tactical rule the port did not have, and it explains the
 measured "about half" exactly: those samples were taken while flying about.
 
-### The one thing left unbuilt
+### The one thing left unbuilt -- and it was settled the next day
 
 `[0x1F31]` is one of the setup screen's two Y/N answers -- `fn 0x14CB9` asks
 "Will you require a briefing <Y/N>?" and "Restore a saved game <Y/N>?", and
@@ -6741,7 +6741,8 @@ bolt, a 3.20 turn does not. The captured outlier reads
 with E = 87.50 -- the ordinary shot's through figure exactly. **The plasma
 bolt drained NO energy at all**; the shields took all of it, ~442 off the
 charge for a printed 639. It is a separate weapon with a separate damage path,
-already on record as 619 and 639 unit hits, and it is UNBUILT in this port.
+already on record as 619 and 639 unit hits. BUILT 2026-08-28, later the
+same day this was written.
 One capture is not a law; what it establishes is that the ordinary-shot
 measurement above is clean once plasma turns are excluded, and that the bolt
 needs its own designed run.
@@ -6838,12 +6839,22 @@ several Mongols at once", which this routine does not obviously do), and how
 `[0x26E1]` is set and spent -- it is the captured `ITEM_PLASMA_SHIELD`, and
 "Raising plasma bolt shield..." at 0x097BA belongs to using it.
 
-### UNBUILT
+### ~~UNBUILT~~ BUILT 2026-08-28
 
-The port has no bolt object, so nothing here is implemented. It wants what the
-death pod wanted -- a persistent position and a per-turn roll -- plus one thing
-the core has never had: an object that belongs to neither side and whose damage
-depends on where the SHIP has moved to since it was created.
+`bolt_cell` / `bolt_quad`, fired in `trek_enemy_turn`'s fire loop and
+detonated by `run_bolt` before it. It needed what the death pod needed -- a
+persistent position and a per-turn roll -- plus the thing the core had never
+had: an object belonging to NEITHER SIDE whose damage depends on where the
+ship has moved to since it was created.
+
+Verified on the C128: a bolt one sector away gave "DAMAGE: 651 UNIT HIT FROM
+PLASMA BOLT.", shields 2500 -> 1849 and energy unmoved, against a predicted
+band of 630..693.
+
+**The roll comes BEFORE the type test** and this port had it the other way
+round for a minute. The suite caught it on an unrelated MEASURED rule -- a
+supply ship and a Commander with equal hit points must fire for equal damage,
+and they stopped doing so the moment the stream depended on class.
 
 
 ## The warp engines break on DISTANCE, and the message says "speed" (2026-08-28)
