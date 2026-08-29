@@ -635,8 +635,15 @@ void ui_draw_viewer(void) {
        STANDARD ORBIT 301, POWER DISTRIB 509, SHIP STATUS 501, GRAV FIELD
        502, ARRAY MONITOR 504, STRUC INTEGRITY 505, PLANET LIST 601 and 602.
        So the viewer is a paged instrument display and STANDARD ORBIT is the
-       page it shows while orbiting. This port draws that one page; the rest
-       are decoration for a screen this port does not have room to cycle.
+       page it shows while orbiting. This port draws that one page.
+
+       THE OTHER EIGHT ARE DEFERRED, NOT DECORATION -- Jamie's call
+       2026-08-29, and the earlier wording here was wrong to imply otherwise.
+       They carry live data: POWER DISTRIB 509 arrives with its own layout,
+       the three energy pools at their maxima. What rules them out is this
+       machine's resident budget and a twenty-column panel, and neither binds
+       on a roomier target. Also unread: what CYCLES the pages. Orbit selects
+       301; nothing has been measured about what selects the rest.
        The orbit page wins over the enemy silhouette because being in orbit
        is the rarer state and the one the player just asked for. */
     if (ship.orbiting != PLANET_NONE) {

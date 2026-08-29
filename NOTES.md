@@ -1806,8 +1806,19 @@ change: enter orbit and the MAIN VIEWER stops showing the nearest enemy and
 shows the page the original shows, with the planet's name and class under it.
 It is a mechanic the port had no idea existed a day ago.
 
-The other eight pages are not built. There is no measurement of how the
-original cycles them.
+**The other eight pages are DEFERRED TO ROOMIER TARGETS, not dropped --
+Jamie's call, 2026-08-29.** They are real instrument pages carrying live data,
+not scenery: POWER DISTRIB 509 arrives with its own layout (`PMAX PAVL PPCT`
+over the three energy pools at their maxima). What rules them out here is the
+C128's resident budget and a 20-column viewer, neither of which binds on
+MEGA65 or Amiga, where far memory is a plain array and the panel can be wider.
+
+**Whoever builds them inherits an unmeasured mechanism: how the original
+CYCLES pages.** The nine titles and their codes are read (MEASURED.md), and
+STANDARD ORBIT 301 is drawn because orbit selects it. Nothing has been read
+about what selects the other eight -- a key, a rotation, a context like orbit.
+That is a read-list item for the target that builds them, not a C128 one, and
+it is why this is deferred rather than merely unimplemented.
 
 #### Why PLANET LIST is a report and not a viewer page
 
