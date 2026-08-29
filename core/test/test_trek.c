@@ -2049,23 +2049,226 @@ static void test_torpedo(void) {
         ok(ship.quad_y == 6, "and it never arrives");
     }
 
+    /* --- THE PLASMA BOLT, BINARY 0x016CF4 and fn 0x1658F --- */
+    puts("the plasma bolt");
+    {
+        TrekEvent ev5[16];
+        int i;
+        uint8_t k, n5;
+
+        /* FIRED BY WARSHIPS ONLY, and only at level 3 and up. */
+        {
+            uint16_t fired_by[9];
+            uint8_t cls, any_low = 0;
+            for (cls = 0; cls < 9; cls++) fired_by[cls] = 0;
+            for (cls = SEC_BATTLESHIP; cls <= SEC_SUPPLY; cls++) {
+                for (i = 0; i < 900; i++) {
+                    trek_new_game(3, (uint16_t)(700 + i));
+                    clear_quadrant();
+                    ship.sec_y = 4; ship.sec_x = 4;
+                    clear_quadrant();
+                    sector[(2 << 3) | 2] = (uint8_t)cls;
+                    enemy_hp[(2 << 3) | 2] = 400;
+                    bolt_cell = QUAD_CELLS;
+                    ship.moved = 0; ship.lost = 0;
+                    n5 = trek_enemy_turn(ev5, 16, 0);
+                    for (k = 0; k < n5; k++)
+                        if (ev5[k].kind == EV_BOLT_FIRED) fired_by[cls]++;
+                }
+            }
+            ok(fired_by[SEC_BATTLESHIP] > 0 && fired_by[SEC_COMMAND] > 0,
+               "battleships and Commanders fire plasma bolts");
+            ok(fired_by[SEC_SCOUT] == 0 && fired_by[SEC_SUPPLY] == 0,
+               "scouts and supply ships never do");
+            /* Six in a hundred of 900. */
+            ok(fired_by[SEC_BATTLESHIP] > 30 && fired_by[SEC_BATTLESHIP] < 90,
+               "about six turns in a hundred");
+
+            /* Level 1 and 2 never. */
+            for (i = 0; i < 900; i++) {
+                trek_new_game(2, (uint16_t)(700 + i));
+                clear_quadrant();
+                ship.sec_y = 4; ship.sec_x = 4;
+                clear_quadrant();
+                sector[(2 << 3) | 2] = SEC_BATTLESHIP;
+                enemy_hp[(2 << 3) | 2] = 400;
+                bolt_cell = QUAD_CELLS; ship.moved = 0; ship.lost = 0;
+                n5 = trek_enemy_turn(ev5, 16, 0);
+                for (k = 0; k < n5; k++)
+                    if (ev5[k].kind == EV_BOLT_FIRED) any_low = 1;
+            }
+            ok(!any_low, "and never below command level 3");
+        }
+
+        /* THE ROLL IS MADE BEFORE THE TYPE TEST -- 0x016CF4 tests level and
+           the in-flight flag, rolls, and only THEN asks the class. So the
+           stream does not depend on who is in the quadrant. Written the other
+           way round first; the class-vs-damage test caught it. */
+        {
+            uint16_t after_scout, after_battle;
+            uint8_t  cls;
+            uint16_t seen[2];
+            for (cls = 0; cls < 2; cls++) {
+                trek_new_game(3, 5150);
+                clear_quadrant();
+                ship.sec_y = 4; ship.sec_x = 4;
+                clear_quadrant();
+                sector[(2 << 3) | 2] = cls ? SEC_BATTLESHIP : SEC_SCOUT;
+                enemy_hp[(2 << 3) | 2] = 400;
+                bolt_cell = QUAD_CELLS; ship.moved = 0; ship.lost = 0;
+                ship.shields = 30000; ship.energy = ENERGY_MAX;
+                /* RUN THE TURN. An earlier version of this compared the
+                   stream WITHOUT running one, so it could not fail. */
+                (void)trek_enemy_turn(ev5, 16, 0);
+                seen[cls] = trek_rand_n(10000);
+            }
+            after_scout = seen[0]; after_battle = seen[1];
+            ok(after_scout == after_battle,
+               "a scout consumes the same draws a battleship does");
+        }
+
+        /* ONE IN FLIGHT AT A TIME. Needs a CROWDED quadrant: with a single
+           enemy the guard is never reached, which is how it survived the
+           first break run untested. Eight battleships at six in a hundred
+           would put two bolts in the air about one turn in ten without it. */
+        {
+            uint8_t most = 0;
+            for (i = 0; i < 500; i++) {
+                uint8_t c2, this_turn = 0;
+                trek_new_game(3, (uint16_t)(6100 + i));
+                clear_quadrant();
+                ship.sec_y = 4; ship.sec_x = 4;
+                clear_quadrant();
+                for (c2 = 0; c2 < 8; c2++) {
+                    sector[(c2 << 3) | 0] = SEC_BATTLESHIP;
+                    enemy_hp[(c2 << 3) | 0] = 400;
+                }
+                bolt_cell = QUAD_CELLS;
+                ship.moved = 0; ship.lost = 0;
+                ship.shields = 60000; ship.energy = ENERGY_MAX;
+                n5 = trek_enemy_turn(ev5, 16, 0);
+                for (k = 0; k < n5; k++)
+                    if (ev5[k].kind == EV_BOLT_FIRED) this_turn++;
+                if (this_turn > most) most = this_turn;
+            }
+            ok(most == 1, "eight enemies still put at most ONE bolt in the air");
+        }
+
+        /* AIMED WHERE THE SHIP IS, and one at a time. */
+        {
+            uint8_t placed = 0, twice = 0;
+            for (i = 0; i < 900 && !placed; i++) {
+                trek_new_game(3, (uint16_t)(2200 + i));
+                clear_quadrant();
+                ship.sec_y = 3; ship.sec_x = 6;
+                clear_quadrant();
+                sector[(1 << 3) | 1] = SEC_BATTLESHIP;
+                enemy_hp[(1 << 3) | 1] = 400;
+                bolt_cell = QUAD_CELLS; ship.moved = 0; ship.lost = 0;
+                n5 = trek_enemy_turn(ev5, 16, 0);
+                for (k = 0; k < n5; k++)
+                    if (ev5[k].kind == EV_BOLT_FIRED) placed = 1;
+                if (placed) {
+                    ok(bolt_cell == ((3 << 3) | 6),
+                       "the bolt takes the ship's CURRENT sector");
+                    ok(bolt_quad == ((ship.quad_y << 3) | ship.quad_x),
+                       "and remembers the quadrant it was fired in");
+                }
+            }
+            ok(placed, "a bolt was fired");
+            (void)twice;
+        }
+
+        /* IT TAKES THE SHIELD CHARGE WHOLE, and energy is untouched. */
+        {
+            uint16_t e0, s0;
+            uint8_t got = 0;
+            trek_new_game(3, 4242);
+            clear_quadrant();
+            ship.sec_y = 4; ship.sec_x = 4;
+            clear_quadrant();
+            bolt_cell = (uint8_t)((4 << 3) | 5);     /* one sector away */
+            bolt_quad = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+            ship.shields = 3000; ship.energy = ENERGY_MAX;
+            ship.shields_up = 1; ship.moved = 0;
+            e0 = ship.energy; s0 = ship.shields;
+            n5 = trek_enemy_turn(ev5, 16, 0);
+            for (k = 0; k < n5; k++)
+                if (ev5[k].kind == EV_BOLT_HIT) {
+                    got = 1;
+                    ok(ship.energy == e0, "the bolt drains NO energy");
+                    ok(s0 - ship.shields == ev5[k].amount,
+                       "and the shield charge takes it whole");
+                    /* d = 1, so (90..99) * 7 = 630..693. */
+                    ok(ev5[k].amount >= 630 && ev5[k].amount <= 693,
+                       "at one sector it is (90..99) x 7");
+                }
+            ok(got, "a bolt one sector away detonates");
+            ok(bolt_cell >= QUAD_CELLS, "and it goes off exactly once");
+        }
+
+        /* MOVING IS THE COUNTER: damage falls with distance and dies at 8. */
+        {
+            uint16_t near_hit = 0, far_hit = 0;
+            uint8_t d;
+            for (d = 1; d <= 7; d += 6) {
+                trek_new_game(3, 4242);
+                clear_quadrant();
+                ship.sec_y = 0; ship.sec_x = 0;
+                clear_quadrant();
+                bolt_cell = (uint8_t)((0 << 3) | d);
+                bolt_quad = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+                ship.shields = 30000; ship.moved = 0;
+                n5 = trek_enemy_turn(ev5, 16, 0);
+                for (k = 0; k < n5; k++)
+                    if (ev5[k].kind == EV_BOLT_HIT) {
+                        if (d == 1) near_hit = ev5[k].amount;
+                        else        far_hit  = ev5[k].amount;
+                    }
+            }
+            ok(near_hit > 0 && far_hit > 0, "it reaches at one and at seven");
+            ok(near_hit > far_hit * 3,
+               "and moving away is worth about a hundred a sector");
+        }
+
+        /* LEAVING THE QUADRANT LOSES IT -- 0x01659E. */
+        {
+            trek_new_game(3, 4242);
+            clear_quadrant();
+            bolt_cell = (uint8_t)((4 << 3) | 4);
+            bolt_quad = (uint8_t)(((ship.quad_y ^ 1) << 3) | ship.quad_x);
+            ship.shields = 3000; ship.moved = 0;
+            n5 = trek_enemy_turn(ev5, 16, 0);
+            {
+                /* Counted, not asserted INSIDE the loop: written that way
+                   first, the loop ran zero times and the check printed
+                   nothing at all -- a pass that never happened. */
+                uint8_t hits = 0;
+                for (k = 0; k < n5; k++)
+                    if (ev5[k].kind == EV_BOLT_HIT) hits++;
+                ok(hits == 0, "a bolt fired elsewhere never goes off");
+            }
+            ok(bolt_cell >= QUAD_CELLS, "it is simply lost");
+            ok(ship.shields == 3000, "and costs nothing");
+        }
+    }
+
     /* --- BLACK HOLES, BINARY 0x016525 and fn 0x0C609 at 0x0D0B6 --- */
     puts("black holes");
     {
-        uint16_t entries = 0, withhole = 0, toomany = 0;
+        uint16_t withhole = 0, toomany = 0;
         uint8_t  cell, col;
         int      i;
 
         /* ONE QUADRANT IN FOUR, on every entry. Counted rather than sampled:
            a single look at a quadrant agrees with "never placed" three times
            in four. */
-        trek_new_game(3, 20250828);
+        trek_new_game(3, 40828);
         for (i = 0; i < 1600; i++) {
             uint8_t here = 0;
             ship.quad_y = 3; ship.quad_x = 3;
             gal_enemies[(3 << 3) | 3] = 1;
             trek_enter_quadrant();
-            entries++;
             for (cell = 0; cell < QUAD_CELLS; cell++)
                 if (sector[cell] == SEC_BLACKHOLE) here++;
             if (here) withhole++;
@@ -2120,7 +2323,7 @@ static void test_torpedo(void) {
 
         /* THE ODDS, and the throw's reach. */
         {
-            uint16_t fatal = 0, n = 0, moved_quad = 0;
+            uint16_t fatal = 0, moved_quad = 0;
             for (i = 0; i < 1000; i++) {
                 uint8_t r, oy, ox;
                 trek_new_game(3, (uint16_t)(9000 + i));
@@ -2133,7 +2336,6 @@ static void test_torpedo(void) {
                 ship.impulse = IMPULSE_START; ship.lost = 0;
                 oy = ship.quad_y; ox = ship.quad_x;
                 r = trek_move_impulse(4, 5);
-                n++;
                 if (r == MOVE_HOLE_LOST) fatal++;
                 else if (ship.quad_y != oy || ship.quad_x != ox) moved_quad++;
             }

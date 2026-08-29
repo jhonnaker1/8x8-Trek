@@ -1112,6 +1112,8 @@ uint8_t trek_shields_down(void);
 #define EV_BOARDERS_GONE 12  /* security has cleared them */  /*@ID*/
 #define EV_DISTRESS     15   /* y,x = the settled quadrant; amount = deadline */  /*@ID*/
 #define EV_MUTANTS      16   /* amount = which report, 0..4 */  /*@ID*/
+#define EV_BOLT_FIRED   17   /* y,x = the firing enemy's sector */  /*@ID*/
+#define EV_BOLT_HIT     18   /* amount = the damage; y,x = where it went off */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1383,6 +1385,61 @@ extern uint8_t hole_threw;
 /* [0x26E0]: the pod has not been destroyed. Galaxy-wide, true from the first
    turn of a new game, and the ONLY thing the detonation looks at. */
 extern uint8_t pod_alive;
+
+/* --------------------------------------------------------- THE PLASMA BOLT
+ *
+ * BINARY 2026-08-28. Not a shot -- an OBJECT IN FLIGHT with its own sector,
+ * fired on one turn and detonating on a later one, and the first thing in
+ * this game that rewards manoeuvring rather than shooting.
+ *
+ * FIRED, inside the enemy fire routine at 0x016CF4:
+ *
+ *     if (level < 3)              no bolt   ; cmp [0x1DF0], 7, V = level+4
+ *     if (one is already flying)  no bolt   ; [0x1E28]
+ *     if (Random(100) <= 93)      no bolt   ; six in a hundred, per enemy
+ *     if (type != 3 && type != 4) no bolt   ; battleships and Commanders
+ *     the bolt takes THE SHIP'S CURRENT SECTOR                ; 0x016D32
+ *
+ * "WARNING:  Mongol at R-C fires plasma bolt." -- its own line, before
+ * anything lands.
+ *
+ * DETONATED, fn 0x1658F, called from the main loop at 0x00592C -- BEFORE the
+ * enemy fire routine and INSIDE the enemy-turn gate, so a turn the enemy
+ * skips is a turn the bolt does not go off:
+ *
+ *     if (not our quadrant)   the bolt is cleared, nothing happens
+ *     if ([0x26E1])           nothing        ; the PLASMA BOLT SHIELD item
+ *     d    = sqrt(dy^2 + dx^2)               ; bolt to ship
+ *     dmg  = (90 + Random(10)) * (8 - d)     ; 0x016601..0x01662B
+ *     if (dmg < 0)            nothing        ; so eight sectors of reach
+ *     SHIELD CHARGE -= dmg                   ; 0x0166AF, WHOLE
+ *
+ * IT TAKES THE CHARGE WHOLE. No absorption split, no 0.8, and main energy is
+ * not touched at all -- the operator at 0x0166AF is the same call proved to
+ * be subtraction where `shields -= absorbed * 0.8` is built. Confirmed on the
+ * original: a captured turn read "639 unit hit from plasma bolt" alongside
+ * "87 unit hit from Mongol at 8-8", and the energy drop was 87.50 exactly.
+ *
+ * AND MOVING IS THE COUNTER. The bolt remembers where you WERE. Damage falls
+ * to nothing at eight sectors, so stepping away is worth about a hundred
+ * points a sector -- but you have to spend the turn to do it.
+ *
+ * MEASURED as a check on the read, from five bolts solved out of the
+ * absorption run's pool readings alone: 606, 613, 639, 645, 652. The
+ * photographed one solves to 638.8 against a printed 639, and
+ * 639 / (8 - sqrt(2)) is 97.03 where the roll is an integer 90..99. */
+#define BOLT_MIN_LEVEL      3   /* `cmp [0x1DF0], 7`, V = level + 4 */  /*@BINARY*/
+#define BOLT_OF_N         100  /*@BINARY*/
+#define BOLT_ABOVE         93   /* Random(100) > 93, so six in a hundred */  /*@BINARY*/
+#define BOLT_DMG_BASE      90  /*@BINARY*/
+#define BOLT_DMG_SPAN      10   /* 90 + Random(10) */  /*@BINARY*/
+#define BOLT_REACH          8   /* (8 - d), so nothing past eight sectors */  /*@BINARY*/
+
+/* Where the bolt is, and which quadrant it was fired in. QUAD_CELLS in
+   bolt_cell means nothing is in flight -- the original's [0x1E28] == 0.
+   Leaving the quadrant loses it, exactly as 0x01659E does. */
+extern uint8_t bolt_cell;
+extern uint8_t bolt_quad;
 
 /* End of a player's turn, whatever it was. The original sheds 20 points of
    laser heat here, in its main loop, whether or not the turn moved the clock

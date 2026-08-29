@@ -300,4 +300,6 @@ const unsigned int str_offset[STR_COUNT] = {
      5901,
      5926,
      5953,
+     5985,
+     6003,
 };

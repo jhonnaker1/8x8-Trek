@@ -10,6 +10,8 @@ uint8_t gal_nova[GAL_CELLS];
 uint8_t  nova_quad;
 uint8_t  pod_alive;
 uint8_t  hole_threw;
+uint8_t  bolt_cell = QUAD_CELLS;
+uint8_t  bolt_quad;
 uint16_t nova_kills;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
@@ -389,6 +391,8 @@ void trek_new_game(uint8_t level, uint16_t seed) {
        else. Set BEFORE the first quadrant is built, which is also where the
        first pod can be placed. */
     pod_alive = 1;
+    bolt_cell = QUAD_CELLS;         /* [0x1E28] == 0: nothing in flight */
+    bolt_quad = 0;
 
     /* Before trek_enter_quadrant(), which places the planets it rolls. */
     planet_new();
@@ -2035,6 +2039,53 @@ static void enemies_move(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
+/* THE PLASMA BOLT GOES OFF -- fn 0x1658F, called at 0x00592C from inside the
+   enemy-turn gate and BEFORE the fire routine. Both of those matter: a turn
+   the enemy skips is a turn the bolt does not detonate, and when it does it
+   lands before the ordinary shots, so their absorption is computed against
+   the charge the bolt has already reduced. That ordering is what made the
+   measured turn add up to 722.48 against a predicted 722.65.
+
+   The damage is taken by the SHIELD CHARGE whole -- no absorption split, no
+   0.8, and main energy is untouched. */
+static void run_bolt(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t  here = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+    uint16_t reach, dmg;
+    uint8_t  by, bx;
+
+    if (bolt_cell >= QUAD_CELLS) return;
+
+    /* Fired somewhere else: it is simply lost -- 0x01659E. */
+    if (bolt_quad != here) { bolt_cell = QUAD_CELLS; return; }
+
+    by = (uint8_t)(bolt_cell >> 3);
+    bx = (uint8_t)(bolt_cell & 7);
+    bolt_cell = QUAD_CELLS;          /* it goes off exactly once, either way */
+
+    /* THE PLASMA BOLT SHIELD stops it dead -- [0x26E1], the captured item.
+       This core has the item (ITEM_PLASMA_SHIELD) but nothing that arms it,
+       so the test is written and always false for now; see planet.h. */
+
+    /* (8 - d) in 8.8, so nothing past eight sectors. */
+    reach = (uint16_t)(BOLT_REACH << 8);
+    {
+        uint16_t d = trek_dist(abs_diff(by, ship.sec_y),
+                               abs_diff(bx, ship.sec_x));
+        if (d >= reach) return;
+        reach = (uint16_t)(reach - d);
+    }
+
+    /* (90 + Random(10)) * (8 - d), the product staged through scale_256 so it
+       stays inside sixteen bits: 99 * 2048 does not. */
+    dmg = scale_256(reach,
+                    (uint16_t)(BOLT_DMG_BASE + trek_rand_n(BOLT_DMG_SPAN)));
+
+    ship.shields = (uint16_t)(ship.shields > dmg ? ship.shields - dmg : 0);
+
+    if (*n < max) { ev[*n].kind = EV_BOLT_HIT; ev[*n].y = by; ev[*n].x = bx;
+                    ev[*n].amount = dmg; (*n)++; }
+}
+
 uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
@@ -2049,6 +2100,10 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
         ship.moved = 0;
         if (skip) return 0;
     }
+
+    /* 0x00592C: the bolt detonates here, before anything else the enemy does
+       and inside the gate above. */
+    run_bolt(ev, &n, max);
 
     /* The turn's tally starts here and is read once, at the bottom. Anything
        a scheduled event put in it before now is discarded, which is what the
@@ -2069,6 +2124,32 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     for (cell = 0; cell < QUAD_CELLS && n < max; cell++) {
         if (!SEC_IS_ENEMY(sector[cell])) continue;
         if (ship.lost) break;
+
+        /* A PLASMA BOLT, 0x016CF4 -- level 3 and up, one in flight at a time,
+           six in a hundred per enemy per turn, and only from the two warship
+           classes. It takes the ship's CURRENT sector, which is what makes
+           moving the counter. Rolled before the ordinary shot because the
+           original tests it first, and an enemy that fires a bolt still
+           shoots. */
+        /* THE ROLL COMES BEFORE THE TYPE TEST, and the order is not
+           cosmetic: 0x016CF4 tests the level and the in-flight flag, THEN
+           rolls Random(100), and only then asks what class the enemy is. So
+           a scout consumes the same draw a Commander does and the stream does
+           not depend on who is in the quadrant. Written the other way round
+           first, and the suite caught it -- a supply ship and a Commander
+           with equal hit points stopped firing for equal damage. */
+        if (ship.level >= BOLT_MIN_LEVEL
+            && bolt_cell >= QUAD_CELLS
+            && trek_rand_n(BOLT_OF_N) > BOLT_ABOVE
+            && (sector[cell] == SEC_BATTLESHIP || sector[cell] == SEC_COMMAND)) {
+            bolt_cell = (uint8_t)((ship.sec_y << 3) | ship.sec_x);
+            bolt_quad = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+            if (n < max) { ev[n].kind = EV_BOLT_FIRED;
+                           ev[n].y = (uint8_t)(cell >> 3);
+                           ev[n].x = (uint8_t)(cell & 7);
+                           ev[n].amount = 0; n++; }
+            if (n >= max) break;
+        }
 
         /* Enemies hold fire on about half their turns. MEASURED; see trek.h.
            This is per enemy and per turn, so a quadrant full of them still

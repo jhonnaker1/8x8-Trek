@@ -1234,6 +1234,28 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
             linebuf[k] = 0;
             ui_message(S(S_170), linebuf);
             return;
+        /* THE PLASMA BOLT, both halves. The warning is its own line and
+           arrives a turn or more before the hit -- the bolt is aimed where
+           you WERE, and moving is the counter. Rare prose, so it lives here
+           rather than in the resident switch: six turns in a hundred per
+           enemy, and putting the two cases in enemy_turn cost 1,131 bytes of
+           resident code and left 164 free. */
+        case EV_BOLT_FIRED:
+            k  = put_str(linebuf, enemy_name(sector[(e->y << 3) | e->x]));
+            k += put_str(linebuf + k, " AT ");
+            k += put_sector(linebuf + k, e->y, e->x);
+            k += put_str(linebuf + k, " ");
+            k += put_str(linebuf + k, S(S_298));
+            linebuf[k] = 0;
+            ui_message(S(S_166), linebuf);
+            return;
+        case EV_BOLT_HIT:
+            *sfx = SFX_D;
+            k  = put_u16(linebuf, e->amount);
+            k += put_str(linebuf + k, S(S_299));
+            linebuf[k] = 0;
+            ui_message(S(S_167), linebuf);
+            return;
         case EV_POD_HIT:
             *sfx = SFX_D;      /* MEASURED: the pod has its own sound */
             k  = put_str(linebuf, S(S_112));

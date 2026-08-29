@@ -39,7 +39,7 @@ static uint16_t get16(void) {
    and it fails at the right moment: change PLANET_MAX and this stops
    compiling until TREK_SAVE_SIZE is brought along. Everything else in the
    record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 461
+#define SAVE_FIXED_BYTES 463
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
@@ -149,6 +149,7 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     put16(ship.life_reserve); put8(ship.life_gone);
     put8(ship.boarders); put16(ship.board_until);
     put8(pod_alive); put8(ship.mutants);
+    put8(bolt_cell); put8(bolt_quad);
     for (i = 0; i < SYS_COUNT; i++) put8(ship.sys[i]);
 
     for (i = 0; i < GAL_CELLS; i++) put8(gal_enemies[i]);
@@ -219,6 +220,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     ship.life_reserve = get16(); ship.life_gone = get8();
     ship.boarders = get8(); ship.board_until = get16();
     pod_alive = get8(); ship.mutants = get8();
+    bolt_cell = get8(); bolt_quad = get8();
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = get8();
 
     for (i = 0; i < GAL_CELLS; i++) gal_enemies[i] = get8();
