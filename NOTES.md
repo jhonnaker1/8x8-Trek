@@ -4937,7 +4937,8 @@ note at the return rather than on a list.
 
 The list above was declared empty in the morning. By the evening these five
 were open, four of them found by USING the port rather than reading more of
-the binary. None is a constant; all five are mechanisms.
+the binary. None is a constant; all five are mechanisms. TWO ARE ALREADY
+CLOSED -- the plasma bolt and [0x1F31] -- both on the same day they opened.
 
   0. ~~**The plasma bolt.**~~ **READ 2026-08-28**, prompted by Jamie reading
      "mongol fires a plasma bolt" off the screen mid-measurement. It is an
@@ -4960,9 +4961,12 @@ the binary. None is a constant; all five are mechanisms.
   3. **What HAIL schedules.** `fn 0x207FD` ends by writing slot [0x1D78] with
      `stardate + something * 0.5` at 0x020A65. HAIL is built and the write is
      not, deliberately -- a slot is not worth inventing.
-  4. **Which setup question `[0x1F31]` is.** A 'Y' suppresses the enemy's
-     FIRST turn. It is one of "briefing?" and "restore a saved game?" and the
-     read does not say which.
+  4. ~~**Which setup question `[0x1F31]` is.**~~ **SETTLED 2026-08-28: the
+     RESTORE question.** Briefing answered N then Y with restore held at N;
+     the byte read 'N' both times. The briefing was screenshotted actually
+     appearing, because a test whose input never registered cannot fail. It
+     agrees with the guard at 0x0058A6, which skips the initial quadrant build
+     on 'Y' -- restore semantics.
   5. **What raises `[0x24A9 + quadrant]` past 20**, the supply-capture
      trigger. Setup writes `Random(3) + 1`; something else raises it.
 

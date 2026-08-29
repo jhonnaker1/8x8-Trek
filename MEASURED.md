@@ -6281,8 +6281,20 @@ measured "about half" exactly: those samples were taken while flying about.
 `[0x1F31]` is one of the setup screen's two Y/N answers -- `fn 0x14CB9` asks
 "Will you require a briefing <Y/N>?" and "Restore a saved game <Y/N>?", and
 0x014DFA upper-cases the reply into it. A 'Y' suppresses the enemy's FIRST
-turn and the loop forces it to 'N' at 0x0059CE. **Which of the two questions
-it is has not been read**, so it is not built.
+turn and the loop forces it to 'N' at 0x0059CE. ~~**Which of the two questions
+it is has not been read**~~
+
+**SETTLED 2026-08-28 ON THE RIG: it is the RESTORE question.** Two games with
+the restore answer held at N and the briefing answered N then Y; the byte read
+'N' both times, so it does not track the briefing. The briefing was
+screenshotted actually appearing in the second game, because a test whose
+input never registered cannot fail and proves nothing.
+
+It agrees with a second reading taken the same day for another purpose: the
+guard at 0x0058A6 skips the initial quadrant build when `[0x1F31] == 'Y'`,
+which is restore semantics -- a loaded game must not have its quadrant rebuilt
+underneath it -- and suppressing the enemy's first turn on load is the same
+courtesy. Two independent lines, one answer.
 
 ### A fourth test that could not fail
 
