@@ -1257,12 +1257,15 @@ READ 2026-08-27, moved off the list below:
                                     all three refill the life support RESERVE
                                     [0x1D30] to 2.0 stardates.
 
-~~STILL TO READ~~ **THE READ LIST IS EMPTY, and closed 2026-08-28.** Every
-entry below is READ and every one is BUILT. It is kept as the record of what
-each turned out to be -- six of the seven had the WRONG LABEL in the routine
-map, which is why "name a routine from its strings before believing any
-label" is a rule now. There are no constants left to find and no routines
-left on this list:
+~~STILL TO READ~~ **THIS LIST is closed -- but the READ LIST IS NOT EMPTY,
+and declaring it empty on 2026-08-28 lasted about four hours.** Every entry
+below is READ and BUILT, and it is kept as the record of what each turned out
+to be: six of the seven had the WRONG LABEL in the routine map, which is why
+"name a routine from its strings before believing any label" is a rule. No
+CONSTANT is unread. But five decodes opened the same day this closed, and
+they are listed under "Still to read, reopened" further down. Closing a list
+is not the same as finishing the work, and a list that can only shrink is a
+list nobody is adding to:
 
     0x15D6E   -  THE BOARDING PARTY  READ 2026-08-27, and the map had it as
                                     "department damage", which it is not --
@@ -4928,3 +4931,35 @@ failure the negative-claims rule exists for.
 Still merged as one outcome in the port, because there is no black-hole cell
 yet. The moment there is, roll 3 splits off, and `core/trek.c` carries that
 note at the return rather than on a list.
+
+
+## Still to read, reopened 2026-08-28
+
+The list above was declared empty in the morning. By the evening these five
+were open, four of them found by USING the port rather than reading more of
+the binary. None is a constant; all five are mechanisms.
+
+  1. **What reaches `fn 0x15F51` on quadrant entry.** The one that cost a
+     shipped regression. An absolute-address search finds a single caller in
+     the new-game setup; the original demonstrably fills a quadrant on every
+     entry. Until the path is known, nothing else about that routine's arity
+     can be trusted either -- and the pod and the black hole both live in it.
+  2. **"Warp engines damaged by excessive speed."** Observed twice, once by
+     Jamie mid-session. No address, no threshold, no damage figure, and
+     nothing in `trek.h` models it. It also costs NO TIME and does not move
+     the ship, which is why it keeps being mistaken for the rig misbehaving.
+  3. **What HAIL schedules.** `fn 0x207FD` ends by writing slot [0x1D78] with
+     `stardate + something * 0.5` at 0x020A65. HAIL is built and the write is
+     not, deliberately -- a slot is not worth inventing.
+  4. **Which setup question `[0x1F31]` is.** A 'Y' suppresses the enemy's
+     FIRST turn. It is one of "briefing?" and "restore a saved game?" and the
+     read does not say which.
+  5. **What raises `[0x24A9 + quadrant]` past 20**, the supply-capture
+     trigger. Setup writes `Random(3) + 1`; something else raises it.
+
+And one NEW discrepancy from the same session, which is a measurement rather
+than a read: the black-hole death sheet totalled **-730 with no "Penalty for
+loss of ship" line**, where the combat-death sheet that restored
+`SCORE_SHIP_LOST` totalled -930 WITH one. Either the penalty is
+ending-dependent or one of the two readings is wrong. The port prints the
+penalty for every loss.
