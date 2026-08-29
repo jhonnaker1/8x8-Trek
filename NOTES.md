@@ -5040,3 +5040,76 @@ explained it exactly, which is the right division of labour and the reverse of
 the order I used.
 
 The shipped code is right: the pod is placed on every entry.
+
+
+## THE MEMORY BUDGET, costed rather than felt (2026-08-28, end of day)
+
+Third time the "does it still fit on the C128" question has come up, and the
+first time it has been answered with arithmetic. The figures rot -- re-derive
+them from `build/trek128.map` before quoting any of this.
+
+### Where the space is
+
+    RESIDENT CODE      543 free of 37,823   -- 99% used, THE constraint
+    OVERLAY WINDOWS 17,764 free of 40,960   -- ten 4K windows, see below
+    LOWRAM             227 free of  2,304
+    BANK 1 / DISK      ample, and the prose is already there
+
+    planet  3885 used   211 free      msgs   2692 used  1404 free
+    cmds    3857 used   239 free      hof    2100 used  1996 free
+    front   3828 used   268 free      events 1411 used  2685 free
+    eval    2971 used  1125 free      info   1235 used  2861 free
+                                      title   666 used  3430 free
+                                      repair  551 used  3545 free
+
+**Overlay space is not fungible with resident space.** It only takes code that
+is RARE enough to justify a disk load and reachable through one resident stub.
+The obviously-rare code has already been moved, four passes of it.
+
+### What is left will cost more than 543
+
+Measured precedent from the two mechanics built today: **black holes cost 692
+resident bytes** and **the plasma bolt 752**, the latter after its prose went
+into OVL_MSGS. Estimating the rest by where each piece is forced to live:
+
+    HAIL's delayed reply     ~20   slot in the schedule; check already in
+                                   OVL_EVENTS, message already in OVL_MSGS
+    warp damage on distance ~120   must sit in the move path, which is hot
+    SEC_NOVA (star hit)     ~250   inside fire_one_torpedo, plus a glyph
+    wear and tear           ~120   the ROLL is per-turn and must be resident
+    chart erasure           ~40    trigger resident, effect overlaid
+    reinforcements          ~20    a scheduled event, so OVL_EVENTS
+    prose and endings        ~2 per string, in str_offset
+
+**Roughly 600-700 against 543 free. It does not fit as it stands**, and it is
+short by a little over a hundred rather than by a mile.
+
+### Two reserves, both identified, either of which covers the gap
+
+1. **`str_offset` is 600 RESIDENT BYTES** -- a two-byte offset per string, read
+   once per `S()` call at `strpool.c:52`. It could live in bank 1 with the
+   prose it indexes, for one extra far read per string fetch. That one move
+   roughly doubles the remaining headroom and is now ON the critical path
+   rather than optional.
+2. **A fifth overlay pass.** The fourth recovered 892 bytes. Its lesson stands
+   and is the warning here: THE CANDIDATES NAMED IN ADVANCE WERE WRONG, and
+   splitting them cost 863 bytes because LTO had already inlined each into its
+   only caller. Measure a split before planning around it.
+
+Note also that planet, cmds and front are nearly FULL while repair and title
+are nearly empty. New overlay work needs rebalancing, not merely space.
+
+### The real uncertainty is not the mechanics
+
+It is **the manual's per-system effect table**, which MEASURED.md calls the
+largest specified-but-unbuilt body of work in the project. It is dozens of
+small rules spread across command handlers rather than one feature, and
+several of those handlers sit in the two nearly-full windows. It has not been
+costed and cannot be until it is read properly.
+
+### Verdict
+
+**Yes, the C128 still holds it -- but not on current headroom, and one
+structural move is now required rather than optional.** No pivot. The tiers
+memo's "NO PIVOT NEEDED" stands, with the qualification that it now depends on
+str_offset moving to bank 1.
