@@ -4952,10 +4952,12 @@ CLOSED -- the plasma bolt and [0x1F31] -- both on the same day they opened.
   1. ~~**What reaches `fn 0x15F51` on quadrant entry.**~~ **READ 2026-08-28.
      IT IS A BACKWARD JUMP, NOT A CALL** -- see the section below. The call
      site really is unique; it is inside the main loop.
-  2. **"Warp engines damaged by excessive speed."** Observed twice, once by
-     Jamie mid-session. No address, no threshold, no damage figure, and
-     nothing in `trek.h` models it. It also costs NO TIME and does not move
-     the ship, which is why it keeps being mistaken for the rig misbehaving.
+  2. ~~**"Warp engines damaged by excessive speed."**~~ **READ 2026-08-28,
+     and it is DISTANCE, not speed** -- `Random < (d-1.5)/2.5` to trigger,
+     `Round(Random*d*10 + 10)` off SYS_WARP, with d in quadrants and warp
+     appearing nowhere. Ten one-quadrant hops at warp 8 took zero damage,
+     which the "speed" reading cannot explain. The positive direction is read
+     but not measured -- long moves are reliably blocked on the rig. UNBUILT.
   3. **What HAIL schedules.** `fn 0x207FD` ends by writing slot [0x1D78] with
      `stardate + something * 0.5` at 0x020A65. HAIL is built and the write is
      not, deliberately -- a slot is not worth inventing.

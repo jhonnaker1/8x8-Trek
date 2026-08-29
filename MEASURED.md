@@ -2552,7 +2552,7 @@ chart. Consistent with the manual's "displayed at all times unless overridden",
 so its job is probably to restore the panel after something overrides it. Not
 settled, but the cheap half is done: on a normal console it is a no-op.
 
-### New mechanic: warp speed can break the engines
+### ~~New mechanic: warp speed can break the engines~~ IT IS DISTANCE, NOT SPEED
 
 Setting warp 8 and moving printed:
 
@@ -2561,6 +2561,11 @@ Setting warp 8 and moving printed:
 No time passed and the ship did not move. Warp 4 then worked. So high warp
 carries a damage risk that nothing in trek.h models, and the ship's own Warp
 Engines entry showed damage afterwards.
+
+> **READ AND CORRECTED 2026-08-28.** The message says "excessive speed" and
+> the observation was taken at warp 8, and both are misleading: **warp appears
+> nowhere in either expression.** See "The warp engines break on DISTANCE"
+> below.
 
 ### Planets, orbit and landing, all in one run
 
@@ -6813,3 +6818,53 @@ The port has no bolt object, so nothing here is implemented. It wants what the
 death pod wanted -- a persistent position and a per-turn roll -- plus one thing
 the core has never had: an object that belongs to neither side and whose damage
 depends on where the SHIP has moved to since it was created.
+
+
+## The warp engines break on DISTANCE, and the message says "speed" (2026-08-28)
+
+`fn 0x0C609`, the MOVE routine, at 0x0D649..0x0D6DD. The constants decode
+exact, which is itself a check on the decoding.
+
+    d = sqrt(dy^2 + dx^2)                    ; 0x0CC?? , quadrants
+    if (Random < (d - 1.5) / 2.5)  nothing   ; 0x0D649, 0x0D665, 0x0D672, 0x0D67A
+    loss = Round(Random * d * 10 + 10)       ; 0x0D684..0x0D6B4
+    [0x2364] -= loss                         ; 0x0D6C5
+    if (this was a warp move)  print         ; 0x0D6C8, the message at 0x0D6D8
+
+`[0x2364]` is the SIXTH word of the twelve-word system array at 0x235A --
+index 5, which is `SYS_WARP` in this port. 1.5, 2.5 and 10.0 all decode exact.
+
+So the risk starts at a distance of 1.5 quadrants and is a certainty past 4,
+and the damage is 10 points plus up to ten per quadrant travelled. Warp is not
+in it.
+
+### Measured, and the measurement had to defeat the rig to happen
+
+**Ten one-quadrant hops at WARP 8: zero damage.** The "speed" reading predicts
+damage there -- warp 8 is the fastest there is -- and the "distance" reading
+predicts none, because (1 - 1.5)/2.5 is negative. Ten for ten.
+
+That also settles a question the read left open: **d is in QUADRANTS, not
+sectors.** A one-quadrant hop is eight sectors, and eight sectors would give
+(8-1.5)/2.5 = 2.6, damage every time.
+
+The moves only landed because the sector map was poked to '.' first. Jamie
+said "blocked by object" three times while this was being set up, and he was
+right every time: a Mongol or a star in the path aborts the move, and 22 of
+the 24 readings in an earlier attempt at this same mechanic were that -- with
+the "system damage" being recorded actually being the blocking Mongol's fire.
+
+### What is NOT measured, and why the rig cannot currently do it
+
+The positive direction. A long move should ALWAYS damage the engines, and
+that is read but not confirmed, because **multi-quadrant moves are reliably
+blocked on this rig**: clearing the source quadrant does not help, since the
+destination is built fresh around the arrival sector and blocks there. Three
+attempts, three blocks.
+
+**The experiment that would settle it:** pick a destination from the galaxy
+chart whose word is 000 -- no enemies, no base, no stars -- and move there.
+An empty quadrant has nothing to block with. The chart is at DS:0x2560, stride
+16, and empty quadrants demonstrably exist (one was found at 8,3 in an earlier
+session). Nothing in the port depends on the answer yet; the mechanic is
+unbuilt either way.
