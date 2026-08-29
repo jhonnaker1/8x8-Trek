@@ -193,7 +193,7 @@ static uint8_t ack_arg(const char *cmd) {
 }
 
 /* Names for the three pools, in the 1/2/3 order trek_divert uses. */
-static const char *pool_name(unsigned char p) {
+OVL_CODE("cmds") static const char *pool_name(unsigned char p) {
     switch (p) {
         case POOL_MAIN:    return "MAIN";
         case POOL_IMPULSE: return "IMPULSE";
@@ -201,7 +201,7 @@ static const char *pool_name(unsigned char p) {
     }
 }
 
-static void report_divert(uint8_t r, uint16_t lost) {
+OVL_CODE("cmds") static void report_divert(uint8_t r, uint16_t lost) {
     switch (r) {
         case DIVERT_OK:
             if (lost) {
@@ -253,8 +253,11 @@ OVL_CODE("cmds") static void do_energy(void) {
 }
 
 /* MAX -- everything the main banks hold, into the shields. The original lists
-   it separately from ENERGY because it is the thing you want in a hurry. */
-static void do_max_energy(void) {
+   it separately from ENERGY because it is the thing you want in a hurry.
+
+   In OVL_CMDS with ENERGY, which is what lets trek_divert and report_divert
+   leave the resident image: they had two callers and one of them was here. */
+OVL_CODE("cmds") static void do_max_energy(void) {
     uint16_t lost = 0;
     uint16_t room = (uint16_t)(SHIELD_MAX > ship.shields
                                ? SHIELD_MAX - ship.shields : 0);
@@ -1381,12 +1384,13 @@ static void enemy_turn(uint8_t player_fired) {
     trek_turn_end();
 }
 
-/* A supernova's four lines. In OVL_CMDS -- the rare-and-modal overlay --
-   because it is 4% of a star hit and star hits are themselves uncommon,
-   while fire_one_torpedo around it is the hottest code in the game and must
-   stay resident. Splitting it here took resident free from 178 back to a
-   workable margin. */
-OVL_CODE("cmds") static void report_nova(uint16_t dmg) {
+/* A supernova's four lines. It was in OVL_CMDS -- 4% of a star hit, and star
+   hits are themselves uncommon, while fire_one_torpedo around it is the
+   hottest code in the game and must stay resident. MOVED TO OVL_MSGS in the
+   fourth pass (2026-08-28) to make room in cmds for the DIVERT chain, and it
+   should have been here from the start: it is prose, and msgs is where the
+   prose lives. */
+OVL_CODE("msgs") static void report_nova(uint16_t dmg) {
             /* The original's four lines, cut to the dialog's width:
                "Star at R-C goes supernova!", "Lexington blown to quad Q.",
                "N Mongols destroyed.", and the damage. */
@@ -1439,7 +1443,12 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             ui_dialog_line(S(S_85));
             break;
         case TORP_NOVA:
-            ovl_load(OVL_CMDS);
+            /* MOVED to OVL_MSGS in the fourth pass: it is four lines of
+               PROSE, msgs is the message overlay and had room, and cmds had
+               to give up 174 bytes so the DIVERT chain could move in. A
+               feature's resident cost is its LOGIC -- the corollary is that
+               its prose belongs wherever the other prose is. */
+            ovl_load(OVL_MSGS);
             report_nova(dmg);
             break;
         case TORP_PLANET:
@@ -1672,7 +1681,8 @@ int main(void) {
             else if (word_is(cmd, "PLAN")) do_planets();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
-            else if (word_is(cmd, "MAX"))  { do_max_energy();   enemy_turn(0); }
+            else if (word_is(cmd, "MAX"))  { ovl_load(OVL_CMDS); do_max_energy();
+                                             enemy_turn(0); }
             else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
             else if (c == KB_L) { do_lasers();     enemy_turn(1); }
             else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
@@ -1683,7 +1693,8 @@ int main(void) {
             else if (c == KB_S) { ovl_load(OVL_CMDS); do_self(); }  /* S)elf */
             else if (c == KB_E) { ovl_load(OVL_CMDS); do_energy();
                                   enemy_turn(0); }
-            else if (c == KB_X) { do_max_energy(); enemy_turn(0); }
+            else if (c == KB_X) { ovl_load(OVL_CMDS); do_max_energy();
+                                  enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
             /* MEASURED 2026-08-24: the arrows are the ORIGINAL's primary
                binding for shields -- EGATREK.REF says "Shields Up (use up

@@ -1046,6 +1046,14 @@ static uint16_t pool_max(uint8_t which) {
     }
 }
 
+/* IN OVL_CMDS. Both callers are commands that already live there -- ENERGY
+   and MAX -- and nothing else in the core or the platform calls this. The
+   fourth overlay pass, 2026-08-28: the candidates the third pass named
+   (run_boarders, run_nova, run_pod) turned out to COST 863 bytes when split,
+   because each is called once and inlining them is free. Frequency picks
+   candidates, but so does whether the compiler has already merged them into
+   their only caller. */
+OVL_CODE("cmds")
 uint8_t trek_divert(uint8_t from, uint8_t to, uint16_t amount, uint16_t *lost) {
     uint16_t *src = pool(from);
     uint16_t *dst = pool(to);
