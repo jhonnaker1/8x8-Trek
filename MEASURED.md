@@ -2913,8 +2913,12 @@ ordinary Detailed Evaluation:
      Mongol ships destroyed per stardate: 0.04
      Score: -701
 
-ONE SAMPLE. Which of the four outcomes is how likely is not measured, and the
-ancestor's failure table is a hypothesis for that, not an answer.
+ONE SAMPLE. ~~Which of the four outcomes is how likely is not measured~~ --
+**READ 2026-08-28 and swept here 2026-08-29: `Random(6)` with every roll
+mapped, 1/6 each for WORKED / MISFIRE / MUTANTS / MISFIRE_HOLES and 2/6 FATAL.
+Also there are FIVE outcomes, not four -- roll 1 and roll 3 print the same
+line and do different things, which is what the 2026-08-28 read separated.**
+The ancestor's failure table was a hypothesis and is not needed.
 
 ### Bonus: shields are the ARROW KEYS
 
@@ -4307,7 +4311,11 @@ part and the rest reaches energy, and systems start dying:
 The absorbed fraction across those five is 0.0650, 0.0651, 0.0651, 0.0650,
 0.0651 -- tight enough to be a formula, not a roll. At a charge of 800 two
 hits absorbed 136.4 and 212.3, which is NOT a constant fraction, so whatever
-the law is it is not simply proportional to charge. **Unresolved.**
+the law is it is not simply proportional to charge. ~~**Unresolved.**~~
+**RESOLVED -- see the retraction above ("A retraction goes with it") and the
+S/E ratio table below: this sweep was reading the POOL DRAIN correctly all
+along, and what was wrong was reading it as the protection. The binary
+predicts these readings to within one percent.**
 
 What is settled is the shape, and it is not ours: `through = amount - shields`
 is wrong. The shields are a proportional absorber whose share falls with

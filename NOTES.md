@@ -1630,10 +1630,18 @@ finishes, and `line("y")` leaves a spare Enter behind it (the Y/N prompt takes
 the key without one), so the box is often gone by the time the frame is
 grabbed.
 
-#### So: RAY's odds are STILL NOT MEASURED, after a fourth attempt
+#### ~~So: RAY's odds are STILL NOT MEASURED, after a fourth attempt~~ -- READ INSTEAD (swept 2026-08-29)
 
-Nothing in this section is an outcome distribution and none should be quoted
-as one. Samples were collected; not one batch survived validation. Three
+**They were never going to be measured; they were READ, and reading is the
+better instrument.** `RAY_OF_N` is 6 and `trek_fire_ray` maps every roll of
+`Random(6)`: 0 WORKED, 1 MISFIRE, 2 MUTANTS, 3 MISFIRE_HOLES, 4 and 5 FATAL.
+So the distribution is exactly 1/6 each and 2/6 fatal, all `@BINARY`. Four
+sampling attempts were spent on a question the disassembler answers in one
+line -- **when a distribution comes from a `Random(n)` with a known switch,
+stop sampling and go and read the switch.**
+
+The section below stands as a record of the rig lessons it bought. Nothing in
+it is an outcome distribution and none should be quoted as one. Samples were collected; not one batch survived validation. Three
 separate batches produced classifications that the screenshots then refuted --
 a SUCCESS that was a refused MOVE, a NOTHING that was the box still saying
 "Preparing death ray...", and a pair with no dialog on screen at all.
@@ -2691,9 +2699,12 @@ type**, and number of stars" -- a type, not a count.
 
 CORRECTED 2026-08-22: this item used to end "which our chart currently gets
 wrong". It does not; `ui_draw_chart()` prints `gal_base[q]`, which is the type
-enum. What is still unverified is the NUMBERING -- ours is 1 StarBase,
-2 Research, 3 Supply, and nothing has ever checked that against the digit the
-original prints. Every capture so far has a 0 in that position.
+enum. ~~What is still unverified is the NUMBERING.~~ **SETTLED, and not by a
+capture: `fn 0x01F8D1` is a plain string table on that digit -- 1 StarBase,
+2 research station, 3 supply depot (MEASURED.md, "The base type is the chart's
+tens digit"). The port's 1/2/3 matches the binary. No rig run needed; this sat
+on the list waiting for a screenshot that a disassembly had already
+answered.**
 
 The pages are reached with Y at the first setup prompt, advanced with Enter and
 abandoned with Q, and the prompt line says so: `(Hit "Enter" for next page or
