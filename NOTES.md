@@ -4949,11 +4949,9 @@ CLOSED -- the plasma bolt and [0x1F31] -- both on the same day they opened.
      bolts solved out of the absorption run, one of them photographed and
      matching to 0.03%. See MEASURED.md. UNBUILT.
 
-  1. **What reaches `fn 0x15F51` on quadrant entry.** The one that cost a
-     shipped regression. An absolute-address search finds a single caller in
-     the new-game setup; the original demonstrably fills a quadrant on every
-     entry. Until the path is known, nothing else about that routine's arity
-     can be trusted either -- and the pod and the black hole both live in it.
+  1. ~~**What reaches `fn 0x15F51` on quadrant entry.**~~ **READ 2026-08-28.
+     IT IS A BACKWARD JUMP, NOT A CALL** -- see the section below. The call
+     site really is unique; it is inside the main loop.
   2. **"Warp engines damaged by excessive speed."** Observed twice, once by
      Jamie mid-session. No address, no threshold, no damage figure, and
      nothing in `trek.h` models it. It also costs NO TIME and does not move
@@ -4976,3 +4974,54 @@ loss of ship" line**, where the combat-death sheet that restored
 `SCORE_SHIP_LOST` totalled -930 WITH one. Either the penalty is
 ending-dependent or one of the two readings is wrong. The port prints the
 penalty for every loss.
+
+
+## fn 0x15F51 is re-entered by a JUMP, and the lesson is not the one I wrote down
+
+The morning's regression said "the pod is placed once" because an exhaustive
+search found `fn 0x15F51` exactly one caller, in the new-game setup, guarded
+against a restore. I recorded the lesson as "a caller search is not a proof of
+arity". **That was the wrong lesson, and the right one is worse.**
+
+The call site IS unique. Every search was correct. What is false is the step
+nobody notices themselves taking: *one call site therefore one execution.*
+
+    0x0058A6   cmp byte [0x1F31], 'Y' / je            ; skip the fill
+    0x0058AD   lcall  -> 0x015F51                     ; THE ONLY CALL SITE
+    ...
+    0x0059CE   mov byte [0x1F31], 'N'                 ; and never skip again
+    ...
+    0x005F22   cmp byte [0x26E3], 0
+    0x005F30   jmp 0x058DB      ; quadrant unchanged: loop back PAST the fill
+    0x005F3A   jmp 0x058A6      ; quadrant CHANGED: loop back BEFORE it
+
+`fn 0x04FD1` is the main program, not a subroutine -- it has no callers at all
+-- and it ends in a loop with TWO back-edges. An ordinary turn re-enters at
+0x058DB and the quadrant stands. A turn that changed quadrant re-enters at
+0x058A6 and the quadrant is rebuilt, pod and black hole and all.
+
+**`[0x26E3]` is "the ship changed quadrant".** Set at 0x0C996 and 0x0D140,
+both inside the MOVE routine `fn 0x0C609`, and at 0x0AC9B, which is the
+supernova throw -- the other thing that relocates the ship. Cleared at
+0x0C698, 0x0CE54 and 0x0D243.
+
+And `[0x1F31]`, settled on the rig earlier today as the RESTORE answer, is
+forced to 'N' at 0x0059CE immediately after the first pass -- so a restored
+game skips its initial fill, keeping the saved sector map, and every entry
+after that rebuilds normally. Every piece fits.
+
+### What this means for the rule
+
+A call graph would have shown one edge and been right. No amount of searching
+for callers, pointers, jump tables or alternate encodings would have found
+this, because there is nothing to find: the answer is the SHAPE OF THE CODE
+AROUND the call, not another reference to it.
+
+**Where a static read says "this happens once", ask what loops over it.** In a
+Turbo Pascal main program with no subroutine boundary to stop at, "once" is a
+claim about control flow, and control flow is the one thing an address search
+cannot see. The emulator settled it in one screenful; the disassembler then
+explained it exactly, which is the right division of labour and the reverse of
+the order I used.
+
+The shipped code is right: the pod is placed on every entry.

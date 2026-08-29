@@ -1247,12 +1247,19 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
  *
  * The original says otherwise. Flying to quadrant 5-8 mid-game, under
  * dosbox-automation, put an 'R' on the scan and set [0x26DF] -- in a quadrant
- * that was not where the game began. So fn 0x15F51 IS reached on entry, by a
- * path that search cannot see. Which path is NOT yet known and is not
- * guessed at here; the same blind spot swallowed the write that initialises
- * [0x26E0], and being wrong the same way twice about the same routine is the
- * reason this paragraph exists. A CALLER SEARCH OVER ABSOLUTE ADDRESSES IS
- * NOT A PROOF OF ARITY.
+ * that was not where the game began.
+ *
+ * THE PATH WAS READ THE SAME DAY, AND IT IS A JUMP. The call site is genuinely
+ * unique; it sits inside the main program's loop, which has two back-edges:
+ * 0x005F30 re-enters at 0x0058DB, past the fill, when the quadrant is
+ * unchanged, and 0x005F3A re-enters at 0x0058A6, before it, when [0x26E3]
+ * says the ship changed quadrant. So the fill runs on every entry from one
+ * call site. `[0x1F31]` is forced to 'N' at 0x0059CE after the first pass, so
+ * a restore skips only its initial fill and keeps the saved map.
+ *
+ * ONE CALL SITE IS NOT ONE EXECUTION. No search for callers, pointers or jump
+ * tables could have found this, because there is nothing to find: the answer
+ * is the shape of the code AROUND the call.
  *
  * The placement does NOT consult [0x26E0]: destroying the pod disarms the
  * detonation for the rest of the game, but 'R's keep appearing in column 8.
