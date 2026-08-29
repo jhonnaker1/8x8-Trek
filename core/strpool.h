@@ -16,6 +16,13 @@
  * memory at startup (core/farmem.h), and are fetched one at a time into a
  * small rotating set of RAM buffers.
  *
+ * THE INDEX IS IN THE FILE TOO, ahead of the text it points into, so a pooled
+ * string costs the binary NOTHING but its id -- which is a #define. It used to
+ * cost two bytes of offset table as well, 600 of them on the C128, and that
+ * was the last of the prose still sitting in the image. A platform
+ * implementing this seam should read its index from the same place; see
+ * tools/gen_strings.py for the layout and c128/src/strpool.c for a reader.
+ *
  * WHY IT ROTATES. `ui_message(S(S_HELM), S(S_AWAITING))` needs two pooled
  * strings alive at once, and a single buffer would hand the same pointer to
  * both arguments. STR_SLOTS is the number that can be live in one expression;

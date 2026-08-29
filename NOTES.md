@@ -756,8 +756,11 @@ optimising the first.**
 
 **MINLEN was a guess and it was wrong.** The generator skipped anything under
 ten characters, on the reasoning that short strings cost more in call overhead
-than they save. Measured, they do not: a pooled string costs two bytes of
-index and turns a load-address into a load-immediate-plus-call. The department
+than they save. Measured, they do not: a pooled string cost two bytes of
+index and turns a load-address into a load-immediate-plus-call. (Since
+2026-08-29 the index ships in the file, so it costs the binary NOTHING but
+its id -- which makes pooling MORE attractive than this paragraph says, not
+less. MINLEN has not been re-measured against that.) The department
 prefixes alone -- `HELM: `, `COMMS: `, `SCIENCE: ` -- were 60 bytes sitting
 above the old floor. It is 6 now. Below that the remaining literals are single
 characters and separators and it genuinely stops paying.
@@ -770,8 +773,9 @@ them out; there is a comment in the generator saying never to add `far_load`,
 `plat_open` or `hof_*` to DRAW_FNS.
 
 Also left: the twelve three-letter `sys_abbrev` codes. Pooling them would save
-about 24 bytes and cost twelve far reads on every SYSTEMS STATUS redraw, which
-is the wrong trade -- a pooled string is a 63-byte far read, roughly 0.6ms.
+about 48 bytes -- 24 when this was written, before the offset table moved into
+the file -- and cost twelve far reads on every SYSTEMS STATUS redraw, which is
+still the wrong trade: a pooled string is a 63-byte far read, roughly 0.6ms.
 
 **Verified on the machine, not just in the map.** Title screen with its pooled
 ship art, the full nine-panel console with every pooled panel title, STATE OF
@@ -783,6 +787,79 @@ which is the sub-tenth carry working, not a bug.
 **What this does NOT do is solve the ceiling.** It bought 1,292 bytes once,
 and the movement correction alone cost 1,424. The remaining feature list is
 estimated at 5,000-6,000 bytes against 169 free. See below.
+
+### The index followed the prose: str_offset to bank 1 (2026-08-29)
+
+**439 bytes of resident image, and the last of the string pool leaves the
+binary.** Free space in the resident pool goes 543 -> 982.
+
+`str_offset[300]` was 600 bytes of `.rodata` in a generated `strdata.c` --
+the offset of each string in `STRINGS.DAT`. Moving 4,088 bytes of prose to
+bank 1 in August and leaving its index behind had only half-finished the job,
+and it was the largest single item still in the tightest pool.
+
+**It could not simply be DECLARED in far memory.** That is the standing limit
+of the seam, not an oversight: bank 1 is filled by LOADing a file into it, and
+a static initialiser table has no route there. So the table travels WITH the
+text it indexes. `tools/gen_strings.py` now writes `STRINGS.DAT` as
+
+        +0              count, 16-bit little endian
+        +2              count 16-bit offsets, little endian
+        +2 + 2*count    the text, each string NUL terminated
+
+which arrives in the same single KERNAL LOAD it always did. `S()` costs one
+extra two-byte far read -- two FETCH calls, against the 63 the text read was
+always going to cost.
+
+**The saving is 439, not 600, and the 161 is the guard and the arithmetic.**
+`str_load()` gained a header check and `S()` gained a second base pointer.
+Worth measuring rather than assuming: this is the third structural move in a
+row where the un-inlining or the bookkeeping ate a quarter of the headline.
+
+**The count is a guard, and it is why the file leads with it.** A disk built
+from an older tree has no header at all, so the first two bytes would be the
+first two letters of the first string -- id 0 would index 8,259 bytes into a
+6,697-byte pool and every label on screen would be noise read from somewhere
+else in bank 1. `str_load()` compares it against the compiled `STR_COUNT` and
+refuses a pool that disagrees, which turns that into the failure the pool
+already plans for: no words, and a game that still plays.
+
+**Both halves verified on the machine, and the guard was verified by making it
+fail.** A correct disk boots to a title screen with every pooled string in
+place, ids 0 through 174; bank 1 at $4000 matches `strings.dat` byte for byte,
+`idx_base` = 2, `txt_base` = 602, and spot reads through the store return the
+right text for ids 255, 256, 262, 294 and 299. A disk carrying the OLD format
+boots to a title screen with the boxes and the big EGA TREK still drawn and
+every pooled string blank -- wordless, not garbled.
+
+**And `make test` had not compiled for two days.** Running it as part of this
+change was the first time anything had, and it failed instantly: `test_panels.c`
+still declared its `S()` stub as `S(uint8_t)`, which stopped matching
+`core/strpool.h` when `StrId` widened to `uint16_t` on 2026-08-27. That is the
+FIRST of the three binaries `make test` builds, so `test_panels` and
+`test_sid` had not run either. Two days, three suites, one compiler error
+scrolling past above a prompt. **CHECK THE EXIT STATUS.**
+
+**Underneath it was a second, older fault, and it is the more interesting
+one.** With the stub fixed, `test_panels` reported 23 failures -- all of them
+the SYSTEMS STATUS gauge. The cause was not the gauge. `set_all(pct)` sets
+every system to the same value, life support included, and since 2026-08-27
+`ui_draw_systems()` swaps SYSTEMS STATUS for the RESERVE panel the moment
+`sys[SYS_LIFE]` is not 100. So every gauge case except `set_all(100)` had been
+measuring a panel with no bars in it, and the one case that passed passed
+because it was the only one still drawing a gauge at all.
+
+**A FIXTURE CAN GO STALE THE SAME WAY AN ASSERTION CAN, and it is quieter
+about it.** Nothing was wrong with the checks; the state they set up stopped
+meaning what it used to mean when a feature landed elsewhere. `set_all()` now
+pins life support at 100 deliberately, with the reason written next to it.
+
+That pinning creates the hole it closes, so `test_reserve_panel_swap()` goes
+the other way: life at 100 draws bars and is NOT headed `LIFE SUPPORT`, life
+at 99 is headed `LIFE SUPPORT` over `RESERVE, DAYS`. The two tests now fail on
+opposite mistakes. Verified by breaking the swap in both directions -- forced
+off, the new test alone fails; forced on, the existing label tests fail too.
+
 
 ### THE CEILING IS REAL, AND OVERLAYS ARE THE ANSWER -- measured 2026-08-26
 

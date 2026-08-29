@@ -6,12 +6,25 @@
 
 /* The C128's string pool. See core/strpool.h for why it exists.
  *
- * STRINGS.DAT is the text back to back, each NUL terminated; strdata.c holds
- * the offset of each, which is the only part left in the binary -- 194 bytes
- * of index against 2,203 bytes of prose. */
+ * STRINGS.DAT carries BOTH halves -- a count, then the offset table, then the
+ * text back to back with each string NUL terminated. Nothing about the pool
+ * is left in the binary except the ids, which are #defines and cost nothing.
+ *
+ * THE INDEX USED TO BE IN THE BINARY, and that was the last 600 bytes of the
+ * prose still sitting in the resident image: `const unsigned int
+ * str_offset[STR_COUNT]` in a generated strdata.c. Lifting the text out and
+ * leaving its index behind had only half-moved it.
+ *
+ * It could not be declared in far memory instead. Bank 1 is filled by LOADing
+ * a file into it (see c128/src/farmem.c) and a static initialiser table has no
+ * route there -- that is the standing limit of the far-memory seam, not an
+ * oversight. So the table travels WITH the text it indexes, written by
+ * tools/gen_strings.py into the same file, arriving in the same single KERNAL
+ * LOAD, and costing one extra two-byte far read per lookup. */
 
 static uint8_t  loaded = 0;
-static uint16_t base = 0;      /* where the pool landed in the far store */
+static uint16_t idx_base = 0;   /* the offset table, in the far store */
+static uint16_t txt_base = 0;   /* the text it points into */
 
 /* Rotating, because one expression can want several pooled strings at once --
    `ui_message(S(a), S(b))` is the common case and a single buffer would hand
@@ -20,9 +33,25 @@ static char slot[STR_SLOTS][STR_MAX];
 static uint8_t next_slot = 0;
 
 uint8_t str_load(void) {
-    base = far_load("STRINGS.DAT");
-    loaded = (uint8_t)(base != FAR_NONE);
-    return loaded;
+    uint16_t base = far_load("STRINGS.DAT");
+    uint16_t count;
+
+    if (base == FAR_NONE) return (loaded = 0);
+
+    /* THE COUNT IS A GUARD, not a convenience -- STR_COUNT is a compile-time
+       constant and the loader does not need to be told it. What it needs is
+       to know that the FILE agrees. A disk built from an older tree has no
+       header at all, so the first two bytes here would be the first two
+       letters of the first string; every id would then index into noise and
+       the screen would fill with garbage read from somewhere else in the
+       store. Refusing the pool turns that into the failure the pool already
+       plans for -- no words, and a game that still plays. */
+    far_read(base, &count, sizeof count);
+    if (count != STR_COUNT) return (loaded = 0);
+
+    idx_base = (uint16_t)(base + sizeof count);
+    txt_base = (uint16_t)(idx_base + STR_COUNT * 2);
+    return (loaded = 1);
 }
 
 /* uint16_t, NOT uint8_t. The pool passed 256 strings on 2026-08-27 and every
@@ -49,7 +78,11 @@ const char *S(StrId id) {
        crash on a disk somebody built without reference/. */
     if (!loaded || id >= STR_COUNT) { dst[0] = '\0'; return dst; }
 
-    off = (uint16_t)(base + str_offset[id]);
+    /* Two far reads now, where there was one. The first is two bytes and
+       costs two FETCH calls; the second was always going to be STR_MAX of
+       them. Against 600 bytes of resident image that is not a trade worth
+       thinking about. */
+    far_read((uint16_t)(idx_base + id * 2), &off, sizeof off);
 
     /* One far read of the whole slot, then find the terminator -- rather than
        a far read per character. Every byte across the bank boundary costs a
@@ -57,7 +90,7 @@ const char *S(StrId id) {
        cheaper than the per-byte alternative. The last string in the pool is
        the only one that can read past the end, which is why the generator
        writes a terminator after it. */
-    far_read(off, dst, STR_MAX - 1);
+    far_read((uint16_t)(txt_base + off), dst, STR_MAX - 1);
     dst[STR_MAX - 1] = '\0';
     for (i = 0; i < STR_MAX; i++)
         if (dst[i] == '\0') break;

@@ -18,6 +18,7 @@
 
 #include "../src/vdc.h"
 #include "../src/layout.h"
+#include "../src/strdata.h"   /* the ids; the text comes from strings.txt via pool_init */
 #include "../../core/hof.h"
 #include "../../core/storage.h"
 #include "../src/ui.h"
@@ -107,7 +108,13 @@ static void pool_init(void) {
     fclose(f);
 }
 
-const char *S(uint8_t id) {
+/* StrId, NOT uint8_t. This said uint8_t until 2026-08-29 and had not compiled
+   since the pool passed 256 strings on 2026-08-27 and core/strpool.h widened
+   the type. Two days of `make test` failing at the FIRST of its three
+   binaries, so test_panels and test_sid never ran at all -- and nothing said
+   so, because the failure was a compiler error scrolling past above a prompt
+   nobody read. CHECK THE EXIT STATUS. */
+const char *S(StrId id) {
     return (id < pool_n && pool[id]) ? pool[id] : "";
 }
 uint8_t str_load(void) { return 1; }
@@ -285,9 +292,22 @@ static void test_panel_holds_twelve(void) {
     check((p->w - 2) % 2 == 0, "its interior splits evenly into two columns");
 }
 
+/* LIFE SUPPORT IS HELD AT 100, and that is the whole point of this helper.
+   Since 2026-08-27 ui_draw_systems() swaps SYSTEMS STATUS for the RESERVE
+   panel the moment sys[SYS_LIFE] is not perfect -- faithfully, the original
+   does the same. These tests are about the bar gauge, so a set_all() that
+   damaged life support along with everything else was quietly measuring a
+   panel with no bars in it: every case except 100% drew RESERVE, and the one
+   that passed passed because it was the only one still drawing a gauge.
+
+   Nobody saw it for two days because the file did not COMPILE (see the S()
+   stub above), so all three of `make test`'s binaries died at the first.
+   Two blind spots stacked: a suite that could not run, and inside it a fixture
+   that would have been testing the wrong screen if it had. */
 static void set_all(unsigned char pct) {
     unsigned char i;
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = pct;
+    ship.sys[SYS_LIFE] = 100;
 }
 
 /* Nothing may land outside the panel's interior rectangle. */
@@ -447,17 +467,59 @@ static void test_colours(void) {
     check(attr[y][x] == EGA_TO_VDC(EGA_LTRED), "40% is red");
 }
 
+/* THE PANEL SWAP ITSELF, which is the discriminator the gauge tests cannot be.
+ *
+ * Every fixture above now pins sys[SYS_LIFE] at 100 so that SYSTEMS STATUS is
+ * what gets drawn -- which means none of them can notice if the swap stops
+ * happening, or starts happening at the wrong threshold. This one runs the
+ * other way: it asserts that damaged life support draws RESERVE and NOT the
+ * twelve bars, so the two tests fail on opposite mistakes.
+ *
+ * LIFE_PANEL_BELOW is 100 and read from the binary -- `cmp [0x235E], 0x64`
+ * at 0x01FDC9 -- so 99 must swap and 100 must not. The boundary is asserted
+ * against the literals, not against the constant, so a wrong LIFE_PANEL_BELOW
+ * cannot satisfy this by agreeing with itself. */
+static void test_reserve_panel_swap(void) {
+    const Panel *p = &panels[P_SYSTEMS];
+    unsigned char x = (unsigned char)(p->x + 1);
+    unsigned char y = (unsigned char)(p->y + 1);
+    char got[VDC_COLS + 1];
+
+    /* Perfect: the bars are there, and the panel is NOT headed LIFE SUPPORT.
+       Both halves matter -- a reserve panel drawn by accident would still put
+       something in row 0, so the assertion has to name what. */
+    set_all(100);
+    screen_reset();
+    ui_draw_systems();
+    check(bar_len(0) == SYS_BAR, "life at 100 draws the twelve bars");
+    row_text(y, x, (unsigned char)strlen(S(S_126)), got);
+    check(strcmp(got, S(S_126)) != 0, "life at 100 is not the reserve panel");
+
+    /* One point of damage, and the whole panel is a different panel. Its two
+       labels are the ones read off the original at cs:0x403A and cs:0x4047. */
+    set_all(100);
+    ship.sys[SYS_LIFE] = 99;
+    screen_reset();
+    ui_draw_systems();
+    row_text(y, x, (unsigned char)strlen(S(S_126)), got);
+    check(strcmp(got, S(S_126)) == 0,
+          "life at 99 swaps SYSTEMS STATUS for RESERVE");
+    row_text((unsigned char)(y + 1), x, (unsigned char)strlen(S(S_253)), got);
+    check(strcmp(got, S(S_253)) == 0, "and the reserve panel says RESERVE, DAYS");
+}
+
 /* Each system is drawn from its own slot, not from a shared one. */
 static void test_independent(void) {
     unsigned char i;
 
     set_all(100);
-    for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = (unsigned char)(i * 9);
+    for (i = 0; i < SYS_COUNT; i++)
+        if (i != SYS_LIFE) ship.sys[i] = (unsigned char)(i * 9);
     screen_reset();
     ui_draw_systems();
 
     for (i = 0; i < SYS_COUNT; i++) {
-        unsigned char pct = (unsigned char)(i * 9);
+        unsigned char pct = (i == SYS_LIFE) ? 100 : (unsigned char)(i * 9);
         unsigned char want = (unsigned char)((pct * SYS_BAR + 50) / 100);
         char msg[64];
         if (want == 0 && pct != 0) want = 1;
@@ -1083,6 +1145,7 @@ int main(void) {
     test_quit_confirm();
     test_calls_them_mongols();
     test_independent();
+    test_reserve_panel_swap();
 
     test_badge_stays_inside();
     test_lasers_stay_inside();

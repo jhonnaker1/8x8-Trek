@@ -33,7 +33,7 @@ LDLIBS = -lcopy-data
 
 SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/music_data.c src/storage.c src/farmem.c src/overlay.c \
-      src/strpool.c src/strdata.c \
+      src/strpool.c \
       ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
 DEBUG_OUT = build/trek128-debug.prg
@@ -107,7 +107,10 @@ music src/music_data.h src/music_data.c:
 # The prose. Unlike the music this list IS committed -- it is the port's own
 # wording, not Anderson's -- so a clone with no reference/ still gets a game
 # with words in it.
-strings src/strdata.h src/strdata.c:
+#
+# There is no generated .c any more. strdata.h is ids alone; the offset table
+# that used to be strdata.c now ships inside strings.dat -- see strpool.c.
+strings src/strdata.h:
 	cd .. && python3 tools/gen_strings.py
 
 # The EGA->VDC colour mapping is pure arithmetic, so it is proven natively on
