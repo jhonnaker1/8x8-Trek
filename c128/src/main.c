@@ -138,7 +138,13 @@ static const char *enemy_name(unsigned char c) {
     }
 }
 
-static char linebuf[32];
+/* Wide enough for the widest line anything composes into it, which
+   `make verify` now derives from the sources rather than trusting. It was 32
+   and six compositions overran it -- the laser-overheat line needs 43 -- with
+   the spill landing on log_count, log_head and panel_slot in .bss and
+   corrupting the message log. A dialog line is 48 columns, so nothing drawn
+   can legitimately need more than this either. */
+static char linebuf[64];
 
 
 /* The laser officer asks for an amount against each enemy vessel in the

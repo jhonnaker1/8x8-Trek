@@ -191,6 +191,165 @@ def check_message_widths():
     print("verify: every ui_message fits the panel -- ok")
 
 
+# put_u16 takes a uint16_t, so five digits. The callers that pass a percentage
+# are not special-cased: a bound that depends on the caller is a bound nobody
+# maintains.
+COMPOSE_FIXED = {"put_u16": 5, "put_sector": 5, "put_tenths_str": 7}
+
+
+def check_linebuf():
+    """No composed line may overrun the buffer it is composed in.
+
+    FOUND 2026-08-28, on the real machine. `linebuf` was 32 bytes and the
+    laser-overheat line is forty:
+
+        "LASERS OVERHEAT. NOW AT " + "88" + "% EFFICIENCY."
+
+    The eight bytes past the end land on log_count, log_head and panel_slot,
+    which sit immediately after it in .bss -- so overheating the banks
+    silently corrupted the MESSAGE LOG's bookkeeping, and the panel then drew
+    a garbage row with a garbage stardate. Three other compositions were over
+    the line too and had simply not been triggered in a session.
+
+    Nothing could have caught it earlier. Both test suites run on the host,
+    where the same overrun lands on host padding and does nothing; the width
+    check above only reads `ui_message(S(a), S(b))`, two literals, and every
+    one of these is built at runtime out of pieces.
+
+    NOTHING HERE IS HARDCODED. Widths are derived from the sources -- a
+    helper's own `return` statements, a name table's own initialiser -- so
+    editing a string cannot leave a stale number behind. An expression this
+    cannot bound STOPS THE BUILD rather than being guessed at, because an
+    under-count is exactly the failure the check exists to catch.
+    """
+    src = {}
+    for rel in ("c128/src/main.c", "c128/src/ui.c", "core/planet.c"):
+        f = C128.parent / rel
+        if f.exists():
+            src[rel] = f.read_text()
+    blob = "\n".join(src.values())
+
+    strings = {}
+    for ln in (C128 / "src" / "strings.txt").read_text().splitlines():
+        if ln[:1].isdigit():
+            i, _, t = ln.partition("\t")
+            strings[int(i)] = t
+
+    def sid(name):
+        m = re.match(r"S_(\d+)$", name.strip())
+        return int(m.group(1)) if m else None
+
+    def array_widths(name):
+        """Every width an element of `name[]` can have, from its initialiser."""
+        m = re.search(r"\b" + re.escape(name) + r"\s*\[[^\]]*\]\s*=\s*\{(.*?)\}",
+                      blob, re.S)
+        if not m:
+            return None
+        body = m.group(1)
+        ids = [strings[int(i)] for i in re.findall(r"\bS_(\d+)\b", body)
+               if int(i) in strings]
+        lits = [t.encode().decode("unicode_escape")
+                for t in re.findall(r'"((?:[^"\\]|\\.)*)"', body)]
+        vals = ids + lits
+        return max(len(v) for v in vals) if vals else None
+
+    def fn_widths(name, seen):
+        """The widest thing `name()` can return, from its own returns."""
+        m = re.search(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", blob)
+        if not m:
+            return None
+        i, depth = m.end() - 1, 0
+        for j in range(i, len(blob)):
+            if blob[j] == "{":
+                depth += 1
+            elif blob[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    body = blob[i:j]
+                    break
+        else:
+            return None
+        outs = [width(e, name, seen) for e in re.findall(r"return\s+(.+?);", body)]
+        outs = [o for o in outs if o is not None]
+        return max(outs) if outs else None
+
+    def width(expr, where, seen=()):
+        expr = expr.strip()
+        if expr in seen:            # a helper that returns a call to itself
+            return 0
+        seen = tuple(seen) + (expr,)
+        m = re.fullmatch(r"S\(S_(\d+)\)", expr)
+        if m:
+            return len(strings[int(m.group(1))])
+        m = re.fullmatch(r'"((?:[^"\\]|\\.)*)"', expr)
+        if m:
+            return len(m.group(1).encode().decode("unicode_escape"))
+        # A ternary: the wider arm.
+        if "?" in expr:
+            arms = [len(strings[int(a)]) for a in re.findall(r"S\(S_(\d+)\)", expr)]
+            if arms:
+                return max(arms)
+        # S(table[i]) and table[i], both resolved from the initialiser.
+        m = re.fullmatch(r"S\(\s*(\w+)\s*\[.*\]\s*\)", expr) \
+            or re.fullmatch(r"(\w+)\s*\[.*\]", expr)
+        if m:
+            w = array_widths(m.group(1))
+            if w is not None:
+                return w
+        m = re.match(r"(\w+)\s*\(", expr)
+        if m:
+            w = fn_widths(m.group(1), seen)
+            if w is not None:
+                return w
+        die("verify: cannot bound the width of `%s` (in %s).\n"
+            "  Teach check_linebuf to resolve it -- do not guess. Guessing is\n"
+            "  how the linebuf overrun of 2026-08-28 got in." % (expr, where))
+
+    bad = []
+    for rel in ("c128/src/main.c", "c128/src/ui.c"):
+        text = src.get(rel, "")
+        m = re.search(r"static char linebuf\[(\d+)\]", text)
+        if not m:
+            continue
+        cap = int(m.group(1))
+        total, start = 0, None
+        for n, ln in enumerate(text.splitlines(), 1):
+            # A switch arm starts a fresh composition: the arms are
+            # alternatives, not pieces of one line.
+            if re.match(r"\s*(case\b|default\s*:)", ln):
+                total, start = 0, None
+            if "linebuf" not in ln:
+                continue
+            if re.search(r"\blinebuf\s*\[[^\]]*\]\s*=\s*0\s*;", ln):
+                if start is not None and total + 1 > cap:
+                    bad.append((rel, start, n, total + 1, cap))
+                total, start = 0, None
+                continue
+            m = re.search(r"=\s*put_str\(\s*linebuf(?:\s*\+\s*\w+)?\s*,\s*(.+)\)\s*;", ln)
+            if m:
+                if start is None:
+                    start = n
+                total += width(m.group(1), "%s:%d" % (rel, n))
+                continue
+            m = re.search(r"=\s*(put_u16|put_sector|put_tenths_str)\(\s*linebuf", ln)
+            if m:
+                if start is None:
+                    start = n
+                total += COMPOSE_FIXED[m.group(1)]
+                continue
+            if re.search(r"linebuf\s*\[\s*\w+\+\+\s*\]\s*=", ln):
+                if start is None:
+                    start = n
+                total += 1
+
+    if bad:
+        die("verify: composed lines overrun the buffer they are built in:\n"
+            + "\n".join(
+                "         %s:%d-%d needs %d bytes, linebuf holds %d"
+                % (f, a, b, t, c) for f, a, b, t, c in bad))
+    print("verify: every composed line fits linebuf -- ok")
+
+
 def die(msg):
     print(f"verify: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -252,6 +411,7 @@ def main():
     check_data_init(MAP)
     check_overlays(MAP)
     check_message_widths()
+    check_linebuf()
 
     consts = constants()
     rows = table_rows()
