@@ -4937,8 +4937,12 @@ note at the return rather than on a list.
 
 The list above was declared empty in the morning. By the evening these five
 were open, four of them found by USING the port rather than reading more of
-the binary. None is a constant; all five are mechanisms. TWO ARE ALREADY
-CLOSED -- the plasma bolt and [0x1F31] -- both on the same day they opened.
+the binary. None is a constant; all five are mechanisms.
+
+**FOUR OF THE FIVE CLOSED THE SAME DAY THEY OPENED** -- the plasma bolt,
+[0x1F31], the fn 0x15F51 jump, and the warp damage. TWO REMAIN: what HAIL
+schedules (3) and what raises the supply-capture trigger (5). Both are small.
+Neither blocks anything that is currently being built.
 
   0. ~~**The plasma bolt.**~~ **READ 2026-08-28**, prompted by Jamie reading
      "mongol fires a plasma bolt" off the screen mid-measurement. It is an
