@@ -3410,6 +3410,58 @@ static void test_shield_absorption(void) {
 
     puts("shields absorb a share (MEASURED)");
 
+    /* THE RATIO OF POOL DRAIN TO ENERGY DRAIN, MEASURED ON THE ORIGINAL
+       2026-08-28. This is the absorption half of the 0.8, and it is the one
+       assertion here that a wrong placement of that constant cannot survive.
+
+       Null volley on the original -- fire zero, which costs no energy and
+       still gives the enemy its turn -- with the twelve systems, both pools,
+       the enemy's hit points and the number of firers all pinned, and the
+       death pod disarmed at [0x26E0] so a detonation could not land in the
+       shield reading. Twenty-four clean turns:
+
+           charge 1000   S/E = 0.5333        (n=5,  four decimal places)
+           charge 2000   S/E = 3.1995..3.2003 (n=19)
+
+       The binary's placement predicts 0.8f/(1-f) = 0.5333 and 3.2000. The
+       alternative -- the 0.8 on the protection rather than the drain --
+       predicts 0.6667 and 4.0000, and is excluded by 25% at both charges.
+
+       Asserted as a RATIO because it is independent of hit points, range and
+       the random band, which is what let the measurement ignore all three. */
+    {
+        uint16_t c, expect_num[2] = { 8, 32 }, expect_den[2] = { 15, 10 };
+        uint16_t charges[2] = { 1000, 2000 };
+        uint8_t  k;
+
+        for (k = 0; k < 2; k++) {
+            uint16_t e0, s0, drain, through;
+            trek_new_game(3, 4711);
+            clear_quadrant();
+            ship.shields_up = 1;
+            ship.shields    = charges[k];
+            ship.energy     = ENERGY_MAX;
+            ship.sys[SYS_SHIELDS] = 100;
+            s0 = ship.shields; e0 = ship.energy;
+
+            {
+                TrekEvent dev[8]; uint8_t dn = 0;
+                trek_take_hit(1000, dev, &dn, 8);
+            }
+
+            drain   = (uint16_t)(s0 - ship.shields);
+            through = (uint16_t)(e0 - ship.energy);
+            /* drain/through == expect_num/expect_den, cross-multiplied so
+               the check is exact rather than a float comparison. 8/15 is
+               0.5333 and 32/10 is 3.2. */
+            c = (uint16_t)(drain * expect_den[k]);
+            ok(c == (uint16_t)(through * expect_num[k]),
+               charges[k] == 1000
+               ? "charge 1000: the pool loses 0.5333 of what energy loses"
+               : "charge 2000: the pool loses 3.2000 of what energy loses");
+        }
+    }
+
     /* Shields DOWN: the pool is untouched and the whole hit reaches energy.
        This port used to drain the pool whether they were up or down. */
     trek_new_game(3, 900);

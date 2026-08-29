@@ -6639,3 +6639,92 @@ model and are corrected there and above:
    before the next fire run: **a torpedo run in a quadrant holding an 'R' will
    lose torpedoes to a target that cannot be damaged**, and nothing in the
    port's own message log would have explained it before today.
+
+
+## THE ABSORPTION HALF OF THE 0.8, SETTLED (2026-08-28)
+
+The shot half was settled on 2026-08-27 and the binary won. This is the other
+half, and the binary wins it too -- to four decimal places.
+
+**The discriminator is a RATIO**, so it needs no knowledge of hit points,
+range, or the random band, all three of which defeated earlier attempts:
+
+    S = shield-charge drop, E = energy drop, f = charge / 2500
+
+    0.8 on the POOL DRAIN (binary)    S/E = 0.8f/(1-f)
+    0.8 on the PROTECTION             S/E =     f/(1-f)
+
+| charge | f | binary predicts | alternative | MEASURED |
+|---|---|---|---|---|
+| 1000 | 0.4 | **0.5333** | 0.6667 | **0.5333** (n=5) |
+| 2000 | 0.8 | **3.2000** | 4.0000 | **3.1995..3.2003** (n=19) |
+
+Twenty-four clean turns, every one within 0.0005 of the prediction, and the
+alternative excluded by 25% at both charges. `SHIELD_ABSORB_NUM/DEN` were
+already BINARY; they are now measured as well, and `core/test/test_trek.c`
+asserts the two ratios by cross-multiplication. Three breaks confirm the test
+can fail: moving the 0.8 onto the protection, removing it, and changing it to
+3/4.
+
+### The rig, and what it had to hold still
+
+Null volley -- fire ZERO, which costs no energy and still gives the enemy its
+turn -- so E is the enemy's shot and nothing else. Pinned every trial: the
+twelve systems, both pools, the enemy's hit points, **the death pod DISARMED
+at [0x26E0]** (a detonation takes 50..99 straight off the charge and would
+have landed in S as noise), and **the number of firers**.
+
+That last one was Jamie's, twice. Mongols wander in from neighbouring
+quadrants -- four had gathered within a few turns, each pinned by the rig to a
+full 355 hit points, so the board was getting stronger every turn. It is the
+same fault as the decaying board that cost the shot half, running the other
+way. Every slot but the first is zeroed now, so exactly one enemy fires.
+
+### The outliers were a different WEAPON, and I nearly filed them as a timing bug
+
+Three trials came back at 4.07, 8.50 and 8.62. Every one of them followed a
+turn that read as "no shot", so they looked exactly like the documented settle
+trap -- damage arriving late and landing on the next reading. That explanation
+fits three samples and is wrong.
+
+Jamie, watching the screen: *"mongol fires a plasma bolt"*.
+
+Predicted before looking, and photographed: an outlier turn shows the plasma
+bolt, a 3.20 turn does not. The captured outlier reads
+
+    639 unit hit from plasma bolt.
+    87 unit hit from Mongol at 8-8.
+
+with E = 87.50 -- the ordinary shot's through figure exactly. **The plasma
+bolt drained NO energy at all**; the shields took all of it, ~442 off the
+charge for a printed 639. It is a separate weapon with a separate damage path,
+already on record as 619 and 639 unit hits, and it is UNBUILT in this port.
+One capture is not a law; what it establishes is that the ordinary-shot
+measurement above is clean once plasma turns are excluded, and that the bolt
+needs its own designed run.
+
+### AND THE PRINTED FIGURE IS THE THROUGH VALUE, NOT absorbed x 0.8
+
+This was the reason the run was scheduled: if the printed "N unit hit" carried
+the 0.8, every screen-sourced absorption figure in this file's back catalogue
+took a correction. **It does not.** With shields UP at charge 2000, the damage
+report read "87 unit hit from Mongol at 8-8" and the energy drop was 87.50 --
+the same number. The charge dropped 280 in that turn, and 0.8 x 280 is 224,
+which is not what was printed.
+
+So the back catalogue needs no correction, and a conflict is recorded rather
+than resolved: the static read of 0x017077 in this file says
+`printed = absorbed * 0.8` with the string "Shields absorb N unit hit from ".
+No message of that wording appeared in twenty-four turns with shields up and
+absorbing. Either that string belongs to a path these turns did not take, or
+the site was mis-attributed. **The experiment that separates them:** capture a
+turn whose printed figure is NOT equal to the energy drop, and read its
+wording. Nothing in the port depends on the answer -- the port prints its own
+messages -- so this is about the instrument, not the game.
+
+### Confirmed in passing
+
+**Life support at 0% swaps the console panel.** The captured outlier shows
+"Life Support damaged. Now at 0%" and the SYSTEMS STATUS panel replaced by
+"LIFE SUPPORT / RESERVE, DAYS" with a bar -- which is what `draw_reserve()`
+does in this port, built from the reading rather than from a screenshot.
