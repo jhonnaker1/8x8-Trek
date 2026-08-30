@@ -2688,6 +2688,58 @@ Notes worth having before building it:
 saved game" prompt still needs to appear and take N, because the sequence
 reads wrong without it, but nothing behind it.
 
+### The briefing text is WRITTEN (2026-08-29): 12 pages, 10,557 bytes, 42 blocks
+
+**Written, not ported.** `c128/src/briefing.txt` is the port's own prose, in
+its own voice, and none of Anderson's wording is in it. The captures were used
+the way this project has always said they should be -- as a specification of
+what each page COVERS -- and the text was then written from the mechanics this
+repo has read out of the binary.
+
+**Why that is the copyright position and not merely a preference.** The
+manual's SHAREWARE section licenses redistribution of his COMPLETE, UNMODIFIED
+package with the notice intact, which is why `reference/` is gitignored. The
+same paragraph ends "The author retains all other rights to the program."
+Copying fifteen pages of his text into a different program is not
+redistribution of his package; it is reproduction in ours, and the notice does
+not license it. Facts are a different matter -- 43 officers and 387 crew, a
+Class IX Research/Battle Cruiser, warp 6 cruising and 8 emergency, the
+specification table -- and those are used freely, as the whole port uses the
+mechanics.
+
+**IT IS 12 PAGES, NOT THE FIFTEEN THIS FILE USED TO SAY.** b13, b14 and b15
+are the setup prompts AFTER the briefing (restore, name, command level), not
+briefing pages. b09 is missing from the captures; its topic is inferable from
+its neighbours and this port covers the ground in its own page 10.
+
+    page  1  welcome, and what the briefing covers
+    page  2  intelligence report -- the war and the mission
+    page  3  specifications, Class IX
+    page  4  THE COMMAND CONSOLE -- ours, and new: nine live panels
+    page  5  navigation: MOVE, WARP, DOCK
+    page  6  engineering: ENERGY, MAX, REPAIR, FIX
+    page  7  weapons: TORPEDO, LASERS
+    page  8  defence: SHUP, SHDN and what shields cost
+    page  9  scanners and the chart
+    page 10  the ship's records: CHART, PLAN, INFO
+    page 11  communications: MSGS, ACK, HAIL, SAVE, SND, QUIT, SELF
+    page 12  exploration: ORBIT, LAND, USE
+
+**It describes THIS port, not the original.** There is no LONG command here
+because the chart panel is permanent; page 4 exists because our nine-panel
+console is not the original's screen; and page 3 tells the captain the helm
+accepts warp 10 while the yard certifies 8 -- which is the binary's own limit
+and the reason the engines strain, read on the same day.
+
+**COST: 10,557 bytes, 42 disk blocks of 254, and ZERO RAM.** It is streamed a
+page at a time through `plat_open`/`plat_read`, which exist for exactly this
+and are still the only part of the disk seam never exercised. The d64 had 387
+blocks free. `make verify` now checks every page fits 78x22, proven by
+breaking one.
+
+**What is NOT built: the viewer.** `s->briefing` is still collected at
+ui.c:1679 and read by nothing.
+
 ### 11. Briefing pages -- CAPTURED 2026-08-21
 
 All fifteen pages are captured to `reference/shots/b*.png`. Contents worth

@@ -151,6 +151,11 @@ def check_overlays(mapfile):
 MSG_W  = 40    # layout.h
 MSG_PAD = 2    # msg_box() draws inside the border
 
+# The briefing draws on a bare 80x25 screen: 22 rows of page leaves a
+# blank line and a footer prompt, and 78 columns leaves a margin.
+BRIEF_ROWS = 22
+BRIEF_COLS = 78
+
 
 def check_message_widths():
     """A message the panel cannot hold is TRUNCATED, and it does not say so.
@@ -473,6 +478,35 @@ def check_overlay_calls():
     print("verify: no overlay calls out of its own window -- ok")
 
 
+def check_briefing():
+    """Every briefing page must fit the 80x25 screen.
+
+    The briefing is PROSE IN A FILE, streamed from the disk a page at a time
+    (core/storage.h's plat_open/plat_read exist for it), so it costs no RAM
+    and nothing in the build would otherwise notice a page growing past the
+    bottom of the screen. Pages are separated by a form feed.
+
+    The bounds leave room for a footer prompt under the text and a column of
+    margin, so a page that passes here can be drawn without clipping.
+    """
+    f = C128 / "src" / "briefing.txt"
+    if not f.exists():
+        return
+    pages = f.read_text().split("\f")
+    bad = []
+    for n, page in enumerate(pages, 1):
+        ls = page.rstrip("\n").split("\n")
+        w = max(len(l) for l in ls)
+        if len(ls) > BRIEF_ROWS or w > BRIEF_COLS:
+            bad.append((n, len(ls), w))
+    if bad:
+        die("briefing pages that will not fit the screen:\n" + "\n".join(
+            "         page %d: %d lines (max %d), %d columns (max %d)"
+            % (n, h, BRIEF_ROWS, w, BRIEF_COLS) for n, h, w in bad))
+    print("verify: %d briefing pages, all inside %dx%d -- ok"
+          % (len(pages), BRIEF_COLS, BRIEF_ROWS))
+
+
 def die(msg):
     print(f"verify: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -536,6 +570,7 @@ def main():
     check_message_widths()
     check_linebuf()
     check_overlay_calls()
+    check_briefing()
 
     consts = constants()
     rows = table_rows()
