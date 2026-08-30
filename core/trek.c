@@ -230,6 +230,7 @@ void trek_sched_restore(uint8_t kind, uint16_t when) {
     if (kind < SCHED_COUNT) sched[kind] = when;
 }
 uint8_t  base_under_attack = GAL_CELLS;
+uint8_t  hail_quad = GAL_CELLS;   /* the base a hail is waiting on */
 uint8_t  gal_commander[GAL_CELLS];
 /* Set by a warp move that ended somewhere the captain did not choose. The
    UI reads and clears it; nothing else does. */
@@ -410,6 +411,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
        flagged as such. */
     for (i = 0; i < SCHED_COUNT; i++) sched[i] = SCHED_NEVER;
     base_under_attack = GAL_CELLS;
+    hail_quad = GAL_CELLS;          /* nothing has been hailed yet */
     bases_lost = 0;
 
     /* The FIRST attack is `stardate + 2 + Random(4)` in the original --
@@ -674,6 +676,10 @@ uint8_t trek_fire_ray(void) {
     return RAY_MISFIRE;                  /* roll 1: the message and nothing */
 }
 
+/* Defined down with the torpedo ray march, which is its other caller. The
+   hail needs a real distance out of a squared one; see trek.h. */
+static uint16_t isqrt16(uint16_t n);
+
 uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
     uint8_t  lo_y, hi_y, lo_x, hi_x, y, x, c;
     uint16_t best = HAIL_START_Q, d;
@@ -700,8 +706,32 @@ uint8_t trek_hail(uint8_t *qy, uint8_t *qx) {
     }
 
     /* No trek_advance_time() here: hailing costs nothing. See trek.h. */
+
+    /* THE ORDER OF THESE THREE IS THE MECHANIC, and it is read from the
+       branches rather than from the order of the addresses -- both message
+       paths in the original JUMP OVER the scheduling code that follows them.
+
+       Blocked: nothing goes out, so nothing comes back. */
     if (trek_rand_n(HAIL_BLOCK_OF_N) < HAIL_BLOCK_BELOW) return HAIL_BLOCKED;
-    if (!found || best > HAIL_RANGE_Q) return HAIL_SILENT;
+
+    if (!found || best > HAIL_RANGE_Q) {
+        /* Out of immediate range. THIS is the branch that schedules: the base
+           heard you and its answer is still travelling. `found` is the v<8.0
+           gate -- best only leaves HAIL_START_Q when a base was seen, and the
+           box cannot hold one further than 32 squared anyway.
+
+           delay = sqrt(25 * best) - 5 tenths; see trek.h for why that is the
+           whole of (v-1.0)*0.5 with no fractional root. best > HAIL_RANGE_Q
+           means best >= 5, so the delay is at least 6 tenths and never
+           underflows. */
+        if (found)
+            trek_schedule(SCHED_HAIL,
+                          (uint16_t)(isqrt16((uint16_t)(25u * best)) - 5u));
+        hail_quad = found ? (uint8_t)((fy << 3) | fx) : GAL_CELLS;
+        return HAIL_SILENT;
+    }
+
+    /* Close enough to answer now, so there is nothing to wait for. */
     if (qy) *qy = fy;
     if (qx) *qx = fx;
     return HAIL_RESPONDS;
@@ -836,6 +866,26 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                     ev[*n].y      = (uint8_t)(q >> 3);
                     ev[*n].x      = (uint8_t)(q & 7);
                     ev[*n].amount = planet_evac_end;
+                    (*n)++;
+                }
+                break;
+            }
+            case SCHED_HAIL: {
+                /* THE BASE MUST STILL BE THERE. 0x020689 re-reads the chart
+                   word for the remembered quadrant and requires the base type
+                   to still be 1 before it prints anything -- so hail a distant
+                   base, let the Mongols take it while the signal is in flight,
+                   and the answer simply never comes. That is the original's
+                   own behaviour and it is the reason this slot remembers a
+                   quadrant rather than just a deadline. */
+                uint8_t q = hail_quad;
+                hail_quad = GAL_CELLS;
+                if (q >= GAL_CELLS || gal_base[q] != BASE_STARBASE) break;
+                if (ev && *n < max) {
+                    ev[*n].kind   = EV_HAIL_REPLY;
+                    ev[*n].y      = (uint8_t)(q >> 3);
+                    ev[*n].x      = (uint8_t)(q & 7);
+                    ev[*n].amount = 0;
                     (*n)++;
                 }
                 break;

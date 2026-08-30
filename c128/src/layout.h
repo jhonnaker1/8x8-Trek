@@ -75,6 +75,17 @@ extern const Panel panels[PANEL_COUNT];
 #define MSG_W   40
 #define MSG_H   14
 
+/* PREVIOUS MESSAGES, the modal log viewer. Here rather than in ui.c because a
+   test has to know where the box is to prove nothing is drawn outside it --
+   which is exactly the bug of 2026-08-29, when msgv_draw() wrote the log's
+   department and text with no bound at all and a long line crossed the right
+   border onto the console behind. */
+#define MSGV_X      25
+#define MSGV_Y       6
+#define MSGV_W      41
+#define MSGV_LINES  11
+#define MSGV_H      (MSGV_LINES + 4)   /* border, title, lines, footer, border */
+
 /* Indices into panels[]. The UI addresses panels by name so that correcting
    the geometry above stays a single-site edit. */
 #define P_SCAN      0

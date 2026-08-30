@@ -1448,11 +1448,8 @@ OVL_CODE("planet") void ui_planet_list(void) {
  * through -- a per-cell background would mean reverse-video spaces. Left
  * alone so this box matches every other dialog in the port rather than
  * being the only filled one. */
-#define MSGV_X      25
-#define MSGV_Y       6
-#define MSGV_W      41
-#define MSGV_LINES  11
-#define MSGV_H      (MSGV_LINES + 4)   /* border, title, lines, footer, border */
+/* MSGV_* live in layout.h with the rest of the panel geometry, so the
+   tests can bound this box without restating where it is. */
 
 #define COL_MSGV_TITLE  EGA_TO_VDC(EGA_CYAN)
 #define COL_MSGV_DATE   EGA_TO_VDC(EGA_MAGENTA)
@@ -1488,9 +1485,27 @@ static void msgv_draw(unsigned char top) {
             scr_puts(x, y, S(S_184), COL_MSGV_DATE);
             put_tenths((unsigned char)(x + 10), y, view_date, COL_MSGV_DATE);
         } else {
+            /* CLAMPED TO THE BOX, and it was not until 2026-08-29. This wrote
+               view_dept then view_text at x+1 with no bound at all: the log
+               holds up to LOG_DEPT + LOG_TEXT = 53 characters and the box
+               interior is MSGV_W - 2 = 39, so a long message drew straight
+               across the right border and over whatever panel was behind it.
+               Jamie saw it on the VDC -- "one message overruns the box" --
+               with a line this session's HAIL reply made long enough to show.
+               The comment above still holds (messages are composed to fit)
+               but a DRAW ROUTINE MUST NOT RELY ON ITS CALLERS being right:
+               this one is reached with whatever the log happens to hold,
+               including entries written by an older build. */
+            unsigned char room = (unsigned char)(MSGV_W - 3);
+            unsigned char dn = (unsigned char)strlen(view_dept);
+
+            if (dn > room) dn = room;
+            view_dept[dn] = '\0';
             scr_puts((unsigned char)(x + 1), y, view_dept, COL_MSGV_TEXT);
-            scr_puts((unsigned char)(x + 1 + strlen(view_dept)), y,
-                     view_text, COL_MSGV_TEXT);
+
+            room = (unsigned char)(room - dn);
+            if (strlen(view_text) > room) view_text[room] = '\0';
+            scr_puts((unsigned char)(x + 1 + dn), y, view_text, COL_MSGV_TEXT);
         }
     }
 }

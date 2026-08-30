@@ -905,6 +905,57 @@ static void test_messages_stay_inside(void) {
     check(escaped == 0,    "messages: no write leaves the message region");
 }
 
+/* NOTHING THE LOG VIEWER DRAWS MAY LEAVE ITS BOX.
+ *
+ * msgv_draw() had no bound at all until 2026-08-29: it wrote view_dept then
+ * view_text at the box's left edge, and the log holds up to LOG_DEPT +
+ * LOG_TEXT = 53 characters against a MSGV_W - 2 = 39 interior. A long message
+ * drew across the right border and over the console behind it. Jamie saw it
+ * on the VDC; no test could have, because test_messages_stay_inside() above
+ * exercises ui_message() -- the small panel -- and never opens the viewer.
+ *
+ * THE FIXTURE MUST USE AN OVER-LONG MESSAGE. A test written with realistic
+ * text passes against the unclamped draw, which is how this survived: the
+ * composed lines were all short enough until one was not. */
+static void test_viewer_stays_inside(void) {
+    unsigned char x, y;
+    int escaped = 0;
+
+    screen_reset();
+    ui_clear_messages();
+    ship.stardate = 35149;
+    ui_message("COMMUNICATIONS: ",
+               "A MESSAGE FAR LONGER THAN THIS BOX CAN EVER HOLD");
+    ui_message("DAMAGE: ", "SHORT ONE");
+
+    /* A CLEAN SCREEN FIRST, so what is counted is what the VIEWER drew. The
+       ui_message() calls above painted the small message panel, which is
+       outside this box and would count as an escape. The log itself lives in
+       VDC memory, not in the fake screen, so clearing the screen does not
+       clear the log. */
+    screen_reset();
+
+    /* SNAPSHOT, not the final screen. ui_messages_view() calls ui_draw_all()
+       on its way out to restore the console, which writes over the whole
+       grid -- so checking `cell` afterwards checks the console and not the
+       viewer. snap_armed makes kb_waitkey() copy the screen as the player
+       sees it, with the box still up. */
+    snap_armed = 1;
+    kb_script = "\033";              /* ESC: draw once, then leave */
+    ui_messages_view();
+
+    for (y = 0; y < VDC_ROWS; y++)
+        for (x = 0; x < VDC_COLS; x++) {
+            if (snap[y][x] == SENTINEL) continue;
+            if (x >= MSGV_X && x < MSGV_X + MSGV_W &&
+                y >= MSGV_Y && y < MSGV_Y + MSGV_H) continue;
+            escaped++;
+        }
+
+    check(off_screen == 0, "the log viewer writes nothing off the grid");
+    check(escaped == 0, "and nothing outside its own box, however long the text");
+}
+
 /* Departments are interleaved in one stack, which is the whole point of the
    correction: a damage report sits between two other messages rather than
    being routed to a panel of its own. */
@@ -1156,6 +1207,7 @@ int main(void) {
     test_message_stack();
     test_message_stamps();
     test_message_scroll();
+    test_viewer_stays_inside();
     test_ack();
     test_log_outlives_the_panel();
     test_msgs_opens_at_the_bottom();

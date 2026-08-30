@@ -194,7 +194,10 @@ def check_message_widths():
 # put_u16 takes a uint16_t, so five digits. The callers that pass a percentage
 # are not special-cased: a bound that depends on the caller is a bound nobody
 # maintains.
-COMPOSE_FIXED = {"put_u16": 5, "put_sector": 5, "put_tenths_str": 7}
+# put_quad is three: both indices are quadrant numbers, bounded by GAL_DIM
+# and not by the caller, which is the whole reason it exists as a helper.
+COMPOSE_FIXED = {"put_u16": 5, "put_sector": 5, "put_tenths_str": 7,
+                 "put_quad": 3}
 
 
 def check_linebuf():
@@ -306,12 +309,14 @@ def check_linebuf():
             "  how the linebuf overrun of 2026-08-28 got in." % (expr, where))
 
     bad = []
+    narrow = []          # composed lines the PANEL will truncate
     for rel in ("c128/src/main.c", "c128/src/ui.c"):
         text = src.get(rel, "")
         m = re.search(r"static char linebuf\[(\d+)\]", text)
         if not m:
             continue
         cap = int(m.group(1))
+        lines = text.splitlines()
         total, start = 0, None
         for n, ln in enumerate(text.splitlines(), 1):
             # A switch arm starts a fresh composition: the arms are
@@ -323,6 +328,27 @@ def check_linebuf():
             if re.search(r"\blinebuf\s*\[[^\]]*\]\s*=\s*0\s*;", ln):
                 if start is not None and total + 1 > cap:
                     bad.append((rel, start, n, total + 1, cap))
+                # AND THE PANEL, which is the tighter of the two bounds and was
+                # not checked at all until 2026-08-29. check_message_widths()
+                # above reads `ui_message(S(a), S(b))` only -- two literals --
+                # so every line BUILT at runtime was bounded by the buffer it
+                # was composed in and by nothing else. The buffer is 64 bytes
+                # and the panel holds 40 minus the department label, so a line
+                # could pass the check and still be cut on screen. Two were:
+                # the hail's own "STARBASE IN 6,6 responds." shipped truncated,
+                # and the delayed reply added the same day was caught here
+                # rather than by looking at the VDC.
+                if start is not None:
+                    for look in lines[n:n + 6]:
+                        d = re.search(r"ui_message\(\s*S\(S_(\d+)\)\s*,"
+                                      r"\s*linebuf\s*\)", look)
+                        if not d:
+                            continue
+                        dept = strings[int(d.group(1))]
+                        room = MSG_W - MSG_PAD - len(dept)
+                        if total > room:
+                            narrow.append((rel, start, n, dept, total, room))
+                        break
                 total, start = 0, None
                 continue
             m = re.search(r"=\s*put_str\(\s*linebuf(?:\s*\+\s*\w+)?\s*,\s*(.+)\)\s*;", ln)
@@ -331,7 +357,7 @@ def check_linebuf():
                     start = n
                 total += width(m.group(1), "%s:%d" % (rel, n))
                 continue
-            m = re.search(r"=\s*(put_u16|put_sector|put_tenths_str)\(\s*linebuf", ln)
+            m = re.search(r"=\s*(put_u16|put_sector|put_tenths_str|put_quad)\(\s*linebuf", ln)
             if m:
                 if start is None:
                     start = n
@@ -348,6 +374,14 @@ def check_linebuf():
                 "         %s:%d-%d needs %d bytes, linebuf holds %d"
                 % (f, a, b, t, c) for f, a, b, t, c in bad))
     print("verify: every composed line fits linebuf -- ok")
+
+    if narrow:
+        die("composed lines the message panel will silently truncate:\n"
+            + "\n".join(
+                "         %s:%d-%d under %s\n"
+                "             needs %d columns, %d fit"
+                % (f, a, b, d.strip(), t, r) for f, a, b, d, t, r in narrow))
+    print("verify: every composed line fits the panel -- ok")
 
 
 def die(msg):

@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 300
+#define STR_COUNT 302
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -255,7 +255,7 @@
 #define S_246  246   /* TORPEDO PASSED WIDE. */
 #define S_247  247   /* % EFFICIENCY. */
 #define S_248  248   /* LASERS OVERHEAT. NOW AT  */
-#define S_249  249   /* CAUGHT IN TRACTOR BEAM. PULLED TO  */
+#define S_249  249   /* TRACTOR BEAM. PULLED TO  */
 #define S_250  250   /* Life support depleted. */
 #define S_251  251   /* ENGINEERING: */
 #define S_252  252   /* Not on reserve life support. */
@@ -301,10 +301,12 @@
 #define S_292  292   /* VANDAL ACTIVATES CLOAKING DEVICE. */
 #define S_293  293   /* NO DAMAGE REPORTED. */
 #define S_294  294   /* ENTERED A BLACK HOLE */
-#define S_295  295   /* THROWN FREE IN QUADRANT  */
+#define S_295  295   /* THROWN FREE IN QUAD  */
 #define S_296  296   /* THE SHIP DID NOT COME OUT. */
 #define S_297  297   /* TORPEDO SUCKED INTO BLACK HOLE. */
-#define S_298  298   /* FIRES PLASMA BOLT */
-#define S_299  299   /*  UNIT HIT FROM PLASMA BOLT. */
+#define S_298  298   /* FIRES BOLT */
+#define S_299  299   /*  UNIT HIT, PLASMA BOLT. */
+#define S_300  300   /*  ANSWERS HAIL. */
+#define S_301  301   /*  KILLED  */
 
 #endif

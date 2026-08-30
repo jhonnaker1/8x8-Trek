@@ -83,6 +83,19 @@ static uint8_t put_u16(char *buf, uint16_t v) {
     return i;
 }
 
+/* A QUADRANT, "y-x" and 1-based. Its width is bounded by the GALAXY, not by
+   the caller: both indices are < GAL_DIM, so this is three columns and can
+   never be more. That matters to c128/tools/verify_prg.py, which has to bound
+   a composed line without knowing what any caller passes -- put_u16 has to be
+   counted at five digits there, and two of those in a line about a quadrant
+   over-counted it by eight columns. */
+static uint8_t put_quad(char *buf, uint8_t y, uint8_t x) {
+    uint8_t n = put_u16(buf, (uint16_t)(y + 1));
+    buf[n++] = '-';
+    n += put_u16(buf + n, (uint16_t)(x + 1));
+    return n;
+}
+
 /* String literals ARE translated to PETSCII by cc65, so this copies letters
    in the 193-218 range while put_u16 writes ASCII digits. Mixing the two in
    one buffer is fine: everything here goes to ui_message, and the screen
@@ -728,9 +741,7 @@ static void report_move(uint8_t r) {
        somewhere the captain did not ask for. */
     if (tractored) {
         uint8_t k = put_str(linebuf, S(S_249));
-        k += put_u16(linebuf + k, (uint16_t)(ship.quad_y + 1));
-        linebuf[k++] = '-';
-        k += put_u16(linebuf + k, (uint16_t)(ship.quad_x + 1));
+        k += put_quad(linebuf + k, ship.quad_y, ship.quad_x);
         linebuf[k++] = '.';
         linebuf[k] = 0;
         tractored = 0;
@@ -747,9 +758,7 @@ static void report_move(uint8_t r) {
             uint8_t k;
             ui_message(S(S_52), S(S_294));
             k  = put_str(linebuf, S(S_295));
-            k += put_u16(linebuf + k, (uint16_t)(ship.quad_y + 1));
-            linebuf[k++] = '-';
-            k += put_u16(linebuf + k, (uint16_t)(ship.quad_x + 1));
+            k += put_quad(linebuf + k, ship.quad_y, ship.quad_x);
             linebuf[k++] = '.';
             linebuf[k] = 0;
             hole_threw = 0;
@@ -1139,11 +1148,16 @@ OVL_CODE("cmds") static void do_hail(void) {
             ui_message(S(S_16), S(S_274));
             return;
         case HAIL_RESPONDS:
+            /* COMMS:, not COMMUNICATIONS:. Same department, nine fewer
+               columns -- and this line has been TRUNCATED on screen since it
+               was written, at 26 columns against the 22 the long label
+               leaves. Nothing caught it because verify only bounded composed
+               lines by the BUFFER; it bounds them by the panel now. */
             k  = put_str(linebuf, S(S_273));
             k += put_sector(linebuf + k, qy, qx);
             k += put_str(linebuf + k, S(S_271));
             linebuf[k] = 0;
-            ui_message(S(S_16), linebuf);
+            ui_message(S(S_166), linebuf);
             return;
         default:
             ui_message(S(S_16), S(S_272));
@@ -1272,16 +1286,22 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
                gone supernova in quadrant R-C" and, when it took Mongols
                with it, ";  N Mongols reported destroyed." -- cs:0x2F28
                and cs:0x2F83, cut to the 26 this panel fits. */
+            /* KILLED, not "lost". `amount` is the MONGOLS the supernova
+               took with it -- EV_NOVA's own comment says so and the original
+               says "N Mongols reported destroyed" -- and this read
+               "SUPERNOVA 6,2; 3 LOST." on the VDC, which a captain would take
+               as three of OURS. Good news rendered as bad. Spotted by Jamie
+               reading the screen; the width checks had nothing to say about
+               it, because it was never too long, only wrong. */
             k  = put_str(linebuf, S(S_264));
             k += put_sector(linebuf + k, e->y, e->x);
             if (e->amount) {
-                k += put_str(linebuf + k, "; ");
+                k += put_str(linebuf + k, S(S_301));
                 k += put_u16(linebuf + k, e->amount);
-                k += put_str(linebuf + k, " lost");
             }
             linebuf[k++] = '.';
             linebuf[k] = 0;
-            ui_message(S(S_263), linebuf);
+            ui_message(S(S_166), linebuf);
             return;
         case EV_BOARDED:
             /* "SECURITY: A Mongol boarding party has transported into
@@ -1315,7 +1335,19 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
             k += put_str(linebuf + k, S(S_277));
             k += put_tenths_str(linebuf + k, e->amount);
             linebuf[k] = 0;
-            ui_message(S(S_16), linebuf);
+            ui_message(S(S_166), linebuf);
+            return;
+        case EV_HAIL_REPLY:
+            /* The delayed half of HAIL. The immediate answer said only that
+               the frequencies were open; this is the base itself, arriving
+               half a stardate per quadrant later. Deliberately worded so the
+               two do not read alike -- S_271 " responds." is the one you get
+               on the spot. */
+            k  = put_str(linebuf, S(S_273));
+            k += put_sector(linebuf + k, e->y, e->x);
+            k += put_str(linebuf + k, S(S_300));
+            linebuf[k] = 0;
+            ui_message(S(S_166), linebuf);
             return;
         case EV_BOARDERS_GONE:
             ui_message(S(S_262), S(S_261));

@@ -2745,6 +2745,129 @@ static void test_torpedo(void) {
         }
         ok(responds == 0, "neither a research station nor a supply depot answers");
 
+        /* --- THE DELAYED REPLY, and its GATING is the whole point ---
+         *
+         * Read 2026-08-29 off the branches, not the address order: BOTH the
+         * blocked path (0x0209A3) and the in-range path (0x020A11) JUMP OVER
+         * the scheduling code at 0x020A65. Only "No response." falls into it.
+         * So these three cases are the discriminator -- a build that schedules
+         * on every hail passes nothing here but the third. */
+        {
+            uint8_t  qy2, qx2, c, tries;
+            uint16_t due;
+            TrekEvent ev2[8];
+            uint8_t  n2, j, seen;
+
+            /* IN RANGE: answers now, so there is nothing to wait for. */
+            responds = 0; wrong = 0;
+            for (i = 0; i < 400; i++) {
+                trek_new_game(3, (uint16_t)(900 + i));
+                for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE;
+                ship.quad_y = 4; ship.quad_x = 4;
+                gal_base[(4 << 3) | 6] = BASE_STARBASE;      /* d^2 = 4 */
+                if (trek_hail(&qy2, &qx2) != HAIL_RESPONDS) continue;
+                responds++;
+                if (trek_is_scheduled(SCHED_HAIL)) wrong++;
+            }
+            ok(responds > 0, "a base in range still answers on the spot");
+            ok(wrong == 0, "and an answer NOW schedules no delayed reply");
+
+            /* BLOCKED: nothing went out, so nothing comes back. */
+            blocked = 0; wrong = 0;
+            for (i = 0; i < 400; i++) {
+                trek_new_game(3, (uint16_t)(1300 + i));
+                for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE;
+                ship.quad_y = 4; ship.quad_x = 4;
+                gal_base[(4 << 3) | 7] = BASE_STARBASE;      /* out of range */
+                if (trek_hail(&qy2, &qx2) != HAIL_BLOCKED) continue;
+                blocked++;
+                if (trek_is_scheduled(SCHED_HAIL)) wrong++;
+            }
+            ok(blocked > 0, "interference still blocks one hail in five");
+            ok(wrong == 0, "and a blocked hail schedules no reply either");
+
+            /* OUT OF RANGE: this is the branch that schedules.
+               THE DELAYS ARE LITERALS, not the formula -- an assertion
+               written as sqrt(25*d)-5 would agree with a wrong sqrt. Three
+               distances, each solved by hand from (v - 1.0) * 0.5:
+                 d^2 = 5  -> v 2.236 -> 0.618 -> 6 tenths
+                 d^2 = 9  -> v 3.000 -> 1.000 -> 10 tenths
+                 d^2 = 32 -> v 5.657 -> 2.328 -> 23 tenths          */
+            {
+                static const struct { uint8_t y, x; uint16_t tenths; } far_base[] = {
+                    { 5, 6,  6 },      /* dy 1, dx 2 */
+                    { 4, 7, 10 },      /* dy 0, dx 3 */
+                    { 0, 0, 23 }       /* the corner of the +-4 box */
+                };
+                uint8_t b;
+                for (b = 0; b < 3; b++) {
+                    char msg[72];
+                    uint16_t got = SCHED_NEVER, t0 = 0;
+                    for (tries = 0; tries < 60; tries++) {
+                        trek_new_game(3, (uint16_t)(2000 + tries + b * 97));
+                        for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE;
+                        ship.quad_y = 4; ship.quad_x = 4;
+                        gal_base[(far_base[b].y << 3) | far_base[b].x] =
+                            BASE_STARBASE;
+                        t0 = ship.stardate;
+                        if (trek_hail(&qy2, &qx2) != HAIL_SILENT) continue;
+                        got = trek_scheduled(SCHED_HAIL);
+                        break;
+                    }
+                    sprintf(msg, "a base at %u,%u is answered in %u tenths",
+                            far_base[b].y, far_base[b].x, far_base[b].tenths);
+                    ok(got == (uint16_t)(t0 + far_base[b].tenths), msg);
+                }
+            }
+
+            /* AND IT ARRIVES, naming the base that answered. */
+            due = SCHED_NEVER;
+            for (tries = 0; tries < 60; tries++) {
+                trek_new_game(3, (uint16_t)(3000 + tries));
+                for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE;
+                ship.quad_y = 4; ship.quad_x = 4;
+                gal_base[(4 << 3) | 7] = BASE_STARBASE;
+                if (trek_hail(&qy2, &qx2) != HAIL_SILENT) continue;
+                due = trek_scheduled(SCHED_HAIL);
+                break;
+            }
+            ok(due != SCHED_NEVER, "an out-of-range hail is waiting on a reply");
+
+            n2 = trek_advance(5, ev2, 8);
+            for (j = 0, seen = 0; j < n2; j++)
+                if (ev2[j].kind == EV_HAIL_REPLY) seen = 1;
+            ok(!seen, "the reply does not arrive before its date");
+
+            n2 = trek_advance(20, ev2, 8);
+            for (j = 0, seen = 0; j < n2; j++)
+                if (ev2[j].kind == EV_HAIL_REPLY) {
+                    seen = 1;
+                    ok(ev2[j].y == 4 && ev2[j].x == 7,
+                       "and it names the StarBase that answered");
+                }
+            ok(seen, "the reply arrives once the clock passes it");
+            ok(!trek_is_scheduled(SCHED_HAIL), "and the slot goes back to never");
+
+            /* THE BASE MUST STILL BE THERE -- 0x020689 re-reads the chart
+               word before printing. Take the base away while the signal is in
+               flight and the answer never comes. Without that re-check this
+               fires and names a quadrant with no base in it. */
+            for (tries = 0; tries < 60; tries++) {
+                trek_new_game(3, (uint16_t)(4000 + tries));
+                for (c = 0; c < GAL_CELLS; c++) gal_base[c] = BASE_NONE;
+                ship.quad_y = 4; ship.quad_x = 4;
+                gal_base[(4 << 3) | 7] = BASE_STARBASE;
+                if (trek_hail(&qy2, &qx2) == HAIL_SILENT) break;
+            }
+            gal_base[(4 << 3) | 7] = BASE_NONE;        /* the Mongols took it */
+            n2 = trek_advance(40, ev2, 8);
+            for (j = 0, seen = 0; j < n2; j++)
+                if (ev2[j].kind == EV_HAIL_REPLY) seen = 1;
+            ok(!seen, "a base destroyed in flight never answers");
+            ok(!trek_is_scheduled(SCHED_HAIL),
+               "and the slot is cleared rather than left pending for ever");
+        }
+
         /* IT COSTS NO TIME. Twenty-five HAILs under dosbox-automation left
            the stardate at 3500.00; the "0.1 stardates" this asserted came
            from a claim retracted in 2026-08-24 that survived in trek.h. */

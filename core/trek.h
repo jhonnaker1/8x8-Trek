@@ -1114,6 +1114,7 @@ uint8_t trek_shields_down(void);
 #define EV_MUTANTS      16   /* amount = which report, 0..4 */  /*@ID*/
 #define EV_BOLT_FIRED   17   /* y,x = the firing enemy's sector */  /*@ID*/
 #define EV_BOLT_HIT     18   /* amount = the damage; y,x = where it went off */  /*@ID*/
+#define EV_HAIL_REPLY   19   /* y,x = the StarBase that answered */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1201,7 +1202,8 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
    the settlers' distress call now, which IS one -- DS:0x1D9C, handled by
    `fn 0x151D0` from the turn loop. */
 #define SCHED_DISTRESS       2   /* DS:0x1D9C */  /*@BINARY*/
-#define SCHED_COUNT          3  /*@ID*/
+#define SCHED_HAIL           3   /* DS:0x1D78 -- the StarBase's reply */  /*@BINARY*/
+#define SCHED_COUNT          4  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
 
@@ -1440,6 +1442,11 @@ extern uint8_t pod_alive;
    Leaving the quadrant loses it, exactly as 0x01659E does. */
 extern uint8_t bolt_cell;
 extern uint8_t bolt_quad;
+
+/* The StarBase a hail is waiting on, packed y<<3|x, or GAL_CELLS for none.
+   The original keeps the row and column in [0x1E02]/[0x1E04]; one packed
+   byte is the same thing and one byte cheaper in the save record. */
+extern uint8_t hail_quad;
 
 /* End of a player's turn, whatever it was. The original sheds 20 points of
    laser heat here, in its main loop, whether or not the turn moved the clock
@@ -1789,16 +1796,37 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * and the sqrt is not needed on a 6502. 2.0 becomes 4, and the 8.0 the
  * original starts from becomes 64.
  *
- * WHAT IT SCHEDULES, read 2026-08-28: THE BASE'S REPLY, DELAYED.
+ * WHAT IT SCHEDULES: THE BASE'S REPLY, DELAYED. Read 2026-08-28; the GATING
+ * corrected 2026-08-29 by disassembling the branches instead of trusting the
+ * order of the addresses, which is what the first read did.
  *
- *     v = 8.0                                  ; "none found", and the gate
- *     for each base in the box: v = min(v, sqrt(dy^2 + dx^2))
- *     if (v >= 8.0)  nothing                   ; no base, no reply
- *     [0x1D78] = stardate + (v - 1.0) * 0.5    ; 0x020A65
+ *     if (Random(10) < 2)   "blocked by subspace interference"
+ *                           jmp past the schedule            ; 0x0209A3
+ *     else if (v <= 2.0)    "StarBase in R-C responds"
+ *                           jmp past the schedule            ; 0x020A11
+ *     else                  "No response."                   ; 0x020A13
+ *                           if (v >= 8.0) nothing            ; 0x020A31
+ *                           [0x1D78] = stardate + (v-1.0)*0.5 ; 0x020A65
  *
- * and when the clock reaches it, 0x0206AD prints "COMMUNICATIONS:  The
- * StarBase in R-C is responding to our hail." and puts the slot back to
- * 9999.0.
+ * **ONLY THE OUT-OF-RANGE HAIL GETS A DELAYED REPLY**, and that is the whole
+ * mechanic rather than a detail: a base close enough to answer answers NOW
+ * and schedules nothing; a blocked hail schedules nothing; a base too far to
+ * reach immediately is the one that calls you back. The first read of this
+ * said "if v >= 8.0 nothing is scheduled" and left the impression that every
+ * hail scheduled -- because 0x020A65 comes after both message branches in
+ * ADDRESS order, and both of them jump over it. Order is not control flow.
+ *
+ * The 0.5 is a real with exponent 0x80 at 0x020A48 and the stardate comes
+ * from [0x1D42]; both were read rather than assumed.
+ *
+ * DELIVERY, 0x02066B. The found base's quadrant is kept in [0x1E02] (row) and
+ * [0x1E04] (column), written by the hail at 0x020964/0x02096A -- so the reply
+ * remembers WHICH base. Before printing, 0x020689 re-reads
+ * `galaxy[row*16 + col*2]` and requires `(word mod 100) div 10 == 1`: THE
+ * QUADRANT MUST STILL HOLD A STARBASE. Hail a distant base, let the Mongols
+ * take it while the signal is in flight, and the answer never comes. Then
+ * 0x0206AD compares the clock against the slot, prints, and the slot goes
+ * back to 9999.0.
  *
  * So a hail is a radio call with a light-lag: the immediate answer only says
  * the frequencies are open, and the base's actual response arrives half a
@@ -1808,9 +1836,17 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * HAIL_START_Q below is that same 8.0, squared, and was read a day earlier
  * without knowing it had a second job.
  *
- * STILL NOT BUILT: it wants a third schedule slot, an EV_ kind and one
- * message. It is the only one of the original's eight slots this core both
- * lacks and has a use for. */
+ * THE PORT WORKS IN SQUARED DISTANCES and needs no sqrt for the search, but
+ * the DELAY wants the real distance. It does not need a fractional root:
+ *
+ *     delay_tenths = (v - 1.0) * 0.5 stardates = (v - 1) * 5 tenths
+ *                  = 5*sqrt(best) - 5 = sqrt(25 * best) - 5
+ *
+ * which is exact in integers. `best` is at most 32 here (the box is +-4), so
+ * 25*best fits a uint16 with room. A base at 2.24 quadrants answers in 0.6
+ * stardates, one at the corner of the box in 2.3 -- both matching the reals.
+ *
+ * BUILT 2026-08-29. */
 #define HAIL_BOX             4   /* quadrants searched either way */  /*@BINARY*/
 #define HAIL_RANGE_Q         4   /* 2.0 quadrants, SQUARED */  /*@BINARY*/
 #define HAIL_START_Q        64   /* the original's 8.0, squared */  /*@BINARY*/
