@@ -1454,7 +1454,11 @@ static void enemy_turn(uint8_t player_fired) {
    fourth pass (2026-08-28) to make room in cmds for the DIVERT chain, and it
    should have been here from the start: it is prose, and msgs is where the
    prose lives. */
-OVL_CODE("msgs") static void report_nova(uint16_t dmg) {
+/* IN OVL_REPAIR, NOT OVL_MSGS, AND ITS ONLY CALLER IS WHY. fire_one_torpedo
+   moved to the repair window (see below) and it is the one thing that calls
+   this. A callee in a DIFFERENT overlay from its caller cannot be reached --
+   there is one window -- so the pair travels together. */
+OVL_CODE("repair") static void report_nova(uint16_t dmg) {
             /* The original's four lines, cut to the dialog's width:
                "Star at R-C goes supernova!", "Lexington blown to quad Q.",
                "N Mongols destroyed.", and the damage. */
@@ -1486,8 +1490,25 @@ OVL_CODE("msgs") static void report_nova(uint16_t dmg) {
 
 /* One torpedo, fired and reported. Split out because the original fires a
    SALVO -- it asks how many first, then a sector per tube -- and the reporting
-   is identical for each. */
-static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
+   is identical for each.
+ *
+ * OVERLAID 2026-08-29, AND IT IS THE LARGEST SINGLE MOVE THE PORT HAS MADE:
+ * 2,056 resident bytes, 602 free -> 2,658. It is almost all REPORTING -- ten
+ * outcomes with a line each -- which is the shape that has paid every time
+ * (see NOTES.md, "a feature's RESIDENT cost is its LOGIC"). The ray march
+ * itself is trek_fire_torpedo() in core and stays resident.
+ *
+ * THE WINDOW IS `repair` BECAUSE IT HAD ROOM, not because it is about repairs.
+ * A window is storage, not taxonomy; `cmds`, `planet` and `front` are full and
+ * this did not fit in `msgs`, which is where its prose would otherwise belong.
+ *
+ * AND MOVING IT ALONE WOULD HAVE CRASHED. This used to do
+ * `ovl_load(OVL_MSGS); report_nova(dmg)` -- loading another overlay INTO THE
+ * WINDOW IT WOULD ITSELF BE EXECUTING FROM. It links, it passes every test,
+ * and it dies on the machine. report_nova moved here with it and the load is
+ * gone. Measuring the SIZE of a split is not measuring the split; the call
+ * graph decides and the linker will not tell you. */
+OVL_CODE("repair") static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
     uint16_t dmg = 0;
     uint8_t  r;
 
@@ -1512,8 +1533,7 @@ static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
                to give up 174 bytes so the DIVERT chain could move in. A
                feature's resident cost is its LOGIC -- the corollary is that
                its prose belongs wherever the other prose is. */
-            ovl_load(OVL_MSGS);
-            report_nova(dmg);
+            report_nova(dmg);      /* same overlay: no load, see above */
             break;
         case TORP_PLANET:
             ui_dialog_line(S(S_245));
@@ -1580,6 +1600,12 @@ static void do_torpedo(const char *line) {
     }
 
     ui_dialog_open(S(S_28));
+
+    /* ONCE, HERE, COVERING BOTH FIRING PATHS -- the "t35" shortcut below and
+       the salvo loop after it. Everything between this and the last shot is
+       resident (the dialog helpers, grab_num, snd_beep), so the window is not
+       disturbed while it is needed. */
+    ovl_load(OVL_REPAIR);
 
     if (n == 2) {                      /* the "t35" shortcut: one, right now */
         if (d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
