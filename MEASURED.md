@@ -3039,7 +3039,7 @@ The original text follows, as the specification it still is:
 | EnTorp Tubes | **100% = three tubes, 67-99% = two, 34-66% = one** |
 | Short Range Scanners | above 90% full; **below 90% cannot see anything smaller than a star**; below 50% dead |
 | Long Range Scanners | **below 100% cannot detect enemy ships**; below 50% dead |
-| Computer | chart entries can be lost and need re-scanning; **automatic navigation needs 100%** |
+| Computer | chart entries can be lost and need re-scanning (**but see below -- the binary appears not to do this**); **automatic navigation needs 100%** |
 | Life Support | must be 100% to make food and oxygen; without it the ship lasts **two days** on reserves |
 | Transporter | must be **100%** to use |
 | Shuttlecraft | must be **100%** to use, and takes **0.2 stardays** round trip |
@@ -3047,6 +3047,38 @@ The original text follows, as the specification it still is:
 
 This is the largest single body of specified-but-unbuilt work in the project,
 and none of it needs an emulator to settle.
+
+### CHART ERASURE: the manual describes it and the binary appears not to do it (2026-08-29)
+
+The one row of the effect table still open was the computer's: *"Portions of
+the ships charts can be lost if the computer is sufficiently damaged and can
+only be recovered by re-scanning."* Costed at ~60 bytes and listed as a build
+item. Went looking for the mechanism before building it, and it is not there.
+
+The RECORDED chart -- the player's, distinct from the galaxy at DS:0x2560 --
+is at **DS:0x2360**. Every reference to that displacement in the image, all
+twenty-four of them:
+
+    writes    0x0058C1 0x010355 0x010390 0x0103A7 0x01EEFF   immediates 1, 2, 3
+              0x021396 0x0279BC                              the L.R. SCAN loop
+    reads     the other seventeen, including three `cmp [..+0x2360], 0`
+              (0x009CF2, 0x00A24E, 0x00DE45) which are TESTS, not stores
+
+**Nothing writes zero and nothing clears the array.** A chart entry, once
+recorded, is never unrecorded.
+
+**THE BOUND ON THAT CLAIM, because it is a negative one.** This is a search
+for the literal displacement 0x2360. An erasure reached through a pointer with
+no displacement, or a block clear spanning the chart, would not appear here.
+What can be said is that all twenty-four literal references are accounted for
+and none of them erases.
+
+**So this is not a build item any more; it is a question.** Building it would
+mean inventing a rule from one manual sentence -- a threshold, a count and a
+trigger, none of them read -- which is the DERIVED tier this project has kept
+at zero. The alternative is a rig session: damage the computer, scan several
+quadrants, and watch whether the chart forgets. A positive on screen would
+settle it where an address search cannot.
 
 ### Smaller rules, also documented and worth checking against the port
 
