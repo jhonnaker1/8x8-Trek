@@ -85,8 +85,30 @@ static void test_no_16bit_overflow(void) {
 
     ok((d88_max >> 4) * 14UL + 128UL <= 65535UL,
        "warp cost distance factor 128+d44*14 fits uint16");
-    ok(((w_max * w_max) / 10UL) * w_max <= 65535UL,
-       "warp cubed, staged, fits uint16");
+    /* warp^3 is STAGED now: wc = 100q + r, and each half is bounded on its
+       own. The unstaged form is 100,000 at warp 10 and this test is what
+       found that when the ceiling moved -- so it now asserts the staging,
+       and the line beneath asserts the form that FAILS, so the guard cannot
+       quietly start testing nothing. */
+    {
+        unsigned long wc = (w_max * w_max) / 10UL;    /* 1000 at warp 10 */
+        unsigned long q = wc / 100UL, r = wc % 100UL;
+        ok(q * w_max <= 65535UL && r * w_max <= 65535UL,
+           "warp cubed, staged at 100, fits uint16");
+        ok(wc * w_max > 65535UL,
+           "...and the unstaged form really would have overflowed");
+    }
+
+    /* The SECOND multiply, which had no guard at all until 2026-08-29 and
+       overflows at warp 10 exactly as the first one does. */
+    {
+        unsigned long wc = 1000UL;                    /* warp^3 at warp 10 */
+        unsigned long g = (128UL + 178UL * 14UL) >> 5;
+        ok((wc >> 3) * g <= 65535UL && (wc & 7UL) * g <= 65535UL,
+           "warp cost final multiply, staged at the shift, fits uint16");
+        ok(wc * g > 65535UL,
+           "...and unstaged it would have overflowed too");
+    }
     ok(43UL * d16_max <= 65535UL,
        "warp time numerator 43*d16 fits uint16");
     ok(((43UL * d16_max) / ((w_max * w_max) / 2UL)) * 10UL <= 65535UL,
@@ -357,9 +379,16 @@ static void test_warp(void) {
 
     trek_new_game(3, 5150);
     clear_quadrant();
-    ok(trek_set_warp(5) == 0,   "warp 0.5 rejected (below minimum)");
-    ok(trek_set_warp(90) == 0,  "warp 9.0 rejected (above maximum)");
-    ok(trek_set_warp(50) == 1,  "warp 5.0 accepted");
+    /* THE CEILING IS 10.0. This asserted that warp 9 was refused, from a
+       WARP_MAX of 80 that cited the manual's "allowed warp 8 in emergencies".
+       The binary's own WARP command clamps at 1.0 and 10.0 (0x00DADE and
+       0x00DAF8) and 9 is accepted; the manual sentence is about what the ship
+       is PERMITTED, and exceeding it is what breaks the engines. */
+    ok(trek_set_warp(5) == 0,    "warp 0.5 rejected (below minimum)");
+    ok(trek_set_warp(90) == 1,   "warp 9.0 accepted -- the ceiling is 10");
+    ok(trek_set_warp(100) == 1,  "warp 10.0 accepted, the binary's own limit");
+    ok(trek_set_warp(101) == 0,  "warp 10.1 rejected");
+    ok(trek_set_warp(50) == 1,   "warp 5.0 accepted");
 
     qy = (uint8_t)((ship.quad_y + 1) & 7);
     qx = ship.quad_x;
@@ -2692,6 +2721,129 @@ static void test_torpedo(void) {
             ok(!moved, "the pod never moves");
             ok(!fired_at_us, "and never fires");
         }
+    }
+
+    /* --- WARP STRAIN: speed AND distance, fn 0x0C609 at 0x0D623 --- */
+    {
+        int i;
+        uint8_t hurt, clear_all;
+        uint16_t before;
+
+        /* A long jump needs an empty galaxy to land in, and the strain is
+           read off sys[SYS_WARP] rather than off any message. */
+        #define SETUP_JUMP(w)                                                \
+            do {                                                             \
+                trek_new_game(3, (uint16_t)(7000 + i));                      \
+                for (clear_all = 0; clear_all < GAL_CELLS; clear_all++) {    \
+                    gal_enemies[clear_all]   = 0;                            \
+                    gal_commander[clear_all] = 0;                            \
+                    gal_stars[clear_all]     = 0;                            \
+                    gal_base[clear_all]      = BASE_NONE;                    \
+                }                                                            \
+                ship.quad_y = 0; ship.quad_x = 0;                            \
+                ship.sec_y = 0;  ship.sec_x = 0;                             \
+                trek_enter_quadrant();                                       \
+                /* AND CLEAR WHAT ENTERING PLACED. trek_enter_quadrant()      \
+                   drops the death pod and rolls a black hole on EVERY entry, \
+                   regardless of the galaxy arrays above, and either one in    \
+                   the departure path blocks the jump -- which showed up as    \
+                   the strain "not firing" on a fraction of the seeds. */      \
+                clear_quadrant();                                            \
+                ship.energy = ENERGY_MAX;                                    \
+                ship.sys[SYS_WARP] = 100;                                    \
+                ship.warp = (w);                                             \
+            } while (0)
+
+        /* BELOW WARP 8, NOTHING BREAKS -- however far you go. This is the
+           assertion the 2026-08-28 read would have failed: it recorded the
+           rule as distance-only and "warp appears nowhere". */
+        hurt = 0;
+        for (i = 0; i < 200; i++) {
+            SETUP_JUMP(79);                      /* warp 7.9 */
+            before = ship.sys[SYS_WARP];
+            trek_move_warp(4, 0, 0, 0);          /* exactly 4.0 quadrants */
+            if (ship.sys[SYS_WARP] != before) hurt++;
+        }
+        ok(hurt == 0, "below warp 8 the engines never strain, at any distance");
+
+        /* AT WARP 8 AND BEYOND 4 QUADRANTS, THEY ALWAYS DO. (d-1.5)/2.5 is
+           past 1 from 4.0 quadrants, and 0,0 -> 7,7 is 7 diagonal. */
+        hurt = 0;
+        for (i = 0; i < 200; i++) {
+            SETUP_JUMP(80);                      /* warp 8.0 exactly */
+            before = ship.sys[SYS_WARP];
+            trek_move_warp(4, 0, 0, 0);
+            if (ship.sys[SYS_WARP] < before) hurt++;
+        }
+        ok(hurt == 200, "at warp 8 a jump past four quadrants always strains");
+
+        /* THE MIDDLE OF THE BAND, which is the only place the ROLL is live.
+           Everything above tests the two ends -- certain past 4.0, impossible
+           below 1.5 -- and INVERTING the comparison passed all of it, because
+           neither end reaches the roll. Found by breaking it on purpose.
+
+           2.5 quadrants gives (2.5 - 1.5) / 2.5 = 0.4 exactly. In 600 jumps
+           that is 240 +- 12 (one sd), so the band below is four sd wide and
+           the inverted rule, at 0.6, lands 120 outside it. */
+        {
+            int damaged = 0;
+            for (i = 0; i < 600; i++) {
+                SETUP_JUMP(80);
+                before = ship.sys[SYS_WARP];
+                trek_move_warp(2, 0, 4, 0);      /* 20 sectors = 2.5 quadrants */
+                if (ship.sys[SYS_WARP] < before) damaged++;
+            }
+            ok(damaged > 190 && damaged < 290,
+               "at 2.5 quadrants the engines strain about two times in five");
+        }
+
+        /* AND A SHORT HOP NEVER DOES, even at the ceiling. One quadrant is
+           1.0, and (1.0 - 1.5)/2.5 is negative -- which is the ten-hop
+           measurement of 2026-08-28, as a test. */
+        hurt = 0;
+        for (i = 0; i < 200; i++) {
+            SETUP_JUMP(WARP_MAX);
+            before = ship.sys[SYS_WARP];
+            trek_move_warp(0, 1, 0, 0);          /* one quadrant east */
+            if (ship.sys[SYS_WARP] != before) hurt++;
+        }
+        ok(hurt == 0, "one quadrant never strains, even at warp 10");
+
+        /* THE LOSS IS 10 PLUS UP TO TEN PER QUADRANT, so a jump of exactly
+           four quadrants loses 10..50. The band is written as LITERALS, not
+           as WARP_DMG_BASE + something * WARP_RISK_SPAN -- an assertion in
+           terms of the constants it tests cannot fail when they are wrong. */
+        {
+            uint8_t lo = 255, hi = 0;
+            for (i = 0; i < 300; i++) {
+                SETUP_JUMP(WARP_MAX);
+                before = ship.sys[SYS_WARP];
+                trek_move_warp(4, 0, 0, 0);
+                {
+                    uint8_t got = (uint8_t)(before - ship.sys[SYS_WARP]);
+                    if (got < lo) lo = got;
+                    if (got > hi) hi = got;
+                }
+            }
+            ok(lo >= 10, "over four quadrants the loss is at least ten");
+            ok(hi <= 50, "and at most ten plus ten a quadrant");
+            ok(hi > lo, "the loss is a roll, not a constant");
+            ok(lo < 20 && hi > 40, "and it spans most of that band");
+        }
+
+        /* IT COMES OFF THE WARP ENGINES AND NOTHING ELSE. */
+        for (i = 0; i < 1; i++) {
+            uint8_t j, others_moved = 0;
+            uint8_t snap[SYS_COUNT];
+            SETUP_JUMP(WARP_MAX);
+            for (j = 0; j < SYS_COUNT; j++) snap[j] = ship.sys[j];
+            trek_move_warp(4, 0, 0, 0);
+            for (j = 0; j < SYS_COUNT; j++)
+                if (j != SYS_WARP && ship.sys[j] != snap[j]) others_moved++;
+            ok(others_moved == 0, "and it comes off SYS_WARP alone");
+            ok(warp_hurt > 0, "the UI is told how much was lost");
+        }
+        #undef SETUP_JUMP
     }
 
     /* --- HAIL, BINARY fn 0x207FD --- */

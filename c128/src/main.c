@@ -747,6 +747,16 @@ static void report_move(uint8_t r) {
         tractored = 0;
         ui_message(S(S_167), linebuf);
     }
+    /* And the engines, strained by speed AND distance -- see core/trek.h.
+       Reported as part of the move because that is where the original prints
+       it, and drained here the same way `tractored` is. */
+    if (warp_hurt) {
+        uint8_t k = put_str(linebuf, S(S_302));
+        k += put_u16(linebuf + k, ship.sys[SYS_WARP]);
+        linebuf[k] = 0;
+        warp_hurt = 0;
+        ui_message(S(S_167), linebuf);
+    }
     switch (r) {
         case MOVE_OK:
             break;

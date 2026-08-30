@@ -168,8 +168,64 @@
    which this core forbids (cl65 warns "Constant is long"). */
 #define STARDATE_START  35000U   /* 3500.0 */  /*@CONFIRMED*/
 #define MISSION_TENTHS  300U     /* 30 stardates to secure the sector */  /*@CONFIRMED*/
-#define WARP_MIN        10       /* tenths: warp 1.0 */  /*@CONFIRMED*/
-#define WARP_MAX        80       /* tenths: warp 8.0, emergency (manual l.250) */  /*@CONFIRMED*/
+/* ------------------------------------------------- WARP, AND ITS PRICE
+ *
+ * THE CEILING IS 10.0, NOT 8.0, AND THIS PORT HAD IT WRONG. The WARP command
+ * at `fn 0x0DACC` clamps what you type between two reals it carries itself:
+ *
+ *     0x00DADE   cx 0x81, di 0x0000   ->  1.0    below it, refused
+ *     0x00DAF8   cx 0x84, di 0x2000   -> 10.0    above it, refused
+ *     0x00DB13   [0x1D6C] = the accepted factor
+ *
+ * WARP_MAX was 80 and cited the manual -- "a cruising speed of up to warp
+ * factor 6, and is allowed warp 8 in emergencies" (l.250). That sentence is
+ * about what the LEXINGTON is ALLOWED, not what the console accepts, and the
+ * binary accepts 10. The manual's own repair formula agrees with the binary
+ * and not with the old constant: "warp 1 plus 0.09 times percentage of
+ * repair" is exactly 10.0 at 100%, so trek_max_warp() was computing 10 and
+ * then being clamped to 8 by the line beneath it.
+ *
+ * AND WARP 8 IS WHERE THE ENGINES START TO BREAK, which is what the manual
+ * means by "beware of excessive speed" and why the ceiling matters. */
+#define WARP_MIN        10       /* tenths: warp 1.0, 0x00DADE */  /*@BINARY*/
+#define WARP_MAX       100       /* tenths: warp 10.0, 0x00DAF8 */  /*@BINARY*/
+
+/* THE ENGINES BREAK ON SPEED **AND** DISTANCE, `fn 0x0C609` at 0x0D623.
+ *
+ *     if (!warp_move)              nothing        ; [bp-0x232], 0x00D623
+ *     if (warp < 8.0)              nothing        ; [0x1D6C], 0x00D644
+ *     if (Random < (d - 1.5)/2.5)                 ; 0x00D67F
+ *         loss = Round(Random * d * 10 + 10)      ; 0x00D684..0x00D6B4
+ *         [0x2364] -= loss                        ; SYS_WARP, 0x00D6C5
+ *         print "damaged by excessive speed"      ; 0x00D6C8
+ *
+ * THE SPEED GATE WAS MISSED BY THE 2026-08-28 READ, which recorded this as
+ * "DISTANCE, not speed" and "warp appears nowhere". Warp appears as a hard
+ * gate at 8.0 -- [0x1D6C] is the factor the WARP command stores, proven by
+ * disassembling its two writers. So the message's word "speed" was right all
+ * along and the correction over-corrected: it is BOTH, and neither alone.
+ *
+ * The ten one-quadrant hops at warp 8 that produced no damage are still
+ * consistent, and remain the evidence that d is in QUADRANTS: the gate passed
+ * and the distance roll did not, because (1.0 - 1.5)/2.5 is negative.
+ *
+ * IT ALSO EXPLAINS THE RIG. Three attempts to see the positive direction
+ * failed and were written up as the move being blocked. A move at warp below
+ * 8 could not have shown damage at any distance, and nothing recorded the
+ * warp factor those attempts used.
+ *
+ * IN INTEGERS. `d` is quadrants; this core carries distance as sixteenths of
+ * a SECTOR (path_dist), and eight sectors make a quadrant, so tenths of a
+ * quadrant are d16 * 5 / 64. The trigger is then a flat roll:
+ *
+ *     damage  <=>  Random(25) < (d_tenths - 15)
+ *
+ * which is (d - 1.5)/2.5 exactly, with no fraction anywhere: certain at 4.0
+ * quadrants and impossible at 1.5, as the reals say. */
+#define WARP_DMG_AT      80   /* tenths: warp 8.0 and above */  /*@BINARY*/
+#define WARP_RISK_FROM   15   /* tenths of a quadrant: the 1.5 */  /*@BINARY*/
+#define WARP_RISK_SPAN   25   /* tenths of a quadrant: the 2.5 */  /*@BINARY*/
+#define WARP_DMG_BASE    10   /* the flat term in the loss */  /*@BINARY*/
 #define WARP_CRUISE     60       /* tenths: warp 6.0, safe cruising */  /*@CONFIRMED*/
 #define WARP_START      10       /*@CONFIRMED*/ /* CONFIRMED: the original opens at warp 1.0,
                                     not the 5.0 an earlier draft assumed */
@@ -1447,6 +1503,10 @@ extern uint8_t bolt_quad;
    The original keeps the row and column in [0x1E02]/[0x1E04]; one packed
    byte is the same thing and one byte cheaper in the save record. */
 extern uint8_t hail_quad;
+
+/* Points of SYS_WARP the last warp move cost, 0 if none. The UI reads it
+   and clears it, as it does `tractored`. */
+extern uint8_t warp_hurt;
 
 /* End of a player's turn, whatever it was. The original sheds 20 points of
    laser heat here, in its main loop, whether or not the turn moved the clock

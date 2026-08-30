@@ -235,6 +235,9 @@ uint8_t  gal_commander[GAL_CELLS];
 /* Set by a warp move that ended somewhere the captain did not choose. The
    UI reads and clears it; nothing else does. */
 uint8_t  tractored;
+/* Points of SYS_WARP lost to the last move's speed and distance, 0 for none.
+   Read and cleared by the UI, exactly like `tractored` above. */
+uint8_t  warp_hurt;
 uint8_t  laser_overheated;
 uint8_t  bases_lost = 0;
 
@@ -1506,14 +1509,37 @@ uint8_t trek_move_delta(int16_t dy, int16_t dx) {
  * (max 512), and the distance factor is divided down before the multiply
  * rather than after, which a single expression could not do without
  * overflowing. */
+/* RESTAGED WHEN THE CEILING WENT TO WARP 10 (2026-08-29), and the overflow
+   guards in the test suite are what caught it. Both multiplies below fitted a
+   uint16 at warp 8 and neither does at warp 10:
+
+       wc * warp    640 * 80 = 51,200   ->  1000 * 100 = 100,000
+       wc * (f>>5)  512 * 81 = 41,472   ->  1000 *  81 =  81,000
+
+   Split at a power of ten and at a power of two respectively, the same
+   argument as scale_256() below: `(100q + r) * w / 100` is `q*w + r*w/100`
+   exactly, and `(wc * g) >> 3` is `(wc>>3)*g + (((wc&7)*g)>>3)` exactly.
+   NO 32-BIT ARITHMETIC -- core/trek.c has none and is not about to gain any
+   for a formula that fits with one more line. */
 static uint16_t warp_energy(uint16_t d88) {
     uint16_t d44 = (uint16_t)(d88 >> 4);                      /* max 178 */
     uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
-                               (uint16_t)ship.warp) / 10);    /* max 640 */
-    uint16_t f;
-    wc = (uint16_t)((wc * (uint16_t)ship.warp) / 100);        /* warp^3 */
+                               (uint16_t)ship.warp) / 10);    /* max 1000 */
+    uint16_t f, g;
+
+    /* warp^3, staged: wc = 100*q + r, and (100q + r)*w/100 = q*w + r*w/100. */
+    {
+        uint16_t q = (uint16_t)(wc / 100), r = (uint16_t)(wc % 100);
+        wc = (uint16_t)(q * (uint16_t)ship.warp
+                        + (r * (uint16_t)ship.warp) / 100);
+    }
+
     f = (uint16_t)(128 + d44 * 14);
-    return (uint16_t)((wc * (f >> 5)) >> 3);
+    g = (uint16_t)(f >> 5);                                   /* max 81 */
+
+    /* (wc * g) >> 3, staged at the shift rather than after it. */
+    return (uint16_t)((uint16_t)((wc >> 3) * g)
+                      + (uint16_t)(((wc & 7u) * g) >> 3));
 }
 
 /* Stardate cost of a warp jump of `d16` sixteenths of a SECTOR, in hundredths.
@@ -1528,6 +1554,32 @@ static uint16_t warp_energy(uint16_t d88) {
  * Staged because 43 * d16 reaches 61,318 and multiplying THAT by ten to reach
  * hundredths would not fit: the quotient and the remainder are scaled
  * separately, and neither exceeds 32,000. */
+/* The engines break on SPEED AND DISTANCE -- see trek.h above WARP_DMG_AT for
+   the branches. Returns the points lost, or 0. Called only from the completed
+   warp move: a BLOCKED one never leaves the departure quadrant, so it cannot
+   cover the 1.5 quadrants the roll needs, and applying it there would be
+   unobservable either way. */
+static uint8_t warp_strain(uint16_t d16) {
+    /* EIGHT BITS THROUGHOUT, deliberately. The longest jump the galaxy holds
+       is corner to corner, 1,425 sixteenths of a sector, which is 111 tenths
+       of a quadrant -- so d10 and everything derived from it fit a uint8_t,
+       and the 6502 pays for every 16-bit operation it does not need. */
+    uint8_t d10 = (uint8_t)((d16 * 5u) / 64u);
+    uint8_t over, loss;
+
+    if (ship.warp < WARP_DMG_AT || d10 <= WARP_RISK_FROM) return 0;
+
+    over = (uint8_t)(d10 - WARP_RISK_FROM);
+    if (over < WARP_RISK_SPAN && trek_rand_n(WARP_RISK_SPAN) >= over) return 0;
+
+    /* Round(Random * d * 10 + 10): ten points flat, plus up to ten for every
+       quadrant crossed. d10 IS d * 10. */
+    loss = (uint8_t)(WARP_DMG_BASE + trek_rand_n((uint8_t)(d10 + 1u)));
+    if (loss > ship.sys[SYS_WARP]) loss = ship.sys[SYS_WARP];
+    ship.sys[SYS_WARP] = (uint8_t)(ship.sys[SYS_WARP] - loss);
+    return loss;
+}
+
 static uint16_t warp_hundredths(uint16_t d16) {
     uint16_t den = (uint16_t)(((uint16_t)ship.warp * (uint16_t)ship.warp) >> 1);
     uint16_t num = (uint16_t)(43u * d16);
@@ -1627,6 +1679,11 @@ uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
             }
         }
     }
+
+    /* AFTER the trip is paid for and before the new quadrant is built, which
+       is where the original does it -- the loss is reported as part of the
+       move, not as an event. */
+    warp_hurt = warp_strain(d16);
 
     trek_enter_quadrant();
     return MOVE_OK;
