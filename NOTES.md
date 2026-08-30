@@ -5177,9 +5177,14 @@ into OVL_MSGS. Estimating the rest by where each piece is forced to live:
     HAIL's delayed reply     ~20   slot in the schedule; check already in
                                    OVL_EVENTS, message already in OVL_MSGS
     warp damage on distance ~120   must sit in the move path, which is hot
+                                   [CAME IN AT 377 on 2026-08-29: 250 for the
+                                   rule and 127 for restaging warp_energy,
+                                   which raising the ceiling to warp 10 forced]
     SEC_NOVA (star hit)     ~250   inside fire_one_torpedo, plus a glyph
     wear and tear           ~120   the ROLL is per-turn and must be resident
-    chart erasure           ~40    trigger resident, effect overlaid
+    chart erosion           ~60    READ 2026-08-29 and bigger than this
+                                   guess: a 64-cell pass, two thresholds,
+                                   hung off the damage report
     reinforcements          ~20    a scheduled event, so OVL_EVENTS
     prose and endings        ~2 per string, in str_offset
 
@@ -5200,6 +5205,43 @@ short by a little over a hundred rather than by a mile.
 
 Note also that planet, cmds and front are nearly FULL while repair and title
 are nearly empty. New overlay work needs rebalancing, not merely space.
+
+### The chart really does erode, and the search that said otherwise found it (2026-08-29)
+
+The last row of the manual's per-system effect table -- *"portions of the ships
+charts can be lost if the computer is sufficiently damaged"* -- and the only
+one with no binary read behind it. It has one now.
+
+**It is in the DAMAGE REPORT**, around 0x0212DE. `[0x1CF4]` is the system being
+reported on: 0x0212EC loads it and 0x0212F0 turns it into `0x1188 + index*16`,
+the system name table. So this is `DamageReport(sys)`, and after printing:
+
+    if (sys != 9)  return                        ; COMPUTER only, 0x02134D
+    for row 1..8, for col 1..8:
+        if (computer <  30)                       erase     ; 0x02136A
+        else if (Random(10) < 5 && computer < 70) erase     ; 0x02137A, 0x02137F
+        erase:  chart[row*16 + col*2] = 0        ; xor ax,ax at 0x021394
+
+    computer >= 70    the chart is untouched
+    computer 30..69   every quadrant forgotten on its own coin flip
+    computer <  30    the whole chart wiped
+
+It fires ON THE REPORT rather than per turn, so a ship at 45% loses about half
+its chart each time the computer is hit again.
+
+#### The retraction, and it is the more useful half
+
+Earlier the same day this was written up as "the binary appears not to do
+this", on the strength of classifying all 24 literal references to the chart at
+DS:0x2360. The erasure was IN that list. Site 0x021396 was put down as "the
+L.R. SCAN loop" from what surrounds it and never disassembled -- and the two
+instructions before it are `xor ax, ax`.
+
+**AN ADDRESS SEARCH THAT LOCATES A SITE AND THEN GUESSES WHAT IT DOES IS WORSE
+THAN NO SEARCH**, because it turns "I do not know" into a confident negative
+with a list of addresses behind it. The list was even complete; the reading of
+it was not. Disassemble every site you are going to cite -- especially the ones
+you are about to dismiss.
 
 ### ~~The real uncertainty is not the mechanics~~ -- the table was already built (swept 2026-08-29)
 
