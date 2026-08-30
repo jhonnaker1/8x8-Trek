@@ -3039,7 +3039,7 @@ The original text follows, as the specification it still is:
 | EnTorp Tubes | **100% = three tubes, 67-99% = two, 34-66% = one** |
 | Short Range Scanners | above 90% full; **below 90% cannot see anything smaller than a star**; below 50% dead |
 | Long Range Scanners | **below 100% cannot detect enemy ships**; below 50% dead |
-| Computer | chart entries can be lost and need re-scanning (**but see below -- the binary appears not to do this**); **automatic navigation needs 100%** |
+| Computer | chart entries can be lost and need re-scanning (**READ 2026-08-29, see below: it is in DamageReport, thresholds 70 and 30**); **automatic navigation needs 100%** |
 | Life Support | must be 100% to make food and oxygen; without it the ship lasts **two days** on reserves |
 | Transporter | must be **100%** to use |
 | Shuttlecraft | must be **100%** to use, and takes **0.2 stardays** round trip |
@@ -3048,37 +3048,46 @@ The original text follows, as the specification it still is:
 This is the largest single body of specified-but-unbuilt work in the project,
 and none of it needs an emulator to settle.
 
-### CHART ERASURE: the manual describes it and the binary appears not to do it (2026-08-29)
+### CHART EROSION IS REAL, AND IT IS IN THE DAMAGE REPORT (READ 2026-08-29)
 
-The one row of the effect table still open was the computer's: *"Portions of
-the ships charts can be lost if the computer is sufficiently damaged and can
-only be recovered by re-scanning."* Costed at ~60 bytes and listed as a build
-item. Went looking for the mechanism before building it, and it is not there.
+**A RETRACTION FIRST.** Earlier the same day this section said the binary
+"appears not to do this", on the strength of classifying all 24 literal
+references to the recorded chart at DS:0x2360. That was wrong, and the way it
+was wrong is worth more than the fact: **site 0x021396 was in the write list
+and was labelled "the L.R. SCAN loop" from its NEIGHBOURHOOD rather than by
+disassembling it.** It is not the scan. It is the erasure, and the two
+instructions before it are `xor ax, ax`. A search that finds the right address
+and then guesses what it does is not a search.
 
-The RECORDED chart -- the player's, distinct from the galaxy at DS:0x2560 --
-is at **DS:0x2360**. Every reference to that displacement in the image, all
-twenty-four of them:
+**THE ROUTINE IS THE DAMAGE REPORT**, around 0x0212DE. `[0x1CF4]` is the
+system index it is reporting on -- 0x0212EC loads it and 0x0212F0 turns it
+into `0x1188 + index*16`, the sixteen-byte system NAME table. So this is
+`DamageReport(sys)`, the same one the wear-and-tear rule calls.
 
-    writes    0x0058C1 0x010355 0x010390 0x0103A7 0x01EEFF   immediates 1, 2, 3
-              0x021396 0x0279BC                              the L.R. SCAN loop
-    reads     the other seventeen, including three `cmp [..+0x2360], 0`
-              (0x009CF2, 0x00A24E, 0x00DE45) which are TESTS, not stores
+    DamageReport(sys):
+        ... print the report for sys ...
+        if (sys != 9)  return                    ; 0x02134D, COMPUTER only
+        for row 1..8, for col 1..8:              ; 0x021354, 0x02135B..0x0213A5
+            if (computer <  30)                       erase   ; 0x02136A jl
+            else if (Random(10) < 5 && computer < 70) erase   ; 0x02137A/0x02137F
+            erase:  chart[row*16 + col*2] = 0             ; 0x021394, 0x021396
 
-**Nothing writes zero and nothing clears the array.** A chart entry, once
-recorded, is never unrecorded.
+where `computer` is `[0x236C]`, which is sys[] index 9 -- the array is twelve
+words at DS:0x235A and 0x235A + 9*2 = 0x236C.
 
-**THE BOUND ON THAT CLAIM, because it is a negative one.** This is a search
-for the literal displacement 0x2360. An erasure reached through a pointer with
-no displacement, or a block clear spanning the chart, would not appear here.
-What can be said is that all twenty-four literal references are accounted for
-and none of them erases.
+**SO THE MANUAL'S "SUFFICIENTLY DAMAGED" IS TWO THRESHOLDS, NOT ONE:**
 
-**So this is not a build item any more; it is a question.** Building it would
-mean inventing a rule from one manual sentence -- a threshold, a count and a
-trigger, none of them read -- which is the DERIVED tier this project has kept
-at zero. The alternative is a rig session: damage the computer, scan several
-quadrants, and watch whether the chart forgets. A positive on screen would
-settle it where an address search cannot.
+    computer >= 70    the chart is untouched
+    computer 30..69   EVERY quadrant is forgotten on a coin flip, one roll each
+    computer <  30    the whole chart is wiped
+
+and it happens **on the damage report**, not per turn -- so it fires when the
+computer is hit, once, across all 64 quadrants. A ship at 45% loses about half
+its chart every time the computer takes another hit.
+
+**This is the last row of the manual's per-system effect table**, and it is
+now read rather than documented. The re-scan half needs nothing: the L.R.
+SCAN already rewrites what it sees.
 
 ### Smaller rules, also documented and worth checking against the port
 
