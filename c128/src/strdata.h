@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 303
+#define STR_COUNT 304
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -309,5 +309,6 @@
 #define S_300  300   /*  ANSWERS HAIL. */
 #define S_301  301   /*  KILLED  */
 #define S_302  302   /* EXCESS SPEED. WARP AT  */
+#define S_303  303   /* THE STAR IS DESTROYED. */
 
 #endif

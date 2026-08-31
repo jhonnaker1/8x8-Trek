@@ -34,6 +34,7 @@
 #define SEC_SUPPLY      8  /*@ID*/
 #define SEC_POD         9   /* the Vandal Death Pod, 'R' */  /*@ID*/
 #define SEC_BLACKHOLE  10   /* ' ' -- drawn as nothing; see below */  /*@ID*/
+#define SEC_NOVA       11   /* 'N' -- a star this ship destroyed */  /*@BINARY*/
 
 /* THE POD IS DELIBERATELY OUTSIDE THIS RANGE, and every loop in the core
    depends on it. The original keeps the pod in the same object table as the
@@ -569,6 +570,23 @@ extern uint8_t gal_known[GAL_CELLS];   /* 0 = never scanned */
    the sentinel needs somewhere of its own. */
 extern uint8_t gal_nova[GAL_CELLS];
 
+/* Destroyed stars per quadrant -- [0x24E9]. NOT the same thing as gal_nova,
+   which is one flag meaning the whole quadrant burnt. The fill draws this
+   many of the quadrant's stars as SEC_NOVA and the rest as SEC_STAR, which
+   is what makes a destroyed star persist across leaving and returning.
+ *
+ * PACKED TWO QUADRANTS TO A BYTE, and the bound is real rather than hopeful:
+ * a quadrant is generated with `Random(9)` stars, so the count cannot pass 8
+ * and a nibble holds it with room. Sixty-four bytes of this array plus the
+ * sixty-four it added to the save record took LOWRAM from 218 free to 86 --
+ * the tightest pool in the build and the one that has been quietly overrun
+ * before. Packing gives half of it back and costs an accessor. */
+#define GAL_STAR_GONE_BYTES (GAL_CELLS / 2)  /*@ID*/
+extern uint8_t gal_star_gone[GAL_STAR_GONE_BYTES];
+
+/* How many of quadrant `q`'s stars this ship has destroyed. */
+uint8_t trek_star_gone(uint8_t q);
+
 /* The current quadrant only, rebuilt on entry. Indexed [y * QUAD_DIM + x]. */
 extern uint8_t sector[QUAD_CELLS];
 
@@ -728,6 +746,7 @@ typedef struct {
        original's Detailed Evaluation, and it printed zero here until there
        were planets to evacuate. */
     uint16_t rescues;
+    uint16_t stars_gone;     /* [0x1DF6] -- stars this ship destroyed */
 } Ship;
 
 extern Ship ship;
@@ -1832,6 +1851,31 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * It does not need to: you were there. */
 #define NOVA_STAR_OF_N    100  /*@BINARY*/
 #define NOVA_STAR_ABOVE    95   /* Random(100) > 95 on a star hit */  /*@BINARY*/
+
+/* THE OTHER TWO OUTCOMES OF A TORPEDO INTO A STAR, `fn 0x00A8C8`, and the
+ * branches were re-read 2026-08-29 rather than taken from the note:
+ *
+ *     Random(100) > 95        4.0%   SUPERNOVA        0x00A8E5, 0x00A8E8
+ *     else Random(100) < 40  38.4%   absorbed         0x00ACC4, 0x00ACC7
+ *     else                   57.6%   the star is DESTROYED
+ *         sector[y*10 + x] = 'N'                      0x00ACFD
+ *         [0x24E9 + quadrant]++                       0x00AD3E..0x00AD54
+ *         [0x1DF6]++                                  0x00AD2A
+ *
+ * BOTH the supernova and the destroyed star increment [0x1DF6], the
+ * stars-destroyed score counter -- the recorded read had it only on the
+ * second, and 0x00A8ED is the first.
+ *
+ * AND A DESTROYED STAR STAYS DESTROYED. [0x24E9] is a per-quadrant COUNT, and
+ * the quadrant fill at 0x016490 draws `if (novas[q] >= k) 'N' else '*'` -- so
+ * the mark is not a decoration on the current visit, it is galaxy state that
+ * outlives leaving. gal_star_gone[] below is that count.
+ *
+ * The galaxy word is NOT touched: the chart still reports the stars the
+ * quadrant was generated with. */
+#define STAR_ABSORB_OF_N  100  /*@BINARY*/
+#define STAR_ABSORB_BELOW  40   /* Random(100) < 40 of the remaining 96% */  /*@BINARY*/
+#define SCORE_PER_STAR     -5   /* "STARS DESTROYED @ -5 EACH" */  /*@CONFIRMED*/
 #define NOVA_HIT_MAX      600   /* Random(600) */  /*@BINARY*/
 
 /* ------------------------------------------------------------------ HAIL
@@ -2037,6 +2081,7 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
    swapped, a ninety-degree mirror about the diagonal -- and carries on, so
    there is no result code for that half. */
 #define TORP_SWALLOWED   13  /*@BINARY*/
+#define TORP_STAR_GONE   14   /* the star is destroyed, cell -> SEC_NOVA */  /*@ID*/
 /* A star ANYWHERE IN THE FLIGHT PATH stops the torpedo -- fn 0x00A8C8, which
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:

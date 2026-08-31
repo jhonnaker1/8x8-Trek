@@ -39,7 +39,7 @@ static uint16_t get16(void) {
    and it fails at the right moment: change PLANET_MAX and this stops
    compiling until TREK_SAVE_SIZE is brought along. Everything else in the
    record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 466
+#define SAVE_FIXED_BYTES 500
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
@@ -145,7 +145,7 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     put16(ship.killed);  put16(ship.killed_cmd);
     put16(ship.casualties);
     put8(ship.lost);     put8(ship.docked);
-    put8(ship.orbiting); put16(ship.rescues);
+    put8(ship.orbiting); put16(ship.rescues); put16(ship.stars_gone);
     put16(ship.life_reserve); put8(ship.life_gone);
     put8(ship.boarders); put16(ship.board_until);
     put8(pod_alive); put8(ship.mutants);
@@ -161,6 +161,10 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
        are. Added in version 4. */
     for (i = 0; i < GAL_CELLS; i++) put8(gal_commander[i]);
     put_bits(gal_nova);
+    /* NOT packed: gal_star_gone is a COUNT, 0..8, not a flag. One byte per
+       quadrant, and it has to be saved or a restored game forgets which
+       stars this captain destroyed and puts them back. */
+    for (i = 0; i < GAL_STAR_GONE_BYTES; i++) put8(gal_star_gone[i]);
     for (i = 0; i < QUAD_CELLS; i++) put8(sector[i]);
     for (i = 0; i < QUAD_CELLS; i++) put16(enemy_hp[i]);
 
@@ -217,7 +221,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     ship.killed = get16();  ship.killed_cmd = get16();
     ship.casualties = get16();
     ship.lost = get8();     ship.docked = get8();
-    ship.orbiting = get8(); ship.rescues = get16();
+    ship.orbiting = get8(); ship.rescues = get16(); ship.stars_gone = get16();
     ship.life_reserve = get16(); ship.life_gone = get8();
     ship.boarders = get8(); ship.board_until = get16();
     pod_alive = get8(); ship.mutants = get8();
@@ -230,6 +234,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     get_bits(gal_known);
     for (i = 0; i < GAL_CELLS; i++) gal_commander[i] = get8();
     get_bits(gal_nova);
+    for (i = 0; i < GAL_STAR_GONE_BYTES; i++) gal_star_gone[i] = get8();
     for (i = 0; i < QUAD_CELLS; i++) sector[i] = get8();
     for (i = 0; i < QUAD_CELLS; i++) enemy_hp[i] = get16();
 

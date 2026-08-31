@@ -1521,11 +1521,14 @@ OVL_CODE("repair") static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
             break;
         /* The port DOES ray-march now (2026-08-26), so this fires on a star
            anywhere in the flight path, not only on the aimed-at cell. The
-           SUPERNOVA branch is built (2026-08-27); the third outcome, the star
-           destroyed outright leaving a nova cell, still is not -- it wants a
-           sector code this port does not have. See core/trek.h. */
+           SUPERNOVA branch is built (2026-08-27) and the third -- the star
+           destroyed outright, leaving a nova cell -- on 2026-08-29. All three
+           are here now. See core/trek.h. */
         case TORP_ABSORBED:
             ui_dialog_line(S(S_85));
+            break;
+        case TORP_STAR_GONE:
+            ui_dialog_line(S(S_303));
             break;
         case TORP_NOVA:
             /* MOVED to OVL_MSGS in the fourth pass: it is four lines of

@@ -7,6 +7,19 @@ uint8_t gal_base[GAL_CELLS];
 uint8_t gal_stars[GAL_CELLS];
 uint8_t gal_known[GAL_CELLS];
 uint8_t gal_nova[GAL_CELLS];
+uint8_t gal_star_gone[GAL_STAR_GONE_BYTES];
+
+/* Two quadrants to a byte, even in the low nibble. See trek.h for why. */
+uint8_t trek_star_gone(uint8_t q) {
+    uint8_t b = gal_star_gone[q >> 1];
+    return (uint8_t)((q & 1) ? (b >> 4) : (b & 0x0F));
+}
+
+static void star_gone_add(uint8_t q) {
+    uint8_t i = (uint8_t)(q >> 1), b = gal_star_gone[i];
+    if (q & 1) { if ((b >> 4) < 15) gal_star_gone[i] = (uint8_t)(b + 0x10); }
+    else       { if ((b & 15) < 15) gal_star_gone[i] = (uint8_t)(b + 1); }
+}
 uint8_t  nova_quad;
 uint8_t  pod_alive;
 uint8_t  hole_threw;
@@ -143,9 +156,14 @@ void trek_enter_quadrant(void) {
        fills in around it. */
     sector[(ship.sec_y << 3) | ship.sec_x] = SEC_SHIP;
 
+    /* The quadrant's stars, of which the first gal_star_gone[q] are the ones
+       this ship has already destroyed -- the original's own rule, drawn at
+       0x016490 as `if (novas[q] >= k) 'N' else '*'`. It is what makes a
+       destroyed star still destroyed when you come back. */
     for (n = 0; n < gal_stars[q]; n++) {
         cell = trek_free_sector();
-        if (cell != 0xFF) sector[cell] = SEC_STAR;
+        if (cell != 0xFF)
+            sector[cell] = (n < trek_star_gone(q)) ? SEC_NOVA : SEC_STAR;
     }
 
     if (gal_base[q] != BASE_NONE) {
@@ -369,6 +387,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.board_until  = 0;
     ship.killed       = 0;
     ship.killed_cmd   = 0;
+    ship.stars_gone   = 0;
     ship.casualties   = 0;
     ship.lost         = 0;
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
@@ -413,6 +432,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
        curve has to do something equivalent. DERIVED plus judgement, and
        flagged as such. */
     for (i = 0; i < SCHED_COUNT; i++) sched[i] = SCHED_NEVER;
+    for (i = 0; i < GAL_STAR_GONE_BYTES; i++) gal_star_gone[i] = 0;
     base_under_attack = GAL_CELLS;
     hail_quad = GAL_CELLS;          /* nothing has been hailed yet */
     bases_lost = 0;
@@ -2509,7 +2529,19 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
            yet. One branch of three, and it says so. */
         if (trek_rand_n(NOVA_STAR_OF_N) > NOVA_STAR_ABOVE)
             return star_supernova(cy, cx, damage);
-        return TORP_ABSORBED;
+        if (trek_rand_n(STAR_ABSORB_OF_N) < STAR_ABSORB_BELOW)
+            return TORP_ABSORBED;
+
+        /* THE MAJORITY CASE: the star is destroyed. The cell becomes 'N' and
+           the quadrant remembers, so it is still 'N' when you come back --
+           see trek.h. Both this and the supernova score against you. */
+        {
+            uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
+            sector[cell] = SEC_NOVA;
+            if (trek_star_gone(q) < gal_stars[q]) star_gone_add(q);
+            if (ship.stars_gone < 0xFFFFu) ship.stars_gone++;
+        }
+        return TORP_STAR_GONE;
     }
     if (c == SEC_PLANET) return TORP_PLANET;
     if (c == SEC_BASE)   return TORP_BASE_HIT;
@@ -2607,12 +2639,14 @@ void trek_score_sheet(ScoreSheet *s) {
     uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
 
     /* Mechanisms that do not exist yet. Written out rather than left to a
-       memset so it is obvious they are zero by absence, not by outcome. */
+       memset so it is obvious they are zero by absence, not by outcome.
+       Stars left this list on 2026-08-29 when SEC_NOVA was built. */
     s->rescues     = ship.rescues;
     s->rescue_pts  = ship.lost ? 0
                    : (int16_t)(ship.rescues * SCORE_PER_RESCUE);
     s->enemy_bases = 0; s->enemy_base_pts = 0;
-    s->stars       = 0; s->star_pts      = 0;
+    s->stars       = ship.stars_gone;
+    s->star_pts    = (int16_t)((int16_t)ship.stars_gone * SCORE_PER_STAR);
 
     /* A flat -200 for losing the ship, separate from the crew. The binary
        decides it by testing whether the SHIELD REAL is still above zero --

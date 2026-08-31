@@ -105,6 +105,12 @@ static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
            into the shape itself rather than passing in -- see core/ega.h. */
         case SEC_POD:        *color = EGA_TO_VDC(EGA_VANDAL);
                              return SC_LETTER('R');
+        /* A star this ship destroyed. The original draws 'N' where the star
+           was, and keeps drawing it: the mark is galaxy state, not a note on
+           the current visit. Coloured as a star because that is what it was;
+           the letter is the difference. */
+        case SEC_NOVA:       *color = COL_STAR;
+                             return SC_LETTER('N');
         /* A BLACK HOLE IS DRAWN AS NOTHING. The original stores ' ' where
            vacuum is '.', and draws the difference: a dot for empty space and
            a blank for a hole. That is the whole of its appearance, and it is

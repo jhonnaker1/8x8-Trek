@@ -1986,7 +1986,7 @@ static void test_torpedo(void) {
     /* A STAR IN THE PATH stops it, even though the target is beyond. That is
        a consequence of marching that the old model could not have. */
     {
-        int i, stopped = 0, nova = 0;
+        int i, stopped = 0, nova = 0, gone = 0;
         uint8_t r;
         trek_new_game(3, 4246);
         for (i = 0; i < 400; i++) {
@@ -1999,11 +1999,65 @@ static void test_torpedo(void) {
             enemy_hp[(1 << 3) | 4] = 60000;
             ship.torps = 9; ship.shields_up = 0;
             r = trek_fire_torpedo(1, 4, &dmg);
+            /* THREE outcomes since 2026-08-29, not two: the star can also
+               be DESTROYED. This counted TORP_ABSORBED and TORP_NOVA and
+               called the sum "always stops", which stopped being the same
+               statement the moment a third stopping outcome existed. */
             if (r == TORP_ABSORBED) stopped++;
             else if (r == TORP_NOVA) nova++;
+            else if (r == TORP_STAR_GONE) gone++;
         }
-        ok(stopped + nova == 400,
+        ok(stopped + nova + gone == 400,
               "a star in the flight path always stops the torpedo");
+        ok(stopped > 0 && gone > 0,
+              "and it is absorbed sometimes and destroyed sometimes");
+        /* 4 / 38.4 / 57.6 on 400 shots. The bands are four sd wide and are
+           written as literals, not as the constants they test. */
+        ok(gone > 175 && gone < 285, "the star is destroyed about 57.6% of hits");
+        ok(stopped > 110 && stopped < 195, "and absorbed about 38.4%");
+
+        /* A DESTROYED STAR STAYS DESTROYED, which is the half of this that is
+           not a cell change. The original keeps a per-quadrant COUNT and the
+           fill draws that many stars as 'N' -- so leaving and coming back
+           must not put the star back. */
+        {
+            uint8_t q, before, after, tries;
+            uint16_t scored = 0;
+
+            for (tries = 0; tries < 200; tries++) {
+                trek_new_game(3, (uint16_t)(6100 + tries));
+                ship.quad_y = 3; ship.quad_x = 3;
+                ship.sec_y = 6; ship.sec_x = 4;
+                q = (uint8_t)((3 << 3) | 3);
+                gal_stars[q] = 4;
+                clear_quadrant();
+                sector[(3 << 3) | 4] = SEC_STAR;
+                ship.torps = 9; ship.shields_up = 0;
+                if (trek_fire_torpedo(3, 4, &dmg) == TORP_STAR_GONE) break;
+            }
+            ok(trek_star_gone(q) == 1, "destroying a star is remembered by the quadrant");
+            ok(ship.stars_gone == 1, "and counted against the captain");
+            scored = ship.stars_gone;
+
+            /* Leave and come back: the fill must draw one N and three stars. */
+            trek_enter_quadrant();
+            before = after = 0;
+            for (q = 0; q < QUAD_CELLS; q++) {
+                if (sector[q] == SEC_NOVA) after++;
+                if (sector[q] == SEC_STAR) before++;
+            }
+            ok(after == 1, "and it is still a nova when the quadrant is rebuilt");
+            ok(before == 3, "with the quadrant's other stars intact");
+
+            /* And the score sheet charges for it. */
+            {
+                ScoreSheet sh;
+                ship.stars_gone = scored;
+                trek_score_sheet(&sh);
+                ok(sh.stars == 1, "the score sheet counts the star");
+                ok(sh.star_pts == -5, "at -5, as the rubric says");
+            }
+        }
         /* fn 0x0A8C8 rolls Random(100) > 95, so four in a hundred. Four
            hundred shots put the expectation at 16; this band is wide enough
            to be stable and narrow enough to fail if the roll is dropped. */
