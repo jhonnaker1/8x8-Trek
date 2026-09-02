@@ -93,7 +93,7 @@ parties, plasma bolts, Vandal cloaking, long-range tractor beams, scanner
 jamming, black holes, supernovas and defective energium crystals are all in the
 binary and absent from the docs.
 
-## Where it stands (2026-08-29)
+## Where it stands (2026-09-02)
 
 The C128 port is **feature complete against the original's mechanics**. Every
 constant it uses was read out of the binary or measured against it running:
@@ -118,9 +118,15 @@ with more room -- they carry live data, and what cycles them is unread. The
 **CP437 charset** and **boss mode** were ruled out for this platform. The
 reasoning for all three is in `NOTES.md`.
 
-What it has not had is **play**. The mechanics are verified individually on
-real hardware; whether the game they add up to is survivable, readable and
-fair is a different question and an open one.
+What it needs is **play**, and the little it has had has been the most
+productive thing in the project. Four sessions at the keyboard have found four
+bugs no build check could see: FIX was missing half its command, nine letters
+of the alphabet could not be typed (the self-destruct password JAMIE has a J
+and an I in it), a yes/no question was drawn in the wrong panel, and the last
+page of the briefing never waited for a key. Each one lived exactly where an
+automated check does not go, and each fix shipped the check that closes its
+class. Whether the game they add up to is survivable, readable and fair is
+still an open question, and only playing it will answer that one too.
 
 ## Targets
 

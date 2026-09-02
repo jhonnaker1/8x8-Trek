@@ -480,7 +480,7 @@ were written up as open in two days. `reference/manual.txt` is ISO-8859 and
 **invisible to grep** until converted; `reference/strings.txt` is plain ASCII
 and answers mechanics; MEASURED.md has its own back catalogue.
 
-### Commands -- twenty of twenty-five
+### Commands -- ~~twenty of~~ **ALL twenty-five, since 2026-08-29**
 
 | | what is left |
 |---|---|
@@ -569,8 +569,10 @@ Still open from those runs:
   measured one: one per settlement taken off, and the SCHEDULED distress
   signal that names a planet and a deadline is BUILT -- SCHED_DISTRESS and
   EV_DISTRESS, since 2026-08-27.
-- **Boarding-party frequency and duration.** The mechanic is in the string
-  table; the numbers need elapsed play.
+- ~~**Boarding-party frequency and duration.**~~ **CLOSED -- both are BINARY**,
+  read rather than played for: `BOARD_OF_N` 100, and a stay of
+  `BOARD_BASE_TENTHS` 5 + `Random*0.5`. The line below it -- "the numbers need
+  elapsed play" -- was true only while the disassembler was the road not taken.
 - ~~**The unbuilt screens**: five loss endings, Union wreckage, reinforcement
   warnings.~~ The loss endings are the Top Secret memo, built 2026-08-29 off
   seven recorded reasons; reinforcement warnings went in the same day. Union
@@ -597,12 +599,13 @@ Still open from those runs:
   there is no edge.** `fn 0x0213AD` rolls per TURN, `Round(hits/350) + 1`
   times at two in three, and never tests how much got through. "Three turns
   in five" was this loop seen from outside. MEASURED.md has the law.
-- **Supply and Research docking quantities.** A StarBase restocks energy and
-  shields to full in one 0.1-stardate turn; the other two types were never
-  found. ~~Wants the base-type array located in memory~~ -- **there is no such
-  array.** The type is the MIDDLE DIGIT of the chart word (2026-08-26), so
-  what is left is only what each type GIVES, which is the dock routine at
-  fn 0x0F022 and is a disassembly job, not a survey.
+- ~~**Supply and Research docking quantities.**~~ **CLOSED, and the
+  disassembly job named here is the one that closed it.** `trek_dock()` gives
+  each type its own gift: every type refills the life reserve (0x00F072, ahead
+  of the branch that separates them, and the Research Station's ONLY gift); a
+  StarBase also tops energy, impulse, shields and torpedoes; a Supply Depot
+  gives torpedoes. The type is the chart word's MIDDLE DIGIT -- there is no
+  base-type array, which is what the survey was waiting on.
 - ~~The STATE OF REPAIR estimate formula~~ **ABANDONED as cosmetic
   2026-08-24.** It is not a function of points remaining at all -- two adjacent
   tenth-boundaries sit one point apart while a third sits three points away, so
@@ -612,14 +615,14 @@ Still open from those runs:
 **Seen repeatedly across runs 1 to 5 and never measured** -- added 2026-08-24,
 because all three are mechanics this port has no part of:
 
-- **The long-range tractor beam.** It seized the ship at least four times in
-  five runs and MEASURED.md calls it "a hazard to measurement", but what
-  triggers it, how often, and whether it is a commander ability are all
-  unknown.
-- **Reinforcements arriving.** Quadrant 7-2 went from two enemies to four
-  between visits and the Mongol counter went back UP. That is the mechanic
-  behind the "reinforcement warnings" string, and it is distinct from the
-  message.
+- ~~**The long-range tractor beam.**~~ **CLOSED -- built, and `tractored` is
+  a live flag in `core/trek.h`.** It is not scheduled and has no stand-in slot;
+  see trek.h's note 3 on why.
+- ~~**Reinforcements arriving.**~~ **READ AND BUILT 2026-09-01**, six BINARY
+  constants and a schedule slot: level 5 only, column 1, first at 3512.0 +
+  `Random*5`, again every 5.0 + `Random*4`, `Random(4) + 2` ships. The
+  observation that started this -- 7-2 going from two enemies to four -- was
+  exactly right.
 - ~~**The Vandal Death Pod's numbers.**~~ READ 2026-08-27, not measured:
   Random(50)+50, one turn in 33 (one in 20 in quadrant columns 7-8). It hits
   every enemy in the quadrant for the same figure, which is why the enemy's
@@ -634,8 +637,9 @@ nothing and found a live bug.
 
 ### Infrastructure
 
-- **The briefing.** The last thing the disk seam was built for; needs
-  `plat_open`/`plat_read`, the one part of the seam never exercised.
+- ~~**The briefing.**~~ **BUILT 2026-08-29** -- twelve pages streamed through
+  `plat_open`/`plat_read`, which is no longer the unexercised part of the seam.
+  Its last page did not wait for a key until 2026-09-02; see below.
 - ~~**The CP437 charset.**~~ **NOT DOING IT on the C128 -- Jamie's call
   2026-08-24.** PETSCII text and lettered ships are an acceptable position for
   this platform. See "The charset is dropped on the C128" below. Other ports
@@ -2052,8 +2056,9 @@ Not missing features -- implemented things that do not match the original.
    It closes eight items that were being carried as unmeasured, including the
    warp damage rule, `REPAIR_FOCUS_FACTOR` (3, not the DERIVED 2), the energium
    gate, and what switches NAVIGATION between its two modes. It also documents
-   a damage effect for **every one of the twelve systems**, of which the port
-   implements exactly one. Full audit in MEASURED.md.
+   a damage effect for **every one of the twelve systems**, ~~of which the port
+   implements exactly one~~ -- **all twelve since 2026-08-24**, see "Damage
+   finally does something" below. Full audit in MEASURED.md.
 
 5b. **The PROVISIONAL sweep -- REPOINTED 2026-08-23.** This item used to read:
    breakpoint `EGATREK_unpacked.exe` in DOSBox-X's debugger to confirm laser
@@ -2191,8 +2196,13 @@ Not missing features -- implemented things that do not match the original.
    budget, and that *would* put this behind the disk seam. But the console
    needs roughly 96 glyphs -- uppercase, digits, punctuation, symbols -- at 8
    source bytes each, which is about 768 bytes, expanded to the VDC's 16-byte
-   slots only during the upload. That fits in the binary. This item can be done
-   whenever it is wanted.
+   slots only during the upload. That fits in the binary.
+
+   **Feasible is not open.** This says the charset *could* be done here; it is
+   NOT DOING IT on the C128 -- Jamie's call 2026-08-24, "PETSCII text and
+   lettered ships are an acceptable position for this platform", which covers
+   the game symbols as much as the letterforms. See THE OPEN LIST,
+   Infrastructure. Kept because another target will want the costing.
 
    `commodore-uno/c128/src/vdc.c` has the upload path including the slot
    padding, and `tools/gen_charset.py` there is the generator precedent.
