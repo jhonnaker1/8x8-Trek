@@ -113,8 +113,11 @@ holes, supernovae, the death ray's five outcomes, tractor beams, wear and
 tear, reinforcements, and a damaged computer eating your star chart.
 
 Three things are deliberately absent, each decided rather than left undone.
-The **MAIN VIEWER's other eight instrument pages** are deferred to targets
-with more room -- they carry live data, and what cycles them is unread. The
+The **MAIN VIEWER's other nine instrument pages** are deferred to targets with
+more room -- they carry live data, and two of them are wider than this port's
+seventeen-column panel. What cycles them was read on 2026-09-02 and is no
+longer a blocker: it is a fresh `Random(10)` roughly every six seconds, or the
+page number typed as a command. The
 **CP437 charset** and **boss mode** were ruled out for this platform. The
 reasoning for all three is in `NOTES.md`.
 

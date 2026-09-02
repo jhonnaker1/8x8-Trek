@@ -4193,8 +4193,10 @@ at their maxima, so that page is LIVE DATA and not decoration. ARRAY MONITOR
 504 has ONLINE/OFFLINE rows, STRUC INTEGRITY 505 a four-row table.
 
 Three things follow. The viewer is a multi-page instrument, not one display.
-STANDARD ORBIT is the page it shows while orbiting a planet -- which is a
-mechanic, not scenery. And PLANET LIST needs TWO pages, so whatever the
+~~STANDARD ORBIT is the page it shows while orbiting a planet~~ -- **WRONG,
+retracted 2026-09-02**: page 8 is reached at random like every other and tests
+the orbit flag itself, falling through to page 6 when there is no orbit. See
+"The MAIN VIEWER, read end to end" at the end of this file. And PLANET LIST needs TWO pages, so whatever the
 viewer's capacity is, the planet list exceeds it.
 
 The port draws STANDARD ORBIT 301 and nothing else of this; there is no
@@ -7027,3 +7029,155 @@ already carries that number as `HAIL_START_Q 64`, in squared form, from the
 **Unbuilt.** It wants a third schedule slot, an EV_ kind and one message, and
 it is the only one of the original's eight slots this core has a use for and
 lacks.
+
+## The MAIN VIEWER, read end to end (2026-09-02)
+
+Read out of the binary with `tools/dis16.py`, not sampled. It answers the one
+thing that has been carried as unread since 2026-08-26 -- **what cycles the
+pages** -- and it OVERTURNS what this repository has been saying about the
+orbit page. Every address below is a raw file offset.
+
+### The pages, and how each routine was named
+
+The nine page titles sit in the CODE segment as Turbo Pascal length-prefixed
+strings, each immediately followed by the procedure that uses them -- so the
+routines are named by the strings before their prologue, not by a guess. The
+segment base is **0x022070** (seg 0x1D27), solved from far calls landing in it.
+
+    page  routine   named by the strings before it
+     0   0x022CF9   GRAV FIELD 502
+     1   0x022DD0   ARRAY MONITOR 504     (ONLINE/OFFLINE, three rows)
+     2   0x022EF0   STRUC INTEGRITY 505   (four-row table)
+     3   0x02322E   *** UNTITLED ***      ENG:10:0, LEFT/RIGHT/FRONT/REAR,
+                                          FUNC1-2, SCAN1-5, AUX1-2, DC00-DC22
+     4   0x022C83   SHIP STATUS 501
+     5   0x022A1A   POWER DISTRIB 509     (PMAX/PAVL/PPCT, three pools)
+     6   0x022773   ENG:99:00 / System
+     7   0x0225CD   SPACE COMM NET 411
+     8   0x022892   STANDARD ORBIT 301    (APOGEE:/PERIGEE:)
+     9   0x022FEB   PLANET LIST 601/602   -- two titles, ONE routine
+
+**TEN pages, not nine.** Page 3 has no title in the string run and was
+therefore missing from the 2026-08-26 list, which counted titles. It is the
+largest page of the set: twelve rows of a two-column engineering readout.
+
+### The dispatcher, and the answer: it is RANDOM
+
+`fn 0x023FD2` (far, CS 0x1D27:0x1F62) is the viewer. Its page dispatch is a
+plain `cmp ax, 0..9` chain at 0x024A98-0x024AF2, and `ax` comes from:
+
+    0x024A6C  mov al, [DS:0x1DDA]        ; the page-force variable
+    0x024A70  mov di, 0x1F42             ; a 32-byte TP set
+    0x024A75  <set membership test>
+    0x024A7A  je  -> Random(10)          ; NOT a member: pick at random
+    0x024A7C  mov ax, [DS:0x1DDA]        ; a member: use it
+
+The set at CS:0x1F42 dumps to `ff03` followed by thirty zero bytes -- bits 0
+to 9, **exactly the ten pages**.
+
+**[DS:0x1DDA] is initialised to 99** (`mov word [1DDA],99` at 0x027CDB), which
+is not in the set. So the default, and the state of a fresh game, is **a fresh
+Random(10) on every redraw**.
+
+**The player forces a page by TYPING ITS NUMBER.** The only other write to
+[0x1DDA] is at 0x005E3E, in the command-line handler: [DS:0x2131] holds the
+upcased first character of the typed command, and 0x005DFA-0x005E23 compares it
+against '0' through '9' -- all ten jump to the same block, which `Val`s the
+command string into [0x1DDA]. A page number is a COMMAND, alongside M, W, L
+and the rest.
+
+This is a complete read, not a lower bound: the immediate `0x1DDA` occurs at
+**four** places in the whole 338KB file, and all four are accounted for above.
+
+### What triggers a redraw -- and the 5.9-second timer
+
+`fn 0x023FD2` is called from exactly three sites:
+
+  * **0x00590B and 0x0059E9**, both in the command loop, both gated
+    `cmp byte [DS:0x26D4],0 / je`. [0x26D4] is a DIRTY FLAG: eleven sites set
+    it to 1 (0x0058CC, 0x00ACA5, 0x00AF9B, 0x00D19F, 0x00D9AC, 0x017AED,
+    0x017F86, 0x01816D, 0x01889A, 0x01EB3D, 0x027C88) and the draw itself
+    clears it at 0x024B1B.
+  * **0x01764F**, inside the KeyPressed poll loop, gated
+    `cmp word [DS:0x1CC4], 0x6C / jl`.
+
+[0x1CC4] is zeroed at the TOP of the draw (0x023FE3) and **incremented by the
+timer ISR** at 0x024B78 -- the same ISR that plays the music, which this file
+already records as the stock **18.2065 Hz** timer, never reprogrammed, one tick
+54.9ms (see "DGROUP, derived twice"). So:
+
+    108 ticks x 54.9ms = 5.93 seconds
+
+**The viewer re-rolls its page every ~5.9 seconds while it waits for you to
+type**, and immediately whenever an event dirties it. Sitting still, the
+instrument display keeps changing on its own.
+
+### The alternation the manual describes is [DS:0x26D5]
+
+The manual, on the main viewer: *"This display alternates between a view from
+outside the ship and a graphical display of some ship function."* That is one
+byte. [0x26D5] is toggled at the end of EVERY draw (0x024B18), and read at
+0x024047 to choose:
+
+    [0x26D5] == 0  ->  0x024060, the outside view (2.5K of silhouette code)
+    [0x26D5] != 0  ->  0x0240C0 -> 0x024A35, clear the panel, dispatch a page
+
+So the outside view and an instrument page take turns, and the page is a fresh
+random draw each time its turn comes round.
+
+There is also a fast path at the head (0x023FE6-0x023FFB): not dirty, [0x26D5]
+and [0x26D2] both set, and it simply blits the cached image from the far
+pointer at [0x26C8] instead of drawing anything.
+
+### THE MUTANTS TAKE THE VIEWER -- [DS:0x26D1]
+
+Before the page dispatch is reached:
+
+    0x024A4D  cmp byte [DS:0x26D1], 0
+    0x024A52  je   -> the ten instrument pages
+              ; otherwise:
+    0x024A54  Random(2) -> fn 0x022506 or fn 0x0223BE, then done
+
+Those two routines have **no strings at all** and are called from nowhere else
+in the file. [0x26D1] is set to 1 at **0x00721D**, immediately after the death
+ray's `...half the crew has turned into some kind of mutants!` and
+`The apparatus is going unstable` strings.
+
+So a mutant crew TAKES OVER THE MAIN VIEWER: the ten instrument pages stop
+appearing and one of two other displays is shown at random instead. It is not
+cosmetic and it is not temporary-looking -- **[0x26D1] is one of five booleans
+written to the save file.**
+
+**Proof of that last claim, and it is exact.** The save reader at 0x0087D4
+through 0x0088C4 does the same thing five times: read a string, compare it
+against the Pascal constant `TRUE` at CS 0x011C:0x218C, set a flag byte. In
+order the five flags are [0x26D6], [0x26D9], [0x26DA], [0x26DC], [0x26D1].
+`reference/EGATREK.SAV` has exactly five TRUE/FALSE lines, 239-243, reading
+FALSE FALSE FALSE TRUE FALSE. Five readers, five lines, same order.
+
+While the mutants hold the ship, 0x005B1A gives them a **1 in 10 chance per
+turn of ending** (`Random(10)` = 0 clears [0x26D1]), and either way one of five
+random messages is printed.
+
+### CORRECTION: nothing selects the orbit page on orbit
+
+This repository has been recording, in `c128/src/ui.c` and in NOTES.md, that
+*"STANDARD ORBIT is the page it shows while orbiting"* and that *"orbit selects
+301"*. **Both are wrong.** [0x1DDA] is written from the command line and
+nowhere else; entering orbit does not touch it. STANDARD ORBIT is page 8 and is
+reached at random like any other.
+
+What actually happens is the reverse, and it is neater. `fn 0x022892`, page 8,
+opens:
+
+    0x0228A1  cmp byte [DS:0x26D9], 0     ; the "in orbit" flag -- the SECOND
+    0x0228A6  jne -> draw the orbit display   of the five saved booleans
+    0x0228A8  jmp 0x0229CC                ; not in orbit:
+    0x0229CC  call 0x022773               ;   fall through to PAGE 6
+
+**Page 8 falls back to page 6 when there is no orbit to show.** The page is
+picked at random; it decides for itself whether it has anything to say.
+
+The port is not wrong to draw the orbit page while orbiting -- with one page
+and no cycling that is a reasonable adaptation -- but the claim that it is what
+the ORIGINAL does was never read, and it is not true.

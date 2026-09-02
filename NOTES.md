@@ -1821,19 +1821,38 @@ change: enter orbit and the MAIN VIEWER stops showing the nearest enemy and
 shows the page the original shows, with the planet's name and class under it.
 It is a mechanic the port had no idea existed a day ago.
 
-**The other eight pages are DEFERRED TO ROOMIER TARGETS, not dropped --
+**The other NINE pages** -- nine, not eight: a tenth page carries no title and
+was missed by counting titles (MEASURED.md, 2026-09-02) -- **are DEFERRED TO
+ROOMIER TARGETS, not dropped --
 Jamie's call, 2026-08-29.** They are real instrument pages carrying live data,
 not scenery: POWER DISTRIB 509 arrives with its own layout (`PMAX PAVL PPCT`
 over the three energy pools at their maxima). What rules them out here is the
 C128's resident budget and a 20-column viewer, neither of which binds on
 MEGA65 or Amiga, where far memory is a plain array and the panel can be wider.
 
-**Whoever builds them inherits an unmeasured mechanism: how the original
-CYCLES pages.** The nine titles and their codes are read (MEASURED.md), and
-STANDARD ORBIT 301 is drawn because orbit selects it. Nothing has been read
-about what selects the other eight -- a key, a rotation, a context like orbit.
-That is a read-list item for the target that builds them, not a C128 one, and
-it is why this is deferred rather than merely unimplemented.
+**~~Whoever builds them inherits an unmeasured mechanism: how the original
+CYCLES pages.~~ READ 2026-09-02** with `tools/dis16.py`, so whoever builds them
+inherits a specification instead. See MEASURED.md, "The MAIN VIEWER, read end
+to end". In short:
+
+  * **TEN pages, not nine.** Page 3 carries no title, so a count of titles
+    missed it -- it is the biggest page of the set.
+  * **The selection is RANDOM.** `fn 0x023FD2` uses `Random(10)` unless a
+    forcing variable holds 0..9, and the ONLY thing that writes it is the
+    player TYPING a page number at the command line. A digit is a command.
+  * **It re-rolls about every 5.9 seconds** -- 108 ticks of the 18.2Hz timer
+    ISR -- while the game waits for input, and immediately on any of eleven
+    events that dirty it.
+  * **It alternates with the view from outside the ship**, one byte toggled
+    every draw, which is exactly what the manual describes.
+  * **A mutant crew takes the viewer over**: the death ray's mutants outcome
+    sets a flag that replaces all ten pages with one of two other displays at
+    random, and that flag is saved with the game.
+
+**And the claim in the old wording was wrong.** Orbit does NOT select 301.
+Page 8 is reached at random like the rest, and checks the orbit flag itself,
+falling through to page 6 when there is nothing to show. Retracted in
+`c128/src/ui.c` and MEASURED.md as well.
 
 #### Why PLANET LIST is a report and not a viewer page
 

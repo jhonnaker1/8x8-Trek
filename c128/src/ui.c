@@ -648,8 +648,21 @@ void ui_draw_viewer(void) {
        They carry live data: POWER DISTRIB 509 arrives with its own layout,
        the three energy pools at their maxima. What rules them out is this
        machine's resident budget and a twenty-column panel, and neither binds
-       on a roomier target. Also unread: what CYCLES the pages. Orbit selects
-       301; nothing has been measured about what selects the rest.
+       on a roomier target.
+
+       WHAT CYCLES THEM IS READ NOW (2026-09-02, tools/dis16.py; MEASURED.md,
+       "The MAIN VIEWER, read end to end"). It is RANDOM: fn 0x023FD2 picks
+       Random(10) unless the player has TYPED a page number, which is a command
+       like any other and the only thing that writes the forcing variable. The
+       viewer re-rolls every ~5.9 seconds while it waits for input, alternating
+       each draw with a view from outside the ship. There are TEN pages, not
+       nine -- one carries no title and was missed by a count of titles.
+
+       AND ORBIT DOES NOT SELECT 301. This comment used to say it did. Page 8
+       is reached at random like the rest and checks the orbit flag ITSELF,
+       falling through to page 6 when there is nothing in orbit to show. Ours
+       drawing it while orbiting is a fair adaptation of a one-page viewer; it
+       is not what the original does.
        The orbit page wins over the enemy silhouette because being in orbit
        is the rarer state and the one the player just asked for. */
     if (ship.orbiting != PLANET_NONE) {
