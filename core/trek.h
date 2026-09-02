@@ -1039,10 +1039,34 @@ uint8_t trek_shields_down(void);
  * It is a sensible rule: a game you have just restored does not get shot at
  * before you have looked at the console.
  *
- * STILL NOT BUILT, and one thing is open before it can be: a string assignment
- * at 0x014E7A writes into the SAME buffer inside the restore branch, so
- * whether the 'Y' survives to the turn loop on a SUCCESSFUL restore is not
- * established. The identity of the question is read; its lifetime is not. */
+ * ~~one thing is open before it can be built: a string assignment at 0x014E7A
+ * writes into the SAME buffer inside the restore branch~~ -- **SETTLED the
+ * same day. THE 'Y' SURVIVES A SUCCESSFUL RESTORE.**
+ *
+ * CS:0x44B4 is the one-character Pascal string "N" (length 0x01, then 0x4E),
+ * and it is assigned to DS:0x1F30 on the **ESC-ABORT PATH ONLY** --
+ * `0x014E61 jne 0x014EAE` routes every non-ESC case past it. Its purpose is
+ * the test at 0x014FD6, where a 'Y' skips the name, level and password
+ * questions because a restored save already holds them; an ABANDONED restore
+ * must not skip them, so it is reset. The file-name prompt reads into a
+ * different buffer entirely (DS:0x2030). Neither failure message resets it:
+ * "*File Not Found*" and "*Wrong File Type*" both loop back to the file-name
+ * prompt via `0x014FD3 jmp 0x014E1D` and never leave the branch with a stale
+ * 'Y'. The whole 338KB binary holds exactly TWO writes to [0x1F31] -- the
+ * upcase store at 0x014E03 and the turn loop's 'N' at 0x0059CE.
+ *
+ * AND IT IS NOT A "FREE FIRST TURN". [0x1F31] == 'Y' is THE RESTORED-GAME
+ * FLAG, with four consumers, of which the paragraph above had spotted one:
+ *
+ *   0x005177  jmp 0x5652     skips ~1,200 bytes of GALAXY GENERATION
+ *   0x005824  call 0x008151  LOADS THE SAVE (the routine holding the five
+ *                            TRUE/FALSE flag reads -- same prologue)
+ *   0x0058A6  skips fn 0x015F51, the QUADRANT ENTRY
+ *   0x005910  skips THE ENEMY'S FIRST TURN
+ *
+ * and then 0x0059CE forces it to 'N' so turn two is normal. The port already
+ * does the first three structurally; the fourth is what is NOT BUILT, and
+ * `Setup.restored` is the flag it wants. */
 #define ENEMY_TURN_OF_N        100  /*@BINARY*/
 #define ENEMY_TURN_AFTER_MOVE   60   /* Random(100) < 60 */  /*@BINARY*/
 

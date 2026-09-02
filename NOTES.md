@@ -5586,14 +5586,16 @@ unread list with the disassembler". What each one turned into:
   * the SPY event
   * the plasma bolt as a USE weapon: the 1-in-3 dud, the enemy falloff, the
     self-damage, and the shield that stops all of it
-  * **the restored game's free first turn** -- added by a re-sweep the same
-    day, from `core/trek.h`, which the earlier sweep's grep missed because it
-    says "has not been read" rather than "unread". `[0x1F31]` is the answer to
+  * **the enemy's first turn after a restore.** `[0x1F31]` is the answer to
     **"Restore a saved game <Y/N>?"** (CS:0x4448, base confirmed on THIRTEEN
-    references), and a 'Y' suppresses the enemy's first turn. One thing is
-    still open before it can be built: a string assignment at 0x014E7A writes
-    the same buffer inside the restore branch, so whether the 'Y' survives to
-    the turn loop on a SUCCESSFUL restore is not established.
+    references), and it is THE RESTORED-GAME FLAG -- it skips galaxy
+    generation, calls the save loader, skips the quadrant entry AND skips the
+    enemy's first turn, then forces itself to 'N'. The port does the first
+    three structurally; only the fourth is unbuilt, and `Setup.restored` is
+    the flag it wants. **The lifetime question is closed**: the "N" assigned
+    at 0x014E7A is on the ESC-abort path only, the failure messages loop back
+    rather than exiting, and a successful restore reaches the turn loop with
+    'Y' intact. See MEASURED.md.
 
 None of it is blocked on anything. Items 8-10 below still want the rig or a
 capture and cannot be got from the disassembler at all.

@@ -7370,3 +7370,53 @@ is measured, and it is built twelve lines from the comment saying otherwise:
 loop, floored at zero three instructions later; `LASER_HEAT_COOL_DAY` 360 is
 0x0201B3; and `HEAT_PER_UNIT` 15 is the `idiv cx, 0xF` at 0x009EF3 that adds
 `fired / 15` to `[0x1DFC]`. All three are BINARY in trek.h already.
+
+## [0x1F31] is the RESTORED-GAME FLAG, and the 'Y' survives (2026-09-02)
+
+Written the same day as the read above, which closed the question of WHICH
+setup answer the byte holds and left its lifetime open. Both are settled now,
+and the second half corrected the first half's framing.
+
+### The lifetime: only ESC resets it
+
+The suspicious write was a string assignment at 0x014E7A into DS:0x1F30, the
+same buffer the answer lives in. It assigns **CS:0x44B4, the one-character
+Pascal string "N"** (0x01 0x4E), and it is on the **ESC-abort path only** --
+`0x014E61 jne 0x014EAE` sends every non-ESC case past it.
+
+Its purpose is not the turn loop at all. It is the test at 0x014FD6: a 'Y'
+there skips the name, command level and password questions, because a restored
+save already holds them. An ABANDONED restore must still ask them, so the byte
+is put back to 'N'.
+
+Everything else leaves it alone:
+
+  * the file-name prompt reads into **DS:0x2030**, a different buffer
+  * "*File Not Found*" (0x014EFC) and "*Wrong File Type*" (0x014F8C) both loop
+    back to the file-name prompt via `0x014FD3 jmp 0x014E1D` -- they never
+    leave the restore branch, so neither can exit with a stale 'Y'
+  * the whole binary contains exactly TWO writes to [0x1F31]: the upcased
+    answer at 0x014E03 and the turn loop's 'N' at 0x0059CE
+
+**So a successful restore reaches the turn loop with 'Y' still in the byte.**
+
+### And it is not a "free first turn"
+
+`core/trek.h` described this as "a 'Y' suppresses the enemy's FIRST turn",
+which is one consumer out of four. `[0x1F31] == 'Y'` is simply **THIS IS A
+RESTORED GAME**:
+
+    0x005177   jmp 0x5652      skip ~1,200 bytes of GALAXY GENERATION
+    0x005824   call 0x008151   LOAD THE SAVE -- and that is the routine
+                               holding the five TRUE/FALSE flag reads at
+                               0x0087D4..0x0088C4; no prologue lies between,
+                               so it is one routine
+    0x0058A6   skip fn 0x015F51, the QUADRANT ENTRY
+    0x005910   skip THE ENEMY'S FIRST TURN
+    0x0059CE   force 'N' -- everything above is normal from turn two
+
+A flag named by ONE of its four uses reads as a bonus rule; named by all four
+it is bookkeeping with one side effect the player can feel. The port already
+does the first three structurally -- it does not regenerate on restore, and
+`ui_setup()` returns straight to the console -- so the only unbuilt part is the
+enemy's first turn, and `Setup.restored` is already the flag for it.
