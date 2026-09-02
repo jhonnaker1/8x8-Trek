@@ -119,6 +119,7 @@ uint8_t ui_play_again(void);
    See ui.c for why this is a report and not a MAIN VIEWER page. */
 void ui_planet_list(void);
 
+void ui_loss_memo(void);
 void ui_evaluation(void);
 void ui_hall_of_fame(const char *name, uint8_t level, int16_t score);
 

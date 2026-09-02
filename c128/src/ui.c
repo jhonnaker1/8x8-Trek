@@ -1873,6 +1873,54 @@ static void ev_count(char *buf, uint16_t v) {
    out empty, which is exactly what was happening before (main() measured
    14,846 bytes because every phase screen had been inlined into it). Reach it
    only through the stub in main.c, never directly. */
+/* THE TOP SECRET MEMO, which the original prints before the evaluation when
+ * the ship is lost. See core/trek.h above LOSS_NONE for the frame and for why
+ * the sentences are written here rather than transcribed.
+ *
+ * IN OVL_EVAL WITH THE EVALUATION, because the two are shown one after the
+ * other and a callee cannot be in another window. */
+static const char *loss_line(uint8_t how) {
+    switch (how) {
+        case LOSS_ENEMY: return "She was destroyed by enemy fire.";
+        case LOSS_LIFE:  return "Life support failed with all hands aboard.";
+        case LOSS_POD:   return "She was destroyed by a Vandal death pod.";
+        case LOSS_HOLE:  return "She entered a black hole and did not come out.";
+        case LOSS_NOVA:  return "A supernova threw her into a burnt quadrant.";
+        case LOSS_RAY:   return "The experimental death ray destroyed her.";
+        case LOSS_SELF:  return "She was destroyed on the order of her captain.";
+        default:         return "She was lost with all hands.";
+    }
+}
+
+OVL_CODE("eval")
+void ui_loss_memo(void) {
+    ScoreSheet sh;
+
+    trek_score_sheet(&sh);
+    scr_clear();
+    scr_puts(32, 1, S(S_20), COL_VALUE);
+    scr_puts(31, 2, S(S_26), COL_LABEL);
+    scr_puts(35, 3, S(S_313), EGA_TO_VDC(EGA_LTRED));
+
+    scr_puts(8,  6, S(S_307), COL_LABEL);
+    scr_puts(8,  7, S(S_312), COL_LABEL);
+    scr_puts(8,  8, "DATE:", COL_LABEL);
+    put_tenths(14, 8, ship.stardate, COL_VALUE);
+    scr_puts(8,  9, S(S_309), COL_LABEL);
+
+    scr_puts(8, 12, loss_line(ship.lost_how), COL_MSG);
+
+    scr_puts(8, 15, S(S_311), COL_LABEL);
+    put_tenths(44, 15, (uint16_t)(ship.stardate - STARDATE_START), COL_VALUE);
+    scr_puts(8, 16, S(S_308), COL_LABEL);
+    put_tenths(44, 16, (uint16_t)(sh.rate_hundredths / 10u), COL_VALUE);
+    scr_puts(8, 17, S(S_310), COL_LABEL);
+    put_signed(44, 17, sh.total, 6, COL_VALUE);
+
+    scr_puts(8, 22, S(S_40), EGA_TO_VDC(EGA_LTRED));
+    kb_waitkey();
+}
+
 OVL_CODE("eval")
 void ui_evaluation(void) {
     ScoreSheet sh;

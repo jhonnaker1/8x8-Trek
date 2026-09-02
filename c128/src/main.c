@@ -1875,6 +1875,10 @@ int main(void) {
            together is what stops the two ever being separated -- see the
            three rules in core/overlay.h. */
         ovl_load(OVL_EVAL);
+        /* THE MEMO FIRST, when there is a ship to account for. The original
+           prints it off the ending code before the evaluation; both are in
+           OVL_EVAL, so one load covers the pair. */
+        if (ship.lost) ui_loss_memo();
         ui_evaluation();
         ovl_load(OVL_HOF);
         ui_hall_of_fame(setup.name, setup.level, trek_score());

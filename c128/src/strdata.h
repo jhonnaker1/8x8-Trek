@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 307
+#define STR_COUNT 314
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -313,5 +313,12 @@
 #define S_304  304   /*  FAILED. */
 #define S_305  305   /* REINFORCEMENTS IN  */
 #define S_306  306   /* RETURN=NEXT PAGE   Q=QUIT BRIEFING */
+#define S_307  307   /* FROM: COMMANDER, EARTH SECTOR */
+#define S_308  308   /* MONGOLS DESTROYED PER STARDATE: */
+#define S_309  309   /* RE:   LOSS OF U.S.S. LEXINGTON, RCB-92 */
+#define S_310  310   /* SCORE: */
+#define S_311  311   /* STARDAYS IN ACTION: */
+#define S_312  312   /* TO:   HEADQUARTERS */
+#define S_313  313   /* TOP SECRET */
 
 #endif

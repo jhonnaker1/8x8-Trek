@@ -96,6 +96,7 @@ static void test_round_trip(void) {
        cannot pass by still looking right. */
     ship.orbiting = 2;
     ship.rescues  = 3;
+    ship.lost_how = LOSS_RAY;   /* the memo is drawn after a restore too */
     planets[2].flags = PF_SCANNED | PF_TAKEN;
     planets[2].find  = PFIND_SETTLERS;
     planets[2].sec   = 41;
@@ -189,6 +190,7 @@ static void test_round_trip(void) {
 
     check_eq(ship.orbiting, before.orbiting, "the planet being orbited");
     check_eq(ship.rescues,  before.rescues,  "settlements evacuated");
+    check_eq(ship.lost_how, before.lost_how, "how the ship was lost");
     check_eq(planet_count,  count_before,    "planet count");
     check(memcmp(planets, planets_before, sizeof planets_before) == 0,
           "the whole planet list survives, tail included");

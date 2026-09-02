@@ -2777,6 +2777,47 @@ static void test_torpedo(void) {
         }
     }
 
+    /* --- HOW THE SHIP WAS LOST, for the Top Secret memo --- */
+    {
+        uint8_t tries, c;
+        uint16_t dmg2;
+
+        trek_new_game(3, 9900);
+        ok(ship.lost_how == LOSS_NONE, "a new ship has no loss on record");
+
+        /* SELF-DESTRUCT. */
+        trek_new_game(3, 9901);
+        trek_self_destruct();
+        ok(ship.lost && ship.lost_how == LOSS_SELF,
+           "self-destruct is recorded as the captain's own order");
+
+        /* THE DEATH RAY's fatal outcome, two rolls in six. */
+        for (tries = 0; tries < 80; tries++) {
+            trek_new_game(3, (uint16_t)(9910 + tries));
+            clear_quadrant();
+            sector[(4 << 3) | 4] = SEC_SCOUT;
+            enemy_hp[(4 << 3) | 4] = 100;
+            if (trek_fire_ray() == RAY_FATAL) break;
+        }
+        ok(ship.lost_how == LOSS_RAY, "the death ray is recorded as the death ray");
+
+        /* A BLACK HOLE, one time in five. */
+        for (tries = 0; tries < 120; tries++) {
+            trek_new_game(3, (uint16_t)(9700 + tries));
+            ship.quad_y = 3; ship.quad_x = 3;
+            ship.sec_y = 4; ship.sec_x = 4;
+            clear_quadrant();
+            sector[(4 << 3) | 5] = SEC_BLACKHOLE;
+            if (trek_move_impulse(4, 5) == MOVE_HOLE_LOST) break;
+        }
+        ok(ship.lost_how == LOSS_HOLE, "a black hole is recorded as a black hole");
+
+        /* The save round trip is test_serial's job -- see it there. */
+        trek_new_game(3, 9960);
+        ok(ship.lost_how == LOSS_NONE, "and a fresh game clears it");
+        (void)c; (void)dmg2;
+    }
+
     /* --- REINFORCEMENTS, fn 0x015A4C: level 5 only, column 1 always --- */
     {
         int i;

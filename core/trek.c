@@ -389,6 +389,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.killed_cmd   = 0;
     ship.stars_gone   = 0;
     ship.wear_last    = STARDATE_START;
+    ship.lost_how     = LOSS_NONE;
     ship.casualties   = 0;
     ship.lost         = 0;
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
@@ -579,7 +580,8 @@ void trek_advance_time(uint16_t tenths) {
             ship.life_reserve = (uint16_t)(ship.life_reserve - tenths);
         } else {
             ship.life_reserve = 0;
-            if (!ship.lost) { ship.lost = 1; ship.life_gone = 1; }
+            if (!ship.lost) { ship.lost = 1; ship.lost_how = LOSS_LIFE;
+                              ship.life_gone = 1; }
         }
     }
 }
@@ -683,7 +685,7 @@ uint8_t trek_fire_ray(void) {
         return RAY_WORKED;
     }
     if (roll == 2) { ship.mutants = 1; return RAY_MUTANTS; }
-    if (roll >= 4) { ship.lost = 1;    return RAY_FATAL;   }
+    if (roll >= 4) { ship.lost = 1; ship.lost_how = LOSS_RAY; return RAY_FATAL; }
 
     /* ROLL 3 IS THE ONE THAT FILLS THE QUADRANT WITH BLACK HOLES. Both rolls
        1 and 3 print "Death ray misfires.", which is why this port had them as
@@ -1098,7 +1100,7 @@ static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
 
     /* 0x020C64: shields at nothing and the ship is gone. A captain flying on
        a flat charge dies to the first detonation. */
-    if (ship.shields == 0) ship.lost = 1;
+    if (ship.shields == 0) { ship.lost = 1; ship.lost_how = LOSS_POD; }
 }
 
 uint8_t trek_events_due(void) {
@@ -1487,6 +1489,7 @@ static uint8_t enter_black_hole(void) {
 
     if (trek_rand_n(HOLE_FATAL_OF_N) == 0) {
         ship.lost = 1;
+        ship.lost_how = LOSS_HOLE;
         ship.casualties = CREW_COMPLEMENT;
         return MOVE_HOLE_LOST;
     }
@@ -2127,6 +2130,7 @@ void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
     if (through >= ship.energy) {
         ship.energy = 0;
         ship.lost = 1;
+        ship.lost_how = LOSS_ENEMY;
         /* All hands. The original scores losing the ship purely as casualties
            -- see MEASURED.md -- so the complement has to land here, not as a
            flat penalty in trek_score(). */
@@ -2508,7 +2512,8 @@ static uint8_t star_supernova(uint8_t sy, uint8_t sx, uint16_t *damage) {
     /* Thrown into a quadrant that is already burnt: "Lexington destroyed."
        0x00AC2F, and it is why the "blown to quad" line is suppressed there --
        you never arrive. */
-    if (gal_nova[dest]) { ship.lost = 1; return TORP_NOVA; }
+    if (gal_nova[dest]) { ship.lost = 1; ship.lost_how = LOSS_NOVA;
+                         return TORP_NOVA; }
 
     ship.quad_y = nqy;
     ship.quad_x = nqx;
@@ -2670,6 +2675,7 @@ uint8_t trek_self_destruct(void) {
        The return value stays, because the UI still reports a count and the
        other loss endings will want the same shape. It is now always nought. */
     ship.lost = 1;
+    ship.lost_how = LOSS_SELF;
     ship.casualties = CREW_COMPLEMENT;   /* as with any loss of the ship */
     return 0;
 }

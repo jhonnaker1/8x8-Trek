@@ -748,6 +748,7 @@ typedef struct {
     uint16_t rescues;
     uint16_t stars_gone;     /* [0x1DF6] -- stars this ship destroyed */
     uint16_t wear_last;      /* [0x1D36] -- stardate of the last breakdown */
+    uint8_t  lost_how;       /* LOSS_*, why the ship was lost */
 } Ship;
 
 extern Ship ship;
@@ -1954,6 +1955,39 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define WEAR_PICK_OF_N         6   /* Random(6): one of the first six */  /*@BINARY*/
 #define WEAR_LOSS_MIN         10  /*@BINARY*/
 #define WEAR_LOSS_SPAN        60   /* Random(60) + 10 */  /*@BINARY*/
+
+/* ------------------------------------------------- HOW THE SHIP WAS LOST
+ *
+ * `[0x26C6]` is the ending code and `fn 0x1DD4F` prints the Top Secret memo
+ * off it -- the frame every loss ending reuses:
+ *
+ *     Dept. of Space / EARTH HEADQUARTERS / Top Secret
+ *     From: Commander, Earth Sector
+ *     To:   Headquarters
+ *     Date: <stardate>
+ *     Re:   Loss of U.S.S. Lexington, RCB-92
+ *
+ *     <one sentence naming how she was lost>
+ *
+ *     Stardays in action / Mongols destroyed per stardate / Score
+ *
+ * The memo has a SECOND form for a ship that survives -- "To: Captain, U.S.S.
+ * Lexington" and "Re: Battle Results" -- so the header changes with the
+ * ending and not only the sentence.
+ *
+ * THE CODES ARE THIS PORT'S OWN NUMBERING. Only 9 (the death ray) and 7 (the
+ * pod) are read; the rest are named after the endings this core can actually
+ * reach, and the SENTENCES are written here rather than transcribed, as
+ * everywhere else. */
+#define LOSS_NONE        0   /* she came home */  /*@ID*/
+#define LOSS_ENEMY       1   /* shot out from under you */  /*@ID*/
+#define LOSS_LIFE        2   /* life support ran out */  /*@ID*/
+#define LOSS_POD         3   /* a Vandal death pod, ending code 7 */  /*@BINARY*/
+#define LOSS_HOLE        4   /* went into a black hole */  /*@ID*/
+#define LOSS_NOVA        5   /* thrown into a burnt quadrant */  /*@ID*/
+#define LOSS_RAY         6   /* the death ray, ending code 9 */  /*@BINARY*/
+#define LOSS_SELF        7   /* per order of the captain */  /*@ID*/
+#define LOSS_COUNT       8  /*@ID*/
 
 /* ------------------------------------------------------------------ HAIL
  *
