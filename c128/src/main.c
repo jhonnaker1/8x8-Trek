@@ -1103,9 +1103,9 @@ static void do_chart(void) {
    experimental and prone to failures and wants a Y. Then Preparing / Firing
    and one of four outcomes. See core/trek.h for the odds and what each does.
 
-   THE ORIGINAL'S TOP SECRET LOSS MEMO IS NOT BUILT. The fatal outcome sets
-   ending code 9 there and prints a Dept. of Space memo; here the ship is
-   simply lost and the ordinary evaluation runs. */
+   The fatal outcome sets ending code 9 and prints a Dept. of Space memo.
+   BUILT 2026-08-29: ui_loss_memo() draws it from ship.lost_how, which this
+   path sets to LOSS_RAY. */
 OVL_CODE("cmds") static void do_ray(void) {
     uint8_t r;
 

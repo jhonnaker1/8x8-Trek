@@ -2152,8 +2152,8 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * own, as it does everywhere else.
  *
  * The fatal outcome sets ending code 9 at [0x26C6] and prints a Top Secret
- * loss memo. THAT SCREEN IS NOT BUILT -- the ship is lost and the ordinary
- * evaluation runs. */
+ * loss memo. BUILT 2026-08-29 -- `ui_loss_memo`, off `ship.lost_how`, which
+ * every death site now records. See LOSS_NONE above. */
 #define RAY_OF_N            6  /*@BINARY*/
 #define MUTANT_CLEAR_OF_N  10   /* one turn in ten they are gone */  /*@BINARY*/
 
@@ -2236,21 +2236,19 @@ uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired);
  * the march calls on '*'. Read out of the binary 2026-08-26, and it is three
  * outcomes, not one:
  *
- *     Random(100) > 95        4.0%   the star goes SUPERNOVA           BUILT
- *     then Random(100) < 40  38.4%   "Torpedo absorbed by star."       BUILT
- *     otherwise              57.6%   the star is DESTROYED, cell -> 'N'  UNBUILT
+ *     Random(100) > 95        4.0%   the star goes SUPERNOVA
+ *     then Random(100) < 40  38.4%   "Torpedo absorbed by star."
+ *     otherwise              57.6%   the star is DESTROYED, cell -> SEC_NOVA
  *
- * The SUPERNOVA case was built on 2026-08-27 -- star_supernova() and
- * TORP_NOVA -- and this comment went on saying UNBUILT for a day, which is
- * the usual direction of that error.
+ * ALL THREE ARE BUILT: the supernova on 2026-08-27 and the destroyed star on
+ * 2026-08-29. See SEC_NOVA and STAR_ABSORB_BELOW above for the branches and
+ * for the per-quadrant count that makes a destroyed star stay destroyed.
  *
- * ONE CASE LEFT, and it is the majority one: 57.6% of star hits DESTROY the
- * star, the cell becomes 'N', and [0x1DF6] increments -- which is where the
- * "Stars destroyed @ -5" scoring line comes from. It wants a nova SECTOR code
- * (SEC_NOVA), which is a smaller job than it was: SEC_BLACKHOLE arrived on
- * 2026-08-28 and proved the cell-type seam takes a new member cleanly. Until
- * then a non-supernova star hit answers TORP_ABSORBED, which is the 38.4%
- * case standing in for both. See MEASURED.md. */
+ * THIS COMMENT HAS BEEN STALE TWICE, in the same direction both times: it
+ * said UNBUILT of the supernova for a day after it was built, wrote that up
+ * as "the usual direction of that error", and then said UNBUILT of the third
+ * outcome for a day after THAT was built. A note about a comment going stale
+ * does not stop the comment going stale. */
 #define TORP_ABSORBED    5   /* a star stopped it */  /*@ID*/
 #define TORP_PLANET      6   /* "Torpedo hit a planet." */  /*@BINARY*/
 #define TORP_BASE_HIT    7   /* "Are you mad? You damaged a base!" */  /*@BINARY*/

@@ -93,11 +93,40 @@ parties, plasma bolts, Vandal cloaking, long-range tractor beams, scanner
 jamming, black holes, supernovas and defective energium crystals are all in the
 binary and absent from the docs.
 
+## Where it stands (2026-08-29)
+
+The C128 port is **feature complete against the original's mechanics**. Every
+constant it uses was read out of the binary or measured against it running:
+
+```
+BINARY 193   CONFIRMED 15   MEASURED 12   FITTED 0   DERIVED 0   PROVISIONAL 0
+```
+
+`make tiers` audits that and fails the build on an unmarked constant. Nothing
+in the port is a guess about a number, and the read list, the emulator-run
+list and the build list are all empty.
+
+What that covers: all 25 commands, the nine-panel console, the twelve-page
+briefing, save and restore, the hall of fame, and the mechanics the manual
+never mentions -- boarding parties, the Vandal death pod, plasma bolts, black
+holes, supernovae, the death ray's five outcomes, tractor beams, wear and
+tear, reinforcements, and a damaged computer eating your star chart.
+
+Three things are deliberately absent, each decided rather than left undone.
+The **MAIN VIEWER's other eight instrument pages** are deferred to targets
+with more room -- they carry live data, and what cycles them is unread. The
+**CP437 charset** and **boss mode** were ruled out for this platform. The
+reasoning for all three is in `NOTES.md`.
+
+What it has not had is **play**. The mechanics are verified individually on
+real hardware; whether the game they add up to is survivable, readable and
+fair is a different question and an open one.
+
 ## Targets
 
 | Platform | Display | Status | Notes |
 |---|---|---|---|
-| **Commodore 128 (VDC)** | 80×25 text, 8×8 cell | In progress | The console is an 80×25 grid at EGA's 8×14 — the VDC maps it **1:1**. Same sixteen colours as EGA but at different indices (`I R G B` vs `R G B I`), so conversion is a 4-bit rotate; 15 of 16 exact, EGA's brown reads olive. Per-cell foreground only; coloured panel fills need the reverse-video bit. |
+| **Commodore 128 (VDC)** | 80×25 text, 8×8 cell | Feature complete | The console is an 80×25 grid at EGA's 8×14 — the VDC maps it **1:1**. Same sixteen colours as EGA but at different indices (`I R G B` vs `R G B I`), so conversion is a 4-bit rotate; 15 of 16 exact, EGA's brown reads olive. Per-cell foreground only; coloured panel fills need the reverse-video bit. |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 hires, 16 colours | Designed | Same width and colour count as mode 10h, and EGA's 2-bit-per-gun levels land exactly on `$0/$5/$A/$F`, so the palette is reproduced rather than approximated. One binary for PAL and NTSC. |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 640×200 bitmap, 16 colours | Designed | VBXE's **HR** overlay mode is 640×N at 4bpp — the same spec as the Amiga target, with a blitter. Verified against Altirra's `vbxe.cpp`, not the documentation. |
 
@@ -113,14 +142,24 @@ drift.
 
 ## Building
 
-Needs [cc65](https://cc65.github.io/) on your `PATH`; `make run` also needs
-[VICE](https://vice-emu.sourceforge.io/).
+Needs [llvm-mos](https://llvm-mos.org/) at `~/llvm-mos`; `make rund` also needs
+[VICE](https://vice-emu.sourceforge.io/) for `x128` and `c1541`. (The port used
+cc65 until August 2026 and left it: cc65 had 210 bytes of MAIN free where the
+disk seam alone needed 815, and its character-set translation caused four
+separate bugs here.)
 
 ```sh
-cd c128 && make        # build/trek128.prg
-cd c128 && make run    # launch it in x128 (the picture is on the VDC window)
-cd c128 && make test    # prove the EGA->VDC colour mapping natively
+cd c128 && make         # build/trek128.prg
+cd c128 && make d64     # build/trek128.d64 -- the real thing
+cd c128 && make rund    # launch the disk in x128 (the picture is on the VDC window)
+cd c128 && make verify  # bounds and encodings the binary can be wrong about
+cd c128 && make test    # the native suites: colour mapping, panels, sound
+make test               # and the core's own, from the repository root
 ```
+
+**Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
+music, the ten code overlays and the twelve-page briefing all load from the
+disk. `make run` boots a game with no words in it.
 
 ## Reference material is not in this repository
 
@@ -142,9 +181,15 @@ To assemble your own copy:
 - **unlzexe** — [mywave82/unlzexe](https://github.com/mywave82/unlzexe), for
   unpacking the LZEXE-compressed original
 
-Message prose in the original is copyrightable. The extracted string catalogue
-is used here as a checklist of *which situations need a message*, never as text
-to copy.
+Message prose in the original is copyrightable, and the shareware notice says
+so itself: it licenses redistribution of the complete unmodified package and
+then ends *"The author retains all other rights to the program."* So the
+extracted string catalogue is used here as a checklist of *which situations
+need a message*, never as text to copy, and the screen captures of the twelve
+briefing pages were used as a specification of what each page covers. Every
+word this port puts on screen is its own. The mechanics are a different matter
+and are used freely -- they are facts about a program, and reading them out of
+the binary is what this project is.
 
 ## Licence
 

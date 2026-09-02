@@ -2897,8 +2897,9 @@ self-destructed. The screenshots at four-second intervals missed the unstable
 message entirely and caught only the aftermath -- a reminder that a polled
 capture is not a recording.
 
-**That aftermath is a screen this port does not have**, and it is not the
-ordinary Detailed Evaluation:
+**That aftermath is a screen this port did not have until 2026-08-29**, and
+it is not the ordinary Detailed Evaluation. It is BUILT now -- `ui_loss_memo`,
+off `ship.lost_how`, recorded at all seven death sites:
 
     Dept. of Space / EARTH HEADQUARTERS / Top Secret
     From: Commander, Earth Sector
@@ -3045,8 +3046,10 @@ The original text follows, as the specification it still is:
 | Shuttlecraft | must be **100%** to use, and takes **0.2 stardays** round trip |
 | Shields | pct is how efficiently shield energy becomes actual shielding |
 
-This is the largest single body of specified-but-unbuilt work in the project,
-and none of it needs an emulator to settle.
+~~This is the largest single body of specified-but-unbuilt work in the
+project.~~ **ALL TWELVE ROWS ARE BUILT** -- see the sweep above the table, and
+chart erosion, the last of them, on 2026-08-29. None of it needed an emulator,
+which was the one part of this sentence that held.
 
 ### CHART EROSION IS REAL, AND IT IS IN THE DAMAGE REPORT (READ 2026-08-29)
 
@@ -5052,7 +5055,7 @@ If the chosen system is already at 0%, the routine returns without a word.
 fitted from one reading and wrecked the system outright; it is now three
 BINARY constants and a graded reduction.
 
-### NOT BUILT: wear and tear
+### ~~NOT BUILT:~~ BUILT 2026-08-29 -- wear and tear
 
 `fn 0x0213F3`, the second call from the turn loop, and a mechanic this port
 does not have at all. `[0x1D36]` is the stardate of the last wear event:
@@ -5078,7 +5081,7 @@ EnergyConverter check instead.
 Not built here because it needs `last_event` in the save record, which is a
 version bump. Fully specified when it is wanted.
 
-### NOT BUILT: a damaged Computer eats the star chart
+### ~~NOT BUILT:~~ BUILT 2026-08-29 -- a damaged Computer eats the star chart
 
 The tail of `fn 0x020DCE`, at 0x02134D, and only when the damaged system is
 index 9. It walks all sixty-four cells of an 8x8 word array at DS:0x2372 --
@@ -5212,7 +5215,7 @@ A 90-degree mirror about the diagonal. **BUILT 2026-08-28**, and it reuses
 `TORP_DIRECT_Q` -- the 0.3 here is the same threshold, and the same constant,
 as a direct hit's.
 
-### NOT BUILT: what a star really does
+### ~~NOT BUILT:~~ BUILT 2026-08-29 -- what a star really does
 
 `fn 0x00A8C8`, which the march calls on '*', is three outcomes:
 
@@ -5225,8 +5228,9 @@ as a direct hit's.
                                    'N' and [0x1DF6] increments
 
 `[0x1DF6]` is where the **"Stars destroyed @ -5"** scoring line comes from.
-The port answers TORP_ABSORBED to all three, because the other two want a nova
-cell type and quadrant destruction that this core does not have.
+~~The port answers TORP_ABSORBED to all three.~~ **All three are built**: the
+supernova on 2026-08-27 and SEC_NOVA -- the 57.6% case -- on 2026-08-29, with
+the per-quadrant count that makes a destroyed star stay destroyed.
 
 ### ALL FOUR ENEMY STRENGTHS, and the level dependence
 
@@ -5324,8 +5328,13 @@ port's own invention and are tagged PROVISIONAL rather than DERIVED, which is
 what they were pretending to be. Finding the pod's real trigger is what the
 rest of `fn 0x1DD4F` is for.
 
-**Four slots this core does not have at all:** the hail response, the boarding
-party, a Union ship's distress call, and the supernova.
+~~**Four slots this core does not have at all:** the hail response, the
+boarding party, a Union ship's distress call, and the supernova.~~ **ALL FOUR
+ARE BUILT.** The distress call and the supernova came earlier; the hail's
+delayed reply (SCHED_HAIL) and reinforcements (SCHED_REINFORCE) went in on
+2026-08-29, taking this core to five schedule slots. The boarding party is a
+per-turn roll here rather than a slot, which is a shape difference and not a
+missing mechanic.
 
 ### Reinforcements, in full, and a surprise
 
@@ -5617,6 +5626,7 @@ less. One emulator run flying column 8 repeatedly would settle it.
 `core/planet.h` is now BINARY, CONFIRMED, MEASURED or ID, except seven
 PROVISIONAL entries -- and all seven are the tractor-beam and death-pod
 stand-ins, whose real shapes are now known and unbuilt rather than unknown.
+(Both were built later, and the audit has read PROVISIONAL 0 since.)
 
 ---
 
@@ -5680,7 +5690,8 @@ enough. Lowering shields is free -- there is no matching subtraction anywhere.
 
 **The three are the death pod's**, and they are a stand-in for a mechanic
 whose real shape is known -- an object placed by the quadrant fill -- and
-unbuilt. Nothing in the port is now a guess about a number.
+unbuilt at the time. (Built 2026-08-28.) Nothing in the port is now a guess
+about a number.
 
 ### A note on the C128 image
 
@@ -6190,9 +6201,10 @@ handlers: `do_repair`, `do_chart`, `do_planets`, `do_hail`, `do_sound`,
 `do_repair`/`do_planets` call INTO other overlays so they cannot move without
 merging. Audit BINARY 116.
 
-### Still unbuilt from this routine
+### ~~Still unbuilt from this routine~~ BUILT 2026-08-29
 
-The third star outcome. `fn 0x0A8C8` splits the other 96% as 38.4% "Torpedo
+The third star outcome, and it turned out to be galaxy state rather than a
+cell change -- see "what a star really does" above. `fn 0x0A8C8` splits the other 96% as 38.4% "Torpedo
 absorbed by star." and 57.6% the star DESTROYED, cell -> 'N'. This core still
 answers TORP_ABSORBED for all of it, because the destroyed case wants a nova
 SECTOR code it does not have.
@@ -6980,8 +6992,9 @@ attempts, three blocks.
 chart whose word is 000 -- no enemies, no base, no stars -- and move there.
 An empty quadrant has nothing to block with. The chart is at DS:0x2560, stride
 16, and empty quadrants demonstrably exist (one was found at 8,3 in an earlier
-session). Nothing in the port depends on the answer yet; the mechanic is
-unbuilt either way.
+session). **BUILT 2026-08-29 anyway, from the branches** -- and the read was
+incomplete: a WARP >= 8 GATE that the first pass missed, which is also why
+three rig attempts could never have shown anything.
 
 
 ## What HAIL schedules: the StarBase's reply is DELAYED (2026-08-28)

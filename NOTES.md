@@ -485,7 +485,7 @@ and answers mechanics; MEASURED.md has its own back catalogue.
 | | what is left |
 |---|---|
 | ~~`Shift-F1` boss mode~~ | **NOT DOING IT -- Jamie's call, 2026-08-24.** See below |
-| `RAY` | fully specified, and bigger than it looks: four outcomes, the fourth destroys the ship and prints a **Top Secret loss report** this port has no equivalent of |
+| `RAY` | fully specified, and bigger than it looks: four outcomes, the fourth destroys the ship and prints a **Top Secret loss report** -- built 2026-08-29 |
 | `O)rbit` / `LAND` / `USE` | needs a core planet model. **Fully captured in run 1** -- every screen, both gates and the payoff. Nothing left to measure; this is now implementation work. See MEASURED.md, "The planet chain, captured end to end" |
 
 ### Corrections to commands already marked done
@@ -571,8 +571,11 @@ Still open from those runs:
   EV_DISTRESS, since 2026-08-27.
 - **Boarding-party frequency and duration.** The mechanic is in the string
   table; the numbers need elapsed play.
-- **The unbuilt screens**: five loss endings, Union wreckage, reinforcement
-  warnings. Specification only, never prose.
+- ~~**The unbuilt screens**: five loss endings, Union wreckage, reinforcement
+  warnings.~~ The loss endings are the Top Secret memo, built 2026-08-29 off
+  seven recorded reasons; reinforcement warnings went in the same day. Union
+  wreckage is named in the strings and has no mechanism behind it in this
+  core. Specification only, never prose -- that part still holds.
 
 **Opened by runs 1 to 3, and all cheap next time the rig is up:**
 
@@ -1231,7 +1234,7 @@ corrected time law vindicated.
      2/6**. See MEASURED.md, "RAY's ODDS, read out of the binary". Nothing
      about this command is unmeasured any more; it only has to be built.
   8. **The Top Secret loss report** -- **CAPTURED 2026-08-26**, see
-     MEASURED.md. Still unbuilt. It is the frame five more loss endings reuse,
+     MEASURED.md. BUILT 2026-08-29. It is the frame every loss ending reuses,
      and its cause line is what varies between them.
   9. **Two scoring lines with no mechanism**: enemy bases destroyed @ 50 and
      stars destroyed @ -5. ~~Rescues @ 200~~ is LIVE as of 2026-08-26 --
@@ -1281,7 +1284,7 @@ DECODED so far, with what each gave:
     0x20DCE   7  DAMAGE REPORT      the severity law, casualties, the chart
                                     erasure; and there is NO threshold
     0x213AD   2  the damage gate    Round(hits/350)+1 rounds at 2/3 each
-    0x213F3   3  WEAR AND TEAR      an unbuilt mechanic, fully specified
+    0x213F3   3  WEAR AND TEAR      BUILT 2026-08-29
     0x1C015   -  max(n-1, 0)        a for-loop the compiler did not fold
     0x1F4B8   -  Sign(x)
     0x0B5FD   -  TORPEDO            it RAY-MARCHES; no accuracy roll, no
@@ -1353,7 +1356,7 @@ list nobody is adding to:
                                     turn, never in the ship's own ROW, so it
                                     cannot touch the ship at all -- the
                                     "blown to quad 8-4" observation is the
-                                    TORPEDO route, which is still unbuilt.
+                                    TORPEDO route, built 2026-08-27.
                                     It can WIN the game.
     0x20B38   -  THE DEATH POD      READ 2026-08-27 and BUILT. A per-turn
                                     roll, NOT a scheduled event: 1 in 33, or
@@ -4761,9 +4764,10 @@ enemy table at spawn and look, per class.
 The planet chain is fully specified in the manual -- `ORBIT` scans for
 energium crystals, `LAND` offers transporter or shuttle at 0.2 stardays,
 `USE` consumes what was found -- but no screen of it has been captured.
-Same for the **five unbuilt loss endings**, including the surrender, and the
-events named in the strings and never seen: Union wreckage, distress signals,
-Mongol reinforcement warnings. The feature list at l.158-164 adds that
+~~Same for the five unbuilt loss endings.~~ The endings are built as the Top
+Secret memo (2026-08-29) and reinforcement warnings with them; distress
+signals were already in. What is still only a string is **Union wreckage**,
+and the surrender, which this core has no mechanism for. The feature list at l.158-164 adds that
 **successful rescues increase score**, which is the scoring end of the
 distress-signal mechanic.
 
@@ -5117,12 +5121,16 @@ mechanism outstanding that anything currently depends on.
      `Round(Random*d*10 + 10)` off SYS_WARP, with d in quadrants and warp
      appearing nowhere. Ten one-quadrant hops at warp 8 took zero damage,
      which the "speed" reading cannot explain. The positive direction is read
-     but not measured -- long moves are reliably blocked on the rig. UNBUILT.
+     but not measured -- long moves are reliably blocked on the rig. **BUILT
+     2026-08-29, and the read was incomplete: there is a WARP >= 8 GATE the
+     first pass missed, which is also why the rig attempts could never have
+     shown anything.**
   3. ~~**What HAIL schedules.**~~ **READ 2026-08-28: the StarBase's REPLY,
      delayed by (distance - 1) / 2 stardates.** A hail is a radio call with a
      light-lag; the immediate answer only says the frequencies are open.
-     "COMMUNICATIONS: The StarBase in R-C is responding to our hail." UNBUILT
-     -- it wants a third schedule slot. See MEASURED.md.
+     "COMMUNICATIONS: The StarBase in R-C is responding to our hail."
+     **BUILT 2026-08-29 as the fourth schedule slot -- and the GATING was
+     read wrong first time: only an OUT-OF-RANGE hail schedules a reply.**
   4. ~~**Which setup question `[0x1F31]` is.**~~ **SETTLED 2026-08-28: the
      RESTORE question.** Briefing answered N then Y with restore held at N;
      the byte read 'N' both times. The briefing was screenshotted actually
@@ -5323,3 +5331,44 @@ stops them being read.
 structural move is now required rather than optional.** No pivot. The tiers
 memo's "NO PIVOT NEEDED" stands, with the qualification that it now depends on
 str_offset moving to bank 1.
+
+## The build list is empty, and a documentation sweep (2026-08-29, end of day)
+
+Ten features went in today and the last of them, chart erosion, emptied the
+build list. Read list, rig list and build list are all empty for the first
+time since this project started.
+
+    BINARY 193   CONFIRMED 15   MEASURED 12   FITTED 0   DERIVED 0   PROVISIONAL 0
+    RESIDENT  1,184 free of 37,823      LOWRAM  139 free of 2,304
+    OVERLAYS 13,000-odd free of 40,960  BANK 1  ~25,000 free
+    SAVE v17, 600 bytes
+
+### What the sweep found, because it is the point of doing one
+
+Fourteen stale "NOT BUILT" markers across NOTES.md, MEASURED.md, core/trek.h
+and c128/src/main.c -- wear and tear, chart erosion, the star's third outcome,
+the loss memo, HAIL's reply, warp damage, reinforcements, and the four
+schedule slots "this core does not have at all", which it now has.
+
+**And the README still said the project needs cc65**, which it left on
+2026-08-23. That is the one a stranger would have hit first: `make` would
+simply have failed. It has been wrong for six days in the most-read file in
+the repository, while NOTES.md carried a detailed account of the migration.
+**The file people read least is the one that rots most quietly.**
+
+**A README that says what is in the port had never existed**, so the only way
+to know was to read twelve thousand lines of dated log. There is a "Where it
+stands" section now, dated, with the audit line in it.
+
+### And I wrote a fresh stale claim while fixing stale claims
+
+The first draft of that section listed "the kill/day gate" among the things
+deliberately left out. It is not: the gate was settled on 2026-08-26 -- three
+stardates on the clock and nothing else -- and the term has been on the score
+sheet ever since. Caught by checking each claim against the code before
+committing, which is the only reason to write the check into the habit rather
+than trusting the sentence.
+
+Every claim in the new section was then verified mechanically: 25 commands
+counted out of the dispatcher, 12 briefing pages counted out of the file, and
+each of the ten "mechanics the manual never mentions" grepped for in `core/`.
