@@ -13,9 +13,26 @@ produce code that does not compile, or worse, compiles and returns the wrong
 buffer. Anything else is left exactly as it is.
 
 THE LIST IS THE SOURCE OF TRUTH. c128/src/strings.txt holds id and text, and
-it IS committed -- unlike the music, this prose is the port's own wording and
-not Anderson's, so a clone with no reference/ can still build STRINGS.DAT and
+it IS committed, so a clone with no reference/ can still build STRINGS.DAT and
 get a game with words in it.
+
+WHAT THIS PROSE ACTUALLY IS, corrected 2026-09-02. This used to say "unlike the
+music, this prose is the port's own wording and not Anderson's". **That is not
+true and was never checked.** Of 326 pooled strings, 177 appear verbatim in
+EGATREK.EXE and 33 match character for character including his capitalisation
+-- the mixed-case entries are the tell, since this port writes in caps.
+
+Most are interface labels a port cannot rename (COMMUNICATIONS, ENGINEERING,
+U.S.S. LEXINGTON) and score-sheet rows that are the measured rubric. But
+roughly forty-seven are whole sentences of Anderson's writing.
+
+**KEPT, deliberately -- Jamie's call, 2026-09-02**, on the grounds that
+rewriting them changes the feel of the game, which is the thing the port exists
+to preserve. Replacements were drafted and read before the decision.
+
+So the honest position is: the BRIEFING and the MUSIC are held to "none of
+Anderson's", and the message pool is not. Do not describe the pool as the
+port's own wording.
 
 The first run extracts literals from the sources and writes the list. Later
 runs READ the list and only add literals that are new, because by then the

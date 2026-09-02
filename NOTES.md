@@ -4720,7 +4720,7 @@ would produce code that either fails to compile or, worse, compiles and
 returns the wrong buffer.
 
 `c128/src/strings.txt` is the source of truth and **is committed** -- unlike
-the music, this prose is the port's own wording, so a clone with no
+the music, this list is committed, so a clone with no
 `reference/` still gets a game with words in it. Ids are permanent. The first
 version rebuilt the list from the sources every run and wiped the pool the
 second time, because by then the sources held `S(n)` and there was nothing
@@ -5798,3 +5798,37 @@ because both constants stay put and the record simply outgrows the buffer.
 Two changes so the third time reports instead of crashing: the test's buffer is
 now `TREK_SAVE_SIZE + 256`, so the write lands, and it prints the real length
 and the number to set. The header says which constant to move by hand.
+
+## The message pool is NOT the port's own wording (2026-09-02)
+
+Found while preparing a release: **177 of the 326 pooled strings appear
+verbatim in EGATREK.EXE**, and 33 of those match character for character
+INCLUDING Anderson's capitalisation. The mixed-case entries are the tell --
+this port writes in caps, so `Replenishing reserve life support.` and
+`The apparatus is going unstable!` did not come from here.
+
+Most of the 177 are things a port cannot rename: department labels
+(COMMUNICATIONS, ENGINEERING), the ship and its registry, panel titles, and the
+score-sheet rows, which ARE the measured rubric. About forty-seven are whole
+sentences.
+
+**`tools/gen_strings.py` said "unlike the music, this prose is the port's own
+wording and not Anderson's" from the day the pool was built.** Nobody checked;
+the check is four lines of Python and it had never been run. It is the
+twenty-fourth stale claim of the day and the only one with legal weight rather
+than tidiness.
+
+### KEPT -- Jamie's call, 2026-09-02
+
+Seventy replacements were drafted and read before the decision. The call is
+that rewriting them changes the feel of the game, which is the thing this port
+exists to preserve, and that short functional lines in a faithful port of 1992
+shareware are a different matter from the note data or the manual.
+
+**So the standard is not uniform, and the docs now say so rather than claiming
+it is:** the BRIEFING and the MUSIC are held to "none of Anderson's"; the
+message pool is not. `gen_strings.py` carries the correction.
+
+**What this does change:** a release build must still ship without `MUSIC.DAT`,
+which is note data extracted from his binary and has never been committed. That
+one is not a judgement call -- it is the rule the repo already set itself.
