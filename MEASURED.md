@@ -7420,3 +7420,67 @@ it is bookkeeping with one side effect the player can feel. The port already
 does the first three structurally -- it does not regenerate on restore, and
 `ui_setup()` returns straight to the console -- so the only unbuilt part is the
 enemy's first turn, and `Setup.restored` is already the flag for it.
+
+## Message colour is PER SITE, not per department (2026-09-02)
+
+Read from the binary and confirmed on the rig, which is the only reason to
+trust it: the two methods were run independently and agree twice.
+
+### The mechanism
+
+There is no department colour table. Each message site calls BGI `SetColor`
+(fn 0x029960, the immediate in the `mov ax, N` before it) and then the message
+routine. The message routine `fn 0x021CC2` adds exactly one rule of its own, at
+0x021CEF: it reads the current colour back and, **if it is 10, uses 15
+instead** -- light green is bumped to white and nothing else is touched.
+
+Attributing the 145 message call sites to the nearest preceding `SetColor`
+gives **ten distinct colours in use** (1, 2, 3, 4, 6, 7, 11, 13, 14, 15). A
+four-way department map cannot produce that.
+
+### Two readings, each confirmed on screen
+
+**NAVIGATION.** Four sites in the 0x0451 segment (base 0x009310, solved on far
+calls and checked against three ORBIT strings) each carry `SetColor(3)` three
+to fifteen bytes before the push:
+
+    00E307 -> 00E310   "NAVIGATION: Not adjacent to planet."
+    00E967 -> 00E970   "NAVIGATION: Not orbitting a planet"
+    00F105 -> 00F114   "NAVIGATION: Docked." + the COMMUNICATIONS line
+    00F178 -> 00F181   "NAVIGATION: Not adjacent to base"
+
+Driven on the rig to quad 7-2 and typing O with no planet adjacent, the box
+that appears samples as **1110 pixels of EGA 3 and nothing else but black**.
+Read and capture agree.
+
+**COMMUNICATIONS, and it is NOT yellow here.** `fn 0x207FD`'s region holds
+exactly one SetColor, **7** at 0x020983. HAIL with no base in range paints a box
+that samples as **1134 pixels of EGA 7 and nothing else but black**. Agreed
+again.
+
+That does not contradict the earlier capture-derived "COMMUNICATIONS is
+yellow" -- it is what per-site colour MEANS. One department's messages are
+different colours at different sites, and a capture can only ever show the
+sites that happen to be on screen.
+
+**DAMAGE REPORT** samples as EGA 6 brown on the panel's blue, which is what the
+port already has.
+
+### What this means for the port
+
+`dept_color()` in `c128/src/ui.c` maps 'D' to brown, "COMM" to yellow and
+everything else to green. It is a four-way map of a thing that is not a map,
+and its "everything else" bucket is where NAVIGATION lives -- so **every HELM
+message in this port is green and should be cyan**, which is the most common
+message class in the game. NOT CHANGED in this commit; recorded.
+
+The honest options are a per-message colour in the string table, or keeping a
+department map and choosing its colours from the commonest site per department.
+The second is a deliberate simplification and should say so.
+
+### Free on the way past: the viewer read confirmed on screen
+
+The ORBIT capture caught the MAIN VIEWER showing **ARRAY MONITOR 504** with its
+ONLINE rows -- one of the ten instrument pages read this morning, drawn on a
+turn nobody asked for it. That is the `Random(10)` selection working, seen
+rather than inferred.

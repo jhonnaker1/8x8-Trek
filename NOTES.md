@@ -5616,11 +5616,20 @@ claim against the code beside it.
 
 ### Still unread, and they want the rig or a capture -- not the disassembler
 
-8. **STATE OF REPAIR with a focus set.** One screenshot, undocked and docked.
-   It is what settled 20 and 47 a stardate; `REPAIR_PER_STARDATE_FOCUS` (60)
-   and `_FOCUS_DOCKED` (100) are still the manual's relative figures.
-9. **HELM and SCIENCE message colours.** No capture has ever had one on
-   screen; the port keeps its own green rather than guessing.
+8. ~~**STATE OF REPAIR with a focus set.**~~ **NOT AN OPEN ITEM.**
+   `REPAIR_PER_STARDATE_FOCUS` 60 (0x0203B8) and `_FOCUS_DOCKED` 100
+   (0x02026E) are BINARY with addresses against them -- they were read, not
+   left on the manual's relative figures. Ninth stale claim of the day.
+9. ~~**HELM and SCIENCE message colours.**~~ **READ AND CAPTURED 2026-09-02,
+   and the question was the wrong shape.** There is no department colour:
+   every message site calls SetColor itself, ten distinct colours are in use
+   across the 145 sites, and the message routine's only rule is that colour 10
+   becomes 15. NAVIGATION (the port's HELM) is EGA 3 cyan -- four sites in the
+   binary, confirmed on the rig as 1110 px of EGA 3 and nothing else. HAIL's
+   COMMUNICATIONS is EGA 7, not the yellow an earlier capture showed, which is
+   what per-site colour means. **The port's `dept_color()` is a four-way map
+   of a thing that is not a map, and every HELM message is green when it
+   should be cyan.** Recorded, not changed. See MEASURED.md.
 10. **The reserve gauge's geometry.** The trigger, region, labels and quantity
     are read; the bar is this port's own and says so.
 
