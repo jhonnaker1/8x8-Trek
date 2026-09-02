@@ -1194,6 +1194,7 @@ uint8_t trek_shields_down(void);
 #define EV_HAIL_REPLY   19   /* y,x = the StarBase that answered */  /*@ID*/
 #define EV_REINFORCE    20   /* y,x = the quadrant; amount = ships */  /*@ID*/
 #define EV_WEAR         21   /* amount = the system index that broke */  /*@ID*/
+#define EV_CHART_LOST   22   /* amount = quadrants forgotten */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1955,6 +1956,44 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define WEAR_PICK_OF_N         6   /* Random(6): one of the first six */  /*@BINARY*/
 #define WEAR_LOSS_MIN         10  /*@BINARY*/
 #define WEAR_LOSS_SPAN        60   /* Random(60) + 10 */  /*@BINARY*/
+
+/* --------------------------------------------------------- CHART EROSION
+ *
+ * The last row of the manual's per-system effect table -- *"portions of the
+ * ships charts can be lost if the computer is sufficiently damaged and can
+ * only be recovered by re-scanning"* -- and the only one that had no binary
+ * read behind it until 2026-08-29.
+ *
+ * IT HANGS OFF THE DAMAGE REPORT, ~0x0212DE, which is `DamageReport(sys)`:
+ * [0x1CF4] is the system it is reporting on, and 0x0212F0 turns it into
+ * `0x1188 + index*16`, the sixteen-byte system NAME table. After printing:
+ *
+ *     if (sys != 9)  return                             ; 0x02134D, COMPUTER
+ *     for row 1..8, for col 1..8:
+ *         if (computer <  30)                     erase ; 0x02136A jl
+ *         else if (Random(10) < 5 && computer < 70) erase ; 0x02137A, 0x02137F
+ *         erase:  chart[row*16 + col*2] = 0             ; xor ax,ax 0x021394
+ *
+ *     computer >= 70    the chart is untouched
+ *     computer 30..69   EVERY quadrant on its own coin flip
+ *     computer <  30    the whole chart wiped
+ *
+ * IT FIRES ON THE REPORT, not per turn, so it happens when the computer is
+ * hit -- once, across all 64 quadrants. A ship at 45% loses about half its
+ * chart every time the computer takes another hit.
+ *
+ * WEAR AND TEAR CANNOT TRIGGER IT: that picks systems 0..5 and the computer
+ * is 9. Only enemy fire reaches this.
+ *
+ * A RETRACTION LIVES HERE. This was written up in the morning as "the binary
+ * appears not to do this", on a search that classified all 24 literal
+ * references to the chart at DS:0x2360 -- and the erasure was IN that list,
+ * at 0x021396, labelled from its neighbours instead of disassembled. The two
+ * instructions before it are `xor ax, ax`. */
+#define CHART_KEEP_ABOVE   70   /* at 70 and over, nothing is lost */  /*@BINARY*/
+#define CHART_WIPE_BELOW   30   /* under 30, all of it */  /*@BINARY*/
+#define CHART_COIN_OF_N    10  /*@BINARY*/
+#define CHART_COIN_BELOW    5   /* Random(10) < 5 */  /*@BINARY*/
 
 /* ------------------------------------------------- HOW THE SHIP WAS LOST
  *

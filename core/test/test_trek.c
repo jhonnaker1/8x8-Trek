@@ -2777,6 +2777,106 @@ static void test_torpedo(void) {
         }
     }
 
+    /* --- CHART EROSION: two thresholds and a coin, fn ~0x0212DE --- */
+    {
+        uint8_t q, tries;
+        uint16_t left;
+        TrekEvent ev5[8];
+        uint8_t n5;
+
+        /* A helper shape: fill the chart, set the computer, take a hit on it,
+           count what survives. */
+        #define ERODE(pct)                                                    \
+            do {                                                              \
+                n5 = 0;                                                       \
+                trek_new_game(3, (uint16_t)(4200 + tries));                   \
+                for (q = 0; q < GAL_CELLS; q++) gal_known[q] = 1;             \
+                ship.sys[SYS_COMPUTER] = (pct);                               \
+                trek_wreck_system(SYS_COMPUTER, 0, ev5, &n5, 8);              \
+                ship.sys[SYS_COMPUTER] = (pct);   /* the hit moved it */      \
+                left = 0;                                                     \
+                for (q = 0; q < GAL_CELLS; q++) left += gal_known[q];         \
+            } while (0)
+
+        /* AT 70 AND ABOVE, NOTHING IS LOST. */
+        tries = 0; ERODE(100);
+        ok(left == GAL_CELLS, "a computer at 100 loses no chart at all");
+
+        /* THE BOUNDARY, TESTED AGAINST THE VALUE THE RULE ACTUALLY READS.
+           trek_wreck_system DAMAGES the computer and then erodes, so setting
+           it to 70 leaves it BELOW 70 by the time the thresholds are applied
+           -- the first draft of this asserted "at exactly 70, nothing" and
+           failed on code that was right. Run the whole band and check the
+           INVARIANT instead: what survives must agree with where the computer
+           ended up. */
+        {
+            uint8_t bad = 0, post;
+            for (tries = 40; tries < 140; tries++) {
+                n5 = 0;
+                trek_new_game(3, (uint16_t)(4200 + tries));
+                for (q = 0; q < GAL_CELLS; q++) gal_known[q] = 1;
+                ship.sys[SYS_COMPUTER] = (uint8_t)(20 + (tries % 80));
+                trek_wreck_system(SYS_COMPUTER, 0, ev5, &n5, 8);
+                post = ship.sys[SYS_COMPUTER];
+                left = 0;
+                for (q = 0; q < GAL_CELLS; q++) left += gal_known[q];
+
+                if (post >= 70 && left != GAL_CELLS) bad++;
+                if (post < 30  && left != 0)         bad++;
+                if (post >= 30 && post < 70 && left == GAL_CELLS) {
+                    /* possible, but only 1 in 2^64 -- treat as a failure */
+                    bad++;
+                }
+            }
+            ok(bad == 0,
+               "what survives always agrees with where the computer ended up");
+        }
+
+        /* UNDER 30, ALL OF IT. */
+        tries = 2; ERODE(29);
+        ok(left == 0, "a computer under 30 wipes the chart");
+        tries = 3; ERODE(0);
+        ok(left == 0, "and at nothing, the same");
+
+        /* BETWEEN, EACH QUADRANT TAKES ITS OWN COIN FLIP -- about half. This
+           is the discriminator for the middle band: a build that wiped
+           everything below 70, or nothing above 30, passes the two ends. */
+        {
+            uint16_t total = 0;
+            for (tries = 4; tries < 24; tries++) {
+                ERODE(50);
+                total = (uint16_t)(total + left);
+            }
+            /* 20 runs x 64 quadrants at p=0.5 is 640 +- 18 (one sd). */
+            ok(total > 560 && total < 720,
+               "between 30 and 69 about half the chart goes, each on its own roll");
+        }
+
+        /* AND IT ONLY EVER FIRES ON THE COMPUTER -- WITH A COMPUTER LOW
+           ENOUGH TO ERODE. The first draft of this left the computer at 100,
+           so erode_chart returned at its first line whether or not the caller
+           gated it, and removing the `which == SYS_COMPUTER` test failed
+           NOTHING. A break that cannot fail proves nothing. */
+        {
+            uint8_t bad = 0;
+            for (tries = 200; tries < 240; tries++) {
+                n5 = 0;
+                trek_new_game(3, (uint16_t)(4400 + tries));
+                for (q = 0; q < GAL_CELLS; q++) gal_known[q] = 1;
+                ship.sys[SYS_COMPUTER] = 40;    /* squarely in the coin band */
+                ship.sys[SYS_LASERS]   = 60;
+                trek_wreck_system(SYS_LASERS, 0, ev5, &n5, 8);
+                left = 0;
+                for (q = 0; q < GAL_CELLS; q++) left += gal_known[q];
+                if (left != GAL_CELLS) bad++;
+            }
+            ok(bad == 0,
+               "a hit on another system leaves the chart alone, however bad "
+               "the computer is");
+        }
+        #undef ERODE
+    }
+
     /* --- HOW THE SHIP WAS LOST, for the Top Secret memo --- */
     {
         uint8_t tries, c;

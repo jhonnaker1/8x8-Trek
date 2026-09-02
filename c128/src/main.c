@@ -1368,6 +1368,14 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
             linebuf[k] = 0;
             ui_message(S(S_166), linebuf);
             return;
+        case EV_CHART_LOST:
+            /* The computer lost part of the chart. Only a re-scan brings a
+               quadrant back -- see core/trek.h. */
+            k  = put_u16(linebuf, e->amount);
+            k += put_str(linebuf + k, S(S_314));
+            linebuf[k] = 0;
+            ui_message(S(S_18), linebuf);
+            return;
         case EV_WEAR:
             /* Nothing shot at us; it simply broke. `amount` is the system. */
             k  = put_str(linebuf, ui_sys_name((uint8_t)e->amount));

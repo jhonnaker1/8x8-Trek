@@ -2004,6 +2004,31 @@ static uint16_t turn_hits, turn_absorbed;
 /* Damages ONE NAMED system by an amount in HIT UNITS, and reports it.
    fn 0x020DCE at 0x020E37..0x020FA7; the law and its constants are in trek.h
    above DMG_FACTOR_UP_X100. `hits` is the turn's total, not one hit. */
+/* THE CHART ERODES WHEN THE COMPUTER IS HIT -- see trek.h above
+   CHART_KEEP_ABOVE. Called from trek_wreck_system with the system's state
+   AFTER the damage, which is what the original tests. */
+static void erode_chart(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t pct = ship.sys[SYS_COMPUTER], q, gone = 0;
+
+    if (pct >= CHART_KEEP_ABOVE) return;
+
+    for (q = 0; q < GAL_CELLS; q++) {
+        if (!gal_known[q]) continue;
+        /* Under 30 every entry goes; between 30 and 69 each takes its own
+           coin flip. The order of the two tests is the original's: the wipe
+           is checked first and does not roll. */
+        if (pct >= CHART_WIPE_BELOW
+            && trek_rand_n(CHART_COIN_OF_N) >= CHART_COIN_BELOW) continue;
+        gal_known[q] = 0;
+        if (gone < 255) gone++;
+    }
+    if (gone && ev && *n < max) {
+        ev[*n].kind = EV_CHART_LOST; ev[*n].y = 0; ev[*n].x = 0;
+        ev[*n].amount = gone;
+        (*n)++;
+    }
+}
+
 void trek_wreck_system(uint8_t which, uint16_t hits,
                        TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t factor, divisor, off, q, r;
@@ -2035,6 +2060,9 @@ void trek_wreck_system(uint8_t which, uint16_t hits,
     if (left > DMG_TOPUP_ABOVE)
         left = (int16_t)(left - (DMG_TOPUP_MIN + trek_rand_n(DMG_TOPUP_SPAN)));
     ship.sys[which] = (uint8_t)(left < 0 ? 0 : left);
+
+    /* And the chart, if it was the computer that took it. */
+    if (which == SYS_COMPUTER) erode_chart(ev, n, max);
 
     /* Round(Sign(hits - 500)) * Random(10): no lives are lost on a turn whose
        hits never passed 500. */
