@@ -97,12 +97,13 @@ endef
 
 all: $(OUT)
 
-# The note data is Nels Anderson's, so it is generated rather than committed --
-# see tools/gen_music.py. On a clone without reference/ this still writes a
-# valid header with empty tracks, so the build never depends on gitignored
-# material being present.
+# THE MUSIC IS THIS PORT'S OWN, composed in tools/make_music.py, so this needs
+# no reference/ at all and a fresh clone gets sound. It used to run
+# gen_music.py, which EXTRACTS Anderson's note data -- that tool is still there
+# and still works, but its output is his creative work, is gitignored, and can
+# never ship on a release disk. See tools/make_music.py.
 music src/music_data.h src/music_data.c:
-	cd .. && python3 tools/gen_music.py
+	cd .. && python3 tools/make_music.py
 
 # The prose. Unlike the music this list IS committed -- it is the port's own
 # wording, not Anderson's -- so a clone with no reference/ still gets a game

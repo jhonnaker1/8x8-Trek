@@ -179,7 +179,12 @@ disk. `make run` boots a game with no words in it.
 
 ## Reference material is not in this repository
 
-`reference/` is deliberately **not tracked**. It holds the original shareware
+`reference/` is deliberately **not tracked**, and since 2026-09-02 the build no
+longer needs it: the music is the port's own (`tools/make_music.py`), so a
+fresh clone gets a disk with sound on it. Only the measurement tools want the
+original.
+
+It holds the original shareware
 package and material derived from it, and the licence in `EGATREK.DOC` requires
 that any distributed copy include `egatrek.exe`, `egatrek.doc`, `egatrek.ref`,
 `orderfrm.txt`, `egatrek.txt` and `file_id.diz` **unmodified**. A working

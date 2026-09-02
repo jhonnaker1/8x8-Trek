@@ -5832,3 +5832,36 @@ message pool is not. `gen_strings.py` carries the correction.
 **What this does change:** a release build must still ship without `MUSIC.DAT`,
 which is note data extracted from his binary and has never been committed. That
 one is not a judgement call -- it is the rule the repo already set itself.
+
+## The music is the port's own now (2026-09-02)
+
+`tools/gen_music.py` extracts Anderson's note data. It works, it stays, and its
+output can never be committed or shipped -- which meant a fresh clone played
+silently and a release disk could carry no sound at all.
+
+`tools/make_music.py` composes the port's own instead, in the original's exact
+data format, so **nothing in the player changed**. It is committed, `make music`
+runs it, and `reference/` is no longer needed to build a disk with sound.
+
+**FAITHFUL IN ROLE, NOT IN TUNE.** The originals were measured first -- title
+205 notes / 45.5s / 170-700Hz, end 319 / 43.5s / 190-1480Hz, and five effects of
+0.1 to 0.9 seconds -- and the new tracks match the durations, the registers and
+the job each one does. None of his intervals are reproduced.
+
+**The SID is used in the DATA, not the registers.** The format is one note at a
+time and the player gives music one voice, so the harmony is ARPEGGIATED:
+chords spelled three notes at a time at 3 ticks each, cycling near 6Hz, which
+reads as a chord rather than as notes. That is the standard C64 answer to being
+short of voices and it is something a PC speaker driving one square wave never
+did. Both themes are in D minor.
+
+**Anderson's note data was NEVER in this repository**, and that was checked
+rather than assumed on the day the new music landed: every blob in every ref
+was searched for the first 24 bytes of his title track. Zero hits. The
+gitignore held from the first commit.
+
+**Still open**: per-track waveform and envelope. Everything plays as a
+flat-envelope pulse, deliberately PC-speaker-like. A table indexed by track --
+triangle and a soft attack for the title, noise for the torpedo, sawtooth for
+the klaxon -- is a small change to `snd_init`/`voice_note` and the biggest
+remaining audible win.
