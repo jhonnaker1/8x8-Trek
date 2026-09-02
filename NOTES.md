@@ -5372,3 +5372,50 @@ than trusting the sentence.
 Every claim in the new section was then verified mechanically: 25 commands
 counted out of the dispatcher, 12 briefing pages counted out of the file, and
 each of the ten "mechanics the manual never mentions" grepped for in `core/`.
+
+## PLAYED IT, and the first thing play found (2026-08-29)
+
+A game at command level 3, start to a docked repair stop. What the mechanics
+did was right; what the game could not do was the finding.
+
+**FIX HAS ONLY HALF OF ITS COMMAND.** The manual, l.459:
+
+    In addition, you will be asked if you want to spend time just making
+    repairs.  In space, repairs will take place no faster than normal.  If
+    docked at a StarBase you can use their facilities to speed repairs.
+
+      1x    Normal repairs, work evenly divided among systems
+      2.5x  Normal repairs while docked at a starbase
+      3x    Repairing only a selected system
+      5x    Repairing a selected system while docked at a starbase
+
+This port has the concentrate half and all four rates -- `REPAIR_FOCUS_FACTOR`
+is 3, docked is 2.5, and they multiply. **What it does not have is the prompt**,
+and `do_fix` is marked `/* no turn */`.
+
+**SO THERE IS NO WAY TO WAIT.** Time advances only on movement and docking
+(MEASURED, and correct). Docking again while already docked costs nothing --
+tested, five D presses left the clock at 3503.0 and every system unchanged.
+So a captain with a wrecked ship, sitting at a StarBase with nothing to shoot,
+cannot spend a stardate repairing. The only way to pass time is to fly.
+
+**How it actually played out**, which is why this is a gameplay bug and not a
+missing line: life support was shot to 0 in the second fight, the RESERVE panel
+replaced SYSTEMS STATUS with 2.0 days on it, and I ran for the base. Docked,
+"ALL STORES FULL", life support still 25% and needing 1.5 stardates. **To repair
+it I had to shuffle between two sectors beside the base, undocking and redocking
+four times a cycle** -- 3502.2 to 3503.0 and life support 25% -> 97%. That works
+and is absurd, and no player would find it.
+
+### What play confirmed, which is worth as much
+
+  * one torpedo, one standard Mongol, first shot of the game
+  * the three-tube salvo asks per tube and resolves in one turn
+  * **firing costs no time**, so a ship on life-support reserve can still fight
+    -- it just cannot travel. That is a real tactical consequence of a rule
+    read from the binary, and it is the most interesting thing in the game.
+  * "BLOCKED BY OBJECT AT 4-1" twice, on a star due west, with a countdown
+    running. The departure walk is faithful and it is genuinely dangerous.
+  * a StarBase came under attack on the scheduled slot, mid-flight
+  * "NOT ADJACENT TO PLANET" on a failed dock, which reads as a bug and is not
+    -- it is the original's own wording, measured, with a comment saying so.
