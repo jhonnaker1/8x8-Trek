@@ -421,10 +421,22 @@ static unsigned char sys_color(unsigned char pct) {
  * guessed. Its own labels are "LIFE SUPPORT" and "RESERVE, DAYS", read at
  * cs:0x403A and cs:0x4047.
  *
- * WHAT IS READ AND WHAT IS NOT: the trigger, the region, the two labels and
- * the quantity are all read. The original also draws a gauge with a "0" tick
- * at the bottom; its geometry is not read, so the bar below is this port's
- * own and is marked as such rather than presented as measured. */
+ * WHAT IS READ: the trigger, the region, the two labels, the quantity -- and
+ * since 2026-09-02 THE GAUGE ITSELF, both out of fn 0x01FF2F and off a rig
+ * capture with Life Support poked to 60. They agree exactly:
+ *
+ *     Rectangle (195,280)-(300,340), outline light gray, fill green
+ *     tick labels "2" "1" "0" down the LEFT at y = 281, 311, 341
+ *     rules every 15 pixels -- four bands of 14 for two days
+ *
+ * It is VERTICAL, 30 pixels to the day, labelled at whole days and ruled at
+ * half days.
+ *
+ * THE BAR BELOW IS STILL THIS PORT'S OWN, and now knowingly so rather than for
+ * want of a measurement: one horizontal 18-cell bar, no rules, no scale. A
+ * 20x8 character panel cannot hold a 105x60 pixel gauge, but it could be
+ * vertical with half-day rules if that is ever wanted. Do not describe the
+ * orientation as measured -- it is measured, and we do the other one. */
 static void draw_reserve(void) {
     const Panel *p = &panels[P_SYSTEMS];
     unsigned char x = (unsigned char)(p->x + 1);

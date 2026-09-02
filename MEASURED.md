@@ -7541,3 +7541,53 @@ fn 0x97D7 is the whole of USE-shield: print, set `[0x26E1]`, return. Both bolt
 paths test it. It is saved with the game (v18) -- a restore that forgot it
 would quietly re-expose a ship the player had made safe, and nothing on the
 console shows the flag.
+
+## The reserve gauge, read and then photographed (2026-09-02)
+
+The last item on the list that wanted the rig. Read out of `fn 0x1FDC9`'s
+reserve branch first, then confirmed on the screen -- and the two agree on
+every number.
+
+### From the binary, fn 0x01FF2F
+
+    panel   (160,250)-(319,349) filled colour 9      ; already known
+    text    (192,263)  colour 4   "LIFE SUPPORT"
+    text    (195,277)  colour 15  "RESERVE, DAYS"
+    text    (180,281)  "2"        ; the tick labels, down the LEFT
+    text    (180,311)  "1"
+    text    (180,341)  "0"
+    SetFillStyle(1, 2)                                ; solid green
+    Rectangle (195,280)-(300,340)   0x02986C
+    SetColor(7)
+    Bar       (195,280)-(300,340)   0x028DF9
+    Line      (195,325)-(300,325)   0x029824          ; and more, every 15px
+
+### From the screen, with Life Support poked to 60
+
+DGROUP was relocated for the run by finding the 10x10 ASCII sector map (the
+anchor DS:0x2622 gives), which put it at 0x2A970 -- and the twelve system words
+at DS:0x235A read back 100 twelve times over on a fresh game, which is what
+confirms the base rather than the map alone.
+
+A column straight down the middle of the gauge at x = 250, y = 280 to 340:
+
+    gray 1, green 14, gray 1, green 14, gray 1, green 14, gray 1, green 14, gray 1
+
+**FOUR GREEN BANDS OF FOURTEEN PIXELS, divided by light-gray rules every 15.**
+So the gauge is VERTICAL, 60 pixels for 2.0 days -- 30 a day -- with the labels
+2, 1 and 0 running DOWN the left at whole days and the rules at every HALF day.
+Full reserve fills all four bands.
+
+### What the port does instead
+
+`draw_reserve()` draws ONE HORIZONTAL 18-cell bar across the panel. The
+orientation, the divisions and the scale labels are all this port's own. That
+was already stated as unmeasured; it is measured now, and the divergence is a
+real one rather than an unknown. A 20x8 character panel cannot reproduce a
+105x60 pixel gauge exactly, but it could be vertical with half-day rules.
+
+Free on the way past, and neither was asked for: the same run caught the MAIN
+VIEWER on **POWER DISTRIB 509**, showing the PMAX/PAVL/PPCT header and the
+three pools at `1:5000 2:0500 3:2500` -- the page whose header measures 18
+columns against this port's 17, seen rather than inferred. And an ALERT panel,
+four DAMAGE REPORT boxes and a partially damaged SYSTEMS STATUS, all in green.

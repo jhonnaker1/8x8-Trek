@@ -5654,11 +5654,12 @@ claim against the code beside it.
    `ui.c` is explicit that it is a simplification rather than a finding. It
    should NOT be "fixed" here by swapping green for cyan: that trades one
    department's error for four others'.
-10. **The reserve gauge's geometry.** The trigger, region, labels and quantity
-    are read; the bar is this port's own and says so. **The only item on this
-    whole list still genuinely open**, and it wants a rig run with life
-    support poked down -- real work for a cosmetic bar, so it is parked
-    honestly rather than half-done.
+10. ~~**The reserve gauge's geometry.**~~ **READ AND CAPTURED 2026-09-02**, and
+    the two agree exactly. It is a VERTICAL gauge, `(195,280)-(300,340)`,
+    green on a light-gray outline, 30 pixels to the day, labelled 2/1/0 down
+    the left at whole days and ruled every 15 pixels at half days -- four
+    bands of fourteen. This port draws one horizontal 18-cell bar instead,
+    which is now a KNOWN divergence rather than an unknown. See MEASURED.md.
 
 11. ~~**Whether the original gates the planet list on scanned quadrants.**~~
     **READ 2026-09-02: IT DOES NOT.** The original's PLANET LIST is viewer
