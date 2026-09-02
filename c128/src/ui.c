@@ -1732,13 +1732,33 @@ void ui_briefing(void) {
                wrong on the VDC the first time this ran. */
             scr_puts(1, 24, S(S_306),
                      EGA_TO_VDC(EGA_LTRED));
-            if (kb_waitkey() == KB_Q) break;
+            /* Q quits: clear the page state so the end-of-file footer
+               below does NOT then ask for a second key. */
+            if (kb_waitkey() == KB_Q) { x = 0; y = 0; break; }
             scr_clear();
             y = 0;
         } else if (c != '\n' && c != '\r' && x < BRIEF_LINE - 1) {
             io_buf[x++] = c;
         }
     }
+
+    /* THE LAST PAGE HAS NO FORM FEED AFTER IT -- the file simply ends, so the
+       loop fell out and the screen cleared while page 12 was still being read
+       (Jamie, 2026-09-02). Every page but the last one waited. Flush whatever
+       line is still pending, then give the final page the same footer and the
+       same wait as its eleven predecessors -- worded for a page with nothing
+       after it, since RETURN=NEXT PAGE would be a lie here. */
+    if (x) {
+        io_buf[x] = 0;
+        scr_puts(1, (unsigned char)(y + 1), (char *)io_buf, COL_MSG);
+        y++;
+    }
+    if (y) {
+        scr_puts(1, 24, S(S_318),
+                 EGA_TO_VDC(EGA_LTRED));
+        kb_waitkey();
+    }
+
     plat_close();
     scr_clear();
 }

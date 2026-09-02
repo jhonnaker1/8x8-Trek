@@ -154,9 +154,24 @@ uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
     return STOR_OK;
 }
 
-uint8_t  plat_open(const char *name) { (void)name; return STOR_NOTFOUND; }
-uint16_t plat_read(void *buf, uint16_t len) { (void)buf; (void)len; return 0; }
-void     plat_close(void) { }
+/* The streaming seam. NOTFOUND by default -- most tests must not find a file
+   -- but test_briefing_pages() turns it on and serves the REAL briefing.txt,
+   so the page loop is exercised against the bytes that actually ship. */
+static FILE *brief_fp   = 0;
+static int   brief_mode = 0;
+
+uint8_t plat_open(const char *name) {
+    if (!brief_mode) { (void)name; return STOR_NOTFOUND; }
+    brief_fp = fopen("src/briefing.txt", "rb");
+    return brief_fp ? STOR_OK : STOR_NOTFOUND;
+}
+uint16_t plat_read(void *buf, uint16_t len) {
+    if (!brief_fp) { (void)buf; (void)len; return 0; }
+    return (uint16_t)fread(buf, 1, len, brief_fp);
+}
+void plat_close(void) {
+    if (brief_fp) { fclose(brief_fp); brief_fp = 0; }
+}
 
 /* ui.c's dialog code references this; nothing here calls it. */
 void vdc_reg_write(unsigned char r, unsigned char v) { (void)r; (void)v; }
@@ -197,8 +212,16 @@ static const char *kb_script = 0;
 static unsigned char snap[VDC_ROWS][VDC_COLS];
 static int snap_armed = 0;
 
+/* The briefing blocks once per page and clears the screen straight after, so
+   the ONLY moment its last page can be inspected is while it is waiting.
+   wait_snap keeps the most recent one; wait_count says how many there were. */
+static unsigned char wait_snap[VDC_ROWS][VDC_COLS];
+static int wait_count = 0;
+
 char kb_waitkey(void) {
     if (snap_armed) { memcpy(snap, cell, sizeof snap); snap_armed = 0; }
+    wait_count++;
+    memcpy(wait_snap, cell, sizeof wait_snap);
     if (kb_script && *kb_script) return *kb_script++;
     return KB_RETURN;
 }
@@ -1178,6 +1201,65 @@ static void test_hall_of_fame_persists(void) {
     check(strcmp(buf, "PICARD") == 0, "the table survives a round trip to disk");
 }
 
+
+/* THE BRIEFING WAITS ON EVERY PAGE, THE LAST ONE INCLUDED.
+ *
+ * Twelve pages are separated by ELEVEN form feeds, and the wait used to live
+ * inside the form-feed branch alone. Page 12 therefore fell out of the read
+ * loop and the screen cleared under the reader (Jamie, 2026-09-02). The page
+ * count is derived from the shipping file, not restated, so adding a page to
+ * briefing.txt cannot quietly leave this test asserting the old number.
+ *
+ * Two assertions, and the second is the one that matters: a loop that waited
+ * twelve times but did it AFTER clearing the screen would pass the first. */
+static void test_briefing_pages(void) {
+    int pages = 1, ch, r, found = 0;
+    FILE *f = fopen("src/briefing.txt", "rb");
+
+    if (!f) { printf("FAIL: cannot open src/briefing.txt\n"); failures++; return; }
+    while ((ch = fgetc(f)) != EOF) if (ch == '\f') pages++;
+    fclose(f);
+
+    screen_reset();
+    brief_mode = 1;
+    wait_count = 0;
+    ui_briefing();
+    brief_mode = 0;
+
+    {
+        char msg[96];
+        sprintf(msg, "briefing waits once per page (%d waits, %d pages)",
+                wait_count, pages);
+        check(wait_count == pages, msg);
+    }
+
+    /* The last wait happened with page 12 still drawn. Its closing line is the
+       thing a reader is left looking at. */
+    for (r = 0; r < VDC_ROWS && !found; r++) {
+        char line[VDC_COLS + 1];
+        int c;
+        for (c = 0; c < VDC_COLS; c++) {
+            unsigned char v = wait_snap[r][c];
+            line[c] = (v == SENTINEL) ? ' ' : (char)v;
+        }
+        line[VDC_COLS] = 0;
+        if (strstr(line, "Good hunting.")) found = 1;
+    }
+    check(found, "the last page is still on screen when the briefing waits");
+
+    /* Q QUITS, AND QUITTING ASKS FOR NOTHING MORE. The end-of-file footer
+       added above must not fire on the way out of an abandoned briefing --
+       that would make Q take two presses. */
+    screen_reset();
+    brief_mode = 1;
+    wait_count = 0;
+    kb_script = "Q";
+    ui_briefing();
+    kb_script = 0;
+    brief_mode = 0;
+    check(wait_count == 1, "Q on page 1 ends the briefing with one press");
+}
+
 int main(void) {
     pool_init();
     trek_new_game(3, 12345);
@@ -1212,6 +1294,7 @@ int main(void) {
     test_log_outlives_the_panel();
     test_msgs_opens_at_the_bottom();
     test_hall_of_fame_persists();
+    test_briefing_pages();
 
     if (failures) { printf("%d failure(s)\n", failures); return 1; }
     printf("console panels: all checks passed\n");

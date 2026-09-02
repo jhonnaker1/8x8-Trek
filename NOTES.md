@@ -2740,8 +2740,38 @@ and are still the only part of the disk seam never exercised. The d64 had 387
 blocks free. `make verify` now checks every page fits 78x22, proven by
 breaking one.
 
-**What is NOT built: the viewer.** `s->briefing` is still collected at
-ui.c:1679 and read by nothing.
+**The viewer was built the same day** (`ui_briefing()`), and this paragraph
+said "NOT built" for four days after it was. See below.
+
+#### The last page did not wait (2026-09-02, found by playing it)
+
+Twelve pages, **eleven** form feeds. The page loop drew a line on `\n` and, on
+`\f`, printed the footer and blocked for a key -- so the wait lived *inside the
+separator branch*. Page 12 has no separator after it: the loop simply ran out
+of file, fell through to `scr_clear()`, and the last page vanished before it
+could be read. Every other page behaved perfectly, which is why nothing caught
+it -- `make verify` counts the pages and measures them, and both numbers were
+right.
+
+**The general shape: a loop driven by a SEPARATOR does the last item's work
+nowhere.** Anything that belongs to an item -- the wait here, but equally a
+flush, a commit, a total -- has to be repeated after the loop, or it happens
+n-1 times. The fix does exactly that: flush the pending line, then footer and
+wait, guarded by "did this page draw anything" so a file that *does* end with a
+form feed asks for nothing extra. Q sets that guard to zero on its way out, or
+quitting would have cost two presses.
+
+The last page gets its own wording -- `PRESS ANY KEY TO TAKE COMMAND`, not
+`RETURN=NEXT PAGE   Q=QUIT BRIEFING`, which would be a lie on a page with
+nothing after it.
+
+`test_briefing_pages()` in `c128/test/test_panels.c` streams the **real**
+`briefing.txt` through the stubbed disk seam and counts the blocking waits
+against a page count derived from the file itself. Deleting the fix makes it
+report `11 waits, 12 pages`, and a second assertion checks the last page is
+still on the screen *at the moment it blocks* -- a loop that waited twelve
+times after clearing would pass the first check and fail this one. Confirmed on
+the machine too: page 12 holds with its footer, and any key takes command.
 
 ### 11. Briefing pages -- CAPTURED 2026-08-21
 
