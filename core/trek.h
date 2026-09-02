@@ -695,11 +695,13 @@ typedef struct {
     uint8_t  torps;
     uint8_t  laser_eff;     /* percent -- heat and battle damage combined,
                                as the original's single gauge reports it */
-    uint16_t laser_heat;    /* energy fired in the current volley, 0..65535.
-                               Per COMMAND, not cumulative over the game, which
-                               is what the ancestor's rpow means and the only
-                               reading we have is consistent with. Whether it
-                               also decays over time is unmeasured. */
+    uint16_t laser_heat;    /* energy fired, 0..65535, accumulated at
+                               fired/HEAT_PER_UNIT and shed twice over:
+                               LASER_HEAT_COOL_TURN once per command and
+                               LASER_HEAT_COOL_DAY per stardate. All three are
+                               BINARY. This said "whether it also decays over
+                               time is unmeasured" until 2026-09-02, twelve
+                               lines from the constants that measure it. */
     uint8_t  warp;          /* tenths, 10..80 */
     uint8_t  shields_up;
     uint16_t stardate;      /* tenths */

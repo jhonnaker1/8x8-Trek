@@ -5541,16 +5541,23 @@ Derived by grepping the CODE for "unread / not read / unmeasured" and checking
 each hit against what is actually built, not by reading this file's own lists
 back. **Three of the hits were stale and are now retracted** -- see below.
 
-### Still unread, and they want the disassembler
+### ~~Still unread~~ ALL READ 2026-09-02 -- and now they are a BUILD list
 
-1. **`[0x1DA2]`, the settlement's evacuation deadline: where it is SET and by
-   how much.** The read that found it (2026-08-27) got the address and the
-   comparison and stopped there. This is the one with gameplay in it -- the
-   port has `PF_SETTLED` and the +200 rescue, but no clock running against the
-   player, so a settlement can never actually be lost to time.
-2. **The word at `[DS:0x235A + idx*2]`**, which the distress signal drains by
-   `10 + Random(90)` and floors at zero. Population or countdown is not read,
-   and the two imply different mechanics.
+Every disassembler item is closed. Full write-up in MEASURED.md, "Clearing the
+unread list with the disassembler". What each one turned into:
+
+1. ~~**`[0x1DA2]`, the settlement's evacuation deadline.**~~ **READ.** Setup
+   arms the slot at `3505.0 + Random()*3.0` and ONLY at `[0x1DF0] >= 7`, so
+   command level 3 and up; fn 0x151D0 then fires ONCE and sets the deadline to
+   `stardate + 1.0 + Random()*3.0`. **UNBUILT** -- the port has PF_SETTLED and
+   the +200 rescue but no clock, so a settlement cannot be lost to time, and
+   it has no level gate on the event at all.
+2. ~~**The word at `[DS:0x235A + idx*2]`.**~~ **NOT AN UNREAD ITEM.** It is
+   the twelve system repair percentages, `DS:0x1188` is the twelve system
+   NAMES, and fn 0x15C07 is the SPY. All retracted on 2026-08-27; this entry
+   survived because the retraction never reached the paragraph that raised it.
+   THE SPY ITSELF IS UNBUILT: one turn in 150 at V > 7, one system down
+   `10 + Random(90)`.
 3. ~~**Where the landing attack roll really lives.**~~ **READ AND FIXED
    2026-09-02** -- and the defect was not the one this entry named. The roll
    was already in the right place; what was wrong was what happens after it.
@@ -5558,16 +5565,30 @@ back. **Three of the hits were stale and are now retracted** -- see below.
    back NOTHING, and both callers spend the find with an unguarded `mod 10`
    whatever the outcome. See MEASURED.md, "The landing party's attack, read
    from the branches".
-4. **The plasma bolt's "failed to detonate" branch.**
-5. **Whether a bolt's detonation damages ENEMIES near it.** This file has
-   claimed since 2026-08-20 that it "can kill several Mongols at once" and the
-   routine does not obviously do that -- so it is an unread mechanism AND an
-   unverified claim.
-6. **`[0x26E1]`, the plasma bolt shield: how it is set and spent.** The port
-   has `ITEM_PLASMA_SHIELD` and a test in `trek.c` that is written and always
-   false, which is the honest way to carry it but is not the mechanic.
-7. **Whether `laser_heat` decays over time.** Per-command is the only reading
-   we have and it is consistent, but decay was never ruled in or out.
+4. ~~**The plasma bolt's "failed to detonate" branch.**~~ **READ:**
+   `Random(3) == 0`. A third of the bolts you fire are duds.
+5. ~~**Whether a bolt's detonation damages ENEMIES near it.**~~ **READ, and
+   the 2026-08-20 claim was right.** fn 0x01EB48 loops the whole enemy table
+   with a distance falloff and a 0.5 floor at zero range -- and then measures
+   the bolt against YOUR OWN sector, so a badly aimed bolt hits the ship.
+6. ~~**`[0x26E1]`, the plasma bolt shield.**~~ **READ:** set by USE, cleared
+   only by a new game, tested by both bolt paths. It is NOT spent -- raise it
+   once and you are immune for the rest of the game, your own bolts included.
+   **UNBUILT**; the port has the item and a test that is always false.
+7. ~~**Whether `laser_heat` decays over time.**~~ **NOT AN UNREAD ITEM.** It
+   decays twice, both BINARY, both built: 20 per command (0x0059BC) and 360
+   per stardate (0x0201B3). The comment claiming otherwise sat twelve lines
+   from the constants that measure it.
+
+### What that leaves, and it is a BUILD list now, not a read list
+
+  * the settlement's evacuation clock, with its level-3 gate
+  * the SPY event
+  * the plasma bolt as a USE weapon: the 1-in-3 dud, the enemy falloff, the
+    self-damage, and the shield that stops all of it
+
+None of it is blocked on anything. Items 8-10 below still want the rig or a
+capture and cannot be got from the disassembler at all.
 
 ### Still unread, and they want the rig or a capture -- not the disassembler
 

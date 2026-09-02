@@ -7272,3 +7272,101 @@ pin it, each confirmed by deleting the line it protects:
 The energium world is deliberate: on a barren world LAND_ATTACKED and
 LAND_NOTHING differ only in the return code, and a test that cannot tell the
 two mechanics apart is not testing one.
+
+## Clearing the unread list with the disassembler (2026-09-02)
+
+Six items were on it wanting a read. Four were genuinely unread and are below.
+**Two were not unread at all** and are dealt with at the end.
+
+### The settlement's evacuation deadline -- ARMED, then SET
+
+`[0x1DA2]` is the deadline and `[0x1D9C]` its schedule slot, both Turbo Pascal
+reals. At `trek_new_game` (0x027BFE) the slot is 9999 and the deadline is 0.
+
+**Arming, at 0x005876 in setup:**
+
+    cmp word [0x1DF0], 7 / jl  -> skip entirely      ; V >= 7, so level 3+
+    [0x1D9C] = 3505.0 + Random() * 3.0
+
+3505.0 decodes from `cx=0x008C si=0x0000 di=0x5B10` and 3.0 from
+`cx=0x0082 si=0x0000 di=0x4000`; STARDATE_START is 3500, so the request is
+armed five to eight stardates into the mission and **only at command level 3
+and above**. Below that a galaxy's settlement is never heard from.
+
+**Firing, fn 0x151D0, once per turn:**
+
+    al = [0x1E1C]                      ; the settled planet's quadrant ROW
+    if al not in {1..8}: return        ; the 32-byte set at CS:0x0096
+    if stardate <= [0x1D9C]: return
+    [0x1D9C] = 9999                    ; so this fires EXACTLY ONCE
+    [0x1DA2] = stardate + 1.0 + Random() * 3.0
+    "<planet>, quad r-c, requests evacuation. They can only hold out until <x>"
+
+So the deadline is one to four stardates after the request, which the routine
+map already had; **what was unread is the arming**, and it carries a command
+level gate that nothing in this port has.
+
+Three sites set the slot back to 9999 and clear `[0x1E1C]`: the rescue itself
+(0x00E416) and the two supernova routes (0x00AAE9, 0x01EDA8).
+
+### The plasma bolt: one in three is a dud
+
+fn 0x09563 is USE PLASMA BOLTS. It asks "Sector to fire at: ", decrements
+`[0x234D]` (item 2), prints "Tracking...", and then:
+
+    Random(3); or ax,ax; jne  ->  "Plasma bolt detonates..."
+    "Plasma bolt failed to detonate."   and RETURN
+
+**A third of the bolts you fire do nothing at all.** The strings resolve at
+CS:0x01D9 and CS:0x01F9 against a base of 0x009310, which also lands CS:0x01B7
+on "Sector to fire at: " and CS:0x0237 on " unit hit from plasma bolt." -- four
+for four, so the block is named by the strings it pushes.
+
+### YES, A BOLT HURTS EVERY ENEMY NEAR IT -- and it can hurt you
+
+NOTES has claimed since 2026-08-20 that a bolt "can kill several Mongols at
+once", and the claim has been carried as unverified ever since. It is right.
+
+A detonation calls `fn 0x01EB48` with (1000, x, y), and that routine is a loop
+over the enemy table: index from 1, stride 6, `[i*6 + 0x25F0] > 0` for alive,
+`[i*6 + 0x25EC]` and `[i*6 + 0x25EE]` for the coordinates, differenced against
+the target and converted to reals. A distance of exactly zero is replaced by
+**0.5** (`cx=0x0080`), which is the divide-by-zero guard and tells you the law
+is a falloff.
+
+And after the enemies, at 0x009641, the SAME routine measures the bolt against
+`[0x1DEA]`/`[0x1DE8]` -- the ship's own sector. **Your own plasma bolt can hit
+you**, and the only thing that stops it is the shield below.
+
+### The plasma bolt shield is NEVER SPENT
+
+`[0x26E1]`. fn 0x97D7 is the whole of USE plasma-bolt-shield: print "Raising
+plasma bolt shield...", `[0x26E1] = 1`, return. Nothing else in the binary
+writes it except the initialiser at 0x027BB2, which writes 0.
+
+Both bolt paths test it and jump clean past the damage -- 0x0165C9 for an
+enemy's bolt and 0x009641 for your own. So it is not a charge that absorbs one
+hit: **raise it once and you are immune to plasma bolts for the rest of the
+game**, including your own.
+
+### The two that were not unread
+
+**`[DS:0x235A + idx*2]`, "population or countdown".** Neither. `DS:0x1188` is
+the **twelve ship system NAMES** -- dumping it prints EnergyConverter, Shields,
+Life Support, Lasers, EnTorp Tubes, Warp Engines, Impulse Engine, S.R. Scanner,
+L.R. Scanner, Computer, Transporter, Shuttlecraft -- and `DS:0x235A` is their
+twelve repair percentages. fn 0x15C07 is the SPY ("SECURITY:  A spy has been
+captured aboard the Lexington, but he has damaged the <system>."), one turn in
+150 at V > 7, taking `10 + Random(90)` off one system at random.
+
+**All of that was retracted on 2026-08-27** in "RETRACTED: fn 0x15C07 is the
+SPY, not the distress signal". The question survived because the retraction did
+not reach the paragraph that raised it -- the same failure, in the same file,
+as the twelve-entry-table claim fixed earlier today.
+
+**"Whether laser heat decays over time is unmeasured"**, in `core/trek.h`. It
+is measured, and it is built twelve lines from the comment saying otherwise:
+`LASER_HEAT_COOL_TURN` 20 is the `sub ax, 0x14` at 0x0059BC in the command
+loop, floored at zero three instructions later; `LASER_HEAT_COOL_DAY` 360 is
+0x0201B3; and `HEAT_PER_UNIT` 15 is the `idiv cx, 0xF` at 0x009EF3 that adds
+`fired / 15` to `[0x1DFC]`. All three are BINARY in trek.h already.

@@ -2305,7 +2305,14 @@ static void run_bolt(TrekEvent *ev, uint8_t *n, uint8_t max) {
 
     /* THE PLASMA BOLT SHIELD stops it dead -- [0x26E1], the captured item.
        This core has the item (ITEM_PLASMA_SHIELD) but nothing that arms it,
-       so the test is written and always false for now; see planet.h. */
+       so the test is written and always false for now; see planet.h.
+
+       HOW IT WORKS, read 2026-09-02: fn 0x97D7 is the whole of USE-shield --
+       print "Raising plasma bolt shield...", set the byte, return -- and
+       NOTHING clears it but a new game. It is not a charge that absorbs one
+       hit; raise it once and you are immune for the rest of the game, to your
+       OWN bolts as well (0x009641 tests it before measuring your bolt against
+       your own sector). Buildable now; see MEASURED.md. */
 
     /* (8 - d) in 8.8, so nothing past eight sectors. */
     reach = (uint16_t)(BOLT_REACH << 8);

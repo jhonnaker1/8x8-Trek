@@ -183,14 +183,20 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * fourth per-planet find (this file's invention) and a twelve-entry table at
  * DS:0x1188 (which is the SYSTEM names). One planet, one pair of globals.
  *
- * PF_SETTLED below carries it. ~~The DEADLINE is not modelled yet -- that
- * wants fn 0x151D0 read~~ -- LOCATED 2026-08-27 without that read: it is the
- * real at [0x1DA2], and its schedule slot is [0x1D9C]. `fn 0x0E3A1` opens by
- * testing the ship's quadrant against the pair above and, while [0x1DA2] is
- * still ahead of the stardate, prints "Planet settlers found..." /
- * "Evacuating settlers..." and sets that slot to 9999. Both supernova routes
- * do the same two writes, which is why planet_quadrant_lost() exists. What
- * remains unread is where [0x1DA2] is SET, and by how much. */
+ * PF_SETTLED below carries it. The DEADLINE is the real at [0x1DA2] and its
+ * schedule slot is [0x1D9C]. `fn 0x0E3A1` opens by testing the ship's quadrant
+ * against the pair above and, while [0x1DA2] is still ahead of the stardate,
+ * prints "Planet settlers found..." / "Evacuating settlers..." and sets that
+ * slot to 9999. Both supernova routes do the same two writes, which is why
+ * planet_quadrant_lost() exists.
+ *
+ * ~~What remains unread is where [0x1DA2] is SET, and by how much.~~ **READ
+ * 2026-09-02.** Setup arms the slot at `3505.0 + Random()*3.0`, and ONLY when
+ * `[0x1DF0] >= 7` -- a command level gate this core does not have. fn 0x151D0
+ * then fires once, sets the slot to 9999 so it never repeats, and writes
+ * `[0x1DA2] = stardate + 1.0 + Random()*3.0`. See MEASURED.md, "Clearing the
+ * unread list with the disassembler". NOT BUILT: this core has PF_SETTLED and
+ * the +200 rescue but no clock, so a settlement cannot yet be lost to time. */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */  /*@BINARY*/
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */  /*@BINARY*/
 
