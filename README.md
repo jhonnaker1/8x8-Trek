@@ -112,14 +112,20 @@ never mentions -- boarding parties, the Vandal death pod, plasma bolts, black
 holes, supernovae, the death ray's five outcomes, tractor beams, wear and
 tear, reinforcements, and a damaged computer eating your star chart.
 
-Three things are deliberately absent, each decided rather than left undone.
-The **MAIN VIEWER's other nine instrument pages** are deferred to targets with
-more room -- they carry live data, and two of them are wider than this port's
-seventeen-column panel. What cycles them was read on 2026-09-02 and is no
-longer a blocker: it is a fresh `Random(10)` roughly every six seconds, or the
-page number typed as a command. The
-**CP437 charset** and **boss mode** were ruled out for this platform. The
-reasoning for all three is in `NOTES.md`.
+Four things are deliberately absent, each decided rather than left undone.
+
+Two are **deferred to roomier targets** rather than cut. The **MAIN VIEWER's
+other nine instrument pages** carry live data and two of them are wider than
+this port's seventeen-column panel; what cycles them was read on 2026-09-02 and
+is no longer a blocker -- a fresh `Random(10)` roughly every six seconds, or the
+page number typed as a command. And **a colour per message**: EGA Trek has no
+department palette at all, every message site picks its own colour, and
+matching that means a byte per pooled string plus a second far read at every
+drawing site. The bytes are nearly free in bank 1; the resident code is not.
+This port keeps a four-way department map instead and `ui.c` says so plainly.
+
+The **CP437 charset** and **boss mode** were ruled out for this platform
+outright. The reasoning for all four is in `NOTES.md`.
 
 What it needs is **play**, and the little it has had has been the most
 productive thing in the project. Four sessions at the keyboard have found four

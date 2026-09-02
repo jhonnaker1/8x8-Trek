@@ -5629,7 +5629,21 @@ claim against the code beside it.
    COMMUNICATIONS is EGA 7, not the yellow an earlier capture showed, which is
    what per-site colour means. **The port's `dept_color()` is a four-way map
    of a thing that is not a map, and every HELM message is green when it
-   should be cyan.** Recorded, not changed. See MEASURED.md.
+   should be cyan.** See MEASURED.md.
+
+   **COLOUR PER POOLED STRING IS DEFERRED TO ROOMIER TARGETS -- Jamie's call,
+   2026-09-02.** The second feature parked for a later target rather than cut,
+   after the MAIN VIEWER's other pages, and the reasoning is the same shape:
+   the DATA is nearly free (a byte per string, ~320 bytes in bank 1) and the
+   RESIDENT cost is not -- `S()` returns text and nothing else, so every
+   drawing site in the game would need a second far read and a second
+   argument, on the machine where resident is the tight pool. A target with a
+   flat address space pays neither, and should do it properly.
+
+   The C128 keeps its four-way map, knowingly wrong in a bounded way, and
+   `ui.c` is explicit that it is a simplification rather than a finding. It
+   should NOT be "fixed" here by swapping green for cyan: that trades one
+   department's error for four others'.
 10. **The reserve gauge's geometry.** The trigger, region, labels and quantity
     are read; the bar is this port's own and says so. **The only item on this
     whole list still genuinely open**, and it wants a rig run with life

@@ -785,11 +785,22 @@ static unsigned char msg_count = 0;
  * The earlier capture-derived "COMMUNICATIONS is yellow" is not contradicted;
  * a different COMMUNICATIONS site is simply a different colour.
  *
- * THIS FUNCTION IS KNOWINGLY WRONG and kept as a deliberate simplification:
- * HELM falls into the "everything else" bucket and draws green where the
- * original draws cyan, and HELM is the commonest message in the game. Fixing
- * it properly means a colour per pooled string, which is two bytes a message
- * this port has not decided to spend. Do not describe it as measured. */
+ * A COLOUR PER POOLED STRING IS THE RIGHT FIX, AND IT IS DEFERRED TO ROOMIER
+ * TARGETS -- Jamie's call, 2026-09-02, the same call as the MAIN VIEWER's
+ * other nine pages. It is a decision, not a debt.
+ *
+ * What that fix would be: the pool is `[count][offsets][text]` and a parallel
+ * byte per string costs ~320 bytes in BANK 1, which is nearly free. The cost
+ * is not the data. It is that `S()` returns text and nothing else, so every
+ * drawing site would need a second far read and a second argument -- resident
+ * code and a wider call at every message in the game, on the machine where
+ * resident is the tight pool. A port with a flat address space pays neither.
+ *
+ * SO THIS FUNCTION IS KNOWINGLY WRONG, and the wrongness is bounded and
+ * known: HELM falls into the "everything else" bucket and draws green where
+ * NAVIGATION is cyan, and HELM is the commonest message in the game. Do not
+ * describe it as measured, and do not "fix" it here by swapping green for
+ * cyan -- that would trade one department's error for four others'. */
 static unsigned char dept_color(const char *dept) {
     if (dept[0] == 'D')                    /* DAMAGE */
         return EGA_TO_VDC(EGA_BROWN);
