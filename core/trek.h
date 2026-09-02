@@ -1024,8 +1024,25 @@ uint8_t trek_shields_down(void);
  * [0x1F31] is one of the setup screen's two Y/N answers (`fn 0x14CB9` asks
  * "Will you require a briefing <Y/N>?" and "Restore a saved game <Y/N>?"),
  * upper-cased and stored. A 'Y' suppresses the enemy's FIRST turn and the
- * loop then forces it to 'N' at 0x0059CE. Which of the two questions it is
- * has not been read, so it is NOT built. */
+ * loop then forces it to 'N' at 0x0059CE.
+ *
+ * ~~Which of the two questions it is has not been read~~ -- **IT IS THE
+ * RESTORE, read 2026-09-02.** The prompt printed immediately before the ReadLn
+ * that fills DS:0x1F30 is CS:0x4448 = "Restore a saved game <Y/N>? ". The
+ * segment base 0x010760 is confirmed on THIRTEEN references, not one: the same
+ * base lands 0x4424 on the briefing prompt, 0x4465 on "File name, <Enter> for
+ * default", 0x4496 on "egatrek.sav", 0x44E5 on "Please enter your name: " and
+ * eight more, all in the order the screen asks them. (A base solved on ONE
+ * match is what let the fn 0x15C07 spy/distress error through; this is not
+ * that.)
+ *
+ * It is a sensible rule: a game you have just restored does not get shot at
+ * before you have looked at the console.
+ *
+ * STILL NOT BUILT, and one thing is open before it can be: a string assignment
+ * at 0x014E7A writes into the SAME buffer inside the restore branch, so
+ * whether the 'Y' survives to the turn loop on a SUCCESSFUL restore is not
+ * established. The identity of the question is read; its lifetime is not. */
 #define ENEMY_TURN_OF_N        100  /*@BINARY*/
 #define ENEMY_TURN_AFTER_MOVE   60   /* Random(100) < 60 */  /*@BINARY*/
 
@@ -2379,9 +2396,11 @@ uint8_t trek_game_state(void);
  * FITTED, not measured -- but it is a far better-founded guess than before,
  * because the condition is no longer invented.
  *
- * Terms this core does not have: stars destroyed (-5), which needs a torpedo
- * that can hit one. Rescues (+200) WERE on this list and are now live -- see
- * core/planet.h and SCORE_PER_RESCUE below. */
+ * ~~Terms this core does not have: stars destroyed (-5), which needs a torpedo
+ * that can hit one.~~ **STALE, corrected 2026-09-02** -- the torpedo destroys
+ * stars (SEC_NOVA, `TORP_STAR_GONE`), `ship.stars_gone` counts them and
+ * `star_pts` scores them at SCORE_PER_STAR, all since 2026-08-29. Rescues
+ * (+200) were on this list too and are also live. The list is empty. */
 /* MEASURED off the Detailed Evaluation's own rubric, and reachable at last:
    settlements evacuated, at 200 apiece. See core/planet.h for what produces
    them. */
@@ -2454,10 +2473,12 @@ int16_t trek_score(void);
    this and derives trek_score() from its total, so the sheet the player reads
    and the number recorded can never disagree.
  *
- * Two items have no mechanism behind them yet and are always zero: enemy
- * bases destroyed, and stars destroyed -- the latter is [0x1DF6] in the
- * original, at -5 each, incremented by a torpedo that destroys a star, which
- * is a mechanic this core does not have. Rescues DO count now, and note that
+ * ~~Two items have no mechanism behind them yet and are always zero: enemy
+ * bases destroyed, and stars destroyed~~ -- **ONE item, corrected 2026-09-02.**
+ * Stars destroyed is [0x1DF6] in the original and `ship.stars_gone` here, at
+ * -5 each, incremented by a torpedo that destroys a star, which this core has
+ * had since 2026-08-29. Only ENEMY BASES DESTROYED is still always zero.
+ * Rescues DO count now, and note that
  * they are forfeit with the ship: the binary credits them in the same branch
  * that applies the -200 (0x01E3A0). Bases hit counts OUR bases lost to ANY
  * cause including our own torpedo (0x00B10C), where this port counts only

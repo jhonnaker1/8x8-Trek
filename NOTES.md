@@ -5586,9 +5586,31 @@ unread list with the disassembler". What each one turned into:
   * the SPY event
   * the plasma bolt as a USE weapon: the 1-in-3 dud, the enemy falloff, the
     self-damage, and the shield that stops all of it
+  * **the restored game's free first turn** -- added by a re-sweep the same
+    day, from `core/trek.h`, which the earlier sweep's grep missed because it
+    says "has not been read" rather than "unread". `[0x1F31]` is the answer to
+    **"Restore a saved game <Y/N>?"** (CS:0x4448, base confirmed on THIRTEEN
+    references), and a 'Y' suppresses the enemy's first turn. One thing is
+    still open before it can be built: a string assignment at 0x014E7A writes
+    the same buffer inside the restore branch, so whether the 'Y' survives to
+    the turn loop on a SUCCESSFUL restore is not established.
 
 None of it is blocked on anything. Items 8-10 below still want the rig or a
 capture and cannot be got from the disassembler at all.
+
+### Three more stale claims, from the same re-sweep
+
+  * `core/trek.c`: *"that second case wants a nova sector code this core does
+    not have yet"* -- sitting DIRECTLY ABOVE the four lines that set
+    `SEC_NOVA`, bump `stars_gone` and return `TORP_STAR_GONE`. Four days.
+  * `core/trek.h`: *"Terms this core does not have: stars destroyed (-5)"* --
+    `star_pts` has scored them since the same day.
+  * `core/trek.h`: *"Two items have no mechanism behind them and are always
+    zero"* -- it is ONE item, enemy bases destroyed.
+
+**Each of the three names a thing the file it lives in also implements.** The
+sweep that catches them is not "grep for unread"; it is checking every negative
+claim against the code beside it.
 
 ### Still unread, and they want the rig or a capture -- not the disassembler
 

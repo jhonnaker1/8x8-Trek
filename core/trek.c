@@ -2646,9 +2646,10 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     if (c == SEC_STAR) {
         /* fn 0x0A8C8: four times in a hundred the star goes up. The other
            96% is TORP_ABSORBED here; the original splits it 38.4/57.6
-           between "absorbed" and "the star is DESTROYED, cell -> 'N'", and
-           that second case wants a nova sector code this core does not have
-           yet. One branch of three, and it says so. */
+           between "absorbed" and "the star is DESTROYED, cell -> 'N'".
+           BOTH ARE BUILT -- this comment claimed the second one "wants a nova
+           sector code this core does not have yet" while sitting directly
+           above the code that does it, from 2026-08-29 to 2026-09-02. */
         if (trek_rand_n(NOVA_STAR_OF_N) > NOVA_STAR_ABOVE)
             return star_supernova(cy, cx, damage);
         if (trek_rand_n(STAR_ABSORB_OF_N) < STAR_ABSORB_BELOW)
