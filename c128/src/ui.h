@@ -51,6 +51,11 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max);
 /* As ui_dialog_ask, but ESC abandons the prompt and returns 0. EGA Trek's
    self-destruct prompt says "Hit ESC to abort"; nothing else offers it. */
 uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max);
+/* A yes/no question asked INSIDE the open dialog rather than in the COMMAND
+   panel, which is where ui_confirm() puts one. Use this whenever the question
+   belongs to a conversation the player is reading in the box -- `make verify`
+   fails a ui_confirm() called between ui_dialog_open() and ui_dialog_close(). */
+uint8_t ui_dialog_yes(const char *prompt);
 void ui_dialog_close(void);
 
 /* Closes with no "hit return" prompt. SAVE uses this because the original's

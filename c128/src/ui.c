@@ -1183,6 +1183,32 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
     (void)ui_dialog_ask_esc(prompt, buf, max);
 }
 
+/* A YES/NO QUESTION ASKED WHERE THE CONVERSATION IS.
+ *
+ * ui_confirm() draws in the COMMAND panel over on the left. That is right for
+ * a bare command line -- Q)uit, which the original also asks there -- and
+ * wrong for a question that is the tail of something the player is reading
+ * inside a dialog box: the prompt appears detached from it, outside the frame.
+ * Jamie saw exactly that on FIX (2026-09-01); do_ray() had been doing the same
+ * thing since the command was built and nobody had run one.
+ *
+ * DECLARED RESIDENT -- no OVL_CODE -- because its two callers are in
+ * DIFFERENT overlays (repair and cmds), and a callee shared across windows
+ * must never sit in one of them. In the build as it stands LTO inlines it into
+ * both and emits nothing at all (it is absent from trek128.map, and resident
+ * free did not move), which is equally safe: a copy inside each window calls
+ * nothing outside it. The rule is about where it may NOT live.
+ *
+ * Anything but Y is no, RETURN included -- the same rule as ui_confirm() and
+ * ui_play_again(), so that a RETURN never means yes on one screen and no on
+ * the next. */
+uint8_t ui_dialog_yes(const char *prompt) {
+    char buf[4];
+
+    ui_dialog_ask(prompt, buf, sizeof buf);
+    return (uint8_t)(buf[0] == KB_Y || buf[0] == KB_Y + 32);
+}
+
 
 /* Closes WITHOUT the "hit return" prompt.
  *

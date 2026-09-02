@@ -159,6 +159,12 @@ CMD_W = 21
 BRIEF_ROWS = 22
 BRIEF_COLS = 78
 
+# DLG_W / DLG_X in ui.c. Dialog text starts at DLG_X + 2 and the far border is
+# at DLG_X + DLG_W - 1, so a line has DLG_W - 4 columns before it eats the
+# frame and whatever is to the right of it.
+DLG_W = 52
+DLG_ROOM = DLG_W - 4
+
 
 def check_message_widths():
     """A message the panel cannot hold is TRUNCATED, and it does not say so.
@@ -512,6 +518,131 @@ def check_confirm_widths():
     print("verify: every ui_confirm prompt fits the command panel -- ok")
 
 
+def _pool():
+    """id -> text, from the committed list the generator owns."""
+    strings = {}
+    for ln in (C128 / "src" / "strings.txt").read_text().splitlines():
+        if ln[:1].isdigit():
+            i, _, t = ln.partition("\t")
+            strings[int(i)] = t
+    return strings
+
+
+def _strip_comments(src):
+    """Blank out comments, KEEPING every newline so line numbers still hold.
+
+    Not cosmetic: the first run of check_confirm_not_in_dialog() reported three
+    violations and all three were the COMMENTS EXPLAINING THE RULE -- the
+    phrase "ui_confirm() draws in the COMMAND panel" matches a call perfectly.
+    A source check that reads prose is checking the wrong text.
+    """
+    out, i, n = [], 0, len(src)
+    while i < n:
+        two = src[i:i + 2]
+        if two == "/*":
+            j = src.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("".join(c if c == "\n" else " " for c in src[i:j]))
+            i = j
+        elif two == "//":
+            j = src.find("\n", i)
+            j = n if j < 0 else j
+            out.append(" " * (j - i))
+            i = j
+        else:
+            out.append(src[i])
+            i += 1
+    return "".join(out)
+
+
+def _ui_sources():
+    return [(n, _strip_comments((C128 / "src" / n).read_text()))
+            for n in ("main.c", "ui.c")]
+
+
+def check_dialog_widths():
+    """A dialog line must fit inside the dialog frame.
+
+    ui_dialog_line() and ui_dialog_ask() draw with scr_puts() at DLG_X + 2 and
+    nothing clips them: a long line writes straight over the right-hand border
+    and on across the console beside it. There was no bound on this at all
+    until 2026-09-02 -- check_message_widths bounds ui_message and
+    check_confirm_widths bounds ui_confirm, and BOTH of them stop at the edge
+    of a function drawing somewhere else. Two rigorous checks with the gap
+    between them, again.
+
+    ui_dialog_ask also puts an INPUT FIELD after its prompt, at
+    prompt + 1 columns in and up to max - 1 characters wide, so the prompt
+    alone fitting is not enough -- the cursor can be outside the box while the
+    text that led to it is inside.
+    """
+    strings = _pool()
+    bad = []
+
+    def text_of(idg, litg):
+        return strings[int(idg)] if idg else litg
+
+    for name, src in _ui_sources():
+        for m in re.finditer(
+                r'ui_dialog_(line|open)\(\s*(?:S\(S_(\d+)\)|"((?:[^"\\]|\\.)*)")',
+                src):
+            t = text_of(m.group(2), m.group(3))
+            if len(t) > DLG_ROOM:
+                bad.append((name, "ui_dialog_" + m.group(1), t, len(t), DLG_ROOM))
+
+        # prompt + a space + the field. `max` is nearly always `sizeof buf`,
+        # so the buffer's own declaration is what gives the width.
+        sizes = dict(re.findall(r'char\s+(\w+)\s*\[\s*(\d+)\s*\]', src))
+        for m in re.finditer(
+                r'ui_dialog_(?:ask|ask_esc|yes)\(\s*(?:S\(S_(\d+)\)|"((?:[^"\\]|\\.)*)")'
+                r'(?:\s*,\s*(\w+)\s*,\s*sizeof\s+(\w+))?', src):
+            t = text_of(m.group(1), m.group(2))
+            # ui_dialog_yes has no buffer argument; its own is 4 bytes.
+            width = int(sizes.get(m.group(4), 4)) if m.group(4) else 4
+            need = len(t) + 1 + (width - 1)
+            if need > DLG_ROOM:
+                bad.append((name, "ui_dialog_ask", t, need, DLG_ROOM))
+
+    if bad:
+        die("dialog text wider than the dialog box:\n" + "\n".join(
+            "         %s %s: %r needs %d, %d fit" % b for b in bad))
+    print("verify: every dialog line fits the dialog box -- ok")
+
+
+def check_confirm_not_in_dialog():
+    """A yes/no question asked while a dialog is OPEN must be asked IN it.
+
+    ui_confirm() draws in the COMMAND panel. Called between ui_dialog_open()
+    and ui_dialog_close() it puts the question down in the corner while the
+    text it refers to sits in the box -- which is what Jamie saw on FIX
+    (2026-09-01), and what do_ray() had been doing since it was built.
+    ui_dialog_yes() is the one to use there.
+
+    Scanned per function, brace-free: from each ui_dialog_open() to the next
+    ui_dialog_close()/ui_dialog_dismiss() in the same file, which is how these
+    are actually written -- one dialog at a time, opened and closed in one
+    function. A ui_confirm() outside every such span is fine and stays fine:
+    Q)uit is asked on the command line in the original too.
+    """
+    bad = []
+    for name, src in _ui_sources():
+        events = [(m.start(), m.group(1)) for m in re.finditer(
+            r'\b(ui_dialog_open|ui_dialog_close|ui_dialog_dismiss|ui_confirm)\s*\(',
+            src)]
+        depth = 0
+        for pos, what in events:
+            if what == "ui_dialog_open":
+                depth = 1
+            elif what in ("ui_dialog_close", "ui_dialog_dismiss"):
+                depth = 0
+            elif depth:
+                bad.append((name, src[:pos].count("\n") + 1))
+    if bad:
+        die("ui_confirm() called with a dialog open -- use ui_dialog_yes():\n"
+            + "\n".join("         %s:%d" % b for b in bad))
+    print("verify: no ui_confirm() inside an open dialog -- ok")
+
+
 def check_briefing():
     """Every briefing page must fit the 80x25 screen.
 
@@ -605,6 +736,8 @@ def main():
     check_linebuf()
     check_overlay_calls()
     check_confirm_widths()
+    check_dialog_widths()
+    check_confirm_not_in_dialog()
     check_briefing()
 
     consts = constants()

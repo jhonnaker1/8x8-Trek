@@ -2773,6 +2773,37 @@ still on the screen *at the moment it blocks* -- a loop that waited twelve
 times after clearing would pass the first check and fail this one. Confirmed on
 the machine too: page 12 holds with its footer, and any key takes command.
 
+#### A question asked in the wrong place, twice (2026-09-01, 2026-09-02)
+
+`ui_confirm()` draws in the COMMAND panel, down in the corner. That is where
+the original asks Q)uit, so the function is right -- it is the *callers* that
+were wrong. FIX asked "shall I start repairs" through it while the whole
+conversation was in the ENGINEERING box, and Jamie saw the question sitting
+outside the frame. RAY had been doing the identical thing since the command was
+built: the warning that the ray is experimental in the WEAPONS box, "ARE YOU
+SURE?" thirty rows away. Nobody had fired one.
+
+`ui_dialog_yes()` asks it in the open box, and both call sites use it.
+
+**The interesting part is the two checks, not the fix.** A bug that happens
+twice in two days is a class, and `make verify` now closes it from both sides:
+
+  * `check_confirm_not_in_dialog()` fails a `ui_confirm()` reached between
+    `ui_dialog_open()` and `ui_dialog_close()`. It found the RAY immediately.
+  * `check_dialog_widths()` bounds dialog text at `DLG_W - 4`, which **nothing
+    bounded at all** until now -- `check_message_widths` covers `ui_message`
+    and `check_confirm_widths` covers `ui_confirm`, and a dialog line falls in
+    the gap between two rigorous checks. For `ui_dialog_ask` it measures the
+    prompt *plus its input field*, because a prompt that fits can still put the
+    cursor outside the frame; the break test for that one is a 19-character
+    prompt needing 59 columns.
+
+Both were proven by breaking them. The first run of the ui_confirm check
+reported three violations and **all three were the comments explaining the
+rule** -- "ui_confirm() draws in the COMMAND panel" matches a call perfectly.
+`_strip_comments()` came out of that: a source check that reads prose is
+checking the wrong text.
+
 ### 11. Briefing pages -- CAPTURED 2026-08-21
 
 All fifteen pages are captured to `reference/shots/b*.png`. Contents worth

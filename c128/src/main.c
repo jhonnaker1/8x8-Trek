@@ -1113,14 +1113,9 @@ OVL_CODE("info") static uint16_t do_fix(void) {
     /* AND THEN THE TIME. Asked whether or not a system was chosen, because
        the rate table pays for waiting either way -- 2.5x docked with no
        focus, 5x docked with one. */
-    /* ASKED IN THE DIALOG, not through ui_confirm. ui_confirm draws in the
-       COMMAND panel over on the left, which is right for a bare command line
-       and wrong here: this is the tail of a conversation the player is
-       reading inside the ENGINEERING box, and the question appeared detached
-       from it, outside the box. Jamie saw it on the VDC. */
-    ui_dialog_ask(ship.docked != BASE_NONE ? S(S_315) : S(S_316),
-                  buf, sizeof buf);
-    if (buf[0] != KB_Y && buf[0] != KB_Y + 32) {
+    /* ASKED IN THE DIALOG, not through ui_confirm -- see ui_dialog_yes(),
+       which this was the first caller of and which now carries the reason. */
+    if (!ui_dialog_yes(ship.docked != BASE_NONE ? S(S_315) : S(S_316))) {
         ui_dialog_close();
         return 0;
     }
@@ -1170,7 +1165,12 @@ OVL_CODE("cmds") static void do_ray(void) {
     ui_dialog_open(S(S_95));
     ui_dialog_line(S(S_286));
     ui_dialog_line(S(S_288));
-    if (!ui_confirm(S(S_278))) {
+    /* IN THE DIALOG. This asked through ui_confirm() until 2026-09-02, which
+       put "ARE YOU SURE?" down in the COMMAND panel while the warning it
+       refers to sat in the WEAPONS box -- the same split Jamie caught on FIX
+       the day before, and here since the command was built. Nobody had fired
+       the ray. */
+    if (!ui_dialog_yes(S(S_278))) {
         ui_dialog_close();
         return;
     }
