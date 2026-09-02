@@ -66,6 +66,11 @@ void ui_repair_report(void);
 /* Full system names, in SYS_* order. F)ix needs them to print its list. */
 const char *ui_sys_name(uint8_t i);
 
+/* The briefing: asks, then shows. Two calls because they live in different
+   overlay windows -- see ui.c. */
+uint8_t ui_setup_briefing(void);
+void    ui_briefing(void);
+
 /* What the setup screen collects, in the original's own order. Answering yes
    to the restore prompt now reads a saved game; if the file is missing it
    reports so and carries on, which is what the original does. */

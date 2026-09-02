@@ -1739,6 +1739,16 @@ int main(void) {
         ovl_load(OVL_TITLE);
         ui_title();
         snd_music(MUS_NONE);
+        /* THE BRIEFING SITS BETWEEN THE FIRST QUESTION AND THE REST, which is
+           where the original has it. The question and the pages live in
+           different overlay windows, so the caller loads each in turn --
+           a callee cannot be in another window. */
+        /* THE BRIEFING SITS BETWEEN THE FIRST QUESTION AND THE REST, which is
+           where the original has it. Both halves are in OVL_TITLE, which is
+           still loaded from the title screen above -- so the common path costs
+           no extra load at all, and OVL_FRONT is loaded once afterwards. */
+        setup.briefing = ui_setup_briefing();
+        if (setup.briefing) ui_briefing();
         ovl_load(OVL_FRONT);
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two

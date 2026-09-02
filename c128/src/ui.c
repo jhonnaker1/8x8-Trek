@@ -1692,6 +1692,77 @@ uint16_t setup_seed(uint16_t entropy, uint8_t level) {
     return v ? v : 1u;
 }
 
+/* THE BRIEFING, streamed. `c128/src/briefing.txt` ships as BRIEF.TXT and is
+ * read a byte at a time through the disk seam -- plat_open/plat_read, which
+ * exist for this and had never once run until now. It is the port's own prose;
+ * see NOTES.md for why none of Anderson's is in it.
+ *
+ * NO PAGE BUFFER. Twelve pages of up to 22 lines would want the best part of a
+ * kilobyte and LOWRAM has 142 bytes free. Instead the file is DRAWN AS IT
+ * ARRIVES: characters accumulate into one line, a newline flushes it to the
+ * screen, and a form feed ends the page and waits for the reader. The only
+ * storage is a line's worth, borrowed from io_buf -- which is sized for the
+ * save record and is idle here, since the briefing runs before a game exists.
+ *
+ * A byte at a time is about 2,300 a second on this drive, so a page of some
+ * 900 bytes takes under half a second to paint. The reader is reading.
+ *
+ * NO FILE, NO BRIEFING. A disk without BRIEF.TXT skips it silently and the
+ * game starts, exactly as a disk without STRINGS.DAT plays without words. */
+#define BRIEF_LINE  80
+
+OVL_CODE("title")
+void ui_briefing(void) {
+    unsigned char x = 0, y = 0;
+    char c;
+
+    if (plat_open("BRIEF.TXT") != STOR_OK) return;
+
+    scr_clear();
+    while (plat_read(&c, 1) == 1) {
+        if (c == '\f' || c == '\n') {
+            io_buf[x] = 0;
+            if (x) scr_puts(1, (unsigned char)(y + 1), (char *)io_buf, COL_MSG);
+            x = 0;
+            y++;
+        }
+        if (c == '\f') {
+            /* Its OWN footer. S_73 is the message viewer's "SPACE=NEXT
+               RETURN=CLOSE" and neither key does anything here -- it read
+               wrong on the VDC the first time this ran. */
+            scr_puts(1, 24, S(S_306),
+                     EGA_TO_VDC(EGA_LTRED));
+            if (kb_waitkey() == KB_Q) break;
+            scr_clear();
+            y = 0;
+        } else if (c != '\n' && c != '\r' && x < BRIEF_LINE - 1) {
+            io_buf[x++] = c;
+        }
+    }
+    plat_close();
+    scr_clear();
+}
+
+/* The briefing question, asked on its own so the BRIEFING CAN RUN BETWEEN IT
+   AND THE REST -- which is where the original puts it, before "Restore a saved
+   game". It cannot be called from inside ui_setup(): that is in OVL_FRONT,
+   there is one window, and the viewer has to be loaded while the pages are
+   drawn.
+ *
+ * IN OVL_TITLE WITH THE VIEWER, not in OVL_FRONT with the rest of setup. Both
+ * reasons matter: the pair then needs ONE overlay load instead of two, and
+ * OVL_FRONT is the window that grows with the save record -- putting these 83
+ * bytes there took it to 55 free. Everything this calls (ask_yes, read_field,
+ * scr_puts) is resident, so it can live in any window at all. */
+OVL_CODE("title")
+uint8_t ui_setup_briefing(void) {
+    scr_clear();
+    scr_puts(31, 1, S(S_89), COL_VALUE);
+    scr_puts(36, 2, S(S_174), COL_VALUE);
+    scr_puts(2,  5, S(S_96), COL_MSG);
+    return ask_yes(7, S(S_156));
+}
+
 OVL_CODE("front")   /* Shares OVL_FRONT with the title and the serialiser it restores through */
 void ui_setup(Setup *s) {
     char buf[8];
@@ -1704,8 +1775,9 @@ void ui_setup(Setup *s) {
     scr_puts(36, 2, S(S_174),           COL_VALUE);
     scr_puts(2,  5, S(S_96), COL_MSG);
 
-    s->briefing = ask_yes(7, S(S_156));
-
+    /* s->briefing was answered by ui_setup_briefing() and the pages, if any,
+       have already been read -- see above. The header is redrawn because the
+       viewer cleared the screen, which is what the original does too. */
     if (ask_yes(9, S(S_155))) {
         /* MEASURED 2026-08-24: the original asks for a file name here with a
            default and an ESC abort, and on success goes STRAIGHT to the

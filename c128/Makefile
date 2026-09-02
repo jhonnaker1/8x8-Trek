@@ -228,6 +228,11 @@ $(D64): $(OUT)
 	@# exactly what a fresh install should have anyway.
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
 	c1541 -attach $(D64) -write build/trek.scr trek.scr,s >/dev/null
+	@# The briefing, as SEQ: it is STREAMED through plat_open/plat_read a
+	@# byte at a time rather than loaded, because twelve pages will not fit
+	@# in memory on this machine. The prose is the port's own -- see
+	@# NOTES.md on why none of Anderson's is in it.
+	c1541 -attach $(D64) -write src/briefing.txt brief.txt,s >/dev/null
 	@# Bulk data, LOADed into bank 1 at startup. WRITTEN AS PRG, NOT SEQ,
 	@# and the two-byte header is why: far_load() uses the KERNAL's LOAD
 	@# with secondary address 0, which reads and discards a PRG's load

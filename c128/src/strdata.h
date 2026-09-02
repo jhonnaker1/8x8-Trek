@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 306
+#define STR_COUNT 307
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -312,5 +312,6 @@
 #define S_303  303   /* THE STAR IS DESTROYED. */
 #define S_304  304   /*  FAILED. */
 #define S_305  305   /* REINFORCEMENTS IN  */
+#define S_306  306   /* RETURN=NEXT PAGE   Q=QUIT BRIEFING */
 
 #endif
