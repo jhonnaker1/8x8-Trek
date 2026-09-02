@@ -1238,6 +1238,7 @@ uint8_t trek_shields_down(void);
 #define EV_REINFORCE    20   /* y,x = the quadrant; amount = ships */  /*@ID*/
 #define EV_WEAR         21   /* amount = the system index that broke */  /*@ID*/
 #define EV_CHART_LOST   22   /* amount = quadrants forgotten */  /*@ID*/
+#define EV_SPY          23   /* amount = the system the spy wrecked */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1992,6 +1993,31 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
  * computer is 9 -- so wear and tear never erodes the chart. */
 #define WEAR_AFTER_TENTHS  35030  /* 3503.0 */  /*@BINARY*/
 #define WEAR_MIN_LEVEL         2   /* level+4 >= 6 */  /*@BINARY*/
+
+/* THE SPY -- fn 0x15C07, read 2026-09-02.
+ *
+ *     Random(150); if != 0 return          ; one turn in 150
+ *     if [0x1DF0] <= 7 return              ; V = level + 4, so level 4 and 5
+ *     idx = Random(12)                     ; one of the twelve systems
+ *     "SECURITY: ... he has damaged the " + name[idx]
+ *     sys[idx] -= 10 + Random(90)          ; floored at zero, 0x015CB8
+ *
+ * THE ROLL COMES BEFORE THE GATE, and that is deliberate here: the original
+ * draws its random number whether or not the level admits the event, so a
+ * seeded game at level 2 and the same game at level 4 do NOT share a random
+ * stream. Matching the order is the only way the sequences line up.
+ *
+ * Unlike wear and tear this does NOT skip a system already at zero (compare
+ * 0x020E24, which does). The spy wrecks it anyway and the message still
+ * prints -- one of the twelve is picked flat, with no regard to its state.
+ *
+ * The wording in this port is its OWN. Anderson's sentence is not copied;
+ * see NOTES.md on why none of his prose is in here. */
+#define SPY_OF_N             150   /* Random(150) == 0, 0x015C16 */  /*@BINARY*/
+#define SPY_MIN_LEVEL          4   /* `cmp [0x1DF0], 7 / jg`, V = level + 4 */  /*@BINARY*/
+#define SPY_PICK_OF_N         12   /* Random(12), 0x015C39 */  /*@BINARY*/
+#define SPY_LOSS_MIN          10   /* 10 + Random(90), 0x015C7F */  /*@BINARY*/
+#define SPY_LOSS_SPAN         90  /*@BINARY*/
 #define WEAR_ROLL_OF_N       100  /*@BINARY*/
 #define WEAR_ROLL_A_BELOW     98   /* Random(100) > 98 - e */  /*@BINARY*/
 #define WEAR_ROLL_B_BELOW     97   /* Random(100) > 97 - e */  /*@BINARY*/

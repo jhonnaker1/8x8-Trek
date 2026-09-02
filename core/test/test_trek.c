@@ -4838,6 +4838,119 @@ static void test_orbit(void) {
     ok(ship.orbiting == PLANET_NONE, "and moving one sector breaks it too");
 }
 
+
+/* THE SETTLEMENT IS LEVEL 3 AND UP, and THE SPY IS LEVEL 4 AND UP.
+ *
+ * Both gates are `cmp word [0x1DF0], 7` on V = level + 4, and they differ by
+ * one instruction: the settlement's is `jl` (arm at V >= 7, level 3) and the
+ * spy's is `jg` (fire at V > 7, level 4). Testing them together is the point
+ * -- an off-by-one in either would pass a test that only looked at one. */
+static void test_level_gated_events(void) {
+    TrekEvent ev[16];
+    uint8_t n, i, lvl;
+
+    puts("level-gated events");
+
+    /* The settlement's slot: never below 3, armed 3505.0-3508.0 at 3 and up. */
+    for (lvl = 1; lvl <= 5; lvl++) {
+        trek_new_game(lvl, (uint16_t)(700 + lvl));
+        if (lvl < DISTRESS_MIN_LEVEL) {
+            char msg[80];
+            sprintf(msg, "level %d arms no settlement call", lvl);
+            ok(trek_scheduled(SCHED_DISTRESS) == SCHED_NEVER, msg);
+        } else {
+            char msg[80];
+            uint16_t at = trek_scheduled(SCHED_DISTRESS);
+            sprintf(msg, "level %d arms it inside 3505.0-3508.0 (got %u)", lvl, at);
+            ok(at >= STARDATE_START + DISTRESS_AT_TENTHS
+                  && at <= STARDATE_START + DISTRESS_AT_TENTHS
+                           + DISTRESS_SPAN_TENTHS, msg);
+        }
+    }
+
+    /* The spy, at level 4. MANY SAMPLES, NOT ONE -- the first draft of this
+       stopped at the first spy and asserted the loss was inside 10..99, which
+       a bare Random(90) passes about nine times in ten. Deleting the `+ 10`
+       failed nothing. Collect the distribution and check BOTH ENDS: the floor
+       is what separates 10 + Random(90) from Random(90), the ceiling is what
+       separates it from Random(100). Systems go back to full each turn so
+       `lost` is the roll rather than a clamp. */
+    {
+        int t, seen = 0;
+        uint8_t lo = 255, hi = 0, bad_index = 0;
+        trek_new_game(4, 5150);
+        for (t = 0; t < 60000 && seen < 200; t++) {
+            uint8_t before[SYS_COUNT];
+            for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
+            memcpy(before, ship.sys, sizeof before);
+            n = trek_advance(0, ev, 16);
+            for (i = 0; i < n; i++) {
+                uint8_t w, lost;
+                if (ev[i].kind != EV_SPY) continue;
+                if (ev[i].amount >= SYS_COUNT) { bad_index = 1; continue; }
+                w = (uint8_t)ev[i].amount;
+                lost = (uint8_t)(before[w] - ship.sys[w]);
+                if (lost < lo) lo = lost;
+                if (lost > hi) hi = lost;
+                seen++;
+            }
+        }
+        {
+            char msg[96];
+            sprintf(msg, "%d spies caught at level 4", seen);
+            ok(seen >= 100, msg);
+            ok(!bad_index, "every one names a system inside the twelve");
+            sprintf(msg, "no loss below %d (lowest seen %u)", SPY_LOSS_MIN, lo);
+            ok(lo >= SPY_LOSS_MIN, msg);
+            sprintf(msg, "and the floor is reached (lowest seen %u)", lo);
+            ok(lo <= SPY_LOSS_MIN + 3, msg);
+            sprintf(msg, "no loss above %d (highest seen %u)",
+                    SPY_LOSS_MIN + SPY_LOSS_SPAN - 1, hi);
+            ok(hi <= SPY_LOSS_MIN + SPY_LOSS_SPAN - 1, msg);
+            sprintf(msg, "and the ceiling is reached (highest seen %u)", hi);
+            ok(hi >= SPY_LOSS_MIN + SPY_LOSS_SPAN - 4, msg);
+        }
+    }
+
+    /* THE FLOOR AT ZERO, which the block above cannot see: it repairs every
+       system to 100 each turn, so the subtraction never goes under. Deleting
+       the clamp failed nothing until this was added. Start every system at 5
+       and the roll is always bigger than the system -- the result must be 0,
+       not the 160-odd an unsigned wrap would give. 0x015CB8. */
+    {
+        int t; uint8_t fired = 0;
+        trek_new_game(4, 5150);
+        for (t = 0; t < 60000 && !fired; t++) {
+            for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 5;
+            n = trek_advance(0, ev, 16);
+            for (i = 0; i < n; i++) {
+                if (ev[i].kind != EV_SPY) continue;
+                fired = 1;
+                {
+                    char msg[80];
+                    uint8_t w = (uint8_t)ev[i].amount;
+                    sprintf(msg, "a system too weak to absorb it lands on 0, "
+                                 "not %u", ship.sys[w]);
+                    ok(ship.sys[w] == 0, msg);
+                }
+            }
+        }
+        ok(fired, "and the floor case was actually reached");
+    }
+
+    /* And NOT at level 3. Twenty thousand turns is over a hundred times the
+       mean interval, so this is a real absence and not a short sample. */
+    {
+        int t; uint8_t fired = 0;
+        trek_new_game(3, 5150);
+        for (t = 0; t < 20000 && !fired; t++) {
+            n = trek_advance(0, ev, 16);
+            for (i = 0; i < n; i++) if (ev[i].kind == EV_SPY) fired = 1;
+        }
+        ok(!fired, "and never at level 3, over 20000 turns");
+    }
+}
+
 static void test_landing(void) {
     uint16_t before, cas = 0;
 
@@ -5157,6 +5270,7 @@ int main(void) {
     test_manual_movement();
     test_planet_generation();
     test_orbit();
+    test_level_gated_events();
     test_landing();
     test_energium();
     test_rescue_scoring();

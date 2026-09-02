@@ -5582,8 +5582,16 @@ unread list with the disassembler". What each one turned into:
 
 ### What that leaves, and it is a BUILD list now, not a read list
 
-  * the settlement's evacuation clock, with its level-3 gate
-  * the SPY event
+  * ~~the settlement's evacuation clock, with its level-3 gate~~ **DONE
+    2026-09-02, and the entry was wrong about the size of it.** The clock was
+    already built -- `SCHED_DISTRESS`, `planet_evac_end`,
+    `EVAC_WARNING_MIN_TENTHS` and `planet_settlement_lost()` have been there
+    since 2026-08-27. The only missing piece was the LEVEL GATE, three lines.
+    Writing "the port has no clock, so a settlement cannot be lost to time"
+    without checking is the same failure this file has been cataloguing all
+    day, committed while cataloguing it.
+  * ~~the SPY event~~ **DONE 2026-09-02** -- `run_spy()`, five BINARY
+    constants, `EV_SPY`, and a SECURITY line in the port's own words.
   * the plasma bolt as a USE weapon: the 1-in-3 dud, the enemy falloff, the
     self-damage, and the shield that stops all of it
   * **the enemy's first turn after a restore.** `[0x1F31]` is the answer to
@@ -5675,3 +5683,70 @@ claim against the code beside it.
 **Nothing on this list blocks anything that is built.** Items 3 and 5 are the
 two worth caring about, and for the same reason: they are not gaps, they are
 places where something shipped is probably WRONG.
+
+## Three level gates and a saboteur (2026-09-02)
+
+Three small mechanics built together because each was small, and because two
+of them are the same instruction with a different jump.
+
+### The settlement is level 3, the spy is level 4, and they differ by one jump
+
+Both gates read `[0x1DF0]`, which is V = command level + 4:
+
+    0x005876   cmp word [0x1DF0], 7 / jl   ->  arm at V >= 7, LEVEL 3
+    0x015C26   cmp word [0x1DF0], 7 / jg   ->  fire at V >  7, LEVEL 4
+
+Tested together on purpose. An off-by-one in either would sail past a test
+that only looked at one of them, and the pair is the discriminator.
+
+At levels 1 and 2 a galaxy's settlement is therefore never heard from at all,
+and the +200 rescue is out of reach -- a real difficulty rule this port did not
+have. **The clock itself was already built**; only the gate was missing.
+
+### The spy
+
+`run_spy()` in the shape of `run_wear()` beside it. One turn in 150, level 4
+and up, `Random(12)` picks a system, `10 + Random(90)` off it, floored at zero.
+
+Two details worth keeping:
+
+  * **The roll comes BEFORE the gate**, matching 0x015C16-0x015C2D. The
+    original draws its random number whether or not the level admits the
+    event, so a seeded game at level 2 and the same game at level 4 do not
+    share a random stream. Order matters here even though the outcome does not.
+  * **No "already at zero" guard**, unlike wear and tear, which has one at
+    0x020E24. The spy wrecks a dead system anyway and the report still comes
+    in. Two routines that look alike and are not.
+
+### The restored game's free first turn
+
+`enemy_turn()` swallows the enemy's half of the first turn when the game was
+restored, then clears the flag. It is the fourth thing `[0x1F31] == 'Y'` gates
+in the original; the port already did the other three structurally.
+
+### The test that passed while the code was wrong
+
+The spy's damage test first stopped at the FIRST spy and asserted the loss was
+inside 10..99. Deleting the `+ 10` -- making it a bare `Random(90)` -- **failed
+nothing**, because one sample from 0..89 is inside 10..99 about nine times in
+ten.
+
+Rewritten to collect two hundred and check BOTH ENDS: the floor separates
+`10 + Random(90)` from `Random(90)`, the ceiling separates it from
+`Random(100)`. Both now fail when broken.
+
+And a second gap the same exercise found: that block repairs every system to
+100 each turn, so **the clamp at zero was never exercised**. Deleting it failed
+nothing either. A second case starts every system at 5, where the roll always
+exceeds the system, and catches the unsigned wrap (175 instead of 0).
+
+**One test cannot check a distribution and a clamp at once**, because the setup
+that exposes one hides the other.
+
+### And the stale-build trap, for the third time today
+
+Three break-tests in a row reported identical failures with identical numbers.
+That was not the tests being blind: `make` had not rebuilt on a sub-second
+mtime change, so all three ran against the first break's binary. `rm -f
+build/test_trek` before each run, not `touch`. **Identical output from
+different breaks is a build smell, not a test result.**

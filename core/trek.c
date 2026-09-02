@@ -448,8 +448,12 @@ void trek_new_game(uint8_t level, uint16_t seed) {
         trek_schedule(SCHED_REINFORCE,
                       trek_sched_deviate(REINF_FIRST_TENTHS, REINF_FIRST_SPAN));
 
-    trek_schedule(SCHED_DISTRESS,
-                  trek_sched_deviate(DISTRESS_AT_TENTHS, DISTRESS_SPAN_TENTHS));
+    /* THE SETTLEMENT IS A LEVEL 3 MECHANIC, the same shape as reinforcements
+       above -- 0x005876 skips the arming below it, so at levels 1 and 2 the
+       slot stays at never and the +200 rescue cannot happen. */
+    if (ship.level >= DISTRESS_MIN_LEVEL)
+        trek_schedule(SCHED_DISTRESS,
+                      trek_sched_deviate(DISTRESS_AT_TENTHS, DISTRESS_SPAN_TENTHS));
     trek_schedule(SCHED_BASE_ATTACK,
                   (uint16_t)(SCHED_ATTACK_BASE_TENTHS
                              + trek_rand_n(SCHED_FIRST_ATTACK_DAYS) * 10));
@@ -1159,6 +1163,28 @@ static void run_wear(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
+/* THE SPY. fn 0x15C07 -- see trek.h for the read and for why the roll comes
+   before the level gate. */
+static void run_spy(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint8_t which, loss;
+
+    if (trek_rand_n(SPY_OF_N) != 0) return;
+    if (ship.level < SPY_MIN_LEVEL) return;
+
+    which = trek_rand_n(SPY_PICK_OF_N);
+    /* No `sys[which] == 0` guard, deliberately: wear and tear has one at
+       0x020E24 and this routine does not. A spy can wreck a system that is
+       already wrecked, and the report still comes in. */
+    loss = (uint8_t)(SPY_LOSS_MIN + trek_rand_n(SPY_LOSS_SPAN));
+    ship.sys[which] = (uint8_t)(loss >= ship.sys[which]
+                                ? 0 : ship.sys[which] - loss);
+    if (ev && *n < max) {
+        ev[*n].kind = EV_SPY; ev[*n].y = 0; ev[*n].x = 0;
+        ev[*n].amount = which;
+        (*n)++;
+    }
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -1179,6 +1205,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     run_pod(ev, &n, max);
     run_mutants(ev, &n, max);
     run_wear(ev, &n, max);
+    run_spy(ev, &n, max);
     return n;
 }
 

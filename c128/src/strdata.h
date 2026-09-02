@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 319
+#define STR_COUNT 320
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -325,5 +325,6 @@
 #define S_316  316   /* MAKE REPAIRS IN SPACE (Y/N)? */
 #define S_317  317   /* HOW MANY STARDATES? */
 #define S_318  318   /* PRESS ANY KEY TO TAKE COMMAND */
+#define S_319  319   /* SABOTAGE:  */
 
 #endif

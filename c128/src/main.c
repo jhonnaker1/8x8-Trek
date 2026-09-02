@@ -1437,6 +1437,15 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
             linebuf[k] = 0;
             ui_message(S(S_18), linebuf);
             return;
+        case EV_SPY:
+            /* SECURITY, not DAMAGE: the ship was not shot, it was got at, and
+               the original files it under SECURITY with the boarding parties.
+               The port's OWN wording -- Anderson's sentence is not copied. */
+            k  = put_str(linebuf, S(S_319));
+            k += put_str(linebuf + k, ui_sys_name((uint8_t)e->amount));
+            linebuf[k] = 0;
+            ui_message(S(S_262), linebuf);
+            return;
         case EV_WEAR:
             /* Nothing shot at us; it simply broke. `amount` is the system. */
             k  = put_str(linebuf, ui_sys_name((uint8_t)e->amount));
@@ -1541,7 +1550,26 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
     trek_turn_end();
 }
 
-static void enemy_turn(uint8_t player_fired) { run_turn(player_fired, 1); }
+/* A RESTORED GAME GETS ITS FIRST TURN FREE.
+ *
+ * [0x1F31] in the original is the answer to "Restore a saved game <Y/N>?" and
+ * a 'Y' gates four things: it skips galaxy generation, calls the save loader,
+ * skips the quadrant entry, and skips the enemy's first turn -- and then the
+ * command loop forces the byte to 'N' at 0x0059CE so turn two is normal
+ * (MEASURED.md, "[0x1F31] is the RESTORED-GAME FLAG"). This port already does
+ * the first three structurally: it does not regenerate on restore, and
+ * ui_setup() returns straight to the console. This is the fourth.
+ *
+ * ONE turn, not one command: the flag is cleared the first time an enemy turn
+ * is actually asked for, whatever the player did with it. Loading a game
+ * inside a crossfire and being shot before the console has drawn is what the
+ * original is avoiding. */
+static uint8_t restored_free_turn = 0;
+
+static void enemy_turn(uint8_t player_fired) {
+    if (restored_free_turn) { restored_free_turn = 0; run_turn(player_fired, 0); return; }
+    run_turn(player_fired, 1);
+}
 
 /* A supernova's four lines. It was in OVL_CMDS -- 4% of a star hit, and star
    hits are themselves uncommon, while fire_one_torpedo around it is the
@@ -1838,6 +1866,9 @@ int main(void) {
            carries the flag rather than main guessing from the level. */
         if (!setup.restored)
             trek_new_game(setup.level, setup.seed);
+
+        /* And the fourth thing a restore gates -- see enemy_turn(). */
+        restored_free_turn = setup.restored;
 
         /* The message log is the one piece of UI state that outlives a game:
            msg_count is a file static in ui.c, and without this the second

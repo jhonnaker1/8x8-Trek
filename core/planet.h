@@ -473,6 +473,11 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * 3501 where the original cannot lose one before 3506. */
 #define EVAC_WARNING_MIN_TENTHS   10  /*@BINARY*/
 #define EVAC_WARNING_SPAN_TENTHS  30  /*@BINARY*/
+/* AND IT IS A LEVEL 3 MECHANIC. `cmp word [0x1DF0], 7 / jl` at 0x005876 skips
+   the arming entirely below it -- V = level + 4, so levels 1 and 2 never hear
+   from their settlers at all and the +200 rescue is out of reach. This port
+   armed it at every level until 2026-09-02. */
+#define DISTRESS_MIN_LEVEL         3  /*@BINARY*/
 #define DISTRESS_AT_TENTHS        50   /* 3505.0, five stardates in */  /*@BINARY*/
 #define DISTRESS_SPAN_TENTHS      30   /* plus Random*3.0 */  /*@BINARY*/
 
