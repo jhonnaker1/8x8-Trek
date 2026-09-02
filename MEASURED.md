@@ -3781,17 +3781,23 @@ was inference.
     NAME comes from a table at DS:0x1188, STRIDE 16, indexed by idx
     [DS:0x235A + idx*2] -= 10 + Random(90)      ; clamped at zero
 
-**SETTLED PLANETS ARE A SEPARATE TWELVE-ENTRY TABLE.** That is the structure
-`core/planet.h` says is missing -- the per-quadrant byte at DS:0x24A9 has only
-three find values and no room for settlers, and this is where they actually
-live: a table of up to twelve named worlds at DS:0x1188 with a parallel word
-each at DS:0x235A that the distress signal DRAINS by 10..99 and floors at
-zero. That word is a population or a countdown; which of the two is not read.
+~~**SETTLED PLANETS ARE A SEPARATE TWELVE-ENTRY TABLE.**~~ **RETRACTED
+2026-08-27** -- and it took until 2026-09-02 for the retraction to reach this
+paragraph, which is the whole reason the rule about grepping for the CLAIM
+rather than the file exists. **DS:0x1188 is the SYSTEM NAMES table**, not
+settlements. There is exactly ONE settled planet in a galaxy and it lives in a
+pair of globals at DS:0x1E1C/0x1E1E, written inside the ENERGIUM branch of the
+planet loop so that the last energium planet wins. See `core/planet.h`, which
+has carried the correct reading since the day it was made.
 
-So the port's `PFIND_SETTLERS` is modelling the right thing in the wrong
-place, at an invented frequency. The faithful model is a second, small table
-of named inhabited worlds -- which is also why the PLANET LIST page and the
-evacuation messages name planets that the per-quadrant byte cannot describe.
+What survives from this paragraph, and is still unread: the word at
+`[DS:0x235A + idx*2]` that the distress signal DRAINS by 10..99 and floors at
+zero. Population or countdown is not read.
+
+~~So the port's `PFIND_SETTLERS` is modelling the right thing in the wrong
+place... The faithful model is a second, small table of named inhabited
+worlds~~ -- **also retracted with the paragraph above.** There is no such
+table. The port models one settled planet, which is what the binary has.
 
 **A THIRD SUPPORT FOR V = level + 4.** The gate here is `[0x1DF0] > 7`, so
 distress signals -- and therefore rescues, and therefore the +200 scoring line
@@ -5324,11 +5330,12 @@ makes it action-triggered like the distress signal.
 the eight addresses; the only stardate comparison in it is against an
 immediate, which is the mission-elapsed test in the scoring.
 
-Both are kept in the port for now, because deleting them would remove a
-feature whose real trigger has not been read -- but their intervals are the
-port's own invention and are tagged PROVISIONAL rather than DERIVED, which is
-what they were pretending to be. Finding the pod's real trigger is what the
-rest of `fn 0x1DD4F` is for.
+~~Both are kept in the port for now... their intervals are the port's own
+invention and are tagged PROVISIONAL~~ -- **SUPERSEDED. BOTH TRIGGERS WERE
+READ.** The tractor is `TRACTOR_OF_N` 10 / `TRACTOR_ABOVE` 7 and the pod is
+`POD_FIRE_OF_N` 33, one in 20 in quadrant columns 7-8, capped at five ships --
+every one of them BINARY in `core/trek.h`. Nothing in this port is
+PROVISIONAL any more; `make tiers` reports 0.
 
 ~~**Four slots this core does not have at all:** the hail response, the
 boarding party, a Union ship's distress call, and the supernova.~~ **ALL FOUR

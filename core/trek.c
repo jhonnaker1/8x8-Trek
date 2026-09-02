@@ -1040,10 +1040,12 @@ static void run_nova(TrekEvent *ev, uint8_t *n, uint8_t max) {
         killed = gal_enemies[c];
 
         /* What was pending there stops being pending. The original clears the
-           base-under-attack pair at [0x1E0A] and a second pair at [0x1E1C]
-           whose identity is not read; this core clears the marker it has and
-           cancels the fall that marker drives, which is the same behaviour
-           for the state this core models. */
+           base-under-attack pair at [0x1E0A] and the SETTLED PLANET's quadrant
+           pair at [0x1E1C] -- identified 2026-08-27, and this comment said
+           "whose identity is not read" for six days after it was. This core
+           clears the marker it has and cancels the fall that marker drives,
+           which is the same behaviour for the state this core models; the
+           settlement's own loss is planet_quadrant_lost(). */
         if (base_under_attack == c) {
             base_under_attack = GAL_CELLS;
             trek_sched_restore(SCHED_BASE_FALLS, SCHED_NEVER);

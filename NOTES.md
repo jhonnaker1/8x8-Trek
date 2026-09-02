@@ -5534,3 +5534,62 @@ and is absurd, and no player would find it.
   * a StarBase came under attack on the scheduled slot, mid-flight
   * "NOT ADJACENT TO PLANET" on a failed dock, which reads as a bug and is not
     -- it is the original's own wording, measured, with a comment saying so.
+
+## The unread list, re-derived 2026-09-02 (after the MAIN VIEWER)
+
+Derived by grepping the CODE for "unread / not read / unmeasured" and checking
+each hit against what is actually built, not by reading this file's own lists
+back. **Three of the hits were stale and are now retracted** -- see below.
+
+### Still unread, and they want the disassembler
+
+1. **`[0x1DA2]`, the settlement's evacuation deadline: where it is SET and by
+   how much.** The read that found it (2026-08-27) got the address and the
+   comparison and stopped there. This is the one with gameplay in it -- the
+   port has `PF_SETTLED` and the +200 rescue, but no clock running against the
+   player, so a settlement can never actually be lost to time.
+2. **The word at `[DS:0x235A + idx*2]`**, which the distress signal drains by
+   `10 + Random(90)` and floors at zero. Population or countdown is not read,
+   and the two imply different mechanics.
+3. **Where the landing attack roll really lives.** `fn 0x0E3A1` before
+   0x00E49C has not been read. This one is not merely unread -- **the port is
+   known to have it in the wrong branch**: it rolls 1-in-5 on the
+   Mongol-supply world, which in the original runs the capture and nothing
+   else. Recorded 2026-08-27, still not corrected.
+4. **The plasma bolt's "failed to detonate" branch.**
+5. **Whether a bolt's detonation damages ENEMIES near it.** This file has
+   claimed since 2026-08-20 that it "can kill several Mongols at once" and the
+   routine does not obviously do that -- so it is an unread mechanism AND an
+   unverified claim.
+6. **`[0x26E1]`, the plasma bolt shield: how it is set and spent.** The port
+   has `ITEM_PLASMA_SHIELD` and a test in `trek.c` that is written and always
+   false, which is the honest way to carry it but is not the mechanic.
+7. **Whether `laser_heat` decays over time.** Per-command is the only reading
+   we have and it is consistent, but decay was never ruled in or out.
+
+### Still unread, and they want the rig or a capture -- not the disassembler
+
+8. **STATE OF REPAIR with a focus set.** One screenshot, undocked and docked.
+   It is what settled 20 and 47 a stardate; `REPAIR_PER_STARDATE_FOCUS` (60)
+   and `_FOCUS_DOCKED` (100) are still the manual's relative figures.
+9. **HELM and SCIENCE message colours.** No capture has ever had one on
+   screen; the port keeps its own green rather than guessing.
+10. **The reserve gauge's geometry.** The trigger, region, labels and quantity
+    are read; the bar is this port's own and says so.
+
+### Retracted while deriving this list
+
+- **`[0x1E1C]` "whose identity is not read"** in `core/trek.c` -- it is the
+  SETTLED PLANET's quadrant, identified 2026-08-27. The comment outlived the
+  retraction by six days.
+- **"Settled planets are a separate twelve-entry table at DS:0x1188"** in
+  MEASURED.md -- retracted 2026-08-27; DS:0x1188 is the SYSTEM NAMES table.
+  `core/planet.h` has carried the correct reading the whole time, which is
+  exactly the failure mode the "grep for the CLAIM, not the file" rule names.
+- **"The tractor and the pod intervals are the port's own invention, tagged
+  PROVISIONAL"** in MEASURED.md -- both triggers were read; every constant is
+  BINARY and `make tiers` reports PROVISIONAL 0.
+
+**Nothing on this list blocks anything that is built.** Items 3 and 5 are the
+two worth caring about, and for the same reason: they are not gaps, they are
+places where something shipped is probably WRONG.
