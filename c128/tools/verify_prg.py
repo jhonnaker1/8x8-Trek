@@ -153,6 +153,9 @@ MSG_PAD = 2    # msg_box() draws inside the border
 
 # The briefing draws on a bare 80x25 screen: 22 rows of page leaves a
 # blank line and a footer prompt, and 78 columns leaves a margin.
+# panels[P_COMMAND].w in layout.c -- ui_confirm clears w-3 and writes there.
+CMD_W = 21
+
 BRIEF_ROWS = 22
 BRIEF_COLS = 78
 
@@ -478,6 +481,37 @@ def check_overlay_calls():
     print("verify: no overlay calls out of its own window -- ok")
 
 
+def check_confirm_widths():
+    """A ui_confirm() prompt must fit the COMMAND panel.
+
+    ui_confirm draws in panels[P_COMMAND], not in the dialog it usually
+    follows: it clears p->w - 3 columns and writes the prompt there. Anything
+    longer runs straight out of the panel and across whatever is beside it.
+
+    FOUND 2026-08-29 by a new prompt doing it -- and the RAY's confirmation,
+    33 characters into 18, had been doing it since the command was built.
+    Nothing looked, because check_message_widths bounds ui_message and this
+    is a different function drawing somewhere else entirely.
+    """
+    src = (C128 / "src" / "main.c").read_text() + (C128 / "src" / "ui.c").read_text()
+    strings = {}
+    for ln in (C128 / "src" / "strings.txt").read_text().splitlines():
+        if ln[:1].isdigit():
+            i, _, t = ln.partition("\t")
+            strings[int(i)] = t
+
+    room = CMD_W - 3
+    bad = []
+    for m in re.finditer(r'ui_confirm\(\s*(?:S\(S_(\d+)\)|"((?:[^"\\]|\\.)*)")', src):
+        t = strings[int(m.group(1))] if m.group(1) else m.group(2)
+        if len(t) > room:
+            bad.append((t, len(t)))
+    if bad:
+        die("ui_confirm prompts wider than the COMMAND panel:\n" + "\n".join(
+            '         %r is %d, %d fit' % (t, n, room) for t, n in bad))
+    print("verify: every ui_confirm prompt fits the command panel -- ok")
+
+
 def check_briefing():
     """Every briefing page must fit the 80x25 screen.
 
@@ -570,6 +604,7 @@ def main():
     check_message_widths()
     check_linebuf()
     check_overlay_calls()
+    check_confirm_widths()
     check_briefing()
 
     consts = constants()

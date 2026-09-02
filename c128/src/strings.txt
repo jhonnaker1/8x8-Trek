@@ -278,7 +278,7 @@
 275	  none.
 276	Mongol supplies captured...
 277	 evac by 
-278	Are you sure you wish to continue
+278	ARE YOU SURE?
 279	Death ray misfires.
 280	Firing!
 281	It worked!
@@ -315,3 +315,6 @@
 312	TO:   HEADQUARTERS
 313	TOP SECRET
 314	 QUADRANTS OFF CHART.
+315	MAKE REPAIRS WHILE DOCKED (Y/N)?
+316	MAKE REPAIRS IN SPACE (Y/N)?
+317	HOW MANY STARDATES?

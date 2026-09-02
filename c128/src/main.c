@@ -1038,7 +1038,34 @@ OVL_CODE("cmds") static void do_self(void) {
    a different repair RATE for the chosen system, 60 points a stardate adrift
    and 100 docked, straight off the manual's own table. See trek.h, including
    why those two are not the undocked rates multiplied by anything. */
-OVL_CODE("cmds") static void do_fix(void) {
+/* THE SECOND HALF OF FIX, and the port shipped without it until 2026-08-29.
+ * The manual (l.459) says the command must also ask whether to spend time
+ * just making repairs, and the binary agrees -- `fn 0x0FE96` onward:
+ *
+ *     "Do you wish to make repairs while"
+ *     "docked <Y/N>? "        when [0x26DA], the docked-at-a-StarBase flag
+ *     "in space <Y/N>? "      otherwise
+ *     "How many stardates? "  read as a REAL
+ *     reject the abort sentinel 32766.0     ; 0x00FF0E
+ *     reject anything <= 0.0                ; 0x00FF27
+ *     otherwise hand it to the clock        ; 0x00FF3A -> fn 0x02013A
+ *
+ * THERE IS NO UPPER LIMIT. The only two tests are the sentinel and zero, so
+ * any positive number of stardates is accepted -- the mission clock is the
+ * price and the game lets you pay it.
+ *
+ * AND IT IS NOT A TURN. fn 0x02013A is the clock: it advances the stardate,
+ * runs repairs and drains life support. Nobody fires. So a captain CAN sit
+ * beside a Commander and repair, which reads as an exploit and is what the
+ * program does -- see run_turn's enemy_acts.
+ *
+ * Returns the tenths of a stardate to spend, or 0. The caller advances the
+ * clock, because the event reporting is resident and this is not. */
+/* IN OVL_INFO, NOT OVL_CMDS. The spend-time half pushed cmds 185 bytes past
+   its window; info had 2,861 free and FIX is a report-shaped command. Every
+   callee here is resident (the dialog helpers, ui_confirm, ui_sys_name,
+   grab_num), so the window is free to be whichever one has room. */
+OVL_CODE("info") static uint16_t do_fix(void) {
     char buf[8];
     /* Its own buffer, NOT the shared linebuf, which is 32 bytes -- the
        two-column list is 40 characters wide and overran it, and the overflow
@@ -1072,7 +1099,7 @@ OVL_CODE("cmds") static void do_fix(void) {
         }
 
         i = (uint8_t)grab_num(buf);
-        if (i == 0) { ui_dialog_close(); return; }
+        if (i == 0) break;          /* abort the CHOICE, still offer the time */
         if (i > SYS_COUNT) { snd_beep(); continue; }
 
         ship.repair_focus = i;
@@ -1080,8 +1107,39 @@ OVL_CODE("cmds") static void do_fix(void) {
           k += put_str(row + k, ui_sys_name((uint8_t)(i - 1)));
           row[k] = 0;
           ui_dialog_line(row); }
+        break;
+    }
+
+    /* AND THEN THE TIME. Asked whether or not a system was chosen, because
+       the rate table pays for waiting either way -- 2.5x docked with no
+       focus, 5x docked with one. */
+    /* ASKED IN THE DIALOG, not through ui_confirm. ui_confirm draws in the
+       COMMAND panel over on the left, which is right for a bare command line
+       and wrong here: this is the tail of a conversation the player is
+       reading inside the ENGINEERING box, and the question appeared detached
+       from it, outside the box. Jamie saw it on the VDC. */
+    ui_dialog_ask(ship.docked != BASE_NONE ? S(S_315) : S(S_316),
+                  buf, sizeof buf);
+    if (buf[0] != KB_Y && buf[0] != KB_Y + 32) {
         ui_dialog_close();
-        return;
+        return 0;
+    }
+    ui_dialog_ask(S(S_317), buf, sizeof buf);
+    ui_dialog_close();
+
+    /* "2" is two stardates and "1.5" is one and a half. Parsed here rather
+       than through grab_digits, which throws the point away and would read
+       1.5 as fifteen. */
+    {
+        uint16_t whole = 0, tenths = 0;
+        uint8_t k = 0;
+        while (buf[k] >= KB_DIGIT0 && buf[k] <= KB_DIGIT0 + 9) {
+            if (whole < 6000) whole = (uint16_t)(whole * 10 + (buf[k] - KB_DIGIT0));
+            k++;
+        }
+        if (buf[k] == '.' && buf[k + 1] >= KB_DIGIT0 && buf[k + 1] <= KB_DIGIT0 + 9)
+            tenths = (uint16_t)(buf[k + 1] - KB_DIGIT0);
+        return (uint16_t)(whole * 10 + tenths);
     }
 }
 
@@ -1406,7 +1464,12 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
    effect and its own line in the damage report. */
 static uint8_t turn_sfx;
 
-static void enemy_turn(uint8_t player_fired) {
+/* `enemy_acts` is 0 for the one caller that spends TIME without giving the
+   enemy a shot: FIX's "make repairs" branch. The original's FIX calls the
+   clock routine (fn 0x02013A) directly rather than going through the turn,
+   and that routine drives repairs and the life-support drain and nothing
+   else -- so scheduled events still land, and nobody fires. */
+static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
     TrekEvent ev[12];
     uint8_t n, i, k;
 
@@ -1421,7 +1484,7 @@ static void enemy_turn(uint8_t player_fired) {
        a turn where nothing is due, which is almost every turn. */
     if (trek_events_due()) ovl_load(OVL_EVENTS);
     n = trek_run_events(ev, 12);
-    if (n < 12)
+    if (enemy_acts && n < 12)
         n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n),
                                           player_fired));
 
@@ -1474,6 +1537,8 @@ static void enemy_turn(uint8_t player_fired) {
        original does it here, at the bottom of its main loop. */
     trek_turn_end();
 }
+
+static void enemy_turn(uint8_t player_fired) { run_turn(player_fired, 1); }
 
 /* A supernova's four lines. It was in OVL_CMDS -- 4% of a star hit, and star
    hits are themselves uncommon, while fire_one_torpedo around it is the
@@ -1833,7 +1898,13 @@ int main(void) {
             else if (c == KB_UP)   { do_shields_up();   enemy_turn(0); }
             else if (c == KB_DOWN) { do_shields_down(); enemy_turn(0); }
             else if (c == KB_C) do_chart();    /* MEASURED: costs no turn */
-            else if (c == KB_F) { ovl_load(OVL_CMDS); do_fix(); }   /* no turn */
+            else if (c == KB_F) {
+                /* FIX itself costs nothing; the time it may ASK for does. */
+                uint16_t t;
+                ovl_load(OVL_INFO);
+                t = do_fix();
+                if (t) { trek_advance_time(t); run_turn(0, 0); }
+            }
             else if (c == KB_W) do_warp(cmd);   /* setting speed is not a turn */
             /* A#, MEASURED: dismisses one message from the panel by its
                position, and a bare A dismisses all of them. The digit is

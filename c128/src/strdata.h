@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 315
+#define STR_COUNT 318
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -284,7 +284,7 @@
 #define S_275  275   /*   none. */
 #define S_276  276   /* Mongol supplies captured... */
 #define S_277  277   /*  evac by  */
-#define S_278  278   /* Are you sure you wish to continue */
+#define S_278  278   /* ARE YOU SURE? */
 #define S_279  279   /* Death ray misfires. */
 #define S_280  280   /* Firing! */
 #define S_281  281   /* It worked! */
@@ -321,5 +321,8 @@
 #define S_312  312   /* TO:   HEADQUARTERS */
 #define S_313  313   /* TOP SECRET */
 #define S_314  314   /*  QUADRANTS OFF CHART. */
+#define S_315  315   /* MAKE REPAIRS WHILE DOCKED (Y/N)? */
+#define S_316  316   /* MAKE REPAIRS IN SPACE (Y/N)? */
+#define S_317  317   /* HOW MANY STARDATES? */
 
 #endif
