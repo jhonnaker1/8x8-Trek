@@ -121,8 +121,10 @@ extern const char planet_class_letter[PCLASS_COUNT];
  * "destroyed " is an INSERT into the settlement line, not a fifth find --
  * which is why a ruined settlement is a flag below rather than its own kind.
  * A settlement is destroyed by the same thing that destroys a base: an
- * evacuation deadline nobody met. That event is NOT built here; see the note
- * on PF_RUINED. */
+ * evacuation deadline nobody met. ~~That event is NOT built here~~ -- it IS,
+ * and has been since 2026-08-27: planet_settlement_lost() compares the clock
+ * against planet_evac_end and ORBIT inserts the word. See the note on
+ * PF_RUINED for why it is derived rather than stored. */
 #define PFIND_SETTLERS    0  /*@ID*/
 #define PFIND_MONGOL      1      /* a Mongol supply station */  /*@ID*/
 #define PFIND_ENERGIUM    2  /*@ID*/
@@ -192,11 +194,16 @@ extern const char planet_class_letter[PCLASS_COUNT];
  *
  * ~~What remains unread is where [0x1DA2] is SET, and by how much.~~ **READ
  * 2026-09-02.** Setup arms the slot at `3505.0 + Random()*3.0`, and ONLY when
- * `[0x1DF0] >= 7` -- a command level gate this core does not have. fn 0x151D0
- * then fires once, sets the slot to 9999 so it never repeats, and writes
- * `[0x1DA2] = stardate + 1.0 + Random()*3.0`. See MEASURED.md, "Clearing the
- * unread list with the disassembler". NOT BUILT: this core has PF_SETTLED and
- * the +200 rescue but no clock, so a settlement cannot yet be lost to time. */
+ * `[0x1DF0] >= 7`. fn 0x151D0 then fires once, sets the slot to 9999 so it
+ * never repeats, and writes `[0x1DA2] = stardate + 1.0 + Random()*3.0`. See
+ * MEASURED.md, "Clearing the unread list with the disassembler".
+ *
+ * ~~NOT BUILT: this core has PF_SETTLED and the +200 rescue but no clock, so a
+ * settlement cannot yet be lost to time.~~ **ALL OF IT IS BUILT.** The clock
+ * had been there since 2026-08-27 -- SCHED_DISTRESS, planet_evac_end,
+ * EVAC_WARNING_MIN_TENTHS -- and the sentence above was written the same day
+ * without checking. DISTRESS_MIN_LEVEL closed the one real gap that afternoon.
+ * Twice in one file, in one session, about the same feature. */
 #define PFIND_ENERGIUM_OF_N   5   /* energium when class <= Random(5) */  /*@BINARY*/
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */  /*@BINARY*/
 
@@ -240,11 +247,14 @@ extern uint8_t planet_count;
  * So it is counts per type with the empty types left out, which is what this
  * array is.
  *
- * The five names are the binary's own table and appear in its order. Only
- * ITEM_RAW_ENERGIUM has a source in this core so far; the other four are kept
- * as ids with no producer for the same reason the score sheet keeps rows that
- * are always zero -- so that building the thing that fills them is a call to
- * one place, not a change to the shape of the game. */
+ * The five names are the binary's own table and appear in its order. ALL FIVE
+ * now have a source: raw energium from mining, and the other four from
+ * trek_capture_supplies() -- items 0..2 rolled, life support always two.
+ *
+ * FOUR OF THE FIVE ALSO HAVE A USE, as of 2026-09-02: raw energium, the life
+ * support canister, the plasma bolt and the plasma bolt shield. Only
+ * ITEM_MONGOL_ENERGIUM is still carried with nothing that spends it, and USE
+ * says so rather than doing nothing. */
 #define ITEM_MONGOL_ENERGIUM  0  /*@ID*/
 #define ITEM_PLASMA_BOLTS     1  /*@ID*/
 #define ITEM_PLASMA_SHIELD    2  /*@ID*/

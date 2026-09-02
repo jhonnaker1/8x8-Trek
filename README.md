@@ -108,9 +108,10 @@ list and the build list are all empty.
 
 What that covers: all 25 commands, the nine-panel console, the twelve-page
 briefing, save and restore, the hall of fame, and the mechanics the manual
-never mentions -- boarding parties, the Vandal death pod, plasma bolts, black
-holes, supernovae, the death ray's five outcomes, tractor beams, wear and
-tear, reinforcements, and a damaged computer eating your star chart.
+never mentions -- boarding parties, the Vandal death pod, plasma bolts both
+ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
+wear and tear, reinforcements, a spy who sabotages a system, a settlement with
+a clock running against it, and a damaged computer eating your star chart.
 
 Four things are deliberately absent, each decided rather than left undone.
 
