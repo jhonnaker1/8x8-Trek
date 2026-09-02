@@ -5631,7 +5631,19 @@ claim against the code beside it.
    of a thing that is not a map, and every HELM message is green when it
    should be cyan.** Recorded, not changed. See MEASURED.md.
 10. **The reserve gauge's geometry.** The trigger, region, labels and quantity
-    are read; the bar is this port's own and says so.
+    are read; the bar is this port's own and says so. **The only item on this
+    whole list still genuinely open**, and it wants a rig run with life
+    support poked down -- real work for a cosmetic bar, so it is parked
+    honestly rather than half-done.
+
+11. ~~**Whether the original gates the planet list on scanned quadrants.**~~
+    **READ 2026-09-02: IT DOES NOT.** The original's PLANET LIST is viewer
+    page 9, `fn 0x22FEB`, and its only test is `planet[q] > 0`. The whole
+    routine touches exactly two DS addresses -- 0x24A9 and one scratch -- and
+    nothing that could hold "quadrant known". It also chooses page 601 or 602
+    with a `Random(2)`. Our scan gate is a deliberate divergence and now says
+    so in `ui.c`. This item was not on the list an hour ago; it became
+    answerable when the MAIN VIEWER read identified the page.
 
 ### Retracted while deriving this list
 

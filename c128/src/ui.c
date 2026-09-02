@@ -766,11 +766,30 @@ static unsigned char msg_height(unsigned char slot) {
 static unsigned char panel_slot[MSG_SLOTS];
 static unsigned char msg_count = 0;
 
-/* Department colours. Yellow and orange are measured -- they are the border
-   and text colours of the COMMUNICATIONS and DAMAGE REPORT boxes in the
-   capture. Everything else is UNMEASURED: no capture has been taken with a
-   HELM or SCIENCE message on screen, so those keep the green this port has
-   been using rather than a guess dressed up as a finding. */
+/* Department colours -- AND THE ORIGINAL DOES NOT HAVE ANY.
+ *
+ * Read and captured 2026-09-02 (MEASURED.md, "Message colour is PER SITE").
+ * Every message site in EGA Trek calls BGI SetColor itself; the message
+ * routine's only rule is that colour 10 becomes 15. Ten distinct colours are
+ * in use across its 145 message sites, so a four-way map of departments is a
+ * map of something that is not one.
+ *
+ * What IS measured, twice each -- once from the SetColor before the push and
+ * once from the pixels of a rig capture:
+ *
+ *     NAVIGATION (this port's HELM)  EGA 3, cyan
+ *     COMMUNICATIONS on HAIL         EGA 7, light gray
+ *     SCIENCE in ORBIT               EGA 6, brown (read, not yet captured)
+ *     DAMAGE REPORT                  EGA 6, brown
+ *
+ * The earlier capture-derived "COMMUNICATIONS is yellow" is not contradicted;
+ * a different COMMUNICATIONS site is simply a different colour.
+ *
+ * THIS FUNCTION IS KNOWINGLY WRONG and kept as a deliberate simplification:
+ * HELM falls into the "everything else" bucket and draws green where the
+ * original draws cyan, and HELM is the commonest message in the game. Fixing
+ * it properly means a colour per pooled string, which is two bytes a message
+ * this port has not decided to spend. Do not describe it as measured. */
 static unsigned char dept_color(const char *dept) {
     if (dept[0] == 'D')                    /* DAMAGE */
         return EGA_TO_VDC(EGA_BROWN);
@@ -1401,8 +1420,15 @@ void ui_repair_report(void) {
 
    Only planets in scanned quadrants are listed, which is the CHART's own rule
    rather than a measured one -- the chart is titled CHART OF KNOWN GALAXY and
-   a planet list that knows more than the chart would be odd. Whether the
-   original gates it at all is unmeasured. */
+   a planet list that knows more than the chart would be odd.
+
+   ~~Whether the original gates it at all is unmeasured.~~ READ 2026-09-02: IT
+   DOES NOT. The original's PLANET LIST is viewer page 9 (fn 0x22FEB), and its
+   only test is `planet[q] > 0` -- the whole routine references exactly two DS
+   addresses, 0x24A9 and one scratch, and nothing that could hold "quadrant
+   known". It also picks page 601 or 602 with a Random(2). So this port's scan
+   gate is a DELIBERATE DIVERGENCE, kept because our PLAN is a full-screen
+   report rather than a viewer page a player glimpses at random. */
 OVL_CODE("planet") void ui_planet_list(void) {
     unsigned char y = (unsigned char)(REP_Y + 2);
     unsigned char i, k, n = 0;
