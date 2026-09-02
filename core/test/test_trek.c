@@ -4839,6 +4839,178 @@ static void test_orbit(void) {
 }
 
 
+
+/* THE PLAYER'S PLASMA BOLT -- two different laws in one command. */
+static void test_plasma_bolt(void) {
+    uint8_t killed; uint16_t self;
+
+    puts("plasma bolt");
+
+    /* THE INVERSE SQUARE, exactly. Put one enemy at a known offset from the
+       burst, park the ship far away so the self-damage cannot interfere, and
+       read the hit points back. Round(1000/d^2) for d^2 = 1,2,4,9 is
+       1000, 500, 250, 111 -- four distinct values, so a linear falloff or a
+       1/d law fails every one of them rather than passing by luck. */
+    {
+        static const struct { uint8_t dy, dx; uint16_t want; } cases[] = {
+            { 0, 1, 1000 }, { 1, 1, 500 }, { 0, 2, 250 }, { 0, 3, 111 },
+        };
+        uint8_t c;
+        for (c = 0; c < 4; c++) {
+            uint8_t ty = 4, tx = 4;
+            uint8_t cell = (uint8_t)(((ty + cases[c].dy) << 3)
+                                     + tx + cases[c].dx);
+            char msg[96];
+            uint16_t got;
+            trek_new_game(3, 3300);
+            memset(sector, SEC_EMPTY, sizeof sector);
+            memset(enemy_hp, 0, sizeof enemy_hp);
+            sector[cell] = SEC_BATTLESHIP;
+            enemy_hp[cell] = 30000;          /* far more than any one bolt */
+            ship.sec_y = 7; ship.sec_x = 7;  /* out of the blast's own way */
+            plasma_shield = 1;               /* and immune, to isolate the law */
+            /* Fire until it is not a dud -- the dud roll is a third. */
+            while (trek_plasma_bolt(ty, tx, &killed, &self) == PBOLT_DUD) {
+                enemy_hp[cell] = 30000;
+            }
+            got = (uint16_t)(30000 - enemy_hp[cell]);
+            sprintf(msg, "d^2 = %u takes %u (want %u)",
+                    (unsigned)(cases[c].dy * cases[c].dy
+                               + cases[c].dx * cases[c].dx),
+                    got, cases[c].want);
+            ok(got == cases[c].want, msg);
+        }
+    }
+
+    /* A DIRECT HIT IS 4000, from the 0.5 the original substitutes for a zero
+       distance. Without that substitution this divides by zero. */
+    {
+        trek_new_game(3, 3300);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        memset(enemy_hp, 0, sizeof enemy_hp);
+        sector[4 * 8 + 4] = SEC_BATTLESHIP;
+        enemy_hp[4 * 8 + 4] = 30000;
+        ship.sec_y = 7; ship.sec_x = 7;
+        plasma_shield = 1;
+        while (trek_plasma_bolt(4, 4, &killed, &self) == PBOLT_DUD)
+            enemy_hp[4 * 8 + 4] = 30000;
+        ok(30000 - enemy_hp[4 * 8 + 4] == PBOLT_POINT_BLANK,
+           "a direct hit is 4000, not a division by zero");
+    }
+
+    /* IT KILLS, AND IT COUNTS. Three enemies packed round the burst. */
+    {
+        uint8_t before_killed;
+        trek_new_game(3, 3300);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        memset(enemy_hp, 0, sizeof enemy_hp);
+        sector[4 * 8 + 4] = SEC_BATTLESHIP;  enemy_hp[4 * 8 + 4] = 100;
+        sector[4 * 8 + 5] = SEC_BATTLESHIP;  enemy_hp[4 * 8 + 5] = 100;
+        sector[5 * 8 + 4] = SEC_BATTLESHIP;  enemy_hp[5 * 8 + 4] = 100;
+        gal_enemies[(ship.quad_y << 3) | ship.quad_x] = 3;
+        ship.enemies_left = 3;
+        before_killed = (uint8_t)ship.killed;
+        ship.sec_y = 7; ship.sec_x = 7;
+        plasma_shield = 1;
+        while (trek_plasma_bolt(4, 4, &killed, &self) == PBOLT_DUD) {
+            enemy_hp[4 * 8 + 4] = 100; enemy_hp[4 * 8 + 5] = 100;
+            enemy_hp[5 * 8 + 4] = 100;
+            sector[4 * 8 + 4] = SEC_BATTLESHIP; sector[4 * 8 + 5] = SEC_BATTLESHIP;
+            sector[5 * 8 + 4] = SEC_BATTLESHIP;
+        }
+        ok(killed == 3, "one bolt takes three Mongols packed round it");
+        ok(ship.killed == before_killed + 3, "and all three go on the sheet");
+    }
+
+    /* ONE IN THREE IS A DUD, and the bolt is spent either way -- the caller
+       spends it, so all this checks is the proportion. 900 shots at nothing. */
+    {
+        int i, duds = 0;
+        char msg[80];
+        trek_new_game(3, 4400);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        plasma_shield = 1;
+        for (i = 0; i < 900; i++)
+            if (trek_plasma_bolt(0, 0, &killed, &self) == PBOLT_DUD) duds++;
+        sprintf(msg, "duds are about one in three (%d of 900)", duds);
+        ok(duds > 240 && duds < 360, msg);
+    }
+
+    /* AND IT CAN HIT YOU -- the enemy bolt's law, not the inverse square, and
+       nothing at all below 200. Fire into our own sector with no shield. */
+    {
+        int i; uint16_t worst = 0, best = 0xFFFF;
+        trek_new_game(3, 4400);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        ship.sec_y = 4; ship.sec_x = 4;
+        plasma_shield = 0;
+        for (i = 0; i < 400; i++) {
+            ship.shields = 30000;
+            if (trek_plasma_bolt(4, 4, &killed, &self) == PBOLT_DUD) continue;
+            if (self > worst) worst = self;
+            if (self < best)  best  = self;
+        }
+        {
+            char msg[96];
+            sprintf(msg, "our own bolt hits us for 720-792 at zero range "
+                         "(%u..%u)", best, worst);
+            /* (90 + Random(10)) * 8 = 720..792. */
+            ok(best >= 720 && worst <= 792, msg);
+        }
+    }
+
+    /* THE SHIELD STOPS IT DEAD, and is never spent. */
+    {
+        int i;
+        uint8_t hurt = 0;
+        trek_new_game(3, 4400);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        ship.sec_y = 4; ship.sec_x = 4;
+        plasma_shield = 1;
+        for (i = 0; i < 400; i++) {
+            ship.shields = 30000;
+            trek_plasma_bolt(4, 4, &killed, &self);
+            if (self || ship.shields != 30000) hurt = 1;
+        }
+        ok(!hurt, "the plasma bolt shield stops our own bolt every time");
+        ok(plasma_shield == 1, "and 400 bolts do not use it up");
+    }
+
+    /* PAST THE EIGHT-SECTOR REACH, nothing at all. */
+    {
+        int i; uint8_t hurt = 0;
+        trek_new_game(3, 4400);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        ship.sec_y = 0; ship.sec_x = 0;
+        plasma_shield = 0;
+        for (i = 0; i < 400; i++) {
+            ship.shields = 30000;
+            trek_plasma_bolt(6, 6, &killed, &self);   /* d = 8.49, past reach */
+            if (self) hurt = 1;
+        }
+        ok(!hurt, "a bolt eight sectors off is out of reach entirely");
+    }
+
+    /* AND THE 200 FLOOR, WHICH IS A DIFFERENT RULE FROM THE REACH. At d = 7.07
+       the reach still admits the bolt -- (8 - 7.07) * (90..99) is 84 to 92 --
+       and the floor is what throws it away. The reach test above cannot see
+       this: deleting the floor failed nothing until this case existed, because
+       every "far" shot it fired was already out of range. */
+    {
+        int i; uint8_t hurt = 0;
+        trek_new_game(3, 4400);
+        memset(sector, SEC_EMPTY, sizeof sector);
+        ship.sec_y = 0; ship.sec_x = 0;
+        plasma_shield = 0;
+        for (i = 0; i < 400; i++) {
+            ship.shields = 30000;
+            trek_plasma_bolt(5, 5, &killed, &self);   /* d = 7.07, in reach */
+            if (self) hurt = 1;
+        }
+        ok(!hurt, "and one inside the reach but under 200 does nothing either");
+    }
+}
+
 /* THE SETTLEMENT IS LEVEL 3 AND UP, and THE SPY IS LEVEL 4 AND UP.
  *
  * Both gates are `cmp word [0x1DF0], 7` on V = level + 4, and they differ by
@@ -5270,6 +5442,7 @@ int main(void) {
     test_manual_movement();
     test_planet_generation();
     test_orbit();
+    test_plasma_bolt();
     test_level_gated_events();
     test_landing();
     test_energium();

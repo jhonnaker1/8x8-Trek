@@ -1562,6 +1562,50 @@ extern uint8_t pod_alive;
 #define BOLT_DMG_SPAN      10   /* 90 + Random(10) */  /*@BINARY*/
 #define BOLT_REACH          8   /* (8 - d), so nothing past eight sectors */  /*@BINARY*/
 
+/* THE PLAYER'S OWN PLASMA BOLT -- fn 0x09563, USE item 2. Read 2026-09-02.
+ *
+ * It is NOT the weapon the enemy fires at you, and the two laws are different
+ * in the same routine:
+ *
+ *     the bolt is spent FIRST, 0x0095A1, before anything can go wrong
+ *     Random(3) == 0            ->  "failed to detonate", and that is the turn
+ *     otherwise, for EVERY enemy in the quadrant (fn 0x01EB48, five slots):
+ *         damage = Round(1000 / d^2)      ; d from the burst to that enemy
+ *         hp -= damage; at zero or less the ship dies
+ *     then, unless the plasma bolt SHIELD is up (0x009641):
+ *         self = (90 + Random(10)) * (8 - d)    ; d from the burst to US
+ *         if (self >= 200) the shield charge takes it, whole
+ *
+ * THE ENEMY LAW NEEDS NO SQUARE ROOT. The original computes
+ * `sqr(sqrt(sqr(dx) + sqr(dy)))` -- Pascal source that squares the distance it
+ * just took the root of -- and that is exactly `dx*dx + dy*dy` in integers.
+ * `0x02C3BF` is Sqr, identified from eight sites that pair it before the sqrt
+ * at `0x2692:0x0D6C`. So this core does the arithmetic the original meant
+ * rather than the arithmetic it wrote, and stays in sixteen bits.
+ *
+ * A DIRECT HIT IS 4000. At zero range the original substitutes 0.5 for the
+ * distance (`cx=0x0080` at 0x01EBE3, the divide-by-zero guard), so d^2 is
+ * 0.25 and the burst does 1000/0.25. One sector away is 1000, two is 250,
+ * three is 111. It is savage close in and nearly nothing past four.
+ *
+ * AND IT CAN KILL YOU. The self-damage is the ENEMY bolt's law, not the
+ * inverse square -- the same `(90 + Random(10)) * (8 - d)` as `run_bolt()`
+ * above -- with a floor of 200 below which nothing happens at all. Firing one
+ * into your own sector is 760-odd off the shield charge. */
+#define PBOLT_DUD_OF_N       3   /* Random(3) == 0, 0x0095D7 */  /*@BINARY*/
+#define PBOLT_BURST       1000   /* Round(1000 / d^2), 0x009613 */  /*@BINARY*/
+#define PBOLT_POINT_BLANK 4000   /* d substituted with 0.5, so 1000/0.25 */  /*@BINARY*/
+#define PBOLT_SELF_FLOOR   200   /* `jae` against 200.0 at 0x0096C4 */  /*@BINARY*/
+
+#define PBOLT_DUD       0   /* it did not go off */  /*@ID*/
+#define PBOLT_FIRED     1  /*@ID*/
+
+/* The captured shield, [0x26E1]: raised by USE and never spent. */
+extern uint8_t plasma_shield;
+
+uint8_t trek_plasma_bolt(uint8_t ty, uint8_t tx,
+                         uint8_t *killed, uint16_t *self_hit);
+
 /* Where the bolt is, and which quadrant it was fired in. QUAD_CELLS in
    bolt_cell means nothing is in flight -- the original's [0x1E28] == 0.
    Leaving the quadrant loses it, exactly as 0x01659E does. */

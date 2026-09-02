@@ -535,7 +535,13 @@ OVL_CODE("planet") static void do_land(void) {
    the original's is: it prints a numbered list of the types held, with the
    quantity in brackets, and the four other types are already named in
    core/planet.h waiting for something to produce them. */
-OVL_CODE("planet") static void do_use(void) {
+/* do_use() ANSWERS ITS CALLER. USE_NONE for everything it handled itself;
+   USE_WANT_BOLT when the player chose a plasma bolt, which needs a window
+   this one has no room for. */
+#define USE_NONE       0
+#define USE_WANT_BOLT  1
+
+OVL_CODE("planet") static uint8_t do_use(void) {
     char buf[8];
     uint8_t i, k, n = 0, pick;
     uint8_t slot[ITEM_COUNT];
@@ -546,7 +552,7 @@ OVL_CODE("planet") static void do_use(void) {
     if (!n) {
         /* "ENGINEERING: No energium crystals are available to load." */
         ui_message(S(S_31), S(S_224));
-        return;
+        return USE_NONE;
     }
 
     ui_dialog_open(S(S_239));
@@ -565,7 +571,7 @@ OVL_CODE("planet") static void do_use(void) {
     ui_dialog_ask(S(S_242), buf, sizeof buf);
 
     pick = (uint8_t)grab_num(buf);
-    if (pick < 1 || pick > n) { ui_dialog_close(); return; }
+    if (pick < 1 || pick > n) { ui_dialog_close(); return USE_NONE; }
 
     /* The reserve life support canister. BINARY 0x009861: a whole stardate,
        clamped at the same 2.0 the dock refills to, and refused unless the
@@ -580,7 +586,27 @@ OVL_CODE("planet") static void do_use(void) {
         }
         ui_dialog_close();
         ui_draw_all();
-        return;
+        return USE_NONE;
+    }
+
+    /* THE CAPTURED PLASMA BOLT SHIELD. fn 0x97D7 is the whole command: say so
+       and set the flag. It is never spent -- see core/trek.c. */
+    if (slot[pick - 1] == ITEM_PLASMA_SHIELD) {
+        inventory[ITEM_PLASMA_SHIELD]--;
+        plasma_shield = 1;
+        ui_dialog_line(S(S_323));
+        ui_dialog_close();
+        return USE_NONE;
+    }
+
+    /* A CAPTURED PLASMA BOLT. Answered by the CALLER, not here: firing it is
+       another dialog and another 700 bytes, and OVL_PLANET has no room for
+       them. do_use() hands the request back to the resident command loop,
+       which is the only code allowed to ovl_load -- the same shape as
+       do_fix() returning tenths for main to spend. */
+    if (slot[pick - 1] == ITEM_PLASMA_BOLTS) {
+        ui_dialog_close();
+        return USE_WANT_BOLT;
     }
 
     if (slot[pick - 1] != ITEM_RAW_ENERGIUM) {
@@ -588,7 +614,7 @@ OVL_CODE("planet") static void do_use(void) {
            better than a silent no-op. */
         ui_dialog_line(S(S_219));
         ui_dialog_close();
-        return;
+        return USE_NONE;
     }
 
     /* The gate is the manual's, and refusing here rather than after the
@@ -600,7 +626,7 @@ OVL_CODE("planet") static void do_use(void) {
         ui_dialog_line(S(S_195));
         ui_dialog_line(S(S_238));
         ui_dialog_close();
-        return;
+        return USE_NONE;
     }
 
     /* A fresh page, for the reason LAND takes one: the item list plus the
@@ -609,7 +635,7 @@ OVL_CODE("planet") static void do_use(void) {
     ui_dialog_line(S(S_203));
     ui_dialog_line(S(S_234));
     ui_dialog_ask(S(S_227), buf, sizeof buf);
-    if (buf[0] != KB_Y) { ui_dialog_close(); return; }
+    if (buf[0] != KB_Y) { ui_dialog_close(); return USE_NONE; }
 
     ui_dialog_line(S(S_196));
 
@@ -1141,6 +1167,49 @@ OVL_CODE("info") static uint16_t do_fix(void) {
     }
 }
 
+/* FIRING A CAPTURED PLASMA BOLT -- fn 0x09563, and see core/trek.h for the
+   two laws. Reached only from do_use(), through the command loop, because
+   OVL_PLANET could not hold it.
+
+   The bolt is spent BEFORE the dud roll, exactly as the original decrements
+   the item at 0x0095A1 ahead of it: a bolt that fails to go off is gone. */
+OVL_CODE("cmds") static void do_plasma_bolt(void) {
+    char     buf[8];
+    uint8_t  d[8], dead = 0, k;
+    uint16_t self = 0;
+
+    ui_dialog_open(S(S_239));
+    ui_dialog_ask(S(S_324), buf, sizeof buf);
+    if (grab_digits(buf, d, 8) < 2
+        || d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
+        ui_dialog_line(S(S_77));
+        ui_dialog_close();
+        return;
+    }
+
+    inventory[ITEM_PLASMA_BOLTS]--;
+    ui_dialog_line(S(S_86));
+
+    if (trek_plasma_bolt((uint8_t)(d[0] - 1), (uint8_t)(d[1] - 1),
+                         &dead, &self) == PBOLT_DUD) {
+        ui_dialog_line(S(S_325));
+    } else {
+        ui_dialog_line(S(S_322));
+        k  = put_u16(linebuf, dead);
+        k += put_str(linebuf + k, S(S_320));
+        linebuf[k] = 0;
+        ui_dialog_line(linebuf);
+        if (self) {
+            k  = put_u16(linebuf, self);
+            k += put_str(linebuf + k, S(S_321));
+            linebuf[k] = 0;
+            ui_dialog_line(linebuf);
+        }
+    }
+    ui_dialog_close();
+    ui_draw_all();
+}
+
 /* C)hart. MEASURED 2026-08-23: on a console already showing the chart this is
    a NO-OP in the original -- nothing on screen changed. The manual says the
    chart is "displayed at all times unless overridden", so redrawing the panel
@@ -1211,7 +1280,7 @@ OVL_CODE("cmds") static void do_ray(void) {
     ui_draw_all();
 }
 
-OVL_CODE("cmds") static void do_hail(void) {
+OVL_CODE("msgs") static void do_hail(void) {
     uint8_t qy = 0, qx = 0, k;
 
     switch (trek_hail(&qy, &qx)) {
@@ -1255,7 +1324,7 @@ static void do_info(void) {
    loaded, the report paints over the console, and the console is redrawn
    when the player is done with it. */
 static void do_planets(void) {
-    ovl_load(OVL_PLANET);
+    ovl_load(OVL_INFO);
     ui_planet_list();
     while (kb_waitkey() != KB_RETURN) { }
     ui_draw_all();
@@ -1893,7 +1962,7 @@ int main(void) {
             else if (word_is(cmd, "RAY"))  { ovl_load(OVL_CMDS); do_ray();
                                              enemy_turn(0); }
             else if (word_is(cmd, "SND"))  do_sound();
-            else if (word_is(cmd, "HAIL")) { ovl_load(OVL_CMDS); do_hail();
+            else if (word_is(cmd, "HAIL")) { ovl_load(OVL_MSGS); do_hail();
                                              enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
             /* LAND and USE are WORDS on the original's reference card --
@@ -1903,8 +1972,17 @@ int main(void) {
                gives it, and sits with the other letters below. */
             else if (word_is(cmd, "LAND")) { ovl_load(OVL_PLANET); do_land();
                                              enemy_turn(0); }
-            else if (word_is(cmd, "USE"))  { ovl_load(OVL_PLANET); do_use();
-                                             enemy_turn(0); }
+            else if (word_is(cmd, "USE"))  {
+                ovl_load(OVL_PLANET);
+                if (do_use() == USE_WANT_BOLT) {
+                    /* THE WINDOW SWITCH HAPPENS HERE, in resident code.
+                       do_use() cannot do it: a function inside an overlay
+                       that calls ovl_load pulls the ground out from under
+                       its own return address. `make verify` fails that. */
+                    ovl_load(OVL_CMDS);
+                    do_plasma_bolt();
+                }
+                enemy_turn(0); }
             /* PLAN is this port's own, for a report the original reaches
                some other way -- see ui_planet_list. A report, so no turn. */
             else if (word_is(cmd, "PLAN")) do_planets();

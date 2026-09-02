@@ -1440,7 +1440,7 @@ void ui_repair_report(void) {
    known". It also picks page 601 or 602 with a Random(2). So this port's scan
    gate is a DELIBERATE DIVERGENCE, kept because our PLAN is a full-screen
    report rather than a viewer page a player glimpses at random. */
-OVL_CODE("planet") void ui_planet_list(void) {
+OVL_CODE("info") void ui_planet_list(void) {
     unsigned char y = (unsigned char)(REP_Y + 2);
     unsigned char i, k, n = 0;
     const Planet *p;

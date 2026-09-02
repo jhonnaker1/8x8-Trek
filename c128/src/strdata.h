@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 320
+#define STR_COUNT 326
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -326,5 +326,11 @@
 #define S_317  317   /* HOW MANY STARDATES? */
 #define S_318  318   /* PRESS ANY KEY TO TAKE COMMAND */
 #define S_319  319   /* SABOTAGE:  */
+#define S_320  320   /*  MONGOL(S) DESTROYED. */
+#define S_321  321   /*  UNIT HIT ON OURSELVES. */
+#define S_322  322   /* PLASMA BOLT DETONATES. */
+#define S_323  323   /* PLASMA BOLT SHIELD RAISED. */
+#define S_324  324   /* SECTOR TO FIRE AT:  */
+#define S_325  325   /* THE BOLT FAILS TO DETONATE. */
 
 #endif

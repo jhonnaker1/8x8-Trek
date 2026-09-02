@@ -33,14 +33,26 @@ static void check_eq(long got, long want, const char *what) {
  * the expected values below are written out by hand, so a cast-based
  * implementation fails here on x86 and arm just as it would on a 68000. */
 static void test_byte_order(void) {
-    uint8_t buf[TREK_SAVE_SIZE];
+    /* SIZED WITH SLACK, DELIBERATELY. If the record has outgrown
+       TREK_SAVE_SIZE, a buffer sized by the constant is smashed by the write
+       itself and this program aborts with nothing on screen at all -- which
+       happened on 2026-08-26 (PLANET_MAX) and again on 2026-09-02 (one byte
+       of plasma_shield), five days and one identical debugging session apart.
+       The slack lets the write land so the check below can print the real
+       number instead of the process dying. */
+    uint8_t buf[TREK_SAVE_SIZE + 256];
     uint16_t n;
 
     trek_new_game(3, 12345);
     ship.energy   = 0x1234;
     ship.stardate = 0xABCD;
 
-    n = trek_state_save(buf, sizeof buf);
+    n = trek_state_save(buf, TREK_SAVE_SIZE + 256);
+    if (n != TREK_SAVE_SIZE) {
+        printf("  the record is %u bytes and TREK_SAVE_SIZE is %u -- set it to "
+               "%u in core/serial.h\n",
+               (unsigned)n, (unsigned)TREK_SAVE_SIZE, (unsigned)n);
+    }
     check_eq(n, TREK_SAVE_SIZE, "save writes exactly TREK_SAVE_SIZE bytes");
 
     check_eq(buf[0], 'E', "magic byte 0");

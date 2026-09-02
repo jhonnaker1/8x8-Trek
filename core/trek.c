@@ -26,6 +26,9 @@ uint8_t  hole_threw;
 uint8_t  bolt_cell = QUAD_CELLS;
 uint8_t  bolt_quad;
 uint16_t nova_kills;
+/* [0x26E1]. Raised by USE and cleared by nothing but a new game -- fn 0x97D7
+   sets it and the initialiser at 0x027BB2 is the only other write. */
+uint8_t plasma_shield;
 uint8_t sector[QUAD_CELLS];
 uint16_t enemy_hp[QUAD_CELLS];
 Ship    ship;
@@ -388,6 +391,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.stars_gone   = 0;
+    plasma_shield     = 0;
     ship.wear_last    = STARDATE_START;
     ship.lost_how     = LOSS_NONE;
     ship.casualties   = 0;
@@ -2331,15 +2335,16 @@ static void run_bolt(TrekEvent *ev, uint8_t *n, uint8_t max) {
     bolt_cell = QUAD_CELLS;          /* it goes off exactly once, either way */
 
     /* THE PLASMA BOLT SHIELD stops it dead -- [0x26E1], the captured item.
-       This core has the item (ITEM_PLASMA_SHIELD) but nothing that arms it,
-       so the test is written and always false for now; see planet.h.
+       LIVE since 2026-09-02: USE raises it (trek_plasma_bolt's neighbour in
+       main.c) and nothing lowers it.
 
        HOW IT WORKS, read 2026-09-02: fn 0x97D7 is the whole of USE-shield --
        print "Raising plasma bolt shield...", set the byte, return -- and
        NOTHING clears it but a new game. It is not a charge that absorbs one
        hit; raise it once and you are immune for the rest of the game, to your
        OWN bolts as well (0x009641 tests it before measuring your bolt against
-       your own sector). Buildable now; see MEASURED.md. */
+       your own sector). See MEASURED.md. */
+    if (plasma_shield) return;
 
     /* (8 - d) in 8.8, so nothing past eight sectors. */
     reach = (uint16_t)(BOLT_REACH << 8);
@@ -2359,6 +2364,72 @@ static void run_bolt(TrekEvent *ev, uint8_t *n, uint8_t max) {
 
     if (*n < max) { ev[*n].kind = EV_BOLT_HIT; ev[*n].y = by; ev[*n].x = bx;
                     ev[*n].amount = dmg; (*n)++; }
+}
+
+/* THE PLAYER FIRES A PLASMA BOLT -- fn 0x09563. See trek.h for the read.
+ *
+ * The caller has already spent the item: the original decrements it at
+ * 0x0095A1, BEFORE the dud roll, so a bolt that fails to detonate is gone
+ * just the same. Doing that here would put the inventory in two places.
+ *
+ * `killed` counts what it destroyed, `self_hit` is what it did to us, and the
+ * return says whether it went off at all. */
+uint8_t trek_plasma_bolt(uint8_t ty, uint8_t tx,
+                         uint8_t *killed, uint16_t *self_hit)
+{
+    uint8_t cell;
+
+    if (killed)   *killed = 0;
+    if (self_hit) *self_hit = 0;
+
+    if (trek_rand_n(PBOLT_DUD_OF_N) == 0) return PBOLT_DUD;
+
+    /* Every enemy in the quadrant, nearest or not. THE DISTANCE IS SQUARED
+       AND THE SQUARE IS ALL WE NEED -- dy*dy + dx*dx is exactly d^2, so no
+       root is taken and nothing leaves sixteen bits: the worst case is
+       7*7 + 7*7 = 98.
+
+       Round(1000/sq) as (2*1000 + sq) / (2*sq), which is TP's round-half-up
+       without a division remainder to inspect. sq is at most 98, so the
+       numerator is at most 2098. */
+    for (cell = 0; cell < QUAD_CELLS; cell++) {
+        uint16_t dy, dx, sq, dmg;
+        if (!SEC_IS_ENEMY(sector[cell])) continue;
+
+        dy = abs_diff((uint8_t)(cell >> 3), ty);
+        dx = abs_diff((uint8_t)(cell & 7),  tx);
+        sq = (uint16_t)(dy * dy + dx * dx);
+
+        dmg = sq ? (uint16_t)((2u * PBOLT_BURST + sq) / (2u * sq))
+                 : PBOLT_POINT_BLANK;
+
+        if (enemy_hp[cell] > dmg) enemy_hp[cell] = (uint16_t)(enemy_hp[cell] - dmg);
+        else {
+            kill_enemy(cell);
+            if (killed && *killed < 255) (*killed)++;
+        }
+    }
+
+    /* AND THEN US, unless the captured shield is up. This half is the ENEMY
+       bolt's law rather than the inverse square -- see run_bolt() above, which
+       computes the identical expression for a bolt fired AT us. */
+    if (!plasma_shield) {
+        uint16_t reach = (uint16_t)(BOLT_REACH << 8);
+        uint16_t d = trek_dist(abs_diff(ty, ship.sec_y),
+                               abs_diff(tx, ship.sec_x));
+        if (d < reach) {
+            uint16_t dmg = scale_256((uint16_t)(reach - d),
+                                     (uint16_t)(BOLT_DMG_BASE
+                                                + trek_rand_n(BOLT_DMG_SPAN)));
+            /* Below 200 it does nothing at all -- `jae` at 0x0096C4. */
+            if (dmg >= PBOLT_SELF_FLOOR) {
+                ship.shields = (uint16_t)(ship.shields > dmg
+                                          ? ship.shields - dmg : 0);
+                if (self_hit) *self_hit = dmg;
+            }
+        }
+    }
+    return PBOLT_FIRED;
 }
 
 uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {

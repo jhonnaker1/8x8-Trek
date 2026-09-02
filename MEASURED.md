@@ -7484,3 +7484,60 @@ The ORBIT capture caught the MAIN VIEWER showing **ARRAY MONITOR 504** with its
 ONLINE rows -- one of the ten instrument pages read this morning, drawn on a
 turn nobody asked for it. That is the `Random(10)` selection working, seen
 rather than inferred.
+
+## The player's plasma bolt, and it is two laws (2026-09-02)
+
+`fn 0x09563`, USE item 2. Not the weapon the enemy fires at you, and the same
+routine uses a different law for each half.
+
+    0x0095A1   the item is spent FIRST, before anything can go wrong
+    0x0095D7   Random(3) == 0  ->  "Plasma bolt failed to detonate." and done
+    0x009617   fn 0x01EB48(1000, x, y): EVERY enemy slot, five of them
+                   damage = Round(1000 / d^2)      ; burst to that enemy
+                   hp -= damage; at <= 0 it is killed (0x01EC72)
+    0x009641   unless [0x26E1], the captured SHIELD:
+    0x009689       self = (90 + Random(10)) * (8 - d)   ; burst to US
+    0x0096C4       if (self >= 200.0) the shield charge takes it
+
+### The enemy law needs no square root, and the original's own source says so
+
+fn 0x01EB48 computes `sqr(sqrt(sqr(dx) + sqr(dy)))` -- Pascal that squares the
+distance it has just taken the root of. `0x02C3BF` is **Sqr**, identified from
+EIGHT sites that pair it twice immediately before the sqrt at `0x2692:0x0D6C`
+(009F77/009F8A->009F97, 00BD7A/00BD92->00BD9F, 00CC90/00CCA4->00CCB1, and five
+more). The sqrt itself was pinned independently at 0x0165EF, where MEASURED.md
+already has `d = sqrt(dy^2 + dx^2)` for the enemy bolt.
+
+So `d^2` is exactly `dy*dy + dx*dx` in integers, and this port does the
+arithmetic the original MEANT rather than the arithmetic it wrote -- no root,
+no fixed point, nothing outside sixteen bits (the worst case is 7*7 + 7*7).
+
+### A direct hit is 4000
+
+At zero range the original substitutes **0.5** for the distance -- `cx=0x0080`
+at 0x01EBE3, reached only when both differences compare equal to zero. It is
+the divide-by-zero guard, and it makes a point-blank burst 1000/0.25.
+
+    d^2   1     2    4    9    16   25
+    dmg   1000  500  250  111  63   40
+
+Savage inside two sectors and nearly nothing past four.
+
+### The self-damage is the OTHER law, with a floor
+
+Not the inverse square: `(90 + Random(10)) * (8 - d)`, the same expression
+`run_bolt()` already computes for a bolt fired AT us, and then `jae` against
+**200.0** at 0x0096C4. So there are two ways for your own bolt to miss you --
+past eight sectors it is out of reach, and inside that it can still fall under
+200 (at d = 7.07 the figure is 84 to 92). **They are different rules and a test
+that only fires out of range cannot see the floor**; deleting the floor failed
+nothing here until a case at d = 7.07 was added.
+
+Fired into your own sector with no shield it is 720 to 792 off the charge.
+
+### The shield is raised once and never spent
+
+fn 0x97D7 is the whole of USE-shield: print, set `[0x26E1]`, return. Both bolt
+paths test it. It is saved with the game (v18) -- a restore that forgot it
+would quietly re-expose a ship the player had made safe, and nothing on the
+console shows the flag.

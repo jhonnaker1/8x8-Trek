@@ -37,9 +37,15 @@ static uint16_t get16(void) {
 
    A negative array size is the portable way to fail a build on a constant,
    and it fails at the right moment: change PLANET_MAX and this stops
-   compiling until TREK_SAVE_SIZE is brought along. Everything else in the
-   record is fixed-size, so 518 is all of it. */
-#define SAVE_FIXED_BYTES 505
+   compiling until TREK_SAVE_SIZE is brought along.
+
+   WHAT IT DOES NOT CATCH, learned 2026-09-02: adding a FIELD. The assertion
+   ties TREK_SAVE_SIZE to PLANET_MAX, so a record that grows by one byte with
+   both constants untouched still passes it and still smashes the buffer. This
+   number has to move by hand with the field list below -- 505 -> 506 for the
+   plasma bolt shield -- and test_serial now reports the real length instead of
+   aborting when it does not. */
+#define SAVE_FIXED_BYTES 506
 typedef char save_size_tracks_planet_max[
     (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
@@ -80,7 +86,13 @@ typedef char save_size_tracks_planet_max[
    lands RESIDENT -- 236 bytes of it, which was more than the packing saved.
    Their only callers are trek_state_save and trek_state_load, and both reach
    this file only from OVL_FRONT. Off-target the macro is empty. */
-OVL_CODE("front") static void put_bits(const uint8_t *a) {          /* 64 flags -> 8 bytes */
+/* RESIDENT AGAIN as of 2026-09-02. They were put in OVL_FRONT because they did
+   not inline; the plasma bolt shield then added one byte to the record, the
+   code around it grew 32, and front had exactly nothing left. Resident had 841
+   free and these two are a fraction of that -- the cheaper side to spend from,
+   and the window that grows every time the save record does is the wrong one
+   to keep filling. */
+static void put_bits(const uint8_t *a) {                            /* 64 flags -> 8 bytes */
     uint8_t i, b;
     for (i = 0; i < GAL_CELLS; i += 8) {
         b = 0;
@@ -88,7 +100,7 @@ OVL_CODE("front") static void put_bits(const uint8_t *a) {          /* 64 flags 
         put8(b);
     }
 }
-OVL_CODE("front") static void get_bits(uint8_t *a) {
+static void get_bits(uint8_t *a) {
     uint8_t i, b;
     for (i = 0; i < GAL_CELLS; i += 8) {
         b = get8();
@@ -191,6 +203,10 @@ uint16_t trek_state_save(uint8_t *buf, uint16_t max) {
     }
     for (i = 0; i < ITEM_COUNT; i++) put8(inventory[i]);
     put16(planet_evac_end);
+    /* v18: the plasma bolt shield. It is raised once and never lowered, so a
+       restore that forgot it would quietly re-expose a ship the player had
+       already made safe -- and nothing on the console shows the flag. */
+    put8(plasma_shield);
 
     return pos;
 }
@@ -253,6 +269,7 @@ uint8_t trek_state_load(const uint8_t *buf, uint16_t len) {
     }
     for (i = 0; i < ITEM_COUNT; i++) inventory[i] = get8();
     planet_evac_end = get16();
+    plasma_shield   = get8();
 
     return 1;
 }

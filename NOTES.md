@@ -5592,8 +5592,10 @@ unread list with the disassembler". What each one turned into:
     day, committed while cataloguing it.
   * ~~the SPY event~~ **DONE 2026-09-02** -- `run_spy()`, five BINARY
     constants, `EV_SPY`, and a SECURITY line in the port's own words.
-  * the plasma bolt as a USE weapon: the 1-in-3 dud, the enemy falloff, the
-    self-damage, and the shield that stops all of it
+  * ~~the plasma bolt as a USE weapon~~ **DONE 2026-09-02** -- the 1-in-3 dud,
+    the inverse-square enemy falloff, the self-damage under its own separate
+    law, and the shield. See MEASURED.md and "The overlay budget ran out"
+    below.
   * **the enemy's first turn after a restore.** `[0x1F31]` is the answer to
     **"Restore a saved game <Y/N>?"** (CS:0x4448, base confirmed on THIRTEEN
     references), and it is THE RESTORED-GAME FLAG -- it skips galaxy
@@ -5750,3 +5752,48 @@ That was not the tests being blind: `make` had not rebuilt on a sub-second
 mtime change, so all three ran against the first break's binary. `rm -f
 build/test_trek` before each run, not `touch`. **Identical output from
 different breaks is a build smell, not a test result.**
+
+## The overlay budget ran out, and what it cost (2026-09-02)
+
+The plasma bolt is the first feature that did not fit anywhere. Adding it broke
+the link three ways, and each fix is worth recording because the next feature
+will hit the same wall.
+
+**OVL_PLANET overflowed by 745.** The bolt is a second dialog inside `do_use()`,
+and planet already held ORBIT, LAND, USE and the PLANET LIST report. Moving
+`ui_planet_list` to OVL_INFO recovered 547 -- still 198 short.
+
+**The fix was not a bigger window, it was the port's own idiom.** `do_use()`
+now RETURNS a request (`USE_WANT_BOLT`) and the resident command loop does the
+overlay switch and calls `do_plasma_bolt()`. `do_use()` could not do it itself:
+a function inside an overlay that calls `ovl_load` pulls the ground out from
+under its own return address, which `make verify` fails on. This is the same
+shape as `do_fix()` returning tenths for main to spend.
+
+**Then OVL_CMDS overflowed by 214**, because the bolt is 1,110 bytes and cmds
+had 896 free. HAIL moved to OVL_MSGS -- three replies of prose, and msgs is
+where the prose lives.
+
+**And OVL_FRONT overflowed by 32**, which had nothing to do with the bolt: the
+save record grew one byte for the shield and the code around it grew 32.
+`put_bits`/`get_bits` went back to RESIDENT, which had 841 free. The window
+that grows every time the save record does is the wrong one to keep filling.
+
+    eval 3643  hof 2100  front 3892  info 2863  repair 3154
+    msgs 3545  planet 3312  cmds 3508  title 1129  events 2436
+
+Resident free 580, save v18 at 601 bytes. **OVL_TITLE is the only window with
+real room left** -- 2,967 free -- and it is the one nothing during play can
+use. The next feature that needs a window needs an eleventh.
+
+### The save record grew and test_serial ABORTED with no message
+
+For the second time, five days after the first. `TREK_SAVE_SIZE` is checked
+against `SAVE_FIXED_BYTES + 5 * PLANET_MAX` by a negative-array-size assertion
+-- which catches PLANET_MAX moving and does NOT catch a FIELD being added,
+because both constants stay put and the record simply outgrows the buffer.
+`test_serial` then smashes its own stack and the process dies silently.
+
+Two changes so the third time reports instead of crashing: the test's buffer is
+now `TREK_SAVE_SIZE + 256`, so the write lands, and it prints the real length
+and the number to set. The header says which constant to move by hand.

@@ -44,12 +44,18 @@
    test_serial aborted. Six bytes per planet slot -- if PLANET_MAX moves, this
    moves with it. See "when a constant changes, re-read everything derived
    from it". */
-#define TREK_SAVE_SIZE  600
+/* AND IT IS ALSO A FUNCTION OF EVERY FIELD. It went 600 -> 601 on 2026-09-02
+   for one byte of plasma_shield, and forgetting THAT shipped the same crash
+   the paragraph above describes, in the same way, five days later. The
+   overrun is a stack smash inside test_serial, which aborts with no message
+   at all -- so test_serial now checks the returned length against this and
+   says the number, before it writes anything. */
+#define TREK_SAVE_SIZE  601
 
 /* Bumped whenever the layout changes. A load of an older version is refused
    rather than misread -- there is no upgrade path and a half-read galaxy is
    worse than no galaxy. */
-#define TREK_SAVE_VERSION 17
+#define TREK_SAVE_VERSION 18
 
 /* Bytes written, or 0 if `max` was too small. */
 uint16_t trek_state_save(uint8_t *buf, uint16_t max);
