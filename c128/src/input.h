@@ -40,10 +40,29 @@
 #define KB_ESC    27
 #define KB_DELETE 20
 #define KB_SPACE  32
+/* THE UNSHIFTED PUNCTUATION, added 2026-09-02, and for the same reason as the
+   nine letters below: this table held a comma and a full stop because two
+   parsers needed them -- "1.5" stardates and nothing else -- and a player
+   typing a NAME into a free-text field found the rest of the keyboard dead.
+   JEAN-LUC and TREK-1 could not be typed.
+
+   All eight are their own keys on the C128 and need no shift decoding. VICE's
+   keymap marks +, :, @ and * with flag 16, "deshift", which means the HOST
+   needs shift for them and the emulated machine does not -- exactly the ones
+   that would look like they needed shift logic and do not. The apostrophe
+   genuinely does (SHIFT+7) and is therefore NOT here. */
+#define KB_STAR   42
+#define KB_PLUS   43
 #define KB_COMMA  44
+#define KB_MINUS  45
 #define KB_PERIOD 46
+#define KB_SLASH  47
 #define KB_DIGIT0 48
 #define KB_DIGIT9 57
+#define KB_COLON  58
+#define KB_SEMI   59
+#define KB_EQUALS 61
+#define KB_AT     64
 /* THE NINE LETTERS THAT ARE NOT COMMANDS, added 2026-08-29. Until then this
    table held only the seventeen letters some command needed, which was fine
    for the command line and wrong for every FREE-TEXT field: the self-destruct

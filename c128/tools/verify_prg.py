@@ -721,6 +721,75 @@ def evaluate(expr, consts):
     return eval(resolved, {"__builtins__": {}})  # noqa: S307 - digits only
 
 
+def check_keyboard_covers(rows, consts):
+    """THE KEYBOARD MUST SPELL EVERYTHING THE PROGRAM ASKS FOR.
+
+    The key table held only the seventeen letters some command needed until
+    2026-08-29, and Jamie -- who had set the self-destruct password to JAMIE --
+    could type neither the J nor the I. The table passed every check there was,
+    because every check was driven by COMMANDS and the commands were exactly
+    what it could spell. A keyboard that can only type the words the program
+    already knows is not a keyboard, and nothing noticed.
+
+    So: take the characters the matrix can actually produce, and require that
+    they cover every command word the dispatcher matches and every default the
+    port puts in a field the player may have to retype or edit -- SAVE_DEFAULT
+    is one, and it is the reason the full stop is in the table at all.
+
+    BE CLEAR ABOUT WHAT IT CANNOT DO. Deleting KB_I makes it fail on HAIL and
+    INFO; deleting KB_J fails NOTHING, because no command word has a J in it.
+    Free text cannot be bounded from the source -- a captain may be called
+    anything -- so this check would have caught half of the bug that prompted
+    it and no more. What actually protects a password is the table holding the
+    whole alphabet, and the letters line printed above this one is what says
+    so. Both were confirmed by deletion.
+    """
+    have = set()
+    for _, _, ch_expr in rows:
+        ch = evaluate(ch_expr, consts)
+        if 32 <= ch < 127:
+            have.add(chr(ch))
+
+    # The cursor keys are on a different matrix and a different strobe
+    # (extkeys[] in input.c), so their KB_ values are deliberately outside
+    # printable ASCII and are not this check's business.
+    for m in re.finditer(r'\{\s*\d+\s*,\s*\d+\s*,\s*(KB_\w+)\s*\}',
+                         _strip_comments(SRC.read_text())):
+        v = consts.get(m.group(1))
+        if v is not None and 32 <= v < 127:
+            have.add(chr(v))
+
+    wanted = {}
+    src = _strip_comments((C128 / "src" / "main.c").read_text())
+    for m in re.finditer(r'word_is\(\s*\w+\s*,\s*"([^"]*)"', src):
+        wanted.setdefault(m.group(1), "a command word")
+    # THE SINGLE-KEY COMMANDS TOO -- twelve commands are words and thirteen
+    # are one keystroke, and a check that saw only the words would have missed
+    # more than half the dispatcher. This is the half the JAMIE bug lived in.
+    for m in re.finditer(r'\bc\s*==\s*(KB_\w+)', src):
+        v = consts.get(m.group(1))
+        if v is not None and 32 <= v < 127:
+            wanted.setdefault(chr(v), "the %s command key" % m.group(1))
+    ui = _strip_comments((C128 / "src" / "ui.c").read_text())
+    for m in re.finditer(r'#define\s+SAVE_DEFAULT\s+"([^"]*)"', ui):
+        wanted.setdefault(m.group(1), "SAVE_DEFAULT")
+
+    if not wanted:
+        die("check_keyboard_covers found nothing to check -- the source "
+            "moved and this check went quietly blind")
+
+    bad = []
+    for text, why in sorted(wanted.items()):
+        missing = sorted({c for c in text.upper() if c not in have})
+        if missing:
+            bad.append((text, why, "".join(missing)))
+    if bad:
+        die("the key table cannot type these:\n" + "\n".join(
+            "         %r (%s) needs %s" % b for b in bad))
+    print("verify: the keyboard can type all %d command words and defaults -- ok"
+          % len(wanted))
+
+
 def main():
     # An explicit path is accepted so the byte-level detection below can be
     # exercised against a deliberately corrupted copy. A check that has only
@@ -766,6 +835,7 @@ def main():
 
     print(f"verify: {len(rows)} keys, {len(letters)} letters "
           f"({', '.join(n for n, _ in letters)})")
+    check_keyboard_covers(rows, consts)
 
     if at >= 0:
         print(f"verify: key table found as ASCII at 0x{at:04x} -- ok")

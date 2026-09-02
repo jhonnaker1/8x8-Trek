@@ -2804,6 +2804,31 @@ rule** -- "ui_confirm() draws in the COMMAND panel" matches a call perfectly.
 `_strip_comments()` came out of that: a source check that reads prose is
 checking the wrong text.
 
+#### The rest of the keyboard (2026-09-02)
+
+The key table carried a comma and a full stop because two parsers needed them
+-- "1.5" stardates, and nothing else -- and that was the whole of its
+punctuation. The eight unshifted punctuation keys are in it now: `- + * / : ;
+= @`, rows and columns from `gtk3_sym.vkm` like everything else there. Four of
+them (`+ : @ *`) carry the keymap's flag 16, "deshift", which means the HOST
+needs shift and the C128 does not -- precisely the ones that look like they
+want shift decoding and do not. **Confirmed on the machine, not reasoned:
+JEAN-LUC*+:@ and then ;=/ typed into the name field.** The apostrophe really
+is SHIFT+7 and is therefore not there.
+
+`check_keyboard_covers()` is the check that follows: the characters the matrix
+can produce must cover every command word the dispatcher matches -- the twelve
+`word_is()` words AND the thirteen single-key ones, which is the half a
+words-only check would have missed -- plus `SAVE_DEFAULT`, which is the reason
+the full stop was ever added.
+
+**It is worth being exact about what it does not do.** Deleting `KB_I` fails
+it on HAIL and INFO. Deleting `KB_J` fails NOTHING, because no command word has
+a J in it -- so this check would have caught half of the JAMIE bug and no more.
+Free text cannot be bounded from the source. What protects a password is the
+table holding the whole alphabet, and the letters line printed above it is what
+reports that. Both confirmed by deletion.
+
 ### 11. Briefing pages -- CAPTURED 2026-08-21
 
 All fifteen pages are captured to `reference/shots/b*.png`. Contents worth

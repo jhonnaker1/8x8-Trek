@@ -73,6 +73,15 @@ static const Key keys[] = {
     { 3, 0, KB_DIGIT0 + 7 }, { 3, 3, KB_DIGIT0 + 8 },
     { 4, 0, KB_DIGIT0 + 9 }, { 4, 3, KB_DIGIT0 },
     { 5, 4, KB_PERIOD }, { 5, 7, KB_COMMA }, { 7, 4, KB_SPACE },
+    /* The rest of the unshifted punctuation, added 2026-09-02. Rows and
+       columns from gtk3_sym.vkm like everything else here; the four the
+       keymap flags 16 (+ : @ *) are "deshift" -- shifted on the HOST
+       keyboard, plain keys on the C128 -- so none of these needs shift
+       decoding. See input.h for why a keyboard that can only spell the words
+       the program already knows is not a keyboard. */
+    { 5, 3, KB_MINUS }, { 5, 0, KB_PLUS },   { 5, 5, KB_COLON },
+    { 5, 6, KB_AT },    { 6, 1, KB_STAR },   { 6, 2, KB_SEMI },
+    { 6, 5, KB_EQUALS }, { 6, 7, KB_SLASH },
 };
 
 #define KEY_COUNT (sizeof keys / sizeof keys[0])
