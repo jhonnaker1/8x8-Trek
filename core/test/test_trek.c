@@ -2777,6 +2777,128 @@ static void test_torpedo(void) {
         }
     }
 
+    /* --- REINFORCEMENTS, fn 0x015A4C: level 5 only, column 1 always --- */
+    {
+        int i;
+        uint8_t lv, c, seen, col_wrong = 0, found = 0;
+        TrekEvent ev3[8];
+        uint8_t n3, j;
+
+        /* BELOW LEVEL 5 THE SLOT IS NEVER SET. This is the discriminator for
+           the level gate: a build that scheduled it for everyone passes every
+           other assertion here. */
+        seen = 0;
+        for (lv = 1; lv <= 4; lv++) {
+            trek_new_game(lv, (uint16_t)(8000 + lv));
+            if (trek_is_scheduled(SCHED_REINFORCE)) seen++;
+        }
+        ok(seen == 0, "below command level 5 no reinforcements are scheduled");
+
+        trek_new_game(5, 8100);
+        ok(trek_is_scheduled(SCHED_REINFORCE),
+           "at level 5 they are, and the first check is 12 to 17 days out");
+        ok(trek_scheduled(SCHED_REINFORCE) >= STARDATE_START + 120
+           && trek_scheduled(SCHED_REINFORCE) <= STARDATE_START + 170,
+           "3512 + Random*5, as the reals say");
+
+        /* AND THEY ARRIVE IN COLUMN 1, whatever else is empty. Every other
+           column is emptied too, so a build that picked the first empty
+           quadrant anywhere would land outside column 0 and fail. */
+        for (i = 0; i < 40; i++) {
+            trek_new_game(5, (uint16_t)(8200 + i));
+            for (c = 0; c < GAL_CELLS; c++) { gal_enemies[c] = 0; gal_nova[c] = 0; }
+            trek_schedule(SCHED_REINFORCE, 1);
+            n3 = trek_advance(20, ev3, 8);
+            for (j = 0; j < n3; j++)
+                if (ev3[j].kind == EV_REINFORCE) {
+                    found++;
+                    if (ev3[j].x != REINF_COLUMN) col_wrong++;
+                    if (gal_enemies[(ev3[j].y << 3) | ev3[j].x] < 2
+                        || gal_enemies[(ev3[j].y << 3) | ev3[j].x] > 5) col_wrong++;
+                }
+        }
+        ok(found == 40, "the slot fires when its date passes");
+        ok(col_wrong == 0, "always in column 1, and two to five ships");
+        ok(trek_is_scheduled(SCHED_REINFORCE), "and it reschedules itself");
+
+        /* Nowhere to put them: still rescheduled, nothing reported. */
+        trek_new_game(5, 8300);
+        for (c = 0; c < GAL_CELLS; c++) gal_enemies[c] = 1;
+        trek_schedule(SCHED_REINFORCE, 1);
+        n3 = trek_advance(20, ev3, 8);
+        for (j = 0, seen = 0; j < n3; j++)
+            if (ev3[j].kind == EV_REINFORCE) seen = 1;
+        ok(!seen, "with column 1 full nothing arrives");
+        ok(trek_is_scheduled(SCHED_REINFORCE), "but the check is still rebooked");
+    }
+
+    /* --- WEAR AND TEAR, fn 0x0213F3 --- */
+    {
+        int i;
+        uint8_t j, broke, worst;
+        TrekEvent ev4[8];
+        uint8_t n4;
+
+        /* NOTHING BREAKS IN THE FIRST THREE DAYS. */
+        broke = 0;
+        for (i = 0; i < 300; i++) {
+            trek_new_game(3, (uint16_t)(8400 + i));
+            ship.stardate = 35029;                 /* 3502.9, just inside */
+            n4 = trek_advance(0, ev4, 8);
+            for (j = 0; j < n4; j++) if (ev4[j].kind == EV_WEAR) broke++;
+        }
+        ok(broke == 0, "nothing wears out before stardate 3503");
+
+        /* AND NEVER AT COMMAND LEVEL 1. */
+        broke = 0;
+        for (i = 0; i < 300; i++) {
+            trek_new_game(1, (uint16_t)(8700 + i));
+            ship.stardate = 35600;
+            ship.wear_last = STARDATE_START;
+            n4 = trek_advance(0, ev4, 8);
+            for (j = 0; j < n4; j++) if (ev4[j].kind == EV_WEAR) broke++;
+        }
+        ok(broke == 0, "and never at command level 1");
+
+        /* A PERFECT SHIP, LATE, AT LEVEL 3: something does break, and it is
+           one of the first six. */
+        broke = 0; worst = 0;
+        for (i = 0; i < 400; i++) {
+            trek_new_game(3, (uint16_t)(9000 + i));
+            ship.stardate = 35600;
+            ship.wear_last = STARDATE_START;
+            n4 = trek_advance(0, ev4, 8);
+            for (j = 0; j < n4; j++)
+                if (ev4[j].kind == EV_WEAR) {
+                    broke++;
+                    if (ev4[j].amount > 5) worst++;   /* outside the first six */
+                }
+        }
+        ok(broke > 0, "a perfect ship does break down eventually");
+        ok(worst == 0, "and only ever one of the first six systems");
+
+        /* THE 95% TEST, and it is the interesting half: damage something and
+           the game stops inventing NEW faults -- only the converter can go. */
+        broke = 0; worst = 0;
+        for (i = 0; i < 400; i++) {
+            trek_new_game(3, (uint16_t)(9500 + i));
+            /* A SMALL e, deliberately: e = (level+3) * elapsed, so a long gap
+               since the last breakdown makes the first branch a certainty and
+               the converter branch unreachable. One stardate gives e = 6. */
+            ship.stardate  = 35100;
+            ship.wear_last = 35090;
+            ship.sys[SYS_SHUTTLE] = 20;            /* average now well under 95 */
+            n4 = trek_advance(0, ev4, 8);
+            for (j = 0; j < n4; j++)
+                if (ev4[j].kind == EV_WEAR) {
+                    broke++;
+                    if (ev4[j].amount != SYS_CONVERTER) worst++;
+                }
+        }
+        ok(worst == 0, "a ship already damaged only ever loses the converter");
+        ok(broke > 0, "and it still loses it sometimes");
+    }
+
     /* --- WARP STRAIN: speed AND distance, fn 0x0C609 at 0x0D623 --- */
     {
         int i;

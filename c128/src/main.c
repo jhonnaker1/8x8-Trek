@@ -1359,6 +1359,25 @@ OVL_CODE("msgs") static void report_rare_event(const TrekEvent *e, uint8_t *sfx)
             linebuf[k] = 0;
             ui_message(S(S_166), linebuf);
             return;
+        case EV_REINFORCE:
+            /* "Mongol reinforcements are reported in quadrant N-1." Always
+               column 1 -- see core/trek.h, four places agree. */
+            k  = put_str(linebuf, S(S_305));
+            k += put_quad(linebuf + k, e->y, e->x);
+            linebuf[k++] = '.';
+            linebuf[k] = 0;
+            ui_message(S(S_166), linebuf);
+            return;
+        case EV_WEAR:
+            /* Nothing shot at us; it simply broke. `amount` is the system. */
+            k  = put_str(linebuf, ui_sys_name((uint8_t)e->amount));
+            k += put_str(linebuf + k, S(S_304));
+            linebuf[k] = 0;
+            /* DAMAGE:, not ENGINEERING: -- the long label leaves 25 columns
+               and ENERGYCONVERTER alone is 15. It is also where every other
+               system-damage line in this port already goes. */
+            ui_message(S(S_167), linebuf);
+            return;
         case EV_BOARDERS_GONE:
             ui_message(S(S_262), S(S_261));
             return;

@@ -388,6 +388,7 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     ship.killed       = 0;
     ship.killed_cmd   = 0;
     ship.stars_gone   = 0;
+    ship.wear_last    = STARDATE_START;
     ship.casualties   = 0;
     ship.lost         = 0;
     for (i = 0; i < SYS_COUNT; i++) ship.sys[i] = 100;
@@ -440,6 +441,12 @@ void trek_new_game(uint8_t level, uint16_t seed) {
     /* The FIRST attack is `stardate + 2 + Random(4)` in the original --
        the integer Random, so it lands on a whole stardate. Later ones use
        the continuous form. Read at 0x0054F4. */
+    /* REINFORCEMENTS ARE A LEVEL 5 MECHANIC and the slot stays at never
+       below it -- 0x005830 sets 9999.0 when level+4 < 9. */
+    if (ship.level >= REINF_LEVEL)
+        trek_schedule(SCHED_REINFORCE,
+                      trek_sched_deviate(REINF_FIRST_TENTHS, REINF_FIRST_SPAN));
+
     trek_schedule(SCHED_DISTRESS,
                   trek_sched_deviate(DISTRESS_AT_TENTHS, DISTRESS_SPAN_TENTHS));
     trek_schedule(SCHED_BASE_ATTACK,
@@ -913,6 +920,31 @@ static uint8_t run_events(uint16_t until, TrekEvent *ev, uint8_t *n, uint8_t max
                 }
                 break;
             }
+            case SCHED_REINFORCE: {
+                /* COLUMN 1 ONLY, and a quadrant with no Mongols in it -- see
+                   trek.h for the four places that agree on the column. */
+                uint8_t r, q, pick = GAL_CELLS, ships;
+                for (r = 0; r < GAL_DIM; r++) {
+                    q = (uint8_t)((r << 3) | REINF_COLUMN);
+                    if (gal_enemies[q] == 0 && !gal_nova[q]) { pick = q; break; }
+                }
+                /* Rescheduled whether or not anywhere was found. */
+                trek_schedule(SCHED_REINFORCE,
+                              trek_sched_deviate(REINF_AGAIN_TENTHS,
+                                                 REINF_AGAIN_SPAN));
+                if (pick >= GAL_CELLS) break;
+                ships = (uint8_t)(REINF_MIN + trek_rand_n(REINF_OF_N));
+                gal_enemies[pick] = ships;
+                ship.enemies_left = (uint16_t)(ship.enemies_left + ships);
+                if (ev && *n < max) {
+                    ev[*n].kind   = EV_REINFORCE;
+                    ev[*n].y      = (uint8_t)(pick >> 3);
+                    ev[*n].x      = (uint8_t)(pick & 7);
+                    ev[*n].amount = ships;
+                    (*n)++;
+                }
+                break;
+            }
             case SCHED_BASE_FALLS: {
                 uint8_t q = base_under_attack;
                 if (q >= GAL_CELLS) break;
@@ -1076,6 +1108,53 @@ uint8_t trek_events_due(void) {
     return 0;
 }
 
+/* WEAR AND TEAR, fn 0x0213F3. See trek.h for the branches and the reals.
+   Per turn, and resident because the ROLL is -- only the report travels. */
+static void run_wear(TrekEvent *ev, uint8_t *n, uint8_t max) {
+    uint16_t e, sum = 0;
+    uint8_t  i, which = SYS_COUNT, roll;
+
+    if (ship.stardate <= WEAR_AFTER_TENTHS) return;
+    if (ship.level < WEAR_MIN_LEVEL) return;
+
+    /* e = Round((level + 3) * elapsed). Both are tenths here and the original
+       works in whole stardates, so the product is divided back down by ten. */
+    e = (uint16_t)(((uint16_t)(ship.level + 3)
+                    * (uint16_t)(ship.stardate - ship.wear_last) + 5u) / 10u);
+    /* THE ORIGINAL COMPARES SIGNED, and e outruns 98 within a few stardates
+       of the last breakdown: `Random(100) > 98 - e` is then always true, not
+       true 99 times in 100. Clamping e and comparing unsigned would leave a
+       roll of 0 falling through to the converter branch for ever. */
+    roll = trek_rand_n(WEAR_ROLL_OF_N);
+    if (e > WEAR_ROLL_A_BELOW || roll > (uint8_t)(WEAR_ROLL_A_BELOW - e)) {
+        /* Only a ship in near-perfect repair invents a new fault. */
+        for (i = 0; i < SYS_COUNT; i++) sum = (uint16_t)(sum + ship.sys[i]);
+        if (sum / SYS_COUNT <= WEAR_AVG_ABOVE) return;
+        which = trek_rand_n(WEAR_PICK_OF_N);
+    } else if (e > WEAR_ROLL_B_BELOW
+               || trek_rand_n(WEAR_ROLL_OF_N)
+                  > (uint8_t)(WEAR_ROLL_B_BELOW - e)) {
+        which = SYS_CONVERTER;
+    } else {
+        return;
+    }
+
+    ship.wear_last = ship.stardate;
+
+    /* 0x020E24: a system already at nothing is left alone. */
+    if (ship.sys[which] == 0) return;
+    {
+        uint8_t loss = (uint8_t)(WEAR_LOSS_MIN + trek_rand_n(WEAR_LOSS_SPAN));
+        ship.sys[which] = (uint8_t)(loss >= ship.sys[which]
+                                    ? 0 : ship.sys[which] - loss);
+    }
+    if (ev && *n < max) {
+        ev[*n].kind = EV_WEAR; ev[*n].y = 0; ev[*n].x = 0;
+        ev[*n].amount = which;
+        (*n)++;
+    }
+}
+
 uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
@@ -1095,6 +1174,7 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     run_nova(ev, &n, max);
     run_pod(ev, &n, max);
     run_mutants(ev, &n, max);
+    run_wear(ev, &n, max);
     return n;
 }
 

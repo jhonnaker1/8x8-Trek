@@ -747,6 +747,7 @@ typedef struct {
        were planets to evacuate. */
     uint16_t rescues;
     uint16_t stars_gone;     /* [0x1DF6] -- stars this ship destroyed */
+    uint16_t wear_last;      /* [0x1D36] -- stardate of the last breakdown */
 } Ship;
 
 extern Ship ship;
@@ -1190,6 +1191,8 @@ uint8_t trek_shields_down(void);
 #define EV_BOLT_FIRED   17   /* y,x = the firing enemy's sector */  /*@ID*/
 #define EV_BOLT_HIT     18   /* amount = the damage; y,x = where it went off */  /*@ID*/
 #define EV_HAIL_REPLY   19   /* y,x = the StarBase that answered */  /*@ID*/
+#define EV_REINFORCE    20   /* y,x = the quadrant; amount = ships */  /*@ID*/
+#define EV_WEAR         21   /* amount = the system index that broke */  /*@ID*/
 #define EV_NOVA         13   /* y,x = the quadrant; amount = Mongols with it */  /*@ID*/
 
 typedef struct {
@@ -1278,7 +1281,8 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max);
    `fn 0x151D0` from the turn loop. */
 #define SCHED_DISTRESS       2   /* DS:0x1D9C */  /*@BINARY*/
 #define SCHED_HAIL           3   /* DS:0x1D78 -- the StarBase's reply */  /*@BINARY*/
-#define SCHED_COUNT          4  /*@ID*/
+#define SCHED_REINFORCE      4   /* DS:0x1D7E -- fn 0x015A4C */  /*@BINARY*/
+#define SCHED_COUNT          5  /*@ID*/
 
 #define SCHED_NEVER     0xFFFFU  /* the original writes the real 9999.0 */  /*@BINARY*/
 
@@ -1877,6 +1881,79 @@ uint8_t trek_run_events(TrekEvent *ev, uint8_t max);
 #define STAR_ABSORB_BELOW  40   /* Random(100) < 40 of the remaining 96% */  /*@BINARY*/
 #define SCORE_PER_STAR     -5   /* "STARS DESTROYED @ -5 EACH" */  /*@CONFIRMED*/
 #define NOVA_HIT_MAX      600   /* Random(600) */  /*@BINARY*/
+
+/* --------------------------------------------------------- REINFORCEMENTS
+ *
+ * `fn 0x015A4C`, segment base 0x150C0, and the whole of it:
+ *
+ *     if (stardate <= [0x1D7E])  return
+ *     find a quadrant in COLUMN 1 with no enemies
+ *     if there is one:
+ *         its galaxy word += (Random(4) + 2) * 100      -- two to five ships
+ *         "Mongol reinforcements are reported in quadrant N-1."
+ *     [0x1D7E] = stardate + 5 + Random*4                -- either way
+ *
+ * TWO THINGS THAT LOOK LIKE BUGS AND ARE NOT.
+ *
+ * ONLY AT COMMAND LEVEL 5. Setup at 0x005830 reads `if ([0x1DF0] < 9)
+ * [0x1D7E] = 9999.0` -- level+4 below nine, so below level five, and the slot
+ * is never for the whole game. At level 5 the first check is scheduled for
+ * 3512 + Random*5.
+ *
+ * AND THEY ALWAYS ARRIVE IN COLUMN 1. The scan walks `0x2562 + 16*i` for
+ * i = 1..8, which is one column of the galaxy array; the write goes to the
+ * same address; the column global is set to the literal 1; and the message
+ * ends in a separate string reading `-1.`, so the text can only ever say
+ * "quadrant N-1". Four independent places agree. Whether Anderson meant it is
+ * not knowable from here, but it is unambiguously what the program does, and
+ * a port that "fixed" it would be a different game. */
+#define REINF_LEVEL           5   /* level 5 alone, 0x005830 */  /*@BINARY*/
+#define REINF_COLUMN          0   /* column 1 as the player counts */  /*@BINARY*/
+#define REINF_FIRST_TENTHS  120   /* 3512.0, and STARDATE_START is 3500 */  /*@BINARY*/
+#define REINF_FIRST_SPAN     50   /* + Random*5 */  /*@BINARY*/
+#define REINF_AGAIN_TENTHS   50   /* + 5 */  /*@BINARY*/
+#define REINF_AGAIN_SPAN     40   /* + Random*4 */  /*@BINARY*/
+#define REINF_MIN             2   /* (Random(4) + 2) ships */  /*@BINARY*/
+#define REINF_OF_N            4  /*@BINARY*/
+
+/* ------------------------------------------------------------ WEAR AND TEAR
+ *
+ * `fn 0x0213F3`, the second call from the turn loop, and a thing that breaks
+ * on a ship nobody has shot at.
+ *
+ *     if (stardate <= 3503.0)  return          ; 0x02140C, the real decodes exact
+ *     if (level + 4 < 6)       return          ; 0x02141E, so level 1 is exempt
+ *     e = Round((level + 3) * (stardate - last_event))   ; 0x021454, 0x021459
+ *
+ *     if (Random(100) > 98 - e)                ; 0x021470
+ *         if (average of all twelve systems > 95)        ; 0x0214BE
+ *             break a random one of the first SIX       ; mode 1
+ *             last_event = stardate
+ *     else if (Random(100) > 97 - e)           ; 0x0214F1
+ *             break the ENERGYCONVERTER                 ; mode 3
+ *             last_event = stardate
+ *
+ * WHAT "BREAK" MEANS, `fn 0x020DCE` at 0x020FA9: `sys[i] -= Random(60) + 10`,
+ * and 0x020E24 returns without doing anything if the system is already at
+ * zero. The mode argument only chooses the index -- 1 is `Random(6)`, 3 is
+ * the converter -- via a helper at 0x01C015 that is a compiler-written loop
+ * computing n-1.
+ *
+ * NOTE WHAT THE 95% TEST DOES: the random breakdown fires only on a ship in
+ * near-perfect repair. Let anything else be broken and the game stops
+ * inventing faults and drops through to the converter check instead.
+ *
+ * AND IT CANNOT TOUCH THE COMPUTER, because mode 1 picks 0..5 and the
+ * computer is 9 -- so wear and tear never erodes the chart. */
+#define WEAR_AFTER_TENTHS  35030  /* 3503.0 */  /*@BINARY*/
+#define WEAR_MIN_LEVEL         2   /* level+4 >= 6 */  /*@BINARY*/
+#define WEAR_ROLL_OF_N       100  /*@BINARY*/
+#define WEAR_ROLL_A_BELOW     98   /* Random(100) > 98 - e */  /*@BINARY*/
+#define WEAR_ROLL_B_BELOW     97   /* Random(100) > 97 - e */  /*@BINARY*/
+#define WEAR_AVG_ABOVE        95   /* the ship must be near perfect */  /*@BINARY*/
+#define WEAR_PICK_OF_N         6   /* Random(6): one of the first six */  /*@BINARY*/
+#define WEAR_LOSS_MIN         10  /*@BINARY*/
+#define WEAR_LOSS_SPAN        60   /* Random(60) + 10 */  /*@BINARY*/
 
 /* ------------------------------------------------------------------ HAIL
  *
