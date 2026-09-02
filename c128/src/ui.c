@@ -1525,9 +1525,14 @@ OVL_CODE("info") void ui_planet_list(void) {
  *   - it costs no turn.
  *
  * Colours are the original's: cyan title and border, magenta StarDate line,
- * green message text, red footer. Note the department colour does NOT carry
- * in here -- COMMUNICATIONS is yellow and DAMAGE REPORT orange on the panel,
- * and both are green in this box. Measured on one of each in one capture.
+ * green message text, red footer. Note the panel colour does NOT carry in
+ * here: the two captured entries were yellow and orange on the panel and both
+ * are green in this box. Measured on one of each in one capture.
+ *
+ * "COMMUNICATIONS is yellow" IS NOT A DEPARTMENT RULE -- read 2026-09-02,
+ * every message site calls SetColor itself and HAIL's COMMUNICATIONS box
+ * samples as EGA 7. The observation here stands (the box flattens whatever the
+ * panel used); the label on it was too general. See dept_color() above.
  *
  * Two deliberate departures, both forced:
  *

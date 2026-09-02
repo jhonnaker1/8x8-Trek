@@ -466,8 +466,11 @@ void trek_new_game(uint8_t level, uint16_t seed) {
 /* -------------------------------------------------------------- movement */
 
 /* The converter supplies ENERGY_PER_DAY per stardate at full repair
-   (manual l.265), so a tenth of a stardate is a tenth of that. Damage is
-   not modelled yet -- there is no damage system. */
+   (manual l.265), so a tenth of a stardate is a tenth of that. ~~Damage is not
+   modelled yet -- there is no damage system.~~ It IS: the gain is scaled by
+   `ship.sys[SYS_CONVERTER]` forty-eight lines below, and has been since
+   2026-08-24. This sentence outlived its own contradiction, in the same file,
+   for nine days. */
 /* The original sheds this in its main loop, once per command -- see trek.h. */
 void trek_turn_end(void) {
     ship.laser_heat = (uint16_t)(ship.laser_heat > LASER_HEAT_COOL_TURN

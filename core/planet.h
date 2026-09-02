@@ -362,12 +362,13 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * So the count is `Random(5) + 2`, and this port shipped 1..10 invented. Two
  * casualties is the floor: a raided landing party ALWAYS loses at least two.
  *
- * The gate is a one-in-five roll, and it is certain as a gate. WHICH case it
- * guards is not yet read -- the block sits between the settlers case and the
- * energium case in a switch over the find, so it is either the Mongol station
- * case (a station raids the party one time in five) or a risk on landings
- * generally. This port keeps it on the Mongol find, where the SCIENCE line
- * puts it, and applies the roll. */
+ * ~~The gate is a one-in-five roll, and it is certain as a gate. WHICH case it
+ * guards is not yet read ... This port keeps it on the Mongol find.~~
+ * **SUPERSEDED THE NEXT DAY -- read the paragraph below, not this one.** It is
+ * a general landing hazard, it replaces the find rather than accompanying it,
+ * and the reasoning above ("the block SITS BETWEEN two cases") is the
+ * order-not-branches mistake in its purest form. Kept as the record of how it
+ * was got wrong. */
 /* THE ATTACK IS A GENERAL LANDING HAZARD, not a Mongol one -- BINARY
  * 2026-08-27, fn 0x0E3A1 at 0x00E435. It is rolled once for every landing
  * that is not the settlement rescue, BEFORE the find is looked at.

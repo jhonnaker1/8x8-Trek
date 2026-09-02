@@ -99,7 +99,7 @@ The C128 port is **feature complete against the original's mechanics**. Every
 constant it uses was read out of the binary or measured against it running:
 
 ```
-BINARY 193   CONFIRMED 15   MEASURED 12   FITTED 0   DERIVED 0   PROVISIONAL 0
+BINARY 203   CONFIRMED 15   MEASURED 12   FITTED 0   DERIVED 0   PROVISIONAL 0
 ```
 
 `make tiers` audits that and fails the build on an unmarked constant. Nothing

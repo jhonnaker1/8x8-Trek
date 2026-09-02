@@ -2787,10 +2787,16 @@ chart panels already are.
 **Entry shape:** one `StarDate: N.N` line, then the message indented one
 character and wrapped to at most three lines. Variable height, 2 to 4 lines.
 
-**Department colour does NOT carry into the overlay.** On the panel,
-COMMUNICATIONS is yellow and DAMAGE REPORT orange. In the overlay both are
-green, with only the `StarDate:` line coloured differently. Measured on an
-entry of each kind in the same capture, so this is not a sampling artefact.
+**Panel colour does NOT carry into the overlay.** The two captured entries were
+yellow and orange on the panel; in the overlay both are green, with only the
+`StarDate:` line coloured differently. Measured on an entry of each kind in the
+same capture, so this is not a sampling artefact.
+
+**But "COMMUNICATIONS is yellow" was too general and is corrected 2026-09-02:**
+there is no department palette -- every message site calls SetColor itself, and
+HAIL's COMMUNICATIONS box samples as EGA 7. See "Message colour is PER SITE".
+What survives here is the real finding: the overlay FLATTENS whatever the panel
+used, whatever that was.
 
 ### A discrepancy left as observed, not explained
 
@@ -3707,9 +3713,9 @@ A spy has been captured aboard the Lexington, but he has damaged the ..."
     print "...he has damaged the " + system_name[idx]
     [0x235A + idx*2] -= 10 + Random(90)      ; 10..99 points off, floored at 0
 
-A mechanic this port has no part of: a spy is caught roughly once in 150
-turns and takes ten to ninety-nine percent off one random system on the way
-out. The `[0x1DF0] > 7` gate still supports V = level + 4 -- a spy only at the
+~~A mechanic this port has no part of~~ **-- BUILT 2026-09-02** (`run_spy()`,
+five BINARY constants, `EV_SPY`): a spy is caught roughly once in 150 turns and
+takes ten to ninety-nine percent off one random system on the way out. The `[0x1DF0] > 7` gate still supports V = level + 4 -- a spy only at the
 top command levels is coherent -- but it says nothing about rescues.
 
 **Where settled planets live is OPEN AGAIN.** The per-quadrant byte at
@@ -4546,7 +4552,8 @@ Two things did come out of it:
 
 - **The shield SYSTEM takes damage when the pool absorbs a big hit** -- to 71%
   on an 795-unit hit that was otherwise fully absorbed, and to 0% twice. That
-  is a mechanic separate from the pool draining, and this port has none of it.
+  is a mechanic separate from the pool draining. ~~this port has none of it~~
+  -- BUILT: `SHIELD_SYS_WEAR_MIN`/`_BASE`/`_DEN` in `trek.c:2131`.
 - **System damage does not need penetration.** One turn damaged the shield
   system with `to_energy` at zero. So the trigger is not simply "something got
   through".
@@ -4593,10 +4600,11 @@ The surviving sheet, after quitting immediately:
       0 Bases hit @ -200 each...........         0
         TOTAL...........................      -300
 
-Two things this port does not have:
+~~Two things this port does not have~~ **-- ONE, and the other is BUILT:**
 
-- **`Rescues @ 200 each`.** That is the scoring end of the distress-signal
-  mechanic -- the manual's feature list says "Successful rescues increase
+- ~~**`Rescues @ 200 each`.**~~ **BUILT** -- `SCORE_PER_RESCUE` 200 and
+  `s->rescue_pts` in `trek.c:2870`, forfeit with the ship. That is the scoring
+  end of the distress-signal mechanic -- the manual's feature list says "Successful rescues increase
   score" and this is the weight. It does NOT appear on the self-destruct
   sheet, so the line set is per-ending.
 - **No `Penalty for loss of ship` line here**, where the self-destruct sheet
@@ -6714,13 +6722,25 @@ pointer write or a block fill that no such search can see. This is exactly the
 shape [[negative-claims-about-egatrek]] warns about, and the one-byte
 experiment named for it cost about four minutes.
 
-**NOT CHANGED YET, deliberately.** This core gates the detonation on
-`pod_here`. Flipping it to "alive" makes the pod a galaxy-wide hazard from
-turn one -- which is what the original does, but the original also lets you
-DESTROY it, and this core has no 'R' sector object to shoot at. Shipping the
-hazard without its counter would be worse than the current approximation. The
-gate flips when the pod becomes a sector object, and that is now the reason to
-build it.
+~~**NOT CHANGED YET, deliberately.** This core gates the detonation on
+`pod_here` ... The gate flips when the pod becomes a sector object, and that is
+now the reason to build it.~~
+
+**IT WAS CHANGED, and this paragraph outlived the change.** Corrected on the
+2026-09-02 sweep. As the code stands:
+
+  * `pod_alive = 1` at `trek.c:422`, set before the first quadrant is built,
+    so the pod IS a galaxy-wide hazard from turn one -- what the original does.
+  * `run_pod()` gates on `if (!pod_alive)` at `trek.c:1089`. There is no
+    `pod_here` gate; the name survives only in a comment calling `[0x26DF]`
+    vestigial.
+  * The pod IS a sector object -- `SEC_POD` placed at `trek.c:225` -- and it
+    can be destroyed: lasers reaching it return `FIRE_KILL` and clear
+    `pod_alive` (`trek.c:1994`), while a torpedo returns `TORP_CLOAKED` and is
+    simply spent, which is what the binary does.
+
+So the hazard and its counter are both here, and the condition this paragraph
+set for making the change had already been met when it was written.
 
 ## THE 0.8 CONFLICT IS SETTLED, and the binary won (2026-08-27)
 

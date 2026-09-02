@@ -1,5 +1,28 @@
 #!/usr/bin/env python3
-"""Check the linked .prg for cc65 character-set translation damage.
+"""Check the linked .prg for the things a test suite structurally cannot see.
+
+WHAT IT CHECKS NOW -- ten checks in this file, not the one it was written for.
+This header described only the key table until 2026-09-02, by which time it was
+doing all of these. (`make verify` prints one more line before them, the lowram
+figure, which the Makefile computes from the map rather than this script.)
+
+    data init         .data really is copied into lowram at startup
+    overlays          ten of them, distinct load addresses, none over 4K
+    message widths    no ui_message() is silently truncated by its panel
+    linebuf           no composed line overruns the buffer it is built in
+    panel widths      ...nor the panel it is drawn into (a different bound)
+    overlay calls     no overlay calls into another overlay's window
+    confirm widths    no ui_confirm() prompt overflows the COMMAND panel
+    dialog widths     no dialog line -- or ask prompt PLUS its input field --
+                      overflows the dialog box
+    confirm placement no ui_confirm() is reached with a dialog open
+    briefing          twelve pages, every one inside 78x22
+    key table         it is ASCII in the binary, and the keyboard can spell
+                      every command word and default the port ships
+
+Each was added because something got through: the widths after a truncated
+message shipped, the placement after a yes/no question drew in the wrong panel
+twice, the keyboard cover after nine letters turned out to be untypable.
 
 Why this exists
 ---------------
@@ -20,8 +43,8 @@ binary tells the truth. Every time it bit, the thing that actually found it
 was grepping the .prg for an expected byte pattern by hand. This makes that a
 build step.
 
-What it checks
---------------
+The key-table check itself
+--------------------------
 The keyboard table must appear in the binary as ASCII. Rather than hardcoding
 bytes -- which would rot the moment a key is added -- the expected sequence is
 derived from input.h and input.c, so this stays honest as the table changes.
