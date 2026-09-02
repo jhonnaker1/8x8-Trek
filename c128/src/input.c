@@ -55,6 +55,13 @@ static const Key keys[] = {
     { 7, 7, KB_ESC },
     /* C)hart and F)ix, both from the reference card. */
     { 2, 4, KB_C }, { 2, 5, KB_F },
+    /* THE REST OF THE ALPHABET, and it is not decoration -- see input.h.
+       Rows and columns transcribed from VICE's own C128 gtk3_sym.vkm, the
+       same authority as every line above and for the same reason: a
+       published matrix table was wrong here once already. */
+    { 3, 4, KB_B }, { 3, 2, KB_G }, { 3, 5, KB_H }, { 4, 1, KB_I },
+    { 4, 2, KB_J }, { 4, 5, KB_K }, { 5, 1, KB_P }, { 3, 7, KB_V },
+    { 1, 4, KB_Z },
     /* A, for A# -- acknowledge a message. */
     { 1, 2, KB_A },
     /* O)rbit, and U for USE. Added 2026-08-26 with the planet chain. LAND

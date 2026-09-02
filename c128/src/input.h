@@ -44,6 +44,23 @@
 #define KB_PERIOD 46
 #define KB_DIGIT0 48
 #define KB_DIGIT9 57
+/* THE NINE LETTERS THAT ARE NOT COMMANDS, added 2026-08-29. Until then this
+   table held only the seventeen letters some command needed, which was fine
+   for the command line and wrong for every FREE-TEXT field: the self-destruct
+   password, the captain's name for the hall of fame, and the save filename.
+   Jamie set the password to JAMIE and could type neither the J nor the I.
+   A keyboard that can only spell the words the program already knows is not
+   a keyboard. */
+#define KB_B      66
+#define KB_G      71
+#define KB_H      72
+#define KB_I      73
+#define KB_J      74
+#define KB_K      75
+#define KB_P      80
+#define KB_V      86
+#define KB_Z      90
+
 #define KB_A      65
 #define KB_C      67
 #define KB_D      68
