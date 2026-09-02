@@ -5551,11 +5551,13 @@ back. **Three of the hits were stale and are now retracted** -- see below.
 2. **The word at `[DS:0x235A + idx*2]`**, which the distress signal drains by
    `10 + Random(90)` and floors at zero. Population or countdown is not read,
    and the two imply different mechanics.
-3. **Where the landing attack roll really lives.** `fn 0x0E3A1` before
-   0x00E49C has not been read. This one is not merely unread -- **the port is
-   known to have it in the wrong branch**: it rolls 1-in-5 on the
-   Mongol-supply world, which in the original runs the capture and nothing
-   else. Recorded 2026-08-27, still not corrected.
+3. ~~**Where the landing attack roll really lives.**~~ **READ AND FIXED
+   2026-09-02** -- and the defect was not the one this entry named. The roll
+   was already in the right place; what was wrong was what happens after it.
+   The attack ends `jmp 0xE4DD`, the common tail, so an ambushed party brings
+   back NOTHING, and both callers spend the find with an unguarded `mod 10`
+   whatever the outcome. See MEASURED.md, "The landing party's attack, read
+   from the branches".
 4. **The plasma bolt's "failed to detonate" branch.**
 5. **Whether a bolt's detonation damages ENEMIES near it.** This file has
    claimed since 2026-08-20 that it "can kill several Mongols at once" and the

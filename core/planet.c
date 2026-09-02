@@ -182,14 +182,13 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
     }
 
     p = &planets[ship.orbiting];
-    if (p->flags & PF_TAKEN) return LAND_ALREADY;
 
     /* SETTLERS FIRST, and they are a property of the planet rather than of
        its find -- exactly one world in a galaxy carries them. A ruined
        settlement has nobody left to take off; the scan still shows it, which
        is what the "destroyed " insert is for. */
     if ((p->flags & PF_SETTLED) && !planet_settlement_lost()) {
-        p->flags = (uint8_t)(p->flags & ~PF_SETTLED);
+        p->flags = (uint8_t)((p->flags & ~PF_SETTLED) | PF_TAKEN);
         ship.rescues++;
         return LAND_SETTLERS;
     }
@@ -200,16 +199,41 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
        Mongol reception, which is when it hurts. */
     if (how == LAND_BY_SHUTTLE) trek_advance_time(2);
 
-    /* The attack, once per landing, before the find is looked at -- 0x00E435.
-       It does NOT return: the original falls straight through to the find
-       test, so a mauled landing party can still come back with something.
-       The caller reports *casualties whatever the outcome code says. */
+    /* THE ATTACK, ROLLED ON EVERY LANDING, AND IT REPLACES THE FIND.
+     *
+     * 0x00E435, before the planet byte is even indexed:
+     *
+     *     Random(5); or ax,ax; jne  ->  4 in 5 skip to the find
+     *     "Landing party attacked..."
+     *     Random(5) + 2             ->  2..6 casualties, added to [0x1DDE]
+     *     jmp 0xE4DD                ->  THE COMMON TAIL, and then `ret`
+     *
+     * That jump is the whole correction. This core read the roll correctly on
+     * 2026-08-27 and then wrote "execution CONTINUES afterwards: you can be
+     * attacked and still come back with something" -- which is exactly what
+     * the jump does not do. 0xE4DD is where the supply capture, the energium
+     * line and "Nothing found." all converge, and fn 0x0E3A1 ends at 0xE4EE.
+     * An attacked party brings back NOTHING.
+     *
+     * ORDER IS NOT CONTROL FLOW, again: the roll sits between the settlers
+     * case and the find cases, and reading it as falling through cost a
+     * mechanic. Read 2026-09-02. */
     if (trek_rand_n(LANDING_ATTACK_OF_N) == 0) {
         lost = (uint16_t)(LANDING_CASUALTY_MIN
                           + trek_rand_n(LANDING_CASUALTY_SPAN));
         ship.casualties = (uint16_t)(ship.casualties + lost);
         if (casualties) *casualties = lost;
+        p->flags |= PF_TAKEN;           /* the caller strips it anyway -- below */
+        return LAND_ATTACKED;
     }
+
+    /* THE FIND IS SPENT WHATEVER HAPPENED, and the check belongs HERE rather
+       than at the top of this function: the original has no "already landed"
+       case at all -- it re-runs the whole routine, attack roll included, and
+       a picked-clean planet simply falls to "Nothing found.". Returning early
+       would make a second landing safe, which it is not. LAND_ALREADY is this
+       port's own message for that state, not a mechanic. */
+    if (p->flags & PF_TAKEN) return LAND_ALREADY;
 
     switch (p->find) {
     case PFIND_ENERGIUM:
@@ -222,10 +246,13 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties) {
 
 
     case PFIND_MONGOL:
-        /* The station is not cleared by being walked into: PF_TAKEN is NOT
-           set, so a second landing party can be sent to the same reception.
-           That is the reading of a find the original never says you removed.
-           0x00E4A3 calls the capture and RETURNS, so nothing else follows. */
+        /* THE STATION IS CLEARED. This used to say it was not -- "0x00E4A3
+           calls the capture and RETURNS, so nothing else follows" -- which is
+           true of fn 0x0E3A1 and false of the landing. BOTH callers, 0x00E843
+           and 0x00E8CF, follow the call with an UNGUARDED
+           `[0x24A9+q] = [0x24A9+q] mod 10`, which strips the tens digit and is
+           precisely PF_TAKEN. Nothing branches around it. Read 2026-09-02. */
+        p->flags |= PF_TAKEN;
         return LAND_SUPPLIES;
 
     default:

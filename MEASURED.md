@@ -6531,6 +6531,10 @@ has been recording all day, committed by me, in the same session.
 `[0x2350]` is `DS:0x234B + 5` -- **item 5, Raw energium**. The inventory
 indices line up across three independent reads now.
 
+**READ IN FULL 2026-09-02 -- see "The landing party's attack, read from the
+branches" at the end of this file.** What follows was written before the
+control flow was traced and gets two things wrong.
+
 Note the FIRST branch returns: landing on a Mongol-supply world runs the
 capture and nothing else. This core rolls a 1-in-5 attack there and otherwise
 answers LAND_NOTHING, which belongs to the settlement branch above it, not
@@ -7188,3 +7192,83 @@ picked at random; it decides for itself whether it has anything to say.
 The port is not wrong to draw the orbit page while orbiting -- with one page
 and no cycling that is a reasonable adaptation -- but the claim that it is what
 the ORIGINAL does was never read, and it is not true.
+
+## The landing party's attack, read from the branches (2026-09-02)
+
+`fn 0x0E3A1` is LAND. The attack roll was read on 2026-08-27 -- the odds and
+the casualty count were right -- but what happens AFTER it was described from
+the ORDER of the blocks rather than from the jumps, and both readings that came
+out of that are wrong. Traced properly:
+
+    0x00E3BE  settlers: quadrant == [0x1E1C]/[0x1E1E] and [0x1DA2] > stardate
+    0x00E432    jmp 0xE4EB  -> THE EPILOGUE. A rescue skips everything below.
+    0x00E435  Random(5); or ax,ax; jne 0xE48F     -> 4 in 5, on to the find
+    0x00E442    "Landing party attacked..."       CS:0x503E
+    0x00E455    Random(5) + 2                     -> 2..6
+    0x00E464    Str(n) + " casualties."           CS:0x5058
+    0x00E484    [0x1DDE] += n
+    0x00E48D    jmp 0xE4DD  -> THE COMMON TAIL. The find is never reached.
+    0x00E48F  planet[q] > 20 -> supply capture (fn 0x181E8), jmp 0xE4DD
+    0x00E4B7  planet[q] > 10 -> "energium successfully mined.", [0x2350]++
+    0x00E4D3  else              "Nothing found."
+    0x00E4DD  the tail both outcomes and the ATTACK reach
+    0x00E4EE  ret
+
+The four strings check out against the segment base solved from the routine
+itself -- CS:0x500E, 0x5027, 0x503E and 0x5058 land on "Planet settlers
+found...", "Evacuating settlers...", "Landing party attacked..." and
+" casualties." Four for four, so the block is named by the strings it PUSHES.
+
+### First correction: AN ATTACKED PARTY BRINGS BACK NOTHING
+
+`jmp 0xE4DD` at 0x00E48D is the whole finding. 0xE4DD is where the supply
+capture and both find messages converge, and the routine returns eleven
+instructions later. The port had it falling through, so a mauled landing party
+still mined its energium.
+
+**This is the third time on this project that reading ORDER instead of BRANCHES
+has shipped a wrong model** -- after HAIL's gating and warp damage's speed
+gate. The blocks really do sit in that order; only the jumps say what runs.
+
+### Second correction: EVERY LANDING SPENDS THE FIND
+
+`fn 0x0E3A1` has two callers, 0x00E843 and 0x00E8CF -- the transporter and the
+shuttle. Both follow the call with the SAME unguarded sequence:
+
+    call 0xE3A1
+    ...                                     ; a message, 0.2 stardates, a flag
+    [0x24A9+q] = [0x24A9+q] mod 10          ; 0x00E88F and 0x00E905
+
+Nothing branches around it. The `mod 10` strips the tens digit, which is
+exactly `PF_TAKEN`, so the find is spent on every landing without exception --
+energium mined, supplies captured, settlers evacuated, and a party that was
+ambushed and came back with none of it.
+
+That kills the note in `core/planet.h` that said a Mongol station "is not
+cleared by being walked into" because 0x00E4A3 "calls the capture and RETURNS".
+The return is real and it is not the end of the landing.
+
+### And there is no "already landed" case
+
+A second landing on a picked-clean planet runs the whole routine again: the
+attack is rolled, and `planet[q]` -- now 1..3 -- falls past both tests to
+"Nothing found.". `LAND_ALREADY` is this port's own message and it is fine, but
+it must be returned AFTER the roll or going back for a second look becomes
+free, which in the original it is not.
+
+### What the port does now
+
+`trek_land()` returns `LAND_ATTACKED` immediately, sets `PF_TAKEN` on every
+path including the rescue and the Mongol station, and checks the spent flag
+after the roll rather than before it. Six assertions in `core/test/test_trek.c`
+pin it, each confirmed by deleting the line it protects:
+
+  * removing the early return fails "a landing party can be attacked on an
+    energium world"
+  * removing the station's PF_TAKEN fails "the station is spent"
+  * moving LAND_ALREADY back to the top fails "a landing party can still be
+    attacked going back"
+
+The energium world is deliberate: on a barren world LAND_ATTACKED and
+LAND_NOTHING differ only in the return code, and a test that cannot tell the
+two mechanics apart is not testing one.

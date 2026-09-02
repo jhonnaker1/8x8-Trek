@@ -476,11 +476,12 @@ OVL_CODE("planet") static void do_land(void) {
 
     r = trek_land(how, &cas);
 
-    /* THE ATTACK IS REPORTED FIRST AND SEPARATELY, whatever the find was.
-       The original rolls it before looking at the planet and falls straight
-       through, so a mauled landing party can still come back with something
-       -- 0x00E435. This port used to return LAND_ATTACKED *instead of* a
-       find, which made the two mutually exclusive. */
+    /* THE ATTACK IS REPORTED FIRST, and on its own: 0x00E435 rolls it before
+       the planet is looked at and then JUMPS PAST the find to the routine's
+       common tail, so an attacked party comes back with nothing. The casualty
+       line is printed here rather than in the switch because the out-param is
+       what carries the number. Corrected 2026-09-02 -- this comment used to
+       say the original "falls straight through". It does not. */
     if (cas) {
         k  = put_str(linebuf, S(S_210));
         k += put_u16(linebuf + k, cas);
@@ -514,6 +515,8 @@ OVL_CODE("planet") static void do_land(void) {
             ui_dialog_line(S(S_226));
             ui_dialog_line(S(S_205));
             break;
+        case LAND_ATTACKED:
+            break;              /* the casualty line above IS the outcome */
         case LAND_ALREADY:
             ui_dialog_line(S(S_223));
             break;

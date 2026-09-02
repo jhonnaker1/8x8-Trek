@@ -195,7 +195,12 @@ extern const char planet_class_letter[PCLASS_COUNT];
 #define PFIND_MONGOL_OF_N     2   /* else Mongol when Random(2) == 0 */  /*@BINARY*/
 
 #define PF_SCANNED     0x01      /* ORBIT has revealed `find` to the player */  /*@ID*/
-#define PF_TAKEN       0x02      /* the find has been collected or evacuated */  /*@ID*/
+/* The find is spent. It is the original's `[0x24A9+q] = [0x24A9+q] mod 10`,
+   which strips the tens digit, and BOTH landing paths do it UNGUARDED after
+   the call -- 0x00E88F and 0x00E905. So every landing spends the find:
+   energium mined, supplies captured, settlers evacuated, nothing found, and
+   a party that was attacked and came back with none of it. */
+#define PF_TAKEN       0x02  /*@ID*/
 /* A settlement that was not relieved in time. The scheduled evacuation event
    ("Planet Gallista-8, quad 8-4, requests evacuation. They can only hold out
    until 3516.5.") IS built -- SCHED_DISTRESS and EV_DISTRESS, 2026-08-27 --
@@ -289,7 +294,11 @@ void trek_leave_orbit(void);
 #define LAND_ENERGIUM        4   /* "energium successfully mined." */  /*@ID*/
 #define LAND_SETTLERS        5   /* "Planet settlers found... Evacuating" */  /*@ID*/
 #define LAND_ATTACKED        6   /* "Landing party attacked... casualties." */  /*@ID*/
-#define LAND_ALREADY         7   /* this planet has already given up its find */  /*@ID*/
+/* THIS PORT'S OWN message, not a mechanic: the original has no "already
+   landed" case and simply reaches "Nothing found." a second time. It is
+   returned AFTER the attack roll, so going back for another look is no safer
+   than the first trip -- that part IS a mechanic. */
+#define LAND_ALREADY         7  /*@ID*/
 #define LAND_SUPPLIES        8   /* "Mongol supplies captured..." */  /*@ID*/
 
 /* ------------------------------------------------- captured Mongol supplies
@@ -345,10 +354,19 @@ uint8_t trek_land(uint8_t how, uint16_t *casualties);
  * puts it, and applies the roll. */
 /* THE ATTACK IS A GENERAL LANDING HAZARD, not a Mongol one -- BINARY
  * 2026-08-27, fn 0x0E3A1 at 0x00E435. It is rolled once for every landing
- * that is not the settlement rescue, BEFORE the find is looked at, and
- * execution CONTINUES afterwards: you can be attacked and still come back
- * with something. This core rolled it only inside the Mongol branch and
- * returned, which made it both too rare and mutually exclusive with a find. */
+ * that is not the settlement rescue, BEFORE the find is looked at.
+ *
+ * ~~and execution CONTINUES afterwards: you can be attacked and still come
+ * back with something.~~ **WRONG, corrected 2026-09-02.** The attack ends
+ * with `jmp 0xE4DD`, the common tail that the supply capture, the energium
+ * line and "Nothing found." all reach, and fn 0x0E3A1 returns at 0xE4EE.
+ * AN ATTACKED PARTY BRINGS BACK NOTHING. The 2026-08-27 read got the roll and
+ * the casualties right and then described the control flow from the order of
+ * the blocks instead of from the branch -- the same mistake this project has
+ * now made three times.
+ *
+ * The settlement rescue is different again: it ends `jmp 0xE4EB`, straight to
+ * the epilogue, so a rescue skips the attack roll AND the tail. */
 #define LANDING_ATTACK_OF_N    5   /* attacked when Random(5) == 0 */  /*@BINARY*/
 #define LANDING_CASUALTY_MIN   2  /*@BINARY*/
 #define LANDING_CASUALTY_SPAN  5   /* Random(5) + 2, so 2..6 */  /*@BINARY*/

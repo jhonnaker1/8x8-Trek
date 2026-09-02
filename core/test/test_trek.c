@@ -4861,12 +4861,28 @@ static void test_landing(void) {
        "the transporter is 100% or nothing (manual)");
     ship.sys[SYS_TRANSPORTER] = 100;
 
-    before = ship.stardate;
-    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ENERGIUM, "energium is mined");
-    ok(ship.stardate == before, "the transporter costs no time (MEASURED)");
-    ok(inventory[ITEM_RAW_ENERGIUM] == 1, "and one crystal comes aboard");
-    ok(trek_land(LAND_BY_TRANSPORTER, 0) == LAND_ALREADY,
-       "the same planet does not give up a second crystal");
+    /* THE MINING RUN NEEDS A LANDING THAT WAS NOT AMBUSHED. One in five is
+       attacked and an attacked party brings back nothing, so a fixed seed
+       here is a coin toss on a mechanic this block is not about -- and seed
+       909 lost it the moment the attack started returning early. Advance the
+       seed until an unattacked landing happens rather than hunting for a seed
+       that works, which would break again the next time anything upstream
+       draws a random number. */
+    {
+        int i;
+        uint8_t r = LAND_ATTACKED;
+        for (i = 0; i < 200 && r == LAND_ATTACKED; i++) {
+            trek_new_game(3, (uint16_t)(909 + i));
+            ship.sec_y = 4; ship.sec_x = 4;
+            one_planet(PFIND_ENERGIUM, 0, 1);
+            trek_orbit();
+            before = ship.stardate;
+            r = trek_land(LAND_BY_TRANSPORTER, 0);
+        }
+        ok(r == LAND_ENERGIUM, "energium is mined");
+        ok(ship.stardate == before, "the transporter costs no time (MEASURED)");
+        ok(inventory[ITEM_RAW_ENERGIUM] == 1, "and one crystal comes aboard");
+    }
 
     /* The shuttlecraft's price, and the whole reason to prefer the
        transporter: 0.2 stardays for the round trip (manual l.490-492). */
@@ -4899,41 +4915,75 @@ static void test_landing(void) {
        "a destroyed settlement has nobody left to take off");
     ok(ship.rescues == 0, "and scores nothing");
 
-    /* A Mongol supply station costs a landing party and is NOT cleared by
-       being walked into -- the party can be sent again, and lose again. */
+    /* A Mongol supply station hands over its supplies -- BINARY 0x00E4A3,
+       which calls the capture and returns -- and IS cleared by the landing:
+       both callers follow the call with an unguarded `mod 10`. This pair
+       asserted the opposite until 2026-09-02. */
     trek_new_game(3, 913);
     ship.sec_y = 4; ship.sec_x = 4;
     one_planet(PFIND_MONGOL, 0, 1);
     trek_orbit();
-    /* A Mongol station hands over supplies -- BINARY 0x00E4A3, which calls
-       the capture and returns. It is not an ambush; the ambush is a separate
-       roll made on EVERY landing. */
     ok(trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_SUPPLIES,
        "a Mongol supply station gives up its supplies");
-    ok((planets[0].flags & PF_TAKEN) == 0,
-       "the station is still there on the next visit");
+    ok((planets[0].flags & PF_TAKEN) != 0,
+       "and the station is spent -- the caller strips the tens digit");
 
-    /* THE ATTACK IS GENERAL, and it does not replace the find. Land on a
-       BARREN world until the roll comes up: the outcome is still the find,
-       and the casualties come back through the out-param. */
+    /* THE ATTACK REPLACES THE FIND. Land on an ENERGIUM world, which would
+       otherwise always mine, until the roll comes up: the outcome must be
+       LAND_ATTACKED and the crystal must NOT have been collected.
+
+       An energium world rather than a barren one on purpose -- on a barren
+       world LAND_ATTACKED and LAND_NOTHING would differ only in the code, and
+       a test that cannot tell the two mechanics apart is not testing one. */
     {
         int i;
-        uint8_t got_att = 0, got_find = 0;
+        uint8_t got_att = 0;
+        uint8_t crystals_before;
         for (i = 0; i < 4000 && !got_att; i++) {
             trek_new_game(3, (uint16_t)(880 + i));
             ship.sec_y = 4; ship.sec_x = 4;
-            one_planet(PFIND_NOTHING, 0, 1);
+            one_planet(PFIND_ENERGIUM, 0, 1);
             trek_orbit();
             cas = 0;
-            if (trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_NOTHING
-                && cas != 0) { got_att = 1; got_find = 1; }
+            crystals_before = inventory[ITEM_RAW_ENERGIUM];
+            if (trek_land(LAND_BY_TRANSPORTER, &cas) == LAND_ATTACKED) {
+                got_att = 1;
+                ok(cas != 0, "an attacked landing reports casualties");
+                ok(inventory[ITEM_RAW_ENERGIUM] == crystals_before,
+                   "and brings back NO energium -- the attack jumps past it");
+                ok((planets[0].flags & PF_TAKEN) != 0,
+                   "and the find is spent all the same");
+            }
         }
-        ok(got_att, "a landing party can be attacked on a barren world");
-        ok(got_find, "and the find is still reported alongside");
+        ok(got_att, "a landing party can be attacked on an energium world");
         ok(cas >= LANDING_CASUALTY_MIN &&
            cas <= LANDING_CASUALTY_MIN + LANDING_CASUALTY_SPAN - 1,
            "the casualties are 2..6");
         ok(ship.casualties == cas, "and land on the ship's tally, which scores");
+    }
+
+    /* A SECOND LANDING IS NOT SAFE. The original has no "already landed"
+       case: it re-runs the routine, attack roll and all. LAND_ALREADY is this
+       port's message for a spent find, and it must come AFTER the roll --
+       returning it early would make repeat landings free. */
+    {
+        int i;
+        uint8_t got_att = 0, got_already = 0;
+        for (i = 0; i < 4000 && !(got_att && got_already); i++) {
+            trek_new_game(3, (uint16_t)(2200 + i));
+            ship.sec_y = 4; ship.sec_x = 4;
+            one_planet(PFIND_NOTHING, 0, 1);
+            trek_orbit();
+            planets[0].flags |= PF_TAKEN;      /* already picked clean */
+            cas = 0;
+            switch (trek_land(LAND_BY_TRANSPORTER, &cas)) {
+                case LAND_ATTACKED: if (cas) got_att = 1;     break;
+                case LAND_ALREADY:  if (!cas) got_already = 1; break;
+                default: break;
+            }
+        }
+        ok(got_already, "a spent planet reports LAND_ALREADY");
+        ok(got_att, "and a landing party can still be attacked going back");
     }
 
     /* The capture itself: one in four gives nothing, and any success always
