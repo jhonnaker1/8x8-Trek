@@ -108,7 +108,14 @@
  * `__mos__` rather than `__C128__` because every 6502 target that will want
  * overlays -- X16, F256, CoCo 3 is a different CPU but the same argument --
  * is built by this toolchain, and none of the roomy ones are. */
-#ifdef __mos__
+/* CORRECTED 2026-09-02: this was `#ifdef __mos__`, on the reasoning that every
+   6502 target wanting overlays is built by llvm-mos "and none of the roomy
+   ones are". The MEGA65 is built by llvm-mos and IS roomier -- 45,055 bytes
+   against the C128's 37,823 -- so the test was asking the wrong question. It
+   is now an explicit opt-in, and each platform's Makefile says whether it
+   wants windows. Both current ports do; a target with 66K of contiguous RAM
+   will not. */
+#ifdef TREK_OVERLAYS
 #define OVL_CODE(sec) __attribute__((noinline, section(".ovl." sec)))
 #else
 #define OVL_CODE(sec)

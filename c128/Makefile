@@ -7,7 +7,7 @@
 # -Oz, NOT -Os. Measured on this codebase: -Oz is 3,200 bytes smaller than -Os,
 # which is most of the win. -flto adds nothing on top of either.
 MOSCC = $(HOME)/llvm-mos/bin/mos-c128-clang
-CFLAGS = -Oz -I src -I ../core -Wall -T trek128.ld
+CFLAGS = -Oz -I src -I ../core -Wall -Werror -DTREK_OVERLAYS -T trek128.ld
 
 # -lcopy-data IS NOT OPTIONAL HERE, AND LEAVING IT OFF COST THE SOUND BUG.
 #

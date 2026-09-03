@@ -3,6 +3,21 @@
 
 #include "../../core/ega.h"
 
+/* TWO PLATFORMS NOW, AND THE MAPPING IS WHERE THEY PART COMPANY.
+ *
+ * `ui.c` is shared between the C128 and the MEGA65 and reaches the colour
+ * conversion through this one macro. Define TREK_COLOUR_IS_EGA and it becomes
+ * the IDENTITY -- the right answer for any target with a programmable palette,
+ * which the MEGA65 build sets after loading EGA's own values into VIC-IV
+ * entries 0..15. Everything below is the C128's fixed RGBI chip.
+ *
+ * If a third target lands here this file has outgrown its name and the shared
+ * UI should move out of c128/src. Until then one #ifdef is cheaper than the
+ * restructure. */
+#ifdef TREK_COLOUR_IS_EGA
+#define EGA_TO_VDC(e) ((unsigned char)(e))
+#else
+
 /* EGA colour index -> VDC colour index.
  *
  * Both chips carry the same sixteen colours -- eight hues at two intensities
@@ -43,5 +58,7 @@
  */
 #define EGA_TO_VDC(e) ((unsigned char)(((((unsigned char)(e)) << 1) | \
                                         (((unsigned char)(e)) >> 3)) & 0x0F))
+
+#endif   /* TREK_COLOUR_IS_EGA */
 
 #endif

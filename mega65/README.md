@@ -61,11 +61,60 @@ platform through a seam that is already abstracted at core level:
 | `plat_*` | 5 | SD-card file I/O via mega65-libc |
 | `far_*` | — | plain RAM; the bank-1 seam exists because the C128 has 42K, and this machine does not |
 
-The three big C128 subsystems — **ten 4K code overlays**, the **bank-1 far
-memory** for strings and music, and the **byte-at-a-time disk streaming** —
-exist because of a 42K address space and a 2MHz 8502. None of them is needed
-here. That is what "the friendliest target on the list" means in practice: most
-of the C128 port's complexity is answering questions this machine does not ask.
+## Overlays are still needed here, and the first version of this file was wrong
+
+That paragraph used to say the three big C128 subsystems — ten 4K code
+overlays, bank-1 far memory, byte-at-a-time disk streaming — were "none of them
+needed here". **Measured, and it is not true of the first one.**
+
+llvm-mos's mega65 region is `$2001..$CFFF`: **45,055 bytes**. The whole game is
+about **66,500 bytes** of code. Unmapping the KERNAL as well would buy 8K and
+still leave it short. So the window stays, and `core/overlay.h`'s `OVL_CODE`
+had to stop testing `__mos__` — the MEGA65 is built by llvm-mos too, and that
+test was asking the wrong question. It is `TREK_OVERLAYS` now, and each
+platform's Makefile says whether it wants windows.
+
+**What does change is the cost, and it changes completely.** The C128 reads
+each 4K image off a 1541 — hundreds of milliseconds, which is why that port
+works so hard to call `ovl_load` rarely and why `check_overlay_calls` exists.
+Here the ten images sit in banked RAM at `$50000` and come in by **DMAgic**:
+one `lcopy`, microseconds. Same mechanism, and the cost that shaped the C128
+port's structure is gone.
+
+The other two really did evaporate. The string pool and music live at `$40000`
+and the message log at `$44000`, reached with `lcopy`/`lpeek`/`lpoke` instead
+of an MMU dance, and `far_read` is a DMA burst.
+
+    resident   33,566 bytes of 40,959    ($2001..$BFFF)
+    window      4,096 bytes              ($C000..$CFFF)
+    images     40,960 bytes              banked at $50000, from OVERLAYS.BIN
+
+## What is verified, and what is not
+
+**Verified:** the toolchain, the video layer and the palette — the smoke build
+draws the console frame and a screenshot measures all sixteen colours onto
+their EGA index. The full game **links** at the sizes above with `-Wall
+-Werror`. The shared `ui.c`, `main.c`, `strpool.c` and `layout.c` compile for
+this target unchanged, which is the real portability result.
+
+**NOT verified: the game running.** Xemu will not mount a fresh SD image until
+it has written its own system files onto it, and that is a GUI action —
+`Disks -> SD-card -> Update files` — with no command line behind it. So startup,
+file loading, the DMA overlay path, input and sound have not been seen working.
+
+`make sd-setup` opens Xemu on the built image for that one-time step; after it,
+`make run` should work. Until someone does it, treat this port as **compiled
+and unproven**.
+
+## It found a bug in the C128 port
+
+Compiling the shared code for a second target immediately flagged
+`-Wreturn-type` on `do_use()`, which had gained a `uint8_t` return the day
+before and still fell off the end of its energium path. The caller tests
+`do_use() == USE_WANT_BOLT`, so a garbage return could have fired the plasma
+bolt dialog after mining a crystal. The C128 build had been printing that
+warning too; the grep used to check builds filtered warnings out. Both ports
+now build with `-Werror`.
 
 ## Verifying it
 

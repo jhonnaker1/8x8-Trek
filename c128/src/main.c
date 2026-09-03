@@ -665,6 +665,7 @@ OVL_CODE("planet") static uint8_t do_use(void) {
         }
     }
     ui_dialog_close();
+    return USE_NONE;
 }
 
 /* SFX_A and SFX_B are MEASURED, not matched by ear: the routine that starts

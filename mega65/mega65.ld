@@ -1,0 +1,68 @@
+/* MEGA65 native mode, with the overlay window and its images.
+ *
+ * WHY THIS PORT STILL HAS OVERLAYS, which the first commit here said it would
+ * not. Measured rather than assumed: llvm-mos's mega65 region is $2001..$CFFF,
+ * 45,055 bytes, and the whole game is about 66,500 bytes of code. Unmapping
+ * the KERNAL as well would buy 8K and still leave it short. So a flat build
+ * does not fit and the window stays.
+ *
+ * WHAT CHANGES IS WHERE THE IMAGES LIVE. On the C128 each 4K image is read off
+ * a 1541 -- hundreds of milliseconds, and the reason ovl_load is called as
+ * rarely as the code can manage. Here they are held in banked RAM at $50000
+ * and copied in by DMAgic, which is microseconds. Same mechanism, and the cost
+ * that shaped the C128 port's structure is gone.
+ */
+__basic_zp_start = 0x0002;
+__basic_zp_end = 0x0090;
+
+MEMORY {
+    /* Resident code, stopping short of the window. */
+    ram (rw) : ORIGIN = 0x2001, LENGTH = 0x9fff       /* $2001..$BFFF */
+
+    /* The one window every overlay is linked to run at. */
+    window (rwx) : ORIGIN = 0xC000, LENGTH = 0x1000   /* $C000..$CFFF */
+
+    /* Image staging, exactly as trek128.ld does it: one region per overlay so
+       that two overlays sharing a load address is a LINK error rather than a
+       silent aliasing bug. These are addresses in the OUTPUT FILE, not in the
+       machine -- objcopy cuts each one out and they end up in banked RAM. */
+    ovlimg0 (rw) : ORIGIN = 0x50000, LENGTH = 0x1000
+    ovlimg1 (rw) : ORIGIN = 0x51000, LENGTH = 0x1000
+    ovlimg2 (rw) : ORIGIN = 0x52000, LENGTH = 0x1000
+    ovlimg3 (rw) : ORIGIN = 0x53000, LENGTH = 0x1000
+    ovlimg4 (rw) : ORIGIN = 0x54000, LENGTH = 0x1000
+    ovlimg5 (rw) : ORIGIN = 0x55000, LENGTH = 0x1000
+    ovlimg6 (rw) : ORIGIN = 0x56000, LENGTH = 0x1000
+    ovlimg7 (rw) : ORIGIN = 0x57000, LENGTH = 0x1000
+    ovlimg8 (rw) : ORIGIN = 0x58000, LENGTH = 0x1000
+    ovlimg9 (rw) : ORIGIN = 0x59000, LENGTH = 0x1000
+}
+
+INCLUDE commodore.ld
+INPUT(unmap-basic.o)
+
+/* The soft stack sits above the window and is not really used: llvm-mos gives
+   a non-reentrant program a STATIC stack, and this code has no recursion and
+   no alloca -- the same analysis trek128.ld records. It is a tripwire. */
+__stack = 0xd000;
+
+SECTIONS {
+    .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
+    .ovl_hof    ORIGIN(window) : { *(.ovl.hof)    } >window AT>ovlimg1
+    .ovl_front  ORIGIN(window) : { *(.ovl.front)  } >window AT>ovlimg2
+    .ovl_info   ORIGIN(window) : { *(.ovl.info)   } >window AT>ovlimg3
+    .ovl_repair ORIGIN(window) : { *(.ovl.repair) } >window AT>ovlimg4
+    .ovl_msgs   ORIGIN(window) : { *(.ovl.msgs)   } >window AT>ovlimg5
+    .ovl_planet ORIGIN(window) : { *(.ovl.planet) } >window AT>ovlimg6
+    .ovl_cmds   ORIGIN(window) : { *(.ovl.cmds)   } >window AT>ovlimg7
+    .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
+    .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
+}
+
+__ovl_start = ORIGIN(window);
+
+/* NO OUTPUT_FORMAT, deliberately, and for the same reason trek128.ld has none:
+   it would emit the PRG directly, and then objcopy could not cut the ten
+   window images out of the link. One link produces an ELF; two objcopy passes
+   make the PRG and OVERLAYS.BIN out of it, so the resident half and the images
+   can never disagree about where anything is. */
