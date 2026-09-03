@@ -5,10 +5,20 @@
  *
  * TWO DIFFERENCES, both simplifications:
  *
- *   - NO REGION DETECTION. The C128 driver reads the raster to tell PAL from
- *     NTSC because the SID's clock differs by 3.8% and it is audible. The
- *     MEGA65 clocks its SIDs from a fixed 1MHz-equivalent regardless of video
- *     mode, so there is one set of numbers. NTSC's are the closer pair.
+ *   - PITCH does not need region detection here, and TEMPO does. The two were
+ *     conflated: this file used to say "NO REGION DETECTION" outright, on the
+ *     grounds that the MEGA65 clocks its SIDs from a fixed 1MHz-equivalent
+ *     regardless of video mode. That argument is about the SID clock and so
+ *     about pitch, and snd_tick_num() is neither -- it converts FRAMES to the
+ *     original's 18.2Hz ticks, and frames are 50 a second on PAL against 60 on
+ *     NTSC. Using the NTSC numerator on a PAL machine ran the music 19% fast,
+ *     which is a whole tone of tempo and plainly audible. Xemu boots PAL.
+ *
+ *     The pitch constant is still NTSC's and is still a GUESS, now labelled as
+ *     one: 1.0MHz sits 2.3% below NTSC's 1.0227 and 1.5% above PAL's 0.9852,
+ *     so if anything PAL is the closer pair and the old comment had it
+ *     backwards. Under half a semitone either way. NOBODY HAS LISTENED YET;
+ *     an ear settles this, not a comment.
  *   - NO FAR MEMORY. Notes are read straight out of the pool array.
  */
 #include <stdint.h>
@@ -17,8 +27,13 @@
 #include "m65snd.h"
 #include "../../c128/src/sidfreq.h"
 #include "music_data.h"
+#include <mega65/memory.h>
 
 #define SID ((volatile unsigned char *)0xD400)
+#define VIC_CTRL1  (*(volatile unsigned char *)0xD011)
+#define VIC_RASTER (*(volatile unsigned char *)0xD012)
+/* The KERNAL's jiffy counter, ordinary RAM bumped once a frame by its IRQ. */
+#define JIFFY_LO   (*(volatile unsigned char *)0x00A2)
 #define V1 0
 #define V2 7
 
@@ -35,6 +50,40 @@ static uint8_t  mus_on, sfx_on, mus_track, mus_ok;
 static uint8_t  note_left, sfx_left;
 static uint8_t  enabled = 1;
 static uint16_t acc;
+uint8_t snd_region = REGION_NTSC;   /* declared in m65snd.h -- the header promised this before the .c had it */
+static unsigned int last_raster;
+
+/* Bit 8 of the raster lives in $D011, so the two reads have to agree about
+   which half of the frame they are in -- the same guard c128/src/sid.c uses,
+   for the same reason. */
+static unsigned int raster_line(void) {
+    unsigned char c1, r, c2;
+    /* WITHOUT THIS THE REGISTERS READ AS A CONSTANT. The Hypervisor's file
+       calls leave the I/O context changed (see m65storage.c's after_hyppo),
+       and nothing re-enables it between then and here, so $D011/$D012 were
+       reading plain RAM -- detect_region() called every machine NTSC and
+       snd_poll() never saw a frame go by. */
+    mega65_io_enable();
+    for (;;) {
+        c1 = VIC_CTRL1;
+        r  = VIC_RASTER;
+        c2 = VIC_CTRL1;
+        if ((c1 & 0x80) == (c2 & 0x80))
+            return (unsigned int)r + ((c1 & 0x80) ? 256u : 0u);
+    }
+}
+
+/* PAL has 312 raster lines and NTSC 263, so the highest line seen over a few
+   frames tells them apart with a threshold anywhere between. Lifted from the
+   C128 port, where the numbers were measured on real hardware. */
+#define PAL_LINE_MIN 300
+
+static uint8_t detect_region(void) {
+    unsigned int spins;
+    for (spins = 0; spins < 30000u; spins++)
+        if (raster_line() >= PAL_LINE_MIN) return REGION_PAL;
+    return REGION_NTSC;
+}
 
 static void voice_off(uint8_t v) { SID[v + 4] = GATE_OFF; }
 
@@ -56,6 +105,8 @@ void snd_init(void) {
     SID[V2 + 2] = PW_LO; SID[V2 + 3] = PW_HI;
     SID[V2 + 5] = AD_FLAT; SID[V2 + 6] = SR_FLAT;
     mus_on = sfx_on = 0; acc = 0;
+    snd_region = detect_region();
+    last_raster = 0;
 }
 
 void snd_off(void) { voice_off(V1); voice_off(V2); mus_on = sfx_on = 0; }
@@ -123,8 +174,31 @@ static void tick(void) {
     }
 }
 
+/* CALLED AS OFTEN AS THE CALLER LIKES, and it must be: the only caller is the
+   keyboard wait loop, which spins thousands of times a second. This used to
+   assume exactly one call per frame -- true of smoke2.c's `wait_vsync();
+   snd_poll();` loop and of nothing in the game, which is why the game was
+   silent: NOTHING CALLED IT AT ALL. A frame has passed when the raster counter
+   goes backwards, which works at any rate above two samples a frame. */
 void snd_poll(void) {
+    unsigned int r;
+
     if (!enabled) return;
-    acc = (uint16_t)(acc + snd_tick_num(REGION_NTSC));
+
+    /* A frame has passed when the raster counter goes backwards -- correct at
+       any call rate above two samples a frame, which this loop clears by
+       orders of magnitude. Same mechanism as c128/src/sid.c.
+
+       READING $D012 FROM HERE USED TO WEDGE THE MACHINE within ten seconds,
+       into a DMA whose descriptor had two bytes wrong. That was never about
+       the raster: the DMA job lived in ZERO PAGE and something overwrote it.
+       With the job out of zero page (see m65mem.c) this is fine. The KERNAL
+       jiffy at $A0..$A2 was tried as a safer source and is useless here --
+       nothing increments it, because no interrupt of the ROM's is running. */
+    r = raster_line();
+    if (r >= last_raster) { last_raster = r; return; }
+    last_raster = r;
+
+    acc = (uint16_t)(acc + snd_tick_num(snd_region));
     while (acc >= SND_TICK_DEN) { acc = (uint16_t)(acc - SND_TICK_DEN); tick(); }
 }

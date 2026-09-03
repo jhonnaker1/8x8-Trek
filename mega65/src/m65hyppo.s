@@ -19,7 +19,7 @@
 ; DMA. It is not worth working out which ones actually matter, and a shorter
 ; list would rot the first time the library changed.
 
-.global trek_read512, trek_open, trek_close
+.global trek_read512, trek_open, trek_closeall
 
 .section .text.trek_hyppo,"ax",@progbits
 
@@ -61,10 +61,18 @@ trek_open:
 	lda retlo
 	rts
 
-; void trek_close(uint8_t fd)           -- fd in A
-trek_close:
+; void trek_closeall(void)
+;
+; There was a trek_close(fd) here. It is gone rather than left unused: hyppo
+; will not accept the descriptor its own openfile returns, so m65storage.c
+; closes with closeall() instead and nothing can call it. Its one lesson is
+; kept, because it applies to any shim written here: THE ARGUMENT MAY BE IN A,
+; AND save_rc DESTROYS A. That version handed `close` whatever save_rc's last
+; `lda` left behind -- __rc0, the soft stack pointer low byte -- so hyppo was
+; asked to close descriptor $B2 three times.
+trek_closeall:
 	jsr save_rc
-	jsr close
+	jsr closeall
 	jsr restore_rc
 	rts
 

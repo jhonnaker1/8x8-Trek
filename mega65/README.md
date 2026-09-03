@@ -166,8 +166,8 @@ The string pool is byte-exact against the file, and so are MUSIC.DAT, all ten
 overlay images in banked RAM, and the window after an `ovl_load` -- checked
 with `-dumpmem` rather than by looking at the screen.
 
-**Sound is the one thing still taken on trust.** It is generated and the driver
-runs, but nothing has listened to it.
+**Sound does not work**, and the briefing bug below is fixed. Jamie played the
+release build on 2026-09-03; see "Sound is diagnosed, not fixed".
 
 ## The bug that was actually there
 
@@ -208,6 +208,74 @@ and no perturbing the build. `-uartmon` opens a unix socket with breakpoints,
 registers and memory. Three earlier hypotheses -- a wrong window address, a
 zero-page clash, banked RAM that was not RAM -- were each disproved in minutes
 once a probe was written, and each had taken an hour to argue about first.
+
+## Sound is diagnosed, not fixed
+
+**`snd_poll()` was never called.** Not from the game, not from anywhere -- only
+`smoke2.c` ever called it, which is why the driver had been "verified" without
+a note ever being played. The C128 port ticks it from inside the key scan;
+this port's `kb_waitkey()` just spun.
+
+Two more real faults were found behind it and ARE fixed, dormant until the call
+site can be restored:
+
+  * **Tempo used the NTSC constant on a PAL machine.** `snd_tick_num()`
+    converts frames to the original's 18.2Hz ticks and the numerators differ by
+    19% (363 against 304). The old comment said region detection was
+    unnecessary because the MEGA65 clocks its SIDs at a fixed rate -- true of
+    PITCH, and `snd_tick_num` is not pitch. `detect_region()` is now here.
+  * **The VIC registers read as a constant.** `$D011`/`$D012` need
+    `mega65_io_enable()` first; the Hypervisor's file calls leave the I/O
+    context changed and nothing restored it between there and here.
+
+**WHY THE CALL SITE IS STILL COMMENTED OUT.** With `snd_poll()` in the key
+loop the machine wedges within ten seconds, every time, into a DMA whose
+descriptor has two bytes wrong -- Xemu stops with "unhandled memory read", the
+screen blanks, and the PC is inside `lcopy`. Confirmed on screen by Jamie, not
+just headless. A **single volatile read of `$D012`** in that loop and nothing
+else was enough to cause it; an empty function call in the same place was
+harmless.
+
+What is known, and it is not a mechanism:
+
+  * The descriptor is an `ovl_load` job with `source_bank` and the low byte of
+    `dest_addr` overwritten -- two adjacent bytes.
+  * `dmalist` is a 20-byte volatile struct that llvm-mos had placed in ZERO
+    PAGE, and the corrupted bytes were inside it. The linker says nothing else
+    is allocated there.
+  * Moving the transfers this port controls onto their own descriptor in
+    `.bss` (`trek_dma()` in `m65mem.c`) makes the reproducer survive 20 seconds
+    instead of 2 -- **but only while the raster read is absent**. Restore the
+    read and it fails again in 2 seconds.
+  * The KERNAL jiffy at `$A0..$A2` was tried as a frame source that cannot
+    fault. It is useless here: nothing increments it, so no ROM interrupt is
+    running -- which also rules out an IRQ handler as the writer.
+
+So the writer of those two bytes is **not identified**, and a silent title
+screen ships instead of a crash. `trek_dma()` stays regardless: it is a real
+robustness win, and **Jamie's original crash was the same shape** -- a DMA
+source of `$454854`, whose low bytes are the ASCII "THE", i.e. text written
+over a descriptor after a full game.
+
+## The briefing did nothing, and why
+
+Answering Y got the setup screen instead of the briefing. `findfile` for
+BRIEF.TXT was failing: hyppo has four file descriptors and **`close(fd)` never
+freed one**, so the fourth open in a session failed and the briefing is the
+fourth file this game opens.
+
+Two separate faults, one on each side:
+
+  * `trek_close` took its argument in A, and `save_rc` destroys A. Hyppo was
+    asked to close descriptor `$B2` -- the soft stack pointer's low byte.
+  * With that fixed, hyppo still refused: **its `openfile` does not return a
+    usable descriptor here.** Every open returns `$18`, the trap number itself,
+    and `closefile` rejects it with error `$89`. `plat_close()` now calls
+    `closeall()`, which works. A probe opening five files in a row gets three
+    and then fails; with `closeall` it gets all five.
+
+That is sound only because this port never has two files open at once, which
+is stated at the call site so the next person does not widen it.
 
 ## It found a bug in the C128 port
 

@@ -35,6 +35,49 @@
  * gone. */
 #include <mega65/memory.h>
 
+/* OUR OWN DMA DESCRIPTOR, AND NOT IN ZERO PAGE.
+ *
+ * mega65-libc's lcopy() builds its job in a 20-byte `volatile struct dmalist`
+ * that llvm-mos places in ZERO PAGE, and something in this program overwrites
+ * two bytes of it. The symptom is a DMA with a wrong source bank and a
+ * destination a few bytes off -- Xemu stops with "unhandled memory read", the
+ * screen goes blank, and the PC is inside lcopy. Seen twice: once by Jamie at
+ * the hall of fame after a full game (source $454854, whose low bytes are the
+ * ASCII "THE"), and once every ten seconds with snd_poll() called from the key
+ * loop, which is the reproducer that made this findable at all.
+ *
+ * The writer has NOT been identified. The linker says nothing but the
+ * descriptor lives at those addresses. This moves the job we control out of
+ * zero page so our transfers cannot be hit; conio still uses the library's. */
+struct dma_job {
+    uint8_t  o0b, o80, src_mb, o81, dst_mb, o85, dst_skip, eop, cmd;
+    uint16_t count;
+    uint16_t src_addr;
+    uint8_t  src_bank;
+    uint16_t dst_addr;
+    uint8_t  dst_bank;
+    uint16_t modulo;
+};
+static volatile struct dma_job job __attribute__((section(".bss.trek_dma")));
+
+static void trek_dma(uint32_t src, uint32_t dst, uint16_t n) {
+    job.o0b = 0x0B; job.o80 = 0x80; job.src_mb = (uint8_t)(src >> 20);
+    job.o81 = 0x81; job.dst_mb = (uint8_t)(dst >> 20);
+    job.o85 = 0x85; job.dst_skip = 1;
+    job.eop = 0x00; job.cmd = 0x00;
+    job.count    = n;
+    job.src_addr = (uint16_t)(src & 0xFFFF);
+    job.src_bank = (uint8_t)((src >> 16) & 0x0F);
+    job.dst_addr = (uint16_t)(dst & 0xFFFF);
+    job.dst_bank = (uint8_t)((dst >> 16) & 0x0F);
+    job.modulo   = 0;
+    mega65_io_enable();
+    POKE(0xD702U, 0x00);
+    POKE(0xD704U, 0x00);
+    POKE(0xD701U, (uint8_t)(((uint16_t)&job) >> 8));
+    POKE(0xD705U, (uint8_t)(((uint16_t)&job) & 0xFF));
+}
+
 #define OVL_IMAGES   0x50000UL     /* banked RAM, loaded once at startup */
 #define OVL_SIZE     0x1000UL
 
@@ -63,7 +106,7 @@ void ovl_load(uint8_t which) {
     /* Lazily, so the SHARED main.c needs no MEGA65-specific startup call. */
     if (ovl_live == 0xFE) { if (!ovl_init()) return; }
     if (which >= OVL_COUNT || which == ovl_live) return;
-    lcopy(OVL_IMAGES + (uint32_t)which * OVL_SIZE, OVL_WINDOW, OVL_SIZE);
+    trek_dma(OVL_IMAGES + (uint32_t)which * OVL_SIZE, OVL_WINDOW, (uint16_t)OVL_SIZE);
     ovl_live = which;
 }
 
@@ -78,7 +121,7 @@ static uint8_t ovl_init(void) {
     for (;;) {
         n = plat_read(stage, sizeof stage);
         if (n == 0) break;
-        lcopy((uint32_t)(uint16_t)stage, dst, n);
+        trek_dma((uint32_t)(uint16_t)stage, dst, n);
         dst += n;
     }
     plat_close();
@@ -111,7 +154,7 @@ uint16_t far_load(const char *name) {
         if (n == 0) break;
         if ((uint16_t)(far_len + n) > FAR_CAPACITY) n = (uint16_t)(FAR_CAPACITY - far_len);
         if (n == 0) break;
-        lcopy((uint32_t)(uint16_t)stage, dst, n);
+        trek_dma((uint32_t)(uint16_t)stage, dst, n);
         dst += n; far_len = (uint16_t)(far_len + n);
     }
     plat_close();
@@ -123,7 +166,7 @@ uint16_t far_size(void) { return far_len; }
 void far_read(uint16_t off, void *dst, uint8_t len) {
     if (off >= far_len) { memset(dst, 0, len); return; }
     if ((uint16_t)(off + len) > far_len) len = (uint8_t)(far_len - off);
-    lcopy(FAR_POOL + off, (uint32_t)(uint16_t)dst, len);
+    trek_dma(FAR_POOL + off, (uint32_t)(uint16_t)dst, len);
 }
 
 /* THE MESSAGE LOG, which on the C128 lives in spare VDC RAM.

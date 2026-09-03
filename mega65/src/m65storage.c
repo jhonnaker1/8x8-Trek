@@ -48,7 +48,25 @@ static void after_hyppo(void) { mega65_io_enable(); }
    entirely. Nothing in this file calls open/read512/close directly any more. */
 uint16_t trek_read512(uint8_t *buf);
 uint8_t  trek_open(const char *name);
-void     trek_close(uint8_t fd);
+void     trek_closeall(void);
+
+/* CLOSING IS closeall(), NOT close(fd), AND THAT IS NOT A SHORTCUT.
+ *
+ * hyppo's openfile does not hand back a usable descriptor here: every open
+ * returns $18 -- the trap number itself -- and passing that to closefile is
+ * refused with error $89, so the file stays open. Hyppo has four descriptors,
+ * so the FOURTH open in a session failed. In the game that was BRIEF.TXT: the
+ * player asked for the briefing and it silently did nothing, because
+ * STRINGS.DAT, MUSIC.DAT and OVERLAYS.BIN had used up the table at startup and
+ * never given it back.
+ *
+ * MEASURED, not assumed: a probe opening five files in a row gets three and
+ * then fails, and with closeall() gets all five and reads the fifth.
+ *
+ * THE PRECONDITION IS THAT ONLY ONE FILE IS EVER OPEN, which is true of this
+ * port -- plat_open/plat_read/plat_close never nest, and plat_read_all is
+ * self-contained. If a caller ever needs two files at once, this has to be
+ * solved properly and not by widening closeall. */
 
 static char *fixname(const char *name) {
     uint8_t i = 0;
@@ -79,7 +97,7 @@ uint8_t plat_read_all(const char *name, void *dst, uint16_t max, uint16_t *got) 
         total = (uint16_t)(total + n);
         if (total >= max) break;
     }
-    trek_close(fd); after_hyppo();
+    trek_closeall(); after_hyppo();
     if (got) *got = total;
     return STOR_OK;
 }
@@ -114,5 +132,5 @@ uint16_t plat_read(void *dst, uint16_t len) {
 }
 
 void plat_close(void) {
-    if (open_fd != 0xFF) { trek_close(open_fd); after_hyppo(); open_fd = 0xFF; }
+    if (open_fd != 0xFF) { trek_closeall(); after_hyppo(); open_fd = 0xFF; }
 }
