@@ -40,10 +40,29 @@ LDFLAGS = -T mega65.ld -Wl,--no-check-sections
 OBJCOPY = $(LLVM_MOS)/bin/llvm-objcopy
 OVERLAYS = eval hof front info repair msgs planet cmds title events
 
+SMOKE2_SRC = src/smoke2.c src/m65vid.c ../c128/src/layout.c ../c128/src/strpool.c \
+             src/m65mem.c src/m65storage.c src/m65snd.c src/music_data.c \
+             ../c128/src/ui.c ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c src/m65input.c
+SMOKE2_OUT = build/smoke2.prg
+
+smoke2: $(SMOKE2_OUT)
+
+# THE OBJCOPY STEP IS NOT OPTIONAL. mega65.ld emits an ELF on purpose (so the
+# overlay images can be cut out of it), so linking straight to a .prg produces
+# an ELF that Xemu loads at $457F -- where it is not recognised as BASIC, so it
+# is never auto-run and the screen shows a SYS line instead. An hour went into
+# a "black screen" that was this.
+$(SMOKE2_OUT): $(SMOKE2_SRC) src/m65vid.h mega65.ld
+	@mkdir -p build
+	$(M65CC) $(CFLAGS) $(LDFLAGS) -o build/smoke2.elf $(SMOKE2_SRC) $(LIBC_A)
+	$(OBJCOPY) -O binary --remove-section=.ovl_* build/smoke2.elf build/smoke2.res
+	@python3 -c "d=open('build/smoke2.res','rb').read(); \
+	    open('$(SMOKE2_OUT)','wb').write(bytes([0x01,0x20]) + d)"
+
 SMOKE_SRC = src/smoke.c src/m65vid.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke run run-smoke music disk sd sd-setup clean
+.PHONY: all smoke smoke2 run run-smoke music disk sd sd-setup clean
 
 all: $(OUT)
 

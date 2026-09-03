@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <mega65/fileio.h>
+#include <mega65/memory.h>
 #include "../../core/storage.h"
 
 /* read512() delivers a whole sector, so this buffer cannot be smaller -- the
@@ -28,6 +29,18 @@ static uint16_t buf_len, buf_pos;
 /* mega65-libc wants a mutable char*, and the Hypervisor wants the name in
    upper case with no path. */
 static char namebuf[20];
+
+/* THE HYPERVISOR LEAVES THE MACHINE DIFFERENT FROM HOW IT FOUND IT.
+ *
+ * hyppo's file calls trap into the Hypervisor, which has its own memory and
+ * I/O banking, and control comes back without the extended I/O context this
+ * port needs -- the VIC-IV registers and the palette stop being reachable, so
+ * everything drawn afterwards goes nowhere and the screen stays black. The
+ * smoke build never noticed because it opens no files.
+ *
+ * Re-enabling I/O after every hyppo call is cheap and makes the seam
+ * self-contained: nothing above this file has to know. */
+static void after_hyppo(void) { mega65_io_enable(); }
 
 static char *fixname(const char *name) {
     uint8_t i = 0;
@@ -44,19 +57,21 @@ uint8_t plat_read_all(const char *name, void *dst, uint16_t max, uint16_t *got) 
     uint8_t *out = (uint8_t *)dst;
     uint16_t total = 0;
     uint8_t fd = open(fixname(name));
+    after_hyppo();
 
     if (got) *got = 0;
     if (fd == 0xFF) return STOR_NOTFOUND;
 
     for (;;) {
         size_t n = read512(buf);
+        after_hyppo();
         if (n == 0) break;
         if (total + n > max) n = max - total;
         memcpy(out + total, buf, n);
         total = (uint16_t)(total + n);
         if (total >= max) break;
     }
-    close(fd);
+    close(fd); after_hyppo();
     if (got) *got = total;
     return STOR_OK;
 }
@@ -68,6 +83,7 @@ uint8_t plat_write_all(const char *name, const void *src, uint16_t len) {
 
 uint8_t plat_open(const char *name) {
     open_fd = open(fixname(name));
+    after_hyppo();
     if (open_fd == 0xFF) return STOR_NOTFOUND;
     buf_len = buf_pos = 0;
     return STOR_OK;
@@ -80,6 +96,7 @@ uint16_t plat_read(void *dst, uint16_t len) {
     while (done < len) {
         if (buf_pos >= buf_len) {
             size_t n = read512(buf);
+            after_hyppo();
             if (n == 0) break;
             buf_len = (uint16_t)n; buf_pos = 0;
         }
@@ -89,5 +106,5 @@ uint16_t plat_read(void *dst, uint16_t len) {
 }
 
 void plat_close(void) {
-    if (open_fd != 0xFF) { close(open_fd); open_fd = 0xFF; }
+    if (open_fd != 0xFF) { close(open_fd); after_hyppo(); open_fd = 0xFF; }
 }

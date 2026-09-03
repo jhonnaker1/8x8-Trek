@@ -89,7 +89,60 @@ of an MMU dance, and `far_read` is a DMA burst.
     window      4,096 bytes              ($C000..$CFFF)
     images     40,960 bytes              banked at $50000, from OVERLAYS.BIN
 
-## Running it, and why that is still awkward
+## Running it headlessly -- SOLVED, and the answer was in Xemu's source
+
+    make                                  # build/egatrek.prg + build/OVERLAYS.BIN
+    tools/putfiles.sh build/OVERLAYS.BIN ../c128/build/strings.dat ...
+    tools/run.sh build/egatrek.prg shot.png 20
+
+**Use Xemu's OWN default card**, `-sdimg @mega65.img`, which lives in its prefs
+directory. Xemu fdisk/formats that card itself the first time it creates one,
+and a card it made needs no ONBOARDing -- so nothing waits for a human and
+`-headless -screenshot` works.
+
+Three hand-built images failed before that: a bare FAT32; an MBR plus FAT32 the
+Hypervisor would not `CHDIR /` into; and a blank card offered to the machine's
+own FDISK+FORMAT utility, which cannot work because that utility is a file ON
+the card. `targets/mega65/sdcontent.c` in Xemu's source is the authority and
+says why: the card needs **two** partitions -- type `0x0C` FAT32 at LBA 2048
+and a type `0x41` MEGA65 system partition -- plus a fixed disk signature
+`837dcba6`. Guessing at that three times cost more than reading it once.
+
+Two smaller traps, both of which look exactly like a hang:
+
+  * **The PRG must load at `$2001`.** Xemu detects that as BASIC and AUTO-RUNs
+    it; anything else just gets a `SYS` line typed and waits for RETURN. A
+    build that links straight to a `.prg` emits an ELF, which loads at `$457F`
+    and is never started. `mega65.ld` deliberately has no `OUTPUT_FORMAT`, so
+    every target must go through objcopy.
+  * **mtools** will not touch the card until the FAT32 BPB has non-zero CHS
+    geometry, which Xemu's formatter leaves at zero. Those fields are legacy
+    and unused by FAT32-LBA; `putfiles.sh` patches them once.
+
+## What actually runs, as of now
+
+`smoke2.c` is a staged harness -- each stage draws a marker, so one screenshot
+says how far it got. All of these pass:
+
+    STAGE 1  video up, EGA palette
+    STAGE 2  STRINGS.DAT loaded through the Hypervisor
+    STAGE 3  drawing still works after Hypervisor file calls
+    U.S.S. LEXINGTON        -- a real pooled string, from the real file
+    STAGE 4  window contains code after ovl_load: A6 16 DA A2 0C 86 04 A2
+    STAGE 5  MUSIC.DAT loaded
+    STAGE 6  music started
+    STAGE 7  2000 frames of snd_poll(), which DMAs into a stack local each one
+
+And the real binary reaches `MAIN REACHED`, `LOOP TOP`, `MUSIC OK`, `OVL OK`.
+
+**THE ONE REMAINING FAULT: `ui_title()` draws nothing.** The markers printed
+before it SURVIVE, which is the informative part -- `ui_title()` opens with a
+screen clear, so it is not merely drawing wrong, it is not reaching its own
+first statement. The overlay window demonstrably holds valid code and
+`OVL_TITLE` is index 8 in both the header and the Makefile's image order, so
+the image is the right one. That is where the next session starts.
+
+## Running it, and why it was awkward
 
 Xemu's `-virtsd` presents a plain directory as the card, which is the only
 provisioning that has worked here. But the MEGA65 ROM runs its **ONBOARDing
