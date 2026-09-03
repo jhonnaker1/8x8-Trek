@@ -36,11 +36,28 @@
 #include <mega65/memory.h>
 
 #define OVL_IMAGES   0x50000UL     /* banked RAM, loaded once at startup */
-#define OVL_WINDOW   0xB000UL
 #define OVL_SIZE     0x1000UL
+
+/* THE WINDOW'S ADDRESS COMES FROM THE LINKER, never from a number typed twice.
+ * It was typed twice for about an hour: mega65.ld moved the window from $B000
+ * to $C000 and this file still said $B000, so every ovl_load DMA'd four
+ * kilobytes over .bss -- including mega65-libc's `dmalist` at $B357. The next
+ * lcopy then read its job list from a corrupted descriptor and Xemu reported
+ * an unhandled read at $166B357, whose low sixteen bits are that address.
+ *
+ * c128/src/overlay.c takes the same symbol for the same reason. */
+extern unsigned char __ovl_start[];
+#define OVL_WINDOW   ((uint32_t)(uint16_t)__ovl_start)
 
 static uint8_t ovl_init(void);
 static uint8_t ovl_live = 0xFE;   /* 0xFE: images not fetched yet */
+
+/* ONE staging buffer for both loaders, and a small one: plat_read already
+   holds a 512-byte sector internally, so this is only the hop from there into
+   banked RAM, and 64 bytes costs nothing in time. Two private buffers of 256
+   and 512 put .bss 1,204 bytes over a region that is 36,863 because the window
+   had to move clear of the stack. */
+static uint8_t stage[64];
 
 void ovl_load(uint8_t which) {
     /* Lazily, so the SHARED main.c needs no MEGA65-specific startup call. */
@@ -56,13 +73,12 @@ void ovl_load(uint8_t which) {
 static uint8_t ovl_init(void) {
     uint32_t dst = OVL_IMAGES;
     uint16_t n;
-    static uint8_t chunk[512];
 
     if (plat_open("OVERLAYS.BIN") != STOR_OK) return 0;
     for (;;) {
-        n = plat_read(chunk, sizeof chunk);
+        n = plat_read(stage, sizeof stage);
         if (n == 0) break;
-        lcopy((uint32_t)(uint16_t)chunk, dst, n);
+        lcopy((uint32_t)(uint16_t)stage, dst, n);
         dst += n;
     }
     plat_close();
@@ -84,7 +100,6 @@ static uint16_t far_len;
    then MUSIC.DAT into the same pool and keep the two bases, so a far_load that
    overwrote would silently take the prose away the moment the music arrived. */
 uint16_t far_load(const char *name) {
-    static uint8_t chunk[256];
     uint16_t base = far_len;
     uint32_t dst = FAR_POOL + base;
     uint16_t n;
@@ -92,11 +107,11 @@ uint16_t far_load(const char *name) {
     if (base >= FAR_CAPACITY) return FAR_NONE;
     if (plat_open(name) != STOR_OK) return FAR_NONE;
     for (;;) {
-        n = plat_read(chunk, sizeof chunk);
+        n = plat_read(stage, sizeof stage);
         if (n == 0) break;
         if ((uint16_t)(far_len + n) > FAR_CAPACITY) n = (uint16_t)(FAR_CAPACITY - far_len);
         if (n == 0) break;
-        lcopy((uint32_t)(uint16_t)chunk, dst, n);
+        lcopy((uint32_t)(uint16_t)stage, dst, n);
         dst += n; far_len = (uint16_t)(far_len + n);
     }
     plat_close();

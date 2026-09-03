@@ -17,9 +17,28 @@ __basic_zp_end = 0x0090;
 
 MEMORY {
     /* Resident code, stopping short of the window. */
-    ram (rw) : ORIGIN = 0x2001, LENGTH = 0x9fff       /* $2001..$BFFF */
+    /* SHORT OF THE STACK ON PURPOSE, the same guard trek128.ld keeps. The soft
+     * stack starts at $C000 and grows DOWN, so the last kilobyte below it is
+     * left unallocated: overflowing .bss into the stack is then a LINK ERROR
+     * rather than a program that runs and quietly corrupts itself. */
+    ram (rw) : ORIGIN = 0x2001, LENGTH = 0x9bff       /* $2001..$BBFF */
 
-    /* The one window every overlay is linked to run at. */
+    /* The window sits at $B000, NOT $C000, and the reason is the soft stack.
+     *
+     * __stack is $D000 and grows DOWN, so a window at $C000..$CFFF is exactly
+     * where the stack lives. This script said $C000 for an afternoon with a
+     * comment calling the stack "a tripwire" that this code never uses --
+     * which was true only while nothing took the address of a local. far_read
+     * DMAs into a `uint8_t note[2]` on the stack, and the moment the music
+     * driver started calling it every frame the overlay window and the stack
+     * were the same memory. The screen went purple and stayed there.
+     *
+     * trek128.ld carries the same warning about __stack and guards for it.
+     * Same trap, same machine-shaped reason, second port.
+     *
+     * RESOLVED by moving the STACK instead of the window: __stack is $C000 now
+     * and grows down through the guard above, so the window has $C000..$CFFF
+     * to itself and the two can never meet. */
     window (rwx) : ORIGIN = 0xC000, LENGTH = 0x1000   /* $C000..$CFFF */
 
     /* Image staging, exactly as trek128.ld does it: one region per overlay so
@@ -41,10 +60,9 @@ MEMORY {
 INCLUDE commodore.ld
 INPUT(unmap-basic.o)
 
-/* The soft stack sits above the window and is not really used: llvm-mos gives
-   a non-reentrant program a STATIC stack, and this code has no recursion and
-   no alloca -- the same analysis trek128.ld records. It is a tripwire. */
-__stack = 0xd000;
+/* $C000, growing DOWN into the kilobyte of guard reserved above -- NOT $D000,
+   which would grow straight through the overlay window. */
+__stack = 0xc000;
 
 SECTIONS {
     .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0

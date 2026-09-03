@@ -30,8 +30,8 @@
 #define SR_FLAT 0xF0
 #define BEEP_TENTHS 44      /* 440Hz, the same A the C128 port beeps */
 
-static uint16_t mus, sfx;
-static uint8_t  mus_on, sfx_on, mus_track;
+static uint16_t mus, sfx, mus_base;
+static uint8_t  mus_on, sfx_on, mus_track, mus_ok;
 static uint8_t  note_left, sfx_left;
 static uint8_t  enabled = 1;
 static uint16_t acc;
@@ -63,19 +63,33 @@ void snd_toggle(void) { enabled = !enabled; if (!enabled) snd_off(); }
 uint8_t snd_enabled(void) { return enabled; }
 
 void snd_music(uint8_t track) {
-    if (!enabled || track >= MUS_COUNT) return;
-    mus_track = track; mus = mus_offset[track]; mus_on = 1; note_left = 0;
+    if (!enabled || !mus_ok || track >= MUS_COUNT) {
+        mus_on = 0; voice_off(V1); return;
+    }
+    mus_track = track;
+    mus = (uint16_t)(mus_base + mus_offset[track]);
+    mus_on = 1; note_left = 0;
 }
 void snd_music_off(void) { mus_on = 0; voice_off(V1); }
 
-/* The C128 needs to be told where the notes landed in bank 1; here they are
-   already in the pool and the base is always zero. Kept so ui.c/main.c can
-   call it without knowing. */
-void snd_music_data(unsigned int base, unsigned char ok) { (void)base; (void)ok; }
+/* WHERE THE NOTES LANDED IN THE POOL, and this is not optional.
+ *
+ * far_load APPENDS, so STRINGS.DAT goes in first and MUSIC.DAT starts after
+ * it -- around offset 7,284, not zero. The first version of this function
+ * threw the base away on the reasoning that "here they are already in the pool
+ * and the base is always zero", which is true of neither. snd_music() then
+ * read its notes from the START OF THE STRING POOL: the first byte pair there
+ * is a zero duration, so every track ended before its first note and the title
+ * screen came up silent. Jamie heard it. */
+void snd_music_data(unsigned int base, unsigned char ok) {
+    mus_base = (uint16_t)base;
+    mus_ok = ok;
+}
 
 void snd_effect(uint8_t which) {
-    if (!enabled || which >= MUS_COUNT) return;
-    sfx = mus_offset[which]; sfx_on = 1; sfx_left = 0;
+    if (!enabled || !mus_ok || which >= MUS_COUNT) return;
+    sfx = (uint16_t)(mus_base + mus_offset[which]);
+    sfx_on = 1; sfx_left = 0;
 }
 void snd_beep(void) { voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0; }
 
@@ -87,7 +101,7 @@ static void tick(void) {
             uint8_t note[2];
             far_read(mus, note, 2);
             if (note[0] == 0) {                 /* end of track: loop it */
-                mus = mus_offset[mus_track];
+                mus = (uint16_t)(mus_base + mus_offset[mus_track]);
                 far_read(mus, note, 2);
                 if (note[0] == 0) { mus_on = 0; voice_off(V1); return; }
             }

@@ -89,6 +89,25 @@ of an MMU dance, and `far_read` is a DMA burst.
     window      4,096 bytes              ($C000..$CFFF)
     images     40,960 bytes              banked at $50000, from OVERLAYS.BIN
 
+## Running it, and why that is still awkward
+
+Xemu's `-virtsd` presents a plain directory as the card, which is the only
+provisioning that has worked here. But the MEGA65 ROM runs its **ONBOARDing
+utility** on a card without Xemu's signature, and that needs a human to press
+RETURN and approve an FPGA-reconfiguration dialog -- which then RESETS the
+machine and runs onboarding again. So `-virtsd` cannot be driven headlessly,
+and `-screenshot`/`-dumpscreen` (which flush on SIGTERM and work fine for the
+smoke build) capture the onboarding screen instead of the game.
+
+Three attempts at a persistent image the Hypervisor would accept all failed: a
+bare FAT32 with no partition table; an MBR plus FAT32, which it could not
+`CHDIR /` into; and a blank card offered to its own FDISK+FORMAT utility, which
+cannot work because that utility is a file **on** the card.
+
+**This is the thing to solve before any more MEGA65 work.** Until it is,
+verification means asking a human what is on the screen, which is slow and --
+as below -- unreliable in a way that wasted a whole debugging session.
+
 ## What is verified, and what is not
 
 **Verified:** the toolchain, the video layer and the palette — the smoke build
@@ -124,3 +143,33 @@ llvm-mos binaries do not reliably return to BASIC.
 
 `-dumpscreen` writes the character matrix as text, so a layout can be asserted
 by reading it rather than by looking at a picture.
+
+
+## A debugging session spent on a phantom
+
+Worth recording because the lesson is not about the MEGA65.
+
+The game reached its **title screen** once, drawn from the shared `ui.c` with
+the overlay DMA path working. The only fault was silence. The music base fix
+went in, and the next three runs came back "purple screen" -- so the fix looked
+like a regression, and two rounds of analysis went into finding what the sound
+driver could possibly have broken. A linker-script collision between the
+overlay window and the soft stack was found and fixed on the strength of it.
+
+**The purple screen was the ONBOARDING SCREEN**, dimmed behind one of Xemu's
+own modal dialogs. It was never the game. The runs had never got as far as our
+code.
+
+Two things went wrong, and only one of them was the emulator's fault:
+
+  * **A screenshot would have settled it in seconds** and I had no way to take
+    one, so I reasoned from a three-word description instead. "Screenshot
+    before theorising" is written down in this project already.
+  * **I asked for a colour, not for a picture.** "Still purple" is consistent
+    with a dozen states; the actual screen was unambiguous the moment it was
+    seen.
+
+The window/stack fix stands on its own -- `__stack` at $D000 really did grow
+down through a window at $C000, and `far_read` really does DMA into a stack
+local -- but it was found by accident while chasing something that was not
+happening.

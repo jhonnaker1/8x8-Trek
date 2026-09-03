@@ -16,6 +16,9 @@
 #include <mega65/fileio.h>
 #include "../../core/storage.h"
 
+/* read512() delivers a whole sector, so this buffer cannot be smaller -- the
+   Hypervisor decides the size, not us. It is the single biggest thing this
+   port keeps in bank 0 and it earns its place. */
 #define SECTOR 512
 
 static uint8_t  open_fd = 0xFF;
