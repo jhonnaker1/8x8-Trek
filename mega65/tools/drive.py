@@ -17,7 +17,21 @@ tools/putfiles.sh before testing a release build again.
 """
 import os, re, signal, socket, subprocess, sys, time
 
-KB_INJECT = 0x6B          # from `llvm-nm build/egatrek-debug.elf`
+def kb_inject_addr(elf):
+    """Look kb_inject up rather than hardcoding it.
+
+    IT MOVES. This was a literal 0x6B for one afternoon, and the moment the
+    build changed it pointed at some other variable: the driver poked a byte
+    nobody read, every key was 'never consumed', and the failure looked like
+    the game hanging."""
+    import subprocess
+    nm = subprocess.check_output(
+        [os.path.expanduser("~/llvm-mos/bin/llvm-nm"), elf]).decode()
+    for ln in nm.splitlines():
+        f = ln.split()
+        if len(f) == 3 and f[2] == "kb_inject":
+            return int(f[0], 16)
+    raise SystemExit("drive: no kb_inject in %s -- is this the `make debug` build?" % elf)
 NAMED = {"RETURN": 0x0D, "SPACE": 0x20, "ESC": 0x1B, "DEL": 0x14,
          "UP": 0x91, "DOWN": 0x11}
 
@@ -34,6 +48,7 @@ def main():
     out, keys = sys.argv[1], [key(t) for t in sys.argv[2:]]
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(here)
+    KB_INJECT = kb_inject_addr("build/egatrek-debug.elf")
     subprocess.check_call(["sh", "tools/putfiles.sh", "build/OVERLAYS-DEBUG.BIN"],
                           stdout=subprocess.DEVNULL)
     # putfiles keeps the source name; the game opens OVERLAYS.BIN.

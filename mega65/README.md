@@ -166,8 +166,8 @@ The string pool is byte-exact against the file, and so are MUSIC.DAT, all ten
 overlay images in banked RAM, and the window after an `ovl_load` -- checked
 with `-dumpmem` rather than by looking at the screen.
 
-**Sound does not work**, and the briefing bug below is fixed. Jamie played the
-release build on 2026-09-03; see "Sound is diagnosed, not fixed".
+Jamie played the release build on 2026-09-03 and found three faults; sound and
+the briefing are fixed below, and one crash remains unexplained.
 
 ## The bug that was actually there
 
@@ -209,53 +209,64 @@ registers and memory. Three earlier hypotheses -- a wrong window address, a
 zero-page clash, banked RAM that was not RAM -- were each disproved in minutes
 once a probe was written, and each had taken an hour to argue about first.
 
-## Sound is diagnosed, not fixed
+## Sound works, and the day it cost is the lesson
 
 **`snd_poll()` was never called.** Not from the game, not from anywhere -- only
-`smoke2.c` ever called it, which is why the driver had been "verified" without
-a note ever being played. The C128 port ticks it from inside the key scan;
-this port's `kb_waitkey()` just spun.
+`smoke2.c` ever called it, which is how a sound driver was written, linked and
+called "verified" without a note ever being played. The C128 port ticks it from
+inside the key scan; this port's `kb_waitkey()` just spun. Three faults, all
+fixed:
 
-Two more real faults were found behind it and ARE fixed, dormant until the call
-site can be restored:
-
+  * **No call site at all.** `snd_poll()` now runs in the key wait loop, which
+    is where the C128 has it.
   * **Tempo used the NTSC constant on a PAL machine.** `snd_tick_num()`
     converts frames to the original's 18.2Hz ticks and the numerators differ by
     19% (363 against 304). The old comment said region detection was
     unnecessary because the MEGA65 clocks its SIDs at a fixed rate -- true of
-    PITCH, and `snd_tick_num` is not pitch. `detect_region()` is now here.
+    PITCH, and `snd_tick_num` is not pitch. `detect_region()` reads the raster
+    and gets PAL under Xemu.
   * **The VIC registers read as a constant.** `$D011`/`$D012` need
     `mega65_io_enable()` first; the Hypervisor's file calls leave the I/O
-    context changed and nothing restored it between there and here.
+    context changed and nothing restored it in between, so `detect_region()`
+    called every machine NTSC and no frame was ever seen.
 
-**WHY THE CALL SITE IS STILL COMMENTED OUT.** With `snd_poll()` in the key
-loop the machine wedges within ten seconds, every time, into a DMA whose
-descriptor has two bytes wrong -- Xemu stops with "unhandled memory read", the
-screen blanks, and the PC is inside `lcopy`. Confirmed on screen by Jamie, not
-just headless. A **single volatile read of `$D012`** in that loop and nothing
-else was enough to cause it; an empty function call in the same place was
-harmless.
+Measured after: 73 notes in twenty seconds, region PAL, `last_raster` 311 --
+which is PAL's last line.
 
-What is known, and it is not a mechanism:
+### What it cost, and why
 
-  * The descriptor is an `ovl_load` job with `source_bank` and the low byte of
-    `dest_addr` overwritten -- two adjacent bytes.
-  * `dmalist` is a 20-byte volatile struct that llvm-mos had placed in ZERO
-    PAGE, and the corrupted bytes were inside it. The linker says nothing else
-    is allocated there.
-  * Moving the transfers this port controls onto their own descriptor in
-    `.bss` (`trek_dma()` in `m65mem.c`) makes the reproducer survive 20 seconds
-    instead of 2 -- **but only while the raster read is absent**. Restore the
-    read and it fails again in 2 seconds.
-  * The KERNAL jiffy at `$A0..$A2` was tried as a frame source that cannot
-    fault. It is useless here: nothing increments it, so no ROM interrupt is
-    running -- which also rules out an IRQ handler as the writer.
+Adding the call made the machine wedge within ten seconds, every time, into a
+DMA with a corrupted descriptor. That was chased for hours through five
+hypotheses -- a runaway soft stack, a zero-page clash, an IRQ handler, reading
+`$D012` at high frequency, the DMA job living in zero page -- and a working
+sound fix was backed out and written up as unfixable.
 
-So the writer of those two bytes is **not identified**, and a silent title
-screen ships instead of a crash. `trek_dma()` stays regardless: it is a real
-robustness win, and **Jamie's original crash was the same shape** -- a DMA
-source of `$454854`, whose low bytes are the ASCII "THE", i.e. text written
-over a descriptor after a full game.
+**Every one of those runs had a STALE OVERLAYS.BIN on the card.** `make sd`
+had been skipped and a `build/disk` snapshot copied instead, so the images were
+from an older link than the PRG. The game loaded them, jumped into the middle
+of some other function, and the machine reset. Two separate wrong conclusions
+were reported to Jamie before the card was checked.
+
+Three things made it worse, and all three are fixed:
+
+  * **A "no crash" result was read as success without looking at the picture.**
+    The run that shipped as "stable" was a BASIC prompt for twenty seconds. The
+    check was `dialogs=0` and an uptime, which a machine that never started
+    passes perfectly.
+  * **Memory dumps were read at hardcoded addresses** that had moved between
+    builds, so "the music driver never ticks" was three unrelated variables.
+    `tools/` reads symbols out of the ELF now, and so does `drive.py`, whose
+    `kb_inject` address had gone stale the same way.
+  * **Nothing tied the two files together.** Now the Makefile writes
+    `ovl_load`'s address into the last two bytes of OVERLAYS.BIN and
+    `ovl_init()` checks it, so a mismatch is a message on screen naming the
+    problem instead of a reset to BASIC. Verified by breaking it on purpose.
+
+`trek_dma()` in `m65mem.c` -- our own DMA descriptor in `.bss` rather than the
+zero-page one llvm-mos gives mega65-libc -- was written during the hunt and is
+kept. It was never the cure, and Jamie's hall-of-fame crash (a DMA source of
+`$454854`, whose low bytes are the ASCII "THE") has NOT been reproduced since
+and is not explained. **Treat it as open.**
 
 ## The briefing did nothing, and why
 

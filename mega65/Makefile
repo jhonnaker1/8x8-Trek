@@ -91,6 +91,15 @@ $(OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld
 	    python3 -c "import sys;d=open('build/ovl$$o.bin','rb').read(); \
 	        open('build/OVERLAYS.BIN','ab').write(d + b'\\0'*(4096-len(d)))"; \
 	done
+	@# THE STAMP THAT TIES THE TWO FILES TOGETHER -- see m65mem.c. ovl_load's
+	@# address comes from this link, so images and program can only agree if
+	@# they were built together. Written into the last overlay's padding.
+	@python3 -c "import subprocess,os; \
+	    nm=subprocess.check_output(['$(LLVM_MOS)/bin/llvm-nm','build/egatrek.elf']).decode(); \
+	    a=[int(l.split()[0],16) for l in nm.splitlines() if l.split()[-1]=='ovl_load'][0]; \
+	    f=open('build/OVERLAYS.BIN','r+b'); f.seek(-2,2); \
+	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close(); \
+	    print('mega65: overlay stamp', hex(a))"
 	@python3 -c "import os; r=os.path.getsize('$(OUT)')-2; \
 	    print('mega65: resident %d bytes of 40959, %d free' % (r, 40959-r)); \
 	    print('mega65: OVERLAYS.BIN %d bytes' % os.path.getsize('build/OVERLAYS.BIN'))"
@@ -116,6 +125,11 @@ $(DEBUG_OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld Makefile
 	    python3 -c "import sys;d=open('build/dovl$$o.bin','rb').read(); \
 	        open('build/OVERLAYS-DEBUG.BIN','ab').write(d + b'\\0'*(4096-len(d)))"; \
 	done
+	@python3 -c "import subprocess; \
+	    nm=subprocess.check_output(['$(LLVM_MOS)/bin/llvm-nm','build/egatrek-debug.elf']).decode(); \
+	    a=[int(l.split()[0],16) for l in nm.splitlines() if l.split()[-1]=='ovl_load'][0]; \
+	    f=open('build/OVERLAYS-DEBUG.BIN','r+b'); f.seek(-2,2); \
+	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close()"
 
 smoke: $(SMOKE_OUT)
 

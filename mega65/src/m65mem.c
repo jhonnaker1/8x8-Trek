@@ -18,6 +18,8 @@
 #include "../../core/overlay.h"
 #include "../../core/farmem.h"
 #include "../../core/storage.h"
+#include "m65vid.h"
+#include "../../core/ega.h"
 
 /* OVERLAYS, AND WHY THIS PORT STILL HAS THEM.
  *
@@ -81,6 +83,26 @@ static void trek_dma(uint32_t src, uint32_t dst, uint16_t n) {
 #define OVL_IMAGES   0x50000UL     /* banked RAM, loaded once at startup */
 #define OVL_SIZE     0x1000UL
 
+/* THE STALE-OVERLAY TRAP, AND WHY THERE IS A CHECK FOR IT.
+ *
+ * OVERLAYS.BIN is linked WITH the resident half: every call an overlay makes
+ * into resident code is a fixed address from that same link. Put yesterday's
+ * images on the card beside today's PRG and the game loads them, jumps into
+ * what is now the middle of some other function, and the machine resets to a
+ * BASIC prompt. There is no error, and nothing on screen says which of the two
+ * files is wrong.
+ *
+ * That cost most of an afternoon on 2026-09-03, twice: a `make sd` was skipped,
+ * a stale build/disk snapshot went onto the card instead, and the resulting
+ * crashes were attributed first to the sound driver and then to reading $D012.
+ * Both were innocent. The sound driver had been backed out and written up as
+ * unfixable before the card was checked.
+ *
+ * So the two files carry a stamp that can only agree if they came from the same
+ * link: the Makefile writes the address of ovl_load into the last two bytes of
+ * OVERLAYS.BIN, which fall inside the final overlay's zero padding. */
+#define OVL_STAMP    (OVL_COUNT * OVL_SIZE - 2)
+
 /* THE WINDOW'S ADDRESS COMES FROM THE LINKER, never from a number typed twice.
  * It was typed twice for about an hour: mega65.ld moved the window from $B000
  * to $C000 and this file still said $B000, so every ovl_load DMA'd four
@@ -125,6 +147,22 @@ static uint8_t ovl_init(void) {
         dst += n;
     }
     plat_close();
+
+    /* SAY SO ON SCREEN rather than jumping into whatever the mismatched image
+       holds. A wrong answer here is not recoverable, so this does not return. */
+    {
+        uint16_t stamp = (uint16_t)(lpeek(OVL_IMAGES + OVL_STAMP)
+                       | ((uint16_t)lpeek(OVL_IMAGES + OVL_STAMP + 1) << 8));
+        if (stamp != (uint16_t)(uint16_t)&ovl_load) {
+            scr_clear();
+            scr_puts(2, 2, "OVERLAYS.BIN IS FROM A DIFFERENT BUILD", EGA_LTRED);
+            scr_puts(2, 4, "THE IMAGES ON THE DISK AND THE PROGRAM IN", EGA_WHITE);
+            scr_puts(2, 5, "MEMORY MUST COME FROM THE SAME LINK.", EGA_WHITE);
+            scr_puts(2, 7, "RUN 'MAKE SD' AND START AGAIN.", EGA_LTCYAN);
+            for (;;) { }
+        }
+    }
+
     ovl_live = OVL_NONE;
     return 1;
 }

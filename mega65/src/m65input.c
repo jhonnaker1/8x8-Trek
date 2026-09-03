@@ -67,12 +67,12 @@ char kb_waitkey(void) {
             return c;
         }
 #endif
-        /* THE MUSIC DRIVER SHOULD TICK HERE and does not. This is where the
-           C128 port ticks it, and putting the call here makes the machine
-           wedge into a corrupted DMA within ten seconds -- see "Sound is
-           diagnosed, not fixed" in the README, which has the whole
-           measurement. Left out rather than shipped: a silent title screen is
-           a missing feature, a crash is a broken game. */
+        /* THE MUSIC DRIVER TICKS HERE, and this is its only call site --
+           exactly as on the C128, where snd_poll() lives inside the key scan.
+           Without it the title track never advanced a note and the machine was
+           silent. snd_poll() detects frames itself, so spinning through it
+           thousands of times a second is correct. */
+        snd_poll();
         kb_entropy++;
         k = kb_poll();
         if (k != KB_NONE) return k;
