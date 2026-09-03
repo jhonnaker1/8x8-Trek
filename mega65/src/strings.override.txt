@@ -1,0 +1,9 @@
+# Per-port text, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override mega65/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, and nothing else -- the generator owns the numbering,
+# so both ports build the same strdata.h and the same STR_COUNT. Only the two
+# strings that name the machine differ.
+0	 MEGA65 PORT 
+82	TO THE MEGA65.

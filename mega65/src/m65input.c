@@ -25,6 +25,15 @@
 
 uint16_t kb_entropy;
 
+#ifdef TREK_DEBUG_INPUT
+/* Scripted input, debug builds only -- the same byte the C128 port carries,
+   for the same reason and poked the same way. Xemu's uart monitor can write
+   memory but CANNOT fake a keypress: $D610 POPS the queue when written, so
+   there is no way in from outside. Without this, a headless run can be
+   screenshotted at the title screen and nowhere past it. */
+volatile unsigned char kb_inject = 0;
+#endif
+
 void kb_init(void) { ASCIIKEY = 0; }
 
 static char translate(unsigned char c) {
@@ -50,6 +59,13 @@ char kb_waitkey(void) {
     /* The same entropy trick the C128 port uses: count the polls spent waiting
        for the player, and seed the galaxy from it. */
     for (;;) {
+#ifdef TREK_DEBUG_INPUT
+        if (kb_inject) {
+            char c = (char)kb_inject;
+            kb_inject = 0;
+            return c;
+        }
+#endif
         kb_entropy++;
         k = kb_poll();
         if (k != KB_NONE) return k;

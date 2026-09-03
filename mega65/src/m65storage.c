@@ -42,6 +42,14 @@ static char namebuf[20];
  * self-contained: nothing above this file has to know. */
 static void after_hyppo(void) { mega65_io_enable(); }
 
+/* AND THE CALLS THEMSELVES GO THROUGH A SHIM -- see m65hyppo.s. The library's
+   file routines are assembly that clobbers llvm-mos's pseudo-registers without
+   saying so, which miscompiled the loop below into one that ignored `len`
+   entirely. Nothing in this file calls open/read512/close directly any more. */
+uint16_t trek_read512(uint8_t *buf);
+uint8_t  trek_open(const char *name);
+void     trek_close(uint8_t fd);
+
 static char *fixname(const char *name) {
     uint8_t i = 0;
     while (name[i] && i < sizeof namebuf - 1) {
@@ -56,14 +64,14 @@ static char *fixname(const char *name) {
 uint8_t plat_read_all(const char *name, void *dst, uint16_t max, uint16_t *got) {
     uint8_t *out = (uint8_t *)dst;
     uint16_t total = 0;
-    uint8_t fd = open(fixname(name));
+    uint8_t fd = trek_open(fixname(name));
     after_hyppo();
 
     if (got) *got = 0;
     if (fd == 0xFF) return STOR_NOTFOUND;
 
     for (;;) {
-        size_t n = read512(buf);
+        uint16_t n = trek_read512(buf);
         after_hyppo();
         if (n == 0) break;
         if (total + n > max) n = max - total;
@@ -71,7 +79,7 @@ uint8_t plat_read_all(const char *name, void *dst, uint16_t max, uint16_t *got) 
         total = (uint16_t)(total + n);
         if (total >= max) break;
     }
-    close(fd); after_hyppo();
+    trek_close(fd); after_hyppo();
     if (got) *got = total;
     return STOR_OK;
 }
@@ -82,7 +90,7 @@ uint8_t plat_write_all(const char *name, const void *src, uint16_t len) {
 }
 
 uint8_t plat_open(const char *name) {
-    open_fd = open(fixname(name));
+    open_fd = trek_open(fixname(name));
     after_hyppo();
     if (open_fd == 0xFF) return STOR_NOTFOUND;
     buf_len = buf_pos = 0;
@@ -95,7 +103,7 @@ uint16_t plat_read(void *dst, uint16_t len) {
     if (open_fd == 0xFF) return 0;
     while (done < len) {
         if (buf_pos >= buf_len) {
-            size_t n = read512(buf);
+            uint16_t n = trek_read512(buf);
             after_hyppo();
             if (n == 0) break;
             buf_len = (uint16_t)n; buf_pos = 0;
@@ -106,5 +114,5 @@ uint16_t plat_read(void *dst, uint16_t len) {
 }
 
 void plat_close(void) {
-    if (open_fd != 0xFF) { close(open_fd); after_hyppo(); open_fd = 0xFF; }
+    if (open_fd != 0xFF) { trek_close(open_fd); after_hyppo(); open_fd = 0xFF; }
 }

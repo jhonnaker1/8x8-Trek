@@ -135,31 +135,17 @@ says how far it got. All of these pass:
 
 And the real binary reaches `MAIN REACHED`, `LOOP TOP`, `MUSIC OK`, `OVL OK`.
 
-**THE ONE REMAINING FAULT: `ui_title()` draws nothing.** The markers printed
-before it SURVIVE, which is the informative part -- `ui_title()` opens with a
-screen clear, so it is not merely drawing wrong, it is not reaching its own
-first statement. The overlay window demonstrably holds valid code and
-`OVL_TITLE` is index 8 in both the header and the Makefile's image order, so
-the image is the right one. That is where the next session starts.
+**AND EVERY ONE OF THOSE STAGES PASSED WHILE THE GAME WAS BROKEN**, which is
+the lesson worth keeping. The harness links the same `m65storage.c` and
+`m65mem.c` the game does, and they work here -- because this binary is small
+enough that the register allocator never parks a live value in the pseudo-
+register the library clobbers. The miscompile below needs the whole program to
+appear. A staged harness proves the code it links, not the program.
 
-## Running it, and why it was awkward
-
-Xemu's `-virtsd` presents a plain directory as the card, which is the only
-provisioning that has worked here. But the MEGA65 ROM runs its **ONBOARDing
-utility** on a card without Xemu's signature, and that needs a human to press
-RETURN and approve an FPGA-reconfiguration dialog -- which then RESETS the
-machine and runs onboarding again. So `-virtsd` cannot be driven headlessly,
-and `-screenshot`/`-dumpscreen` (which flush on SIGTERM and work fine for the
-smoke build) capture the onboarding screen instead of the game.
-
-Three attempts at a persistent image the Hypervisor would accept all failed: a
-bare FAT32 with no partition table; an MBR plus FAT32, which it could not
-`CHDIR /` into; and a blank card offered to its own FDISK+FORMAT utility, which
-cannot work because that utility is a file **on** the card.
-
-**This is the thing to solve before any more MEGA65 work.** Until it is,
-verification means asking a human what is on the screen, which is slow and --
-as below -- unreliable in a way that wasted a whole debugging session.
+**RESOLVED 2026-09-03, and it was never `ui_title()`.** This paragraph used to
+say the title screen "is not reaching its own first statement", reasoned from
+the markers before it surviving. They survive because the program had no title
+overlay to run. See "The bug that was actually there", below.
 
 ## What is verified, and what is not
 
@@ -169,14 +155,59 @@ their EGA index. The full game **links** at the sizes above with `-Wall
 -Werror`. The shared `ui.c`, `main.c`, `strpool.c` and `layout.c` compile for
 this target unchanged, which is the real portability result.
 
-**NOT verified: the game running.** Xemu will not mount a fresh SD image until
-it has written its own system files onto it, and that is a GUI action —
-`Disks -> SD-card -> Update files` — with no command line behind it. So startup,
-file loading, the DMA overlay path, input and sound have not been seen working.
+**Verified 2026-09-03: the game runs.** Startup, the three file loads, the
+DMAgic overlay path, input and the console all work. The release build reaches
+its title screen and blocks in `kb_waitkey()` with the screen drawn; driven
+headlessly from there through setup into the nine-panel console; and a `MSGS`
+command pages an overlay in over a live console, so runtime overlay swapping
+works too. `make drive` reproduces all of it.
 
-`make sd-setup` opens Xemu on the built image for that one-time step; after it,
-`make run` should work. Until someone does it, treat this port as **compiled
-and unproven**.
+The string pool is byte-exact against the file, and so are MUSIC.DAT, all ten
+overlay images in banked RAM, and the window after an `ovl_load` -- checked
+with `-dumpmem` rather than by looking at the screen.
+
+**Sound is the one thing still taken on trust.** It is generated and the driver
+runs, but nothing has listened to it.
+
+## The bug that was actually there
+
+`plat_read(stage, 64)` was reading **whole files in a single call** and
+returning their length modulo 256. Measured on the machine with Xemu's uart
+monitor, breaking on the instruction that stores `far_len`: the entire startup
+produced two hits, `far_len := 116` for a 7,284-byte STRINGS.DAT and `+156` for
+a 412-byte MUSIC.DAT.
+
+The generated loop kept its remaining count in `$81/$82` and tested it there,
+but emitted its decrement against `__rc24`. Nothing decremented the tested
+value, so the loop ran until EOF, and `done` came out eight bits wide.
+
+**The cause is that mega65-libc's `fileio.s` is hand-written assembly that
+clobbers llvm-mos's zero-page pseudo-registers without declaring it** -- `stx
+__rc4 / sty __rc5` around the hyppo trap, and the trap returns through
+registers the compiler was never told about. Stamping zero page after `open()`
+and reading it back across one `read512()` shows `$06`, `$07` and `$16`
+changing. Believing the call clobbers nothing, the compiler kept a live value
+in one of them.
+
+`src/m65hyppo.s` wraps `open`, `read512` and `close` and saves all 32
+pseudo-registers across them. That is about 130 cycles against a hypervisor
+trap and a 512-byte DMA, and it costs roughly a kilobyte of resident space,
+because the compiler now knows it must preserve registers around the call. The
+loop then compiled correctly.
+
+**Why it took so long.** Every read SUCCEEDED -- every sector shows in the HDOS
+log -- so the loop looked healthy while the destination pointer stood still.
+`far_load` wrote one chunk to the pool base, `ovl_init` never wrote to banked
+RAM at all, and `ovl_load` then DMA'd four kilobytes of uninitialised memory
+into the window. `ui_title()` was called into that. It was always fine.
+
+**The instruments that settled it**, neither of which was being used: `-dumpmem`
+writes 384K of linear RAM on SIGTERM, and `llvm-nm` on the ELF turns that dump
+into the value of every static after the fact -- no on-screen instrumentation
+and no perturbing the build. `-uartmon` opens a unix socket with breakpoints,
+registers and memory. Three earlier hypotheses -- a wrong window address, a
+zero-page clash, banked RAM that was not RAM -- were each disproved in minutes
+once a probe was written, and each had taken an hour to argue about first.
 
 ## It found a bug in the C128 port
 
@@ -190,12 +221,37 @@ now build with `-Werror`.
 
 ## Verifying it
 
-Xemu flushes `-screenshot` **and** `-dumpscreen` on **SIGTERM**, which is what
-makes a program with no exit path checkable — `-prgexit` never fires, because
-llvm-mos binaries do not reliably return to BASIC.
+Xemu flushes `-screenshot`, `-dumpscreen` and `-dumpmem` on **SIGTERM**, which
+is what makes a program with no exit path checkable — `-prgexit` never fires,
+because llvm-mos binaries do not reliably return to BASIC. (`-dumpscreen` has
+produced nothing for this port; the other two are what get used.)
 
-`-dumpscreen` writes the character matrix as text, so a layout can be asserted
-by reading it rather than by looking at a picture.
+**`-dumpmem` is the instrument that matters.** It writes 384K of linear RAM,
+laid out flat, so `d[0x2001:]` is the loaded PRG, `$20000` is the ROM, `$40000`
+is the string pool and `$50000` the overlay images. Run `llvm-nm` on the ELF and
+every static in the program becomes readable after the fact — `far_len`,
+`ovl_live`, the DMA descriptor — with no on-screen instrumentation and nothing
+perturbed. Adding printouts to chase this bug changed the register allocation
+and made it move.
+
+**`-uartmon <socket>`** opens a MEGA65 serial monitor on a unix socket: `r` for
+registers, `m<28-bit addr>` to read, `s<addr> <bytes>` to write, `b<addr>` to
+break, `t0` to resume. A breakpoint on one store settled in seconds what a day
+of reasoning had not.
+
+**`make drive`** runs the instrumented build headlessly and screenshots the
+result:
+
+    make debug
+    python3 tools/drive.py out.png RETURN N RETURN N RETURN J A M I E RETURN 3 RETURN X RETURN
+
+Xemu cannot inject a keystroke — `$D610` is the ASCII key register and writing
+it POPS the queue rather than filling it — so the debug build carries
+`kb_inject` (as the C128 port does) and the driver pokes it through the monitor.
+It **handshakes on the byte**, waiting for the game to zero it before sending
+the next: `kb_inject` holds one key, and a fixed delay silently lost six of them
+across the disk load between the briefing question and the setup screen, which
+put every later answer on the wrong question.
 
 
 ## A debugging session spent on a phantom

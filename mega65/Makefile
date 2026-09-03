@@ -6,6 +6,12 @@
 # colour RAM is the full 2000 cells rather than the 1K window at $D800.
 # llvm-mos's mega65 target does that for us.
 
+# STATED, NOT POSITIONAL. make's default goal is whatever target it reads
+# first, and this file grew a smoke harness above `all:` -- so a bare `make`
+# here built build/smoke2.prg and not the game, for as long as the harness has
+# existed. Nobody noticed because every command in the README says `make all`.
+.DEFAULT_GOAL := all
+
 LLVM_MOS  ?= $(HOME)/llvm-mos
 M65CC      = $(LLVM_MOS)/bin/mos-mega65-clang
 
@@ -26,7 +32,7 @@ M65ROM  ?= $(HOME)/Library/Application Support/xemu-lgb/mega65/MEGA65.ROM
 SHARED = ../c128/src/ui.c ../c128/src/main.c ../c128/src/layout.c \
          ../c128/src/strpool.c \
          ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
-PLATFORM = src/m65vid.c src/m65input.c src/m65snd.c src/m65storage.c \
+PLATFORM = src/m65vid.c src/m65input.c src/m65snd.c src/m65storage.c src/m65hyppo.s \
            src/m65mem.c src/music_data.c
 SRC = $(SHARED) $(PLATFORM)
 OUT = build/egatrek.prg
@@ -62,7 +68,7 @@ $(SMOKE2_OUT): $(SMOKE2_SRC) src/m65vid.h mega65.ld
 SMOKE_SRC = src/smoke.c src/m65vid.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke smoke2 run run-smoke music disk sd sd-setup clean
+.PHONY: all debug smoke smoke2 run run-smoke drive music disk sd clean
 
 all: $(OUT)
 
@@ -89,6 +95,28 @@ $(OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld
 	    print('mega65: resident %d bytes of 40959, %d free' % (r, 40959-r)); \
 	    print('mega65: OVERLAYS.BIN %d bytes' % os.path.getsize('build/OVERLAYS.BIN'))"
 
+# A SEPARATE binary, deliberately, exactly as the C128 port keeps one:
+# TREK_DEBUG_INPUT compiles in a byte a script can poke to fake a keypress, and
+# the release build must not have it. Its overlay images differ from the release
+# build's, so they are cut from its own ELF and written beside it.
+DEBUG_OUT = build/egatrek-debug.prg
+
+debug: $(DEBUG_OUT)
+
+$(DEBUG_OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld Makefile
+	@mkdir -p build
+	$(M65CC) $(CFLAGS) -DTREK_DEBUG_INPUT $(LDFLAGS) \
+	    -o build/egatrek-debug.elf $(SRC) $(LIBC_A)
+	$(OBJCOPY) -O binary --remove-section=.ovl_* build/egatrek-debug.elf build/egatrek-debug.res
+	@python3 -c "d=open('build/egatrek-debug.res','rb').read(); \
+	    open('$(DEBUG_OUT)','wb').write(bytes([0x01,0x20]) + d)"
+	@rm -f build/OVERLAYS-DEBUG.BIN
+	@for o in $(OVERLAYS); do \
+	    $(OBJCOPY) -O binary --only-section=.ovl_$$o build/egatrek-debug.elf build/dovl$$o.bin; \
+	    python3 -c "import sys;d=open('build/dovl$$o.bin','rb').read(); \
+	        open('build/OVERLAYS-DEBUG.BIN','ab').write(d + b'\\0'*(4096-len(d)))"; \
+	done
+
 smoke: $(SMOKE_OUT)
 
 $(SMOKE_OUT): $(SMOKE_SRC) src/m65vid.h
@@ -106,33 +134,44 @@ DISK = build/disk
 disk: $(OUT)
 	@mkdir -p $(DISK)
 	@cd .. && python3 tools/gen_strings.py >/dev/null && python3 tools/make_music.py >/dev/null
-	@cp ../c128/build/strings.dat $(DISK)/STRINGS.DAT
+	@# THE POOL IS SHARED, THE TWO STRINGS THAT NAME THE MACHINE ARE NOT.
+	@# Same ids, same count, same strdata.h -- see src/strings.override.txt.
+	@cd .. && python3 tools/gen_strings.py --override mega65/src/strings.override.txt \
+	    mega65/build/strings.dat
+	@cp build/strings.dat $(DISK)/STRINGS.DAT
 	@cp ../c128/build/music.dat   $(DISK)/MUSIC.DAT
 	@cp ../c128/src/briefing.txt  $(DISK)/BRIEF.TXT
 	@cp build/OVERLAYS.BIN        $(DISK)/OVERLAYS.BIN
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > $(DISK)/TREK.SCR
 	@ls -l $(DISK)
 
-# The SD image the Hypervisor will accept: an MBR with a FAT32 partition, at
-# least 4GB (it prints "LOOKING FOR SDHC CARD >=4GB" and means it), the ROM at
-# the root, and the game's data files beside it. Sparse, so it costs the few
-# hundred KB actually written.
-SD = build/sd.img
+# THE CARD IS XEMU'S OWN, and that is the whole trick. Three hand-built images
+# failed before this: a bare FAT32, an MBR+FAT32 the Hypervisor would not CHDIR
+# into, and a blank card offered to the format utility that lives ON the card.
+# `-sdimg @mega65.img` names the image in Xemu's own preferences directory,
+# which Xemu partitions, formats and populates itself the first time it creates
+# one -- so it needs no ONBOARDing and nothing waits for a human. The game's
+# files go onto it with mtools; tools/putfiles.sh has the one wrinkle (Xemu's
+# formatter leaves the legacy CHS geometry zeroed and mtools refuses the card
+# until it is patched).
+#
+# There used to be an `sd` target here that built build/sd.img with
+# tools/mksd.py. THE SCRIPT DOES NOT EXIST -- the approach was abandoned for
+# the one above and the rules outlived it, so `make run` had been broken for a
+# day. Both are gone rather than repaired.
+sd: disk
+	sh tools/putfiles.sh $(DISK)/STRINGS.DAT $(DISK)/MUSIC.DAT \
+	    $(DISK)/OVERLAYS.BIN $(DISK)/BRIEF.TXT $(DISK)/TREK.SCR
 
-$(SD): disk
-	python3 tools/mksd.py $(SD) "$(M65ROM)" $(DISK)/*
-
-sd: $(SD)
-
-# ONE-TIME SETUP, and it needs a human: Xemu writes its own system files onto a
-# new card through Disks -> SD-card -> Update files, and there is no command
-# line for it. Run this once, do that, quit; after which `make run` works.
-sd-setup: $(SD)
-	$(XMEGA65) -rom "$(M65ROM)" -sdimg $(CURDIR)/$(SD)
-
-run: $(SD)
-	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -sdimg $(CURDIR)/$(SD) \
+run: sd
+	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -sdimg @mega65.img \
 	    -prg $(CURDIR)/$(OUT)
+
+# Headless, scripted, and screenshotted -- how this port is actually checked.
+# `make debug` first: the release build has no kb_inject to poke.
+DRIVE_KEYS ?= RETURN N RETURN N RETURN J A M I E RETURN 3 RETURN X RETURN
+drive: debug disk
+	python3 tools/drive.py build/screen.png $(DRIVE_KEYS)
 
 run-smoke: $(SMOKE_OUT)
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -prg $(CURDIR)/$(SMOKE_OUT)
