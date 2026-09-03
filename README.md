@@ -140,21 +140,57 @@ still an open question, and only playing it will answer that one too.
 
 ## Targets
 
-| Platform | Display | Status | Notes |
-|---|---|---|---|
-| **Commodore 128 (VDC)** | 80×25 text, 8×8 cell | Feature complete | The console is an 80×25 grid at EGA's 8×14 — the VDC maps it **1:1**. Same sixteen colours as EGA but at different indices (`I R G B` vs `R G B I`), so conversion is a 4-bit rotate; 15 of 16 exact, EGA's brown reads olive. Per-cell foreground only; coloured panel fills need the reverse-video bit. |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×200 hires, 16 colours | Designed | Same width and colour count as mode 10h, and EGA's 2-bit-per-gun levels land exactly on `$0/$5/$A/$F`, so the palette is reproduced rather than approximated. One binary for PAL and NTSC. |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 640×200 bitmap, 16 colours | Designed | VBXE's **HR** overlay mode is 640×N at 4bpp — the same spec as the Amiga target, with a blitter. Verified against Altirra's `vbxe.cpp`, not the documentation. |
+**Tier 1 — 80 columns and 16 colours.** The console is a 80×25 grid of
+per-cell colour; anything that can hold that runs the game as designed.
 
-Ordering between the Amiga and VBXE legs is still open. The 40-column colour
-machines (C64, Plus/4, CBM-II, MEGA65, CoCo 3) are viable but need a paged UI,
-since a nine-panel console does not fit in 40 columns.
+| Platform | Display | CPU | Status |
+|---|---|---|---|
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.9.0](../../releases/latest) |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | Designed — the friendliest target on the list |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | Designed |
+| **Foenix F256** | Vicky text 80×60, per-cell colour via CLUTs | 65C02 | Designed |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)**, HR mode | 640×N bitmap, 16 colours | 6502 | Designed |
+
+**Tier 2 — CoCo 3.** Verified on a real ROM in XRoar: `WIDTH 80` plus `ATTR`
+gives eight distinct hues from a reprogrammable 64-colour palette. Eight is
+exactly what the console needs, so it fits — tightly. A fourth CPU family
+(6809), toolchain already proven here.
+
+**Tier 3 and out.** MSX2 has 80 columns but the colour collapses. The whole
+Atari ST line is out — 640×200 costs all but four colours (Jamie's call). The
+stock Atari 800XL is out too: ANTIC stops at 40 columns, and only VBXE brings
+it back in. The 40-column colour machines (C64, Plus/4, CBM-II) are viable but
+would need a paged UI, because a nine-panel console does not fit in 40 columns.
+
+### The order, decided 2026-08-23
+
+Ranking six targets is a question with no useful answer, so they are split by
+**what they cost** instead:
+
+1. **The text-mode siblings go first** — MEGA65, X16, F256, and CoCo 3. Each
+   puts the console on a hardware text grid, so the platform layer is a rewrite
+   of `c128/src/vdc.c` against the same four primitives. MEGA65's `m65native.c`
+   already exposes `scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and
+   `wait_vsync` — the same names with the same signatures. Whichever goes
+   first, the rest follow nearly mechanically, and their order among themselves
+   is close to arbitrary.
+
+2. **The two bitmap targets go last, together** — Amiga and VBXE. Both need a
+   layer the others do not: a font, a glyph blitter, and a dirty-cell scheme so
+   the port is not repainting 2000 cells a frame. That is the same design work
+   twice, and separating them by three text ports would mean designing it,
+   forgetting it, and rediscovering it.
+
+So **VBXE sits next to the Amiga, at the end** — because they share a problem,
+not because either is the hardest target.
 
 The core obeys 8-bit rules from line one even where the host doesn't force it —
 no `float`, `double`, `malloc` or `long`; explicit-width types throughout; 8.8
 fixed point with a precomputed distance table instead of runtime `sqrt`.
 `core/` is compiled by each platform rather than copied into it, so it cannot
-drift.
+drift. `make port-check` compiles it for the 68000 with `-Werror` on every
+build, so the portability contract is under test before the port exists.
 
 ## Building
 
