@@ -234,8 +234,33 @@ fixed:
     been writing `$D02F` twice and the CPU port at `$00` once per key poll --
     thousands of times a second, for nothing.
 
-Measured after: 68 notes in eighteen seconds, region PAL, `last_raster` 311 --
-which is PAL's last line.
+### The tempo was double, and the frame counter is why
+
+Jamie said the title music sounded too rapid. The data settles it without an
+ear: the title track is 106 notes over 942 ticks, which at the original's
+18.2065Hz is **2.05 notes a second**, and it was running at 3.8.
+
+**The MEGA65's native display is 625 physical lines, so the VIC-II compatible
+raster at `$D011`/`$D012` runs 0..311 TWICE per frame.** Measured: 99.8 wraps a
+second against PAL's 50. Every other machine this driver runs on wraps once,
+which is why counting wraps as frames is right on the C128 and wrong here.
+
+Halving it would have worked on this machine and been a guess about every
+other. Instead **CIA1's time-of-day tenths** -- the only honest clock here,
+measured at 10 a second while no ROM interrupt runs at all -- are used to count
+how many wraps a second actually holds, and the accumulator step follows.
+
+**And the calibration has to be CONTINUOUS.** A one-shot in `snd_init()`
+counted 49 wraps in its second while the same code in the running game counted
+99.6, both out of one run: the rate genuinely changes once the video mode
+settles, and calibrating early gets the wrong half. `snd_poll()` re-derives it
+every second, with a short first window so the opening bars are only briefly
+wrong. Sanity check on the arithmetic: 50 wraps a second yields 364 and
+sidfreq.h's hand-computed PAL constant is 363.
+
+Measured after: `tick_num` settles at 182 (100 wraps a second) and the track
+plays 174 original ticks in ten seconds -- 17.4 against 18.2065, or 96% speed,
+which is inside the error of timing two separate emulator runs.
 
 `raster_line()` is also **bounded** now. It spun on `for (;;)` until two reads
 of `$D011` agreed about bit 7, which is a hang with no escape in a routine the

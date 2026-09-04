@@ -50,8 +50,28 @@ static uint8_t  mus_on, sfx_on, mus_track, mus_ok;
 static uint8_t  note_left, sfx_left;
 static uint8_t  enabled = 1;
 static uint16_t acc;
-uint8_t snd_region = REGION_NTSC;   /* declared in m65snd.h -- the header promised this before the .c had it */
+uint8_t snd_region = REGION_NTSC;   /* pitch only; sid.h declares it */
 static unsigned int last_raster;
+
+/* THE TICK RATE IS CALIBRATED AT STARTUP, NOT ASSUMED.
+ *
+ * The C128 driver counts raster wraps and treats each as one frame, because on
+ * that machine it is one. HERE IT IS TWO: the MEGA65's native display is 625
+ * physical lines, so the VIC-II compatible counter at $D011/$D012 runs 0..311
+ * TWICE per frame. Measured 99.8 wraps a second against PAL's 50 -- and the
+ * title track, which the data says should run 106 notes over 51.7 seconds,
+ * played at nearly double speed. Jamie heard it before any of this was checked.
+ *
+ * Halving it would have worked here and been a guess about every other machine
+ * and video mode. Instead CIA1's time-of-day clock -- ten ticks a second, and
+ * measured to run -- is used once at startup to count how many wraps a second
+ * actually holds, and the accumulator step follows from that. As a check on
+ * the arithmetic: 50 wraps a second yields 364, and sidfreq.h's hand-computed
+ * PAL constant is 363. */
+#define CIA1_TOD10 (*(volatile unsigned char *)0xDC08)
+static uint16_t tick_num;         /* thousandths of an original tick per wrap */
+static uint16_t cal_wraps, cal_tenths, cal_window;
+static unsigned char cal_tod;
 
 /* Bit 8 of the raster lives in $D011, so the two reads have to agree about
    which half of the frame they are in -- the same guard c128/src/sid.c uses,
@@ -81,16 +101,20 @@ static unsigned int raster_line(void) {
     return (unsigned int)r + ((c2 & 0x80) ? 256u : 0u);
 }
 
-/* PAL has 312 raster lines and NTSC 263, so the highest line seen over a few
-   frames tells them apart with a threshold anywhere between. Lifted from the
-   C128 port, where the numbers were measured on real hardware. */
-#define PAL_LINE_MIN 300
+/* CALIBRATION IS CONTINUOUS, NOT ONCE AT STARTUP, and that is measured rather
+   than tidy-minded. A one-shot calibration in snd_init() counted 49 wraps in
+   its second while the same code in the running game counted 99.6 -- both
+   numbers out of ONE run, so the wrap rate genuinely changes after startup and
+   calibrating once, early, gets the wrong half of it.
 
-static uint8_t detect_region(void) {
-    unsigned int spins;
-    for (spins = 0; spins < 30000u; spins++)
-        if (raster_line() >= PAL_LINE_MIN) return REGION_PAL;
-    return REGION_NTSC;
+   So snd_poll() keeps counting against CIA1's time-of-day tenths and re-derives
+   the step from the last window. The first window is short, so the title track
+   is only briefly wrong; later ones are a second, because a short window's
+   count jitters by a wrap or two and that lands straight on the tempo. */
+static void recalibrate(uint16_t wraps, uint16_t tenths) {
+    unsigned long wps = ((unsigned long)wraps * 10UL) / tenths;
+    if (wps >= 20UL && wps <= 2000UL)
+        tick_num = (uint16_t)(18206UL / wps);
 }
 
 static void voice_off(uint8_t v) { SID[v + 4] = GATE_OFF; }
@@ -113,8 +137,13 @@ void snd_init(void) {
     SID[V2 + 2] = PW_LO; SID[V2 + 3] = PW_HI;
     SID[V2 + 5] = AD_FLAT; SID[V2 + 6] = SR_FLAT;
     mus_on = sfx_on = 0; acc = 0;
-    snd_region = detect_region();
     last_raster = 0;
+    /* The C128's hand-computed PAL step until the first window closes: one
+       frame per wrap, which is what every other machine does. */
+    tick_num = snd_tick_num(REGION_PAL);
+    cal_wraps = cal_tenths = 0;
+    cal_window = 3;                /* 0.3s for the first, a second after */
+    cal_tod = CIA1_TOD10;
 }
 
 void snd_off(void) { voice_off(V1); voice_off(V2); mus_on = sfx_on = 0; }
@@ -204,9 +233,26 @@ void snd_poll(void) {
        jiffy at $A0..$A2 was tried as a safer source and is useless here --
        nothing increments it, because no interrupt of the ROM's is running. */
     r = raster_line();
+
+    /* CIA1's time-of-day tenths are the only honest clock on this machine --
+       measured at 9.8 a second against wall time, while no ROM interrupt runs
+       at all. Everything here is counted against it. */
+    {
+        unsigned char t = CIA1_TOD10;
+        if (t != cal_tod) {
+            cal_tod = t;
+            if (++cal_tenths >= cal_window) {
+                recalibrate(cal_wraps, cal_tenths);
+                cal_wraps = cal_tenths = 0;
+                cal_window = 10;
+            }
+        }
+    }
+
     if (r >= last_raster) { last_raster = r; return; }
     last_raster = r;
+    cal_wraps++;
 
-    acc = (uint16_t)(acc + snd_tick_num(snd_region));
+    acc = (uint16_t)(acc + tick_num);
     while (acc >= SND_TICK_DEN) { acc = (uint16_t)(acc - SND_TICK_DEN); tick(); }
 }
