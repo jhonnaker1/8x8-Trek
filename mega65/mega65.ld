@@ -21,7 +21,19 @@ MEMORY {
      * stack starts at $C000 and grows DOWN, so the last kilobyte below it is
      * left unallocated: overflowing .bss into the stack is then a LINK ERROR
      * rather than a program that runs and quietly corrupts itself. */
-    ram (rw) : ORIGIN = 0x2001, LENGTH = 0x9bff       /* $2001..$BBFF */
+    /* $2001..$BDFF. THE GUARD WAS A KILOBYTE AND IS NOW HALF ONE, on a
+     * measurement rather than a feeling: the soft stack pointer sits at $BFC1
+     * in the running game -- 63 bytes deep -- because llvm-mos puts almost
+     * every local in a per-function static frame and reaches the soft stack
+     * only for recursion and alloca, neither of which this port uses. 512
+     * bytes is still eight times the observed depth, and the guard's job is
+     * unchanged: overflowing .bss into it is a LINK ERROR, not a program that
+     * runs and quietly corrupts itself.
+     *
+     * What the other 512 buys is instrumentation. The debug build had reached
+     * the point where a two-line key logger overflowed the region by ONE byte,
+     * which is a bad place to be when a bug needs measuring. */
+    ram (rw) : ORIGIN = 0x2001, LENGTH = 0x9dff       /* $2001..$BDFF */
 
     /* The window sits at $B000, NOT $C000, and the reason is the soft stack.
      *
