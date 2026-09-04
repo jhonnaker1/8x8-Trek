@@ -225,13 +225,26 @@ fixed:
     unnecessary because the MEGA65 clocks its SIDs at a fixed rate -- true of
     PITCH, and `snd_tick_num` is not pitch. `detect_region()` reads the raster
     and gets PAL under Xemu.
-  * **The VIC registers read as a constant.** `$D011`/`$D012` need
-    `mega65_io_enable()` first; the Hypervisor's file calls leave the I/O
-    context changed and nothing restored it in between, so `detect_region()`
-    called every machine NTSC and no frame was ever seen.
+  * ~~The VIC registers read as a constant without `mega65_io_enable()`.~~
+    **RETRACTED 2026-09-03 -- that was the stale card as well.** It was
+    "measured" during the same window, on runs where the game never started, so
+    every reading was just a startup value. Re-measured against a matching
+    card: `$D011`/`$D012` read correctly with no `mega65_io_enable()` in
+    `raster_line()` at all, region comes out PAL, and the call is gone. It had
+    been writing `$D02F` twice and the CPU port at `$00` once per key poll --
+    thousands of times a second, for nothing.
 
-Measured after: 73 notes in twenty seconds, region PAL, `last_raster` 311 --
+Measured after: 68 notes in eighteen seconds, region PAL, `last_raster` 311 --
 which is PAL's last line.
+
+`raster_line()` is also **bounded** now. It spun on `for (;;)` until two reads
+of `$D011` agreed about bit 7, which is a hang with no escape in a routine the
+key loop calls thousands of times a second -- and a hang there freezes the
+screen with the current SID note still gated on, which is what Jamie saw at the
+hall of fame. **That freeze has NOT been reproduced**, headlessly or otherwise:
+driven to that exact screen the CPU cycles normally and the music keeps
+advancing. So the bound is a hypothesis about his freeze and a plain defect fix
+regardless.
 
 ### What it cost, and why
 

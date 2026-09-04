@@ -57,20 +57,28 @@ static unsigned int last_raster;
    which half of the frame they are in -- the same guard c128/src/sid.c uses,
    for the same reason. */
 static unsigned int raster_line(void) {
-    unsigned char c1, r, c2;
-    /* WITHOUT THIS THE REGISTERS READ AS A CONSTANT. The Hypervisor's file
-       calls leave the I/O context changed (see m65storage.c's after_hyppo),
-       and nothing re-enables it between then and here, so $D011/$D012 were
-       reading plain RAM -- detect_region() called every machine NTSC and
-       snd_poll() never saw a frame go by. */
-    mega65_io_enable();
-    for (;;) {
+    unsigned char c1, c2 = 0, r = 0, tries;
+
+    /* BOUNDED, AND THAT IS THE POINT. This was `for (;;)`, spinning until two
+       reads of $D011 agreed about bit 7 -- a hang with no escape, in a routine
+       the key loop calls thousands of times a second. If the register ever
+       stops behaving, the game stops dead with the screen frozen and the
+       current SID note still gated on, which is exactly what Jamie saw at the
+       hall of fame on 2026-09-03. NOT REPRODUCED, so this is a hypothesis and
+       not a diagnosis -- but an unbounded wait on a hardware read has no place
+       here either way.
+
+       Agreement happens on the first pass in every run measured. After eight
+       tries, take the reading: the cost is a possible one-line error, and
+       frame detection does not care about one line. */
+    for (tries = 0; tries < 8; tries++) {
         c1 = VIC_CTRL1;
         r  = VIC_RASTER;
         c2 = VIC_CTRL1;
         if ((c1 & 0x80) == (c2 & 0x80))
             return (unsigned int)r + ((c1 & 0x80) ? 256u : 0u);
     }
+    return (unsigned int)r + ((c2 & 0x80) ? 256u : 0u);
 }
 
 /* PAL has 312 raster lines and NTSC 263, so the highest line seen over a few
