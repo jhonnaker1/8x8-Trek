@@ -194,7 +194,10 @@ here rather than left in commit messages where nobody re-reads them.
   * **Saving does not work.** `plat_write_all()` returns `STOR_ERROR`, so SAVE
     and the hall of fame report a failure rather than writing. This is a
     *bounded* job, not a mystery -- see "Writing files IS possible" below --
-    but it needs a low-memory trampoline and has not been built.
+    but it needs a low-memory trampoline and has not been built. Scope it
+    around **byte-at-a-time CBDOS I/O**, which is proven working here: the
+    KERNAL's banked LOAD exists in the ROM but delivers nothing under Xemu, so
+    it cannot be tested. See "The C65 KERNAL HAS a banked LOAD" below.
 
 Everything above the first two items is fixed and verified; the sound, briefing
 and end-of-game overlay fixes since 2026-09-03 have been checked headlessly and
@@ -434,6 +437,116 @@ change.
 
 It also changes how the port ships: a D81 has to be mounted alongside the SD
 card's data files.
+
+## The C65 KERNAL HAS a banked LOAD, and Xemu cannot run it (2026-09-05)
+
+Asked because a D81 would let this port save, and if switching reads to the
+same path were also fast, the Hypervisor could go entirely. The C128 gets an
+8x speedup from `SETBNK` ($FF68) loading straight into bank 1 -- see
+`c128/src/farmem.c` -- so the question was whether the C65 KERNAL has the
+equivalent.
+
+**It does.** The ROM carries TWO KERNAL jump tables, and checking only the
+first one gives the wrong answer:
+
+  * `$2FF00` (lower half) is the plain C64 table. No `$FF68`; `$FFD5` LOAD is
+    the C64 routine, storing through `sta ($AE),y` -- 16-bit, current map only.
+  * `$3FF00` (upper half, the C65-mode KERNAL) carries the **C128-style
+    extended table**, and `$FF68` -- SETBNK's exact slot on the C128 -- is a
+    live `JMP $03A8`.
+
+And that half's LOAD is built for banking. Its inner loop:
+
+    $CD52   18        clc
+            8a        txa
+            65 ad     adc $AD
+            85 ad     sta $AD
+            90 06     bcc +6
+            e6 ae     inc $AE
+            d0 02     bne +2
+    $CD5E   e3 af     inw $AF        ; carry into the BANK bytes
+    ...
+    $F57B   ea 92 ad  sta [$AD],Z    ; 45GS02 32-BIT FLAT store
+
+A 32-bit destination pointer at `$AD..$B0` that carries across bank
+boundaries. That is a banked load by construction, not by inference.
+
+**AND IT DELIVERS NOTHING UNDER XEMU.** A probe (`sei`-free, ROM mapped in,
+SETNAM/SETLFS/SETBNK/LOAD, markers between each step) run against a D81 built
+with `c1541`:
+
+    SETNAM, SETLFS and the $FF68 call all return cleanly
+    LOAD returns SUCCESS: carry clear, end address $0200 for a 512-byte
+      file loaded at $0000 -- and $4200 for the same file at $4000
+    the payload appears NOWHERE except $11406 and $11504, 254 bytes apart,
+      which are the DOS's own sector buffers
+
+**Identical with SETBNK and without it**, so this is not about banking: plain
+LOAD does not deliver either.
+
+What is underneath it: Xemu raises an **unhandled memory access** at that
+moment, and `-headless` auto-answers EXIT. That is why the first three runs
+looked like a hang at `$CD52` and quit after two seconds -- `uptime=00:02`
+against a 40-second wait, which is the tell. `-skipunhandledmem` lets the
+probe finish, and the transfer then silently does nothing. The DMA job LOAD
+leaves at `$1400` shows the destination advancing correctly (`$41FA` for a
+load begun at `$4000`) with a destination **megabyte of `$02`** -- which does
+not exist on a 384K machine. That is the access Xemu cannot handle.
+
+**WHAT THIS MEANS FOR THE D81 PLAN, and it is not the capability question.**
+The capability is real and cannot be validated -- not by us, and not by
+anyone with only Xemu. Every check this port has runs through that emulator.
+A load path that reports success while moving nothing is the exact shape of
+the `read512` bug that cost three days, and shipping one we cannot test would
+be worse than not having it.
+
+So: **do not bet a D81 port on a fast banked LOAD.** Either scope it around
+byte-at-a-time CBDOS I/O -- which is PROVEN working here, and is how the write
+test above passes -- and accept the cost on 48,647 bytes of startup reads, or
+treat "make Xemu run LOAD" as a prerequisite that comes first.
+
+Reproducing any of it: `-dumpmem` plus `llvm-nm` on the probe's ELF reads the
+markers back; `-skipunhandledmem` is the flag that turns a two-second phantom
+hang into a real run; and Xemu's own default D81 lives at
+`~/Library/Application Support/xemu-lgb/mega65/hdos/mega65.d81`, which
+`c1541 -attach ... -write` will fill (the `-8` route behaves identically, so
+it is not the variable it looks like).
+
+## The llvm-mos ABI, measured -- and what it clears (2026-09-05)
+
+Written down because two bugs here were this, one lead died on it, and it was
+being reasoned about rather than checked.
+
+**`__rc20`..`__rc31` are CALLEE-SAVED. `__rc2`..`__rc19` are not.** Measured:
+compile a function holding values live across an opaque call and the prologue
+pushes `__rc20`-`__rc23` and spills `__rc24`-`__rc31` to the soft stack, and
+nothing below. **Pointer arguments pass in `__rc2/__rc3`**; byte arguments in
+A, then X, then `__rc2`, `__rc3` -- which is exactly why `trek_close(fd)` broke
+(a byte in A, destroyed by `save_rc`) while `trek_open(name)` never did.
+
+`__rc0` is at `$02`, so `__rc4`=`$06`, `__rc5`=`$07`, `__rc20`=`$16`.
+
+**Now scan every hand-written .s in mega65-libc for writes to the callee-saved
+range.** There are none:
+
+    dirent.s        __rc2, __rc3
+    fileio.s        __rc4, __rc5
+    memory_asm.s    __rc4 .. __rc8
+
+All caller-saved, all legal. **So the library's assembly was never the
+problem.** The original probe saw `$06`, `$07` and `$16` change across one
+`read512()`; `$06`/`$07` are the library's own legal scratch, and **`$16` is
+`__rc20`, which nothing in the library writes.** It came from the Hypervisor
+trap itself. The wrapper in `src/m65hyppo.s` is still exactly right -- the
+reason stated at the top of that file just names the wrong culprit.
+
+**What this CLEARS.** `lpeek`/`lpoke` (`memory_asm.s`) look like the identical
+bug -- hand-written asm assigning pseudo-registers -- and `m65mem.c` calls
+`lpoke` for every message-log write, including during the end-of-game sequence
+where `ship` is corrupted. They touch only `__rc4`..`__rc8` and they do not
+trap. **They are safe, and the message log is not a suspect for the `$6464`
+corruption.** Any future hyppo entry point needs the shim; anything in
+`memory_asm.s` does not.
 
 ## It found a bug in the C128 port
 

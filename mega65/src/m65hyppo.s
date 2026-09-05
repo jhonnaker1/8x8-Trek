@@ -1,10 +1,23 @@
 ; Hypervisor calls, with llvm-mos's imaginary registers saved across them.
 ;
-; WHY THIS FILE EXISTS. mega65-libc's fileio.s is hand-written assembly that
-; uses __rc4 and __rc5 as scratch around the hyppo trap, and the trap itself
-; returns through registers the compiler was never told about. llvm-mos
-; therefore believes read512() clobbers nothing and is free to keep a live
-; value in a pseudo-register across the call.
+; WHY THIS FILE EXISTS -- and the culprit is the TRAP, not the library.
+;
+; This comment used to blame mega65-libc's fileio.s for using __rc4 and __rc5
+; as scratch. MEASURED 2026-09-05, and that half is a red herring: llvm-mos
+; saves __rc20..__rc31 across a call and NOTHING BELOW, so __rc2..__rc19 are
+; caller-saved and fileio.s's use of __rc4/__rc5 is perfectly legal. Scanning
+; every .s in that library finds no write to the callee-saved range at all.
+;
+; The original probe saw $06, $07 and $16 change across one read512(). $06 and
+; $07 are __rc4/__rc5 -- the library's own legal scratch. **$16 is __rc20,
+; which nothing in the library writes**: it is the HYPERVISOR TRAP that lands
+; there, and the compiler was never told a trap happens. llvm-mos therefore
+; believes read512() clobbers nothing and is free to keep a live value in a
+; pseudo-register across the call.
+;
+; The consequence for anyone extending this: a new hyppo entry point needs the
+; same wrapper, and a call into mega65-libc that does NOT trap (lpeek, lpoke,
+; lcopy in memory_asm.s) does not.
 ;
 ; WHAT THAT COST: plat_read()'s loop counter. The generated code kept the
 ; remaining count in $81/$82, tested it there, and emitted its decrement
