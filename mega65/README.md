@@ -326,6 +326,50 @@ Two separate faults, one on each side:
 That is sound only because this port never has two files open at once, which
 is stated at the call site so the next person does not widen it.
 
+## Writing files IS possible: the ROM has to be mapped back in
+
+`plat_write_all()` returns STOR_ERROR because mega65-libc's fileio is
+open/read512/close with no write anywhere. That is still true -- but it is not
+the only route, and the other one works.
+
+**The internal drive is device 8, driven by the C65 DOS in ROM, and ordinary
+CBM KERNAL calls reach it.** Proven from BASIC first: with a D81 mounted,
+`OPEN 2,8,2,"TEST,S,W"` writes a real SEQ file. Proven then from our own
+machine code, which is the part that matters -- the same `cbm_k_setlfs` /
+`cbm_k_setnam` / `cbm_k_open` / `cbm_k_ckout` / `cbm_k_bsout` sequence that
+`c128/src/storage.c` already uses, writing a file to the D81 and closing it.
+
+**WHY IT HANGS WITHOUT THAT, and it took three probes to find.** llvm-mos links
+`unmap-basic.o` into every MEGA65 program:
+
+    sei
+    ldx #$2f / stx $00        ; CPU port DDR
+    ldx #$3e / stx $01        ; bank the ROM out
+    ldx #$44 / stx $d030      ; VIC-III ROM mapping
+
+That pages the C65 BASIC/DOS ROM out so the program gets the RAM. `OPEN` on
+device 8 then calls into DOS code that is no longer there and never returns --
+which is why BASIC succeeds and we hang, and why it looks like a device
+problem when it is a banking one. Interrupts are NOT the cause; a probe with
+`cli` hangs identically.
+
+Mapping it back is three stores, the same ones llvm-mos's own `.fini` uses on
+exit:
+
+    $01 = $3F, $D030 = $64      /* ROM in  */
+    $01 = $3E, $D030 = $44      /* ROM out */
+
+**THE CONSTRAINT, and it is the whole design problem.** While the ROM is
+mapped, $8000..$BFFF is not our RAM. This port's resident image runs to about
+$B236, so the code performing the I/O and its buffers must live BELOW that
+window -- the probe worked because it sits at $2001 and is a few hundred bytes.
+The save record is 601 bytes and the hall of fame 300, so a low-memory
+trampoline plus buffer is feasible, but it is real work and not a one-line
+change.
+
+It also changes how the port ships: a D81 has to be mounted alongside the SD
+card's data files.
+
 ## It found a bug in the C128 port
 
 Compiling the shared code for a second target immediately flagged
