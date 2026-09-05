@@ -19,6 +19,15 @@ reference/
 c128/src/music_data.h
 c128/src/music_data.c
 
+# AND THE MEGA65'S COPIES, which were TRACKED until 2026-09-05 while the C128's
+# were not. That asymmetry was the hazard: `make -C mega65 music` copies
+# whatever is in c128/src/ across, so the extractor's output would have landed
+# in a path git was willing to commit, sidestepping the rule above. Both ports
+# regenerate these from tools/make_music.py -- verified by deleting them and
+# building -- so tracking them bought nothing.
+mega65/src/music_data.h
+mega65/src/music_data.c
+
 # Build output
 build/
 *.o
