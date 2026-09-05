@@ -7,9 +7,12 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: first code landed.** The C128-VDC port has a working build — VDC
-> driver, EGA→VDC colour mapping, and the nine-panel console skeleton. Research
-> and decisions are recorded in [`NOTES.md`](NOTES.md).
+> **Status: one port released, a second running.** The **Commodore 128** port
+> is feature complete and released as [v0.9.0](../../releases/latest). The
+> **MEGA65** port plays — console, sound, overlays and the briefing — with
+> saving still to come; see [`mega65/README.md`](mega65/README.md) for what
+> works and what is still open. Research and decisions are recorded in
+> [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
 
@@ -93,7 +96,7 @@ parties, plasma bolts, Vandal cloaking, long-range tractor beams, scanner
 jamming, black holes, supernovas and defective energium crystals are all in the
 binary and absent from the docs.
 
-## Where it stands (2026-09-02)
+## Where the C128 port stands (2026-09-02)
 
 The C128 port is **feature complete against the original's mechanics**. Every
 constant it uses was read out of the binary or measured against it running:
@@ -146,7 +149,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | Platform | Display | CPU | Status |
 |---|---|---|---|
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.9.0](../../releases/latest) |
-| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | Designed — the friendliest target on the list |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Playable** — console, sound and overlays; no save yet |
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | Designed |
 | **Foenix F256** | Vicky text 80×60, per-cell colour via CLUTs | 65C02 | Designed |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
@@ -170,11 +173,17 @@ Ranking six targets is a question with no useful answer, so they are split by
 
 1. **The text-mode siblings go first** — MEGA65, X16, F256, and CoCo 3. Each
    puts the console on a hardware text grid, so the platform layer is a rewrite
-   of `c128/src/vdc.c` against the same four primitives. MEGA65's `m65native.c`
-   already exposes `scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and
-   `wait_vsync` — the same names with the same signatures. Whichever goes
-   first, the rest follow nearly mechanically, and their order among themselves
-   is close to arbitrary.
+   of `c128/src/vdc.c` against the same four primitives. MEGA65's `m65vid.c`
+   exposes `scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and
+   `wait_vsync` — the same names with the same signatures, and the shared
+   `ui.c`, `main.c`, `strpool.c` and `layout.c` compiled for it unchanged.
+
+   **The screen layer really was mechanical; nothing else was.** Doing the
+   MEGA65 for real cost far more than a `vdc.c` rewrite, and none of it was
+   display work: a hand-written library clobbering the compiler's zero-page
+   pseudo-registers, a hypervisor that never freed a file descriptor, and a
+   raster counter that wraps twice per frame and so ran the music at double
+   speed. Budget the next sibling for its own three of those.
 
 2. **The two bitmap targets go last, together** — Amiga and VBXE. Both need a
    layer the others do not: a font, a glyph blitter, and a dirty-cell scheme so
@@ -212,6 +221,23 @@ make test               # and the core's own, from the repository root
 **Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
 music, the ten code overlays and the twelve-page briefing all load from the
 disk. `make run` boots a game with no words in it.
+
+The MEGA65 port needs the same llvm-mos plus
+[mega65-libc](https://github.com/MEGA65/mega65-libc), and
+[Xemu](https://github.com/lgblgblgb/xemu)'s `xmega65` to run it. Its data files
+go on an SD-card image rather than a disk:
+
+```sh
+cd mega65 && make         # build/egatrek.prg + build/OVERLAYS.BIN
+cd mega65 && make verify  # load address, resident space, overlays, build stamp
+cd mega65 && make sd      # put the data files on Xemu's own card
+cd mega65 && make run     # launch it
+cd mega65 && make drive   # headless: script the keys, screenshot the result
+```
+
+`make sd` runs `verify` on the way through, so a binary that cannot run — wrong
+load address, stale overlay images, an overlay calling out of its own window —
+cannot reach the card.
 
 ## Reference material is not in this repository
 

@@ -169,6 +169,71 @@ with `-dumpmem` rather than by looking at the screen.
 Jamie played the release build on 2026-09-03 and found three faults; sound and
 the briefing are fixed below, and one crash remains unexplained.
 
+## Still open (2026-09-05)
+
+Three faults, none of them reproduced by a build check, so they are written
+here rather than left in commit messages where nobody re-reads them.
+
+  * **`ship` is corrupted after the hall of fame.** The console comes back with
+    `$6464` in energy, impulse, shields and enemies_left, and 100 in torps and
+    laser_eff -- the shape of `sys[]` written at the wrong offset. The ship is
+    intact *during* play (energy 5000 read from behind the self-destruct
+    dialog), so it happens somewhere in the end-of-game sequence.
+
+    **It is MEGA65-only**, established 2026-09-05 rather than assumed:
+    `core/trek.c` and `core/hof.c` pass their native guard tests, and the C128
+    driven through the identical sequence returns a coherent ship
+    (`energy=5000, impulse=500, shields=2500, torps=9, level=3, enemies=37`).
+    So it is in this port's platform layer, not in shared code.
+
+  * **A crash and a freeze around the hall of fame**, both reported from play
+    on 2026-09-03. One dump showed `$454854` -- ASCII "THE" -- sitting in a DMA
+    descriptor. Neither has been reproduced since, and the overlay-id fix
+    (`fe9d4f1`) plausibly addresses the crash without that being demonstrated.
+
+  * **Saving does not work.** `plat_write_all()` returns `STOR_ERROR`, so SAVE
+    and the hall of fame report a failure rather than writing. This is a
+    *bounded* job, not a mystery -- see "Writing files IS possible" below --
+    but it needs a low-memory trampoline and has not been built.
+
+Everything above the first two items is fixed and verified; the sound, briefing
+and end-of-game overlay fixes since 2026-09-03 have been checked headlessly and
+**not yet played by a human**.
+
+## What `make verify` checks
+
+Added 2026-09-05. This port had no verify step at all for six days after the
+C128's overlay call-graph check caught a guaranteed crash -- same architecture,
+same one window, same `.ovl_*` section names, nothing looking at them.
+
+    load address      the PRG must start at $2001 or Xemu will not auto-run it
+    resident space    the image against mega65.ld's OWN `ram` region
+    overlay layout    one run address, distinct load addresses, each fits
+    overlay calls     rules 2 and 3 of core/overlay.h -- shared with the C128
+    OVERLAYS.BIN      ten 4K slots, each byte-identical to its ELF section
+    build stamp       the last two bytes are this link's ovl_load
+
+The call-graph and layout checks live in `tools/overlay_check.py` and are
+shared with the C128, because the hazard is the architecture's and not the
+machine's. What is deliberately NOT here: the message, panel, dialog and
+briefing width checks, which read shared sources against shared constants and
+cannot come out differently for this target (`make -C c128 verify` runs them);
+and the key table, because there isn't one -- `$D610` hands this port ASCII.
+
+**Two things it found on the day it was written.** The Makefile printed
+"resident N bytes of 40959" while `mega65.ld`'s region was 40447, so every
+free-space figure this port had ever reported was 512 bytes too generous. And
+the image builder pads with `b'\0'*(4096-len(d))`, which for an over-length
+overlay multiplies by a negative, writes an over-length slot, and silently
+shifts every slot after it -- no exception, no warning, and the wrong bytes
+DMA'd into the window from then on.
+
+Each check was verified **by breaking it**: a corrupted load address, a shrunk
+`ram` region, one flipped byte inside an image, a wrong stamp, a resized
+OVERLAYS.BIN, a shrunk window, and a planted `ovl_load` inside `.ovl_msgs` --
+seven deliberate faults, seven non-zero exits, and the call-graph one named
+`.ovl_msgs:do_hail` exactly.
+
 ## The bug that was actually there
 
 `plat_read(stage, 64)` was reading **whole files in a single call** and

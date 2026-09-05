@@ -60,12 +60,19 @@ from pathlib import Path
 
 HERE = pathlib.Path(__file__).resolve()
 C128 = HERE.parents[1]
+sys.path.insert(0, str(C128.parent / "tools"))
+import overlay_check  # noqa: E402  -- needs the path above
 PRG = C128 / "build" / "trek128.prg"
 HDR = C128 / "src" / "input.h"
 SRC = C128 / "src" / "input.c"
 
 
 MAP = C128 / "build" / "trek128.map"
+
+# trek128.ld's `window` region. The Makefile spells the same number as
+# OVL_WINDOW for the image builder; if they ever disagree the images are
+# cut to one bound and checked against the other.
+OVL_WINDOW = 0x1000
 
 
 def check_data_init(mapfile):
@@ -123,52 +130,14 @@ def check_data_init(mapfile):
 
 
 def check_overlays(mapfile):
-    """Every overlay must run at the window and load from its OWN address.
+    """Run address, distinct load addresses, and window fit -- shared.
 
-    THIS IS A REAL BUG THAT SHIPPED FOR TEN MINUTES, and it was silent at
-    every stage. Overlays deliberately share a RUN address -- that is the
-    whole idea -- and the first version gave them all one staging region to
-    take their LOAD addresses from. lld does not advance a region's pointer
-    for a section that also carries an explicit run address, so both overlays
-    came out at load address $10000, occupied the same bytes of the ELF, and
-    llvm-objcopy dumped the SAME image twice under two names. The link was
-    silent, the extraction was silent, the disk looked right, and the game
-    drew the hall of fame when it asked for the evaluation.
-
-    So: same VMA is required, distinct LMAs are required, and neither is
-    something a human will notice in a map file.
+    The reasoning, and the ten silent minutes that produced this check, are in
+    tools/overlay_check.py. `reserve=2` is the build stamp the Makefile
+    appends to every image (see OVL_IMAGES): a section filling the whole
+    window would have its last two instructions overwritten by it.
     """
-    text = mapfile.read_text()
-    ovl, window = [], None
-    for line in text.splitlines():
-        parts = line.split()
-        if len(parts) == 5 and parts[4].startswith(".ovl_"):
-            vma, lma, size = (int(parts[i], 16) for i in range(3))
-            ovl.append((parts[4], vma, lma, size))
-        elif len(parts) == 5 and parts[4] == "window" or (
-                len(parts) >= 3 and parts[-1] == "__ovl_start"):
-            pass
-    if not ovl:
-        print("verify: no overlays in this build")
-        return
-
-    vmas = {v for _, v, _, _ in ovl}
-    if len(vmas) != 1:
-        die("overlays do not share one run address: "
-            + ", ".join("%s at $%04x" % (n, v) for n, v, _, _ in ovl))
-
-    seen = {}
-    for name, _, lma, _ in ovl:
-        if lma in seen:
-            die(f"{name} and {seen[lma]} both LOAD from ${lma:04x}, so they are\n"
-                f"         the same bytes of the ELF and llvm-objcopy will dump\n"
-                f"         one image twice. Give each overlay its own staging\n"
-                f"         region in trek128.ld.")
-        seen[lma] = name
-
-    win = max(s for _, _, _, s in ovl)
-    print("verify: %d overlays at $%04x, distinct load addresses, largest %d bytes"
-          % (len(ovl), ovl[0][1], win))
+    overlay_check.check_overlay_layout(mapfile, OVL_WINDOW, die, reserve=2)
 
 
 MSG_W  = 40    # layout.h
@@ -427,87 +396,15 @@ OBJDUMP = str(Path.home() / "llvm-mos/bin/llvm-objdump")
 
 
 def check_overlay_calls():
-    """No overlay may call INTO another overlay, or load one.
+    """Rules 2 and 3 of core/overlay.h, enforced. See tools/overlay_check.py.
 
-    THERE IS ONE WINDOW. Code in .ovl_X runs at $AFC0 and so does code in
-    .ovl_Y, so a call from one to the other lands on whatever is loaded rather
-    than on what it names -- and an ovl_load() from inside an overlay
-    overwrites the very code making the call. Neither is a link error, neither
-    fails a test, and both die on the machine.
-
-    FOUND THE HARD WAY 2026-08-29: fire_one_torpedo was moved to an overlay on
-    its own, and it did `ovl_load(OVL_MSGS); report_nova(dmg)` to reach a
-    callee an earlier pass had put in the msgs window. It built, it verified,
-    all three suites passed, and it would have crashed the first time a torpedo
-    hit a star. Caught by reading the call graph, which is not a thing to rely
-    on twice.
-
-    AN ADDRESS CANNOT NAME A SECTION HERE -- every overlay starts at $AFC0, so
-    $AFC0 belongs to ten different functions at once. The question is not "who
-    owns this address" but "does the CALLING section own it": a call inside
-    .ovl_X to a window address is fine exactly when some symbol of .ovl_X
-    covers it. The first draft of this check asked the first question and
-    reported a call that was perfectly correct.
+    Shared with the MEGA65 since 2026-09-05 -- one window, one hazard, and it
+    was C128-only for six days while the second port had no verify at all.
     """
     elf = C128 / "build" / "trek128.elf"
     if not elf.exists():
         return
-
-    syms = subprocess.run([OBJDUMP, "--syms", str(elf)],
-                          capture_output=True, text=True).stdout
-    spans, lo, hi = {}, None, None
-    for ln in syms.splitlines():
-        m = re.match(r"^([0-9a-f]{8})\s+\S*\s+F\s+(\.ovl_\w+)\s+([0-9a-f]{8})\s+(\S+)", ln)
-        if not m:
-            continue
-        a0, sec, sz, nm = int(m.group(1), 16), m.group(2), int(m.group(3), 16), m.group(4)
-        spans.setdefault(sec, []).append((a0, a0 + sz, nm))
-        lo = a0 if lo is None else min(lo, a0)
-        hi = max(hi or 0, a0 + sz)
-    if not spans:
-        return
-
-    # ovl_load is RESIDENT, so its address is unambiguous -- and a call to it
-    # from inside a window is always fatal.
-    loader = None
-    for ln in syms.splitlines():
-        m = re.match(r"^([0-9a-f]{8})\s+\S*\s+F\s+\.text\s+[0-9a-f]{8}\s+ovl_load$", ln)
-        if m:
-            loader = int(m.group(1), 16)
-
-    stray, loads = [], []
-    for sec, own in sorted(spans.items()):
-        d = subprocess.run([OBJDUMP, "-d", "--section=" + sec, str(elf)],
-                           capture_output=True, text=True).stdout
-        here = None
-        for ln in d.splitlines():
-            m = re.match(r"^\s*([0-9a-f]+)\s+<(\S+)>:", ln)
-            if m:
-                here = m.group(2)
-                continue
-            m = re.search(r"\b(jsr|jmp)\s+\$([0-9a-f]{4})\b", ln)
-            if not m:
-                continue
-            tgt = int(m.group(2), 16)
-            if loader is not None and tgt == loader:
-                loads.append((sec, here))
-                continue
-            if not (lo <= tgt < hi):
-                continue                                  # resident: fine
-            if not any(a0 <= tgt < a1 for a0, a1, _ in own):
-                elsewhere = sorted({s2 for s2, o2 in spans.items()
-                                    for a0, a1, _ in o2 if a0 <= tgt < a1} - {sec})
-                stray.append((sec, here, "$%04x" % tgt, ", ".join(elsewhere) or "nothing"))
-
-    if loads:
-        die("an overlay calls ovl_load, which overwrites the code making the\n"
-            "         call. Move the callee into this window instead:\n"
-            + "\n".join("         %s:%s" % l for l in loads))
-    if stray:
-        die("overlay code calls a window address its own section does not\n"
-            "         own -- it will land on whatever is loaded:\n"
-            + "\n".join("         %s:%s -> %s (lives in %s)" % t for t in stray))
-    print("verify: no overlay calls out of its own window -- ok")
+    overlay_check.check_overlay_calls(elf, OBJDUMP, die)
 
 
 def check_confirm_widths():

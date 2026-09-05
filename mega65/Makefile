@@ -68,7 +68,7 @@ $(SMOKE2_OUT): $(SMOKE2_SRC) src/m65vid.h mega65.ld
 SMOKE_SRC = src/smoke.c src/m65vid.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all debug smoke smoke2 run run-smoke drive music disk sd clean
+.PHONY: all debug smoke smoke2 run run-smoke drive music disk sd verify clean
 
 all: $(OUT)
 
@@ -100,8 +100,15 @@ $(OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld
 	    f=open('build/OVERLAYS.BIN','r+b'); f.seek(-2,2); \
 	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close(); \
 	    print('mega65: overlay stamp', hex(a))"
-	@python3 -c "import os; r=os.path.getsize('$(OUT)')-2; \
-	    print('mega65: resident %d bytes of 40959, %d free' % (r, 40959-r)); \
+	@# THE LIMIT COMES FROM mega65.ld, not from a number typed here. It used
+	@# to say 40959 while the linker script's `ram` region was 40447, so every
+	@# free-space figure this port ever printed was 512 bytes too generous --
+	@# and free space is exactly the thing those figures get consulted for.
+	@python3 -c "import os,re; \
+	    n = int(re.search(r'ram \(rw\) : ORIGIN = 0x[0-9a-f]+, LENGTH = (0x[0-9a-f]+)', \
+	                      open('mega65.ld').read()).group(1), 16); \
+	    r = os.path.getsize('$(OUT)')-2; \
+	    print('mega65: resident %d bytes of %d, %d free' % (r, n, n-r)); \
 	    print('mega65: OVERLAYS.BIN %d bytes' % os.path.getsize('build/OVERLAYS.BIN'))"
 
 # A SEPARATE binary, deliberately, exactly as the C128 port keeps one:
@@ -145,7 +152,19 @@ $(SMOKE_OUT): $(SMOKE_SRC) src/m65vid.h
 # which is what open()/read512() read through.
 DISK = build/disk
 
-disk: $(OUT)
+# THE CHECKS THE COMPILER AND THE TEST SUITE STRUCTURALLY CANNOT MAKE.
+# This port had none for six days after the C128's overlay call-graph check
+# caught a guaranteed crash -- same architecture, same one window, same
+# `.ovl_*` sections, and nothing looking at them. tools/verify_prg.py says what
+# it checks and, just as importantly, what it deliberately leaves to
+# `make -C c128 verify` because the sources are shared.
+verify: $(OUT)
+	python3 tools/verify_prg.py
+
+# `disk` depends on verify so a binary that cannot run -- wrong load address,
+# stale images, an overlay calling out of its window -- can never reach the SD
+# card. The C128 hangs its verify off `run` for exactly this reason.
+disk: $(OUT) verify
 	@mkdir -p $(DISK)
 	@cd .. && python3 tools/gen_strings.py >/dev/null && python3 tools/make_music.py >/dev/null
 	@# THE POOL IS SHARED, THE TWO STRINGS THAT NAME THE MACHINE ARE NOT.
