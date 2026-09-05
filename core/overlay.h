@@ -121,6 +121,28 @@
 #define OVL_CODE(sec)
 #endif
 
+/* RULE 3's STUB, and NOINLINE is the whole point of it.
+ *
+ * `ovl_load(OVL_TITLE); ui_title();` written inline inside a long function
+ * lets the compiler put the 8 in a register EARLY and reload it at the call --
+ * and main()'s outer loop spans a whole game, so that register has to survive
+ * every command, every file read and every library call in between. It did
+ * not: on the MEGA65 the second pass loaded overlay 0 instead of 8, jumped
+ * into it, and the end-of-game screens looped for ever instead of asking
+ * "play again". MEASURED 2026-09-03 by logging every ovl_load request.
+ *
+ * Inside a stub the id is an immediate two instructions from the call, so
+ * there is nothing to hold and nothing to clobber. Both ports compile the
+ * same pattern -- `lda <reg>; jsr ovl_load` at the loop top -- so both were
+ * exposed; only the MEGA65 had a library careless enough to trip it.
+ *
+ * It expands to nothing off-target, where ovl_load is already empty. */
+#ifdef TREK_OVERLAYS
+#define OVL_LOADER static __attribute__((noinline)) void
+#else
+#define OVL_LOADER static void
+#endif
+
 /* Makes `which` resident, and is IDEMPOTENT: asking for the overlay that is
    already loaded costs nothing, so a stub may call it on every entry. A
    platform with no overlays implements this as an empty function. */

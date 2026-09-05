@@ -14,6 +14,20 @@
 #include "../../core/trek.h"
 #include "../../core/planet.h"
 
+/* THE OVERLAY LOADERS -- one per window, and the ONLY way this file asks for
+   one. See OVL_LOADER in core/overlay.h for why these are functions and not
+   `ovl_load(OVL_X)` written where it is wanted. */
+OVL_LOADER load_eval(void)   { ovl_load(OVL_EVAL); }
+OVL_LOADER load_hof(void)    { ovl_load(OVL_HOF); }
+OVL_LOADER load_front(void)  { ovl_load(OVL_FRONT); }
+OVL_LOADER load_info(void)   { ovl_load(OVL_INFO); }
+OVL_LOADER load_repair(void) { ovl_load(OVL_REPAIR); }
+OVL_LOADER load_msgs(void)   { ovl_load(OVL_MSGS); }
+OVL_LOADER load_planet(void) { ovl_load(OVL_PLANET); }
+OVL_LOADER load_cmds(void)   { ovl_load(OVL_CMDS); }
+OVL_LOADER load_title(void)  { ovl_load(OVL_TITLE); }
+OVL_LOADER load_events(void) { ovl_load(OVL_EVENTS); }
+
 /* 8x8 Trek -- C128 VDC port, milestone 2.
  *
  * Galaxy generation, movement and laser fire, driven from the shared core.
@@ -1000,7 +1014,7 @@ static uint8_t put_sector(char *buf, uint8_t y, uint8_t x) {
    permanently visible panels, and the command card calls it a "state of Repair
    report". Blocks on Return, then repaints the console it drew over. */
 static void do_repair(void) {
-    ovl_load(OVL_REPAIR);
+    load_repair();
     ui_repair_report();
     while (kb_waitkey() != KB_RETURN) { }
     ui_draw_all();
@@ -1316,7 +1330,7 @@ static void do_sound(void) {
 }
 
 static void do_info(void) {
-    ovl_load(OVL_INFO);
+    load_info();
     ui_info_panel();
     ui_draw_all();
 }
@@ -1325,7 +1339,7 @@ static void do_info(void) {
    loaded, the report paints over the console, and the console is redrawn
    when the player is done with it. */
 static void do_planets(void) {
-    ovl_load(OVL_INFO);
+    load_info();
     ui_planet_list();
     while (kb_waitkey() != KB_RETURN) { }
     ui_draw_all();
@@ -1564,7 +1578,7 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
        evaluated after it and not before. */
     /* The scheduled-event handlers live in OVL_EVENTS. Nothing is loaded on
        a turn where nothing is due, which is almost every turn. */
-    if (trek_events_due()) ovl_load(OVL_EVENTS);
+    if (trek_events_due()) load_events();
     n = trek_run_events(ev, 12);
     if (enemy_acts && n < 12)
         n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n),
@@ -1605,7 +1619,7 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
             case EV_NONE:
                 continue;
             default:
-                ovl_load(OVL_MSGS);
+                load_msgs();
                 report_rare_event(&ev[i], &turn_sfx);
                 continue;
         }
@@ -1696,7 +1710,7 @@ OVL_CODE("repair") static void report_nova(uint16_t dmg) {
  * this did not fit in `msgs`, which is where its prose would otherwise belong.
  *
  * AND MOVING IT ALONE WOULD HAVE CRASHED. This used to do
- * `ovl_load(OVL_MSGS); report_nova(dmg)` -- loading another overlay INTO THE
+ * `load_msgs(); report_nova(dmg)` -- loading another overlay INTO THE
  * WINDOW IT WOULD ITSELF BE EXECUTING FROM. It links, it passes every test,
  * and it dies on the machine. report_nova moved here with it and the load is
  * gone. Measuring the SIZE of a split is not measuring the split; the call
@@ -1801,7 +1815,7 @@ static void do_torpedo(const char *line) {
        the salvo loop after it. Everything between this and the last shot is
        resident (the dialog helpers, grab_num, snd_beep), so the window is not
        disturbed while it is needed. */
-    ovl_load(OVL_REPAIR);
+    load_repair();
 
     if (n == 2) {                      /* the "t35" shortcut: one, right now */
         if (d[0] < 1 || d[0] > 8 || d[1] < 1 || d[1] > 8) {
@@ -1910,7 +1924,7 @@ int main(void) {
            setup screen is up. An earlier version of this let it run through
            setup, which was a guess this file admitted to at the time. */
         snd_music(MUS_TITLE);
-        ovl_load(OVL_TITLE);
+        load_title();
         ui_title();
         snd_music(MUS_NONE);
         /* THE BRIEFING SITS BETWEEN THE FIRST QUESTION AND THE REST, which is
@@ -1923,7 +1937,7 @@ int main(void) {
            no extra load at all, and OVL_FRONT is loaded once afterwards. */
         setup.briefing = ui_setup_briefing();
         if (setup.briefing) ui_briefing();
-        ovl_load(OVL_FRONT);
+        load_front();
         ui_setup(&setup);
         /* The seed comes out of how long the player took to answer, so no two
            sittings get the same galaxy. Before this, GAME_SEED was a constant
@@ -1958,12 +1972,12 @@ int main(void) {
                merely when a turn passes. MEASURED -- see trek.h. */
             /* Word commands first: SHUP and SHDN both begin with S, which the
                card gives to self destruct. */
-            if      (word_is(cmd, "SAVE")) { ovl_load(OVL_FRONT); ui_save_game(&setup); }
-            else if (word_is(cmd, "MSGS")) { ovl_load(OVL_MSGS); ui_messages_view(); }
-            else if (word_is(cmd, "RAY"))  { ovl_load(OVL_CMDS); do_ray();
+            if      (word_is(cmd, "SAVE")) { load_front(); ui_save_game(&setup); }
+            else if (word_is(cmd, "MSGS")) { load_msgs(); ui_messages_view(); }
+            else if (word_is(cmd, "RAY"))  { load_cmds(); do_ray();
                                              enemy_turn(0); }
             else if (word_is(cmd, "SND"))  do_sound();
-            else if (word_is(cmd, "HAIL")) { ovl_load(OVL_MSGS); do_hail();
+            else if (word_is(cmd, "HAIL")) { load_msgs(); do_hail();
                                              enemy_turn(0); }
             else if (word_is(cmd, "INFO")) do_info();
             /* LAND and USE are WORDS on the original's reference card --
@@ -1971,16 +1985,16 @@ int main(void) {
                miscellaneous item" -- and they have to be, because L is the
                lasers and U is nothing. O)rbit is the single key the card
                gives it, and sits with the other letters below. */
-            else if (word_is(cmd, "LAND")) { ovl_load(OVL_PLANET); do_land();
+            else if (word_is(cmd, "LAND")) { load_planet(); do_land();
                                              enemy_turn(0); }
             else if (word_is(cmd, "USE"))  {
-                ovl_load(OVL_PLANET);
+                load_planet();
                 if (do_use() == USE_WANT_BOLT) {
                     /* THE WINDOW SWITCH HAPPENS HERE, in resident code.
                        do_use() cannot do it: a function inside an overlay
                        that calls ovl_load pulls the ground out from under
                        its own return address. `make verify` fails that. */
-                    ovl_load(OVL_CMDS);
+                    load_cmds();
                     do_plasma_bolt();
                 }
                 enemy_turn(0); }
@@ -1989,19 +2003,19 @@ int main(void) {
             else if (word_is(cmd, "PLAN")) do_planets();
             else if (word_is(cmd, "SHUP")) { do_shields_up();   enemy_turn(0); }
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
-            else if (word_is(cmd, "MAX"))  { ovl_load(OVL_CMDS); do_max_energy();
+            else if (word_is(cmd, "MAX"))  { load_cmds(); do_max_energy();
                                              enemy_turn(0); }
             else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
             else if (c == KB_L) { do_lasers();     enemy_turn(1); }
             else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
-            else if (c == KB_D) { ovl_load(OVL_CMDS); do_dock();
+            else if (c == KB_D) { load_cmds(); do_dock();
                                   enemy_turn(0); }
-            else if (c == KB_O) { ovl_load(OVL_PLANET); do_orbit();
+            else if (c == KB_O) { load_planet(); do_orbit();
                                   enemy_turn(0); }
-            else if (c == KB_S) { ovl_load(OVL_CMDS); do_self(); }  /* S)elf */
-            else if (c == KB_E) { ovl_load(OVL_CMDS); do_energy();
+            else if (c == KB_S) { load_cmds(); do_self(); }  /* S)elf */
+            else if (c == KB_E) { load_cmds(); do_energy();
                                   enemy_turn(0); }
-            else if (c == KB_X) { ovl_load(OVL_CMDS); do_max_energy();
+            else if (c == KB_X) { load_cmds(); do_max_energy();
                                   enemy_turn(0); }
             else if (c == KB_R) do_repair();   /* a report, not a turn */
             /* MEASURED 2026-08-24: the arrows are the ORIGINAL's primary
@@ -2014,7 +2028,7 @@ int main(void) {
             else if (c == KB_F) {
                 /* FIX itself costs nothing; the time it may ASK for does. */
                 uint16_t t;
-                ovl_load(OVL_INFO);
+                load_info();
                 t = do_fix();
                 if (t) { trek_advance_time(t); run_turn(0, 0); }
             }
@@ -2066,13 +2080,13 @@ int main(void) {
         /* THE ONLY WAY INTO THE EVALUATION OVERLAY. Loading and calling
            together is what stops the two ever being separated -- see the
            three rules in core/overlay.h. */
-        ovl_load(OVL_EVAL);
+        load_eval();
         /* THE MEMO FIRST, when there is a ship to account for. The original
            prints it off the ending code before the evaluation; both are in
            OVL_EVAL, so one load covers the pair. */
         if (ship.lost) ui_loss_memo();
         ui_evaluation();
-        ovl_load(OVL_HOF);
+        load_hof();
         ui_hall_of_fame(setup.name, setup.level, trek_score());
 
         if (!ui_play_again()) break;
