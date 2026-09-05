@@ -2,6 +2,9 @@
 #include <stdint.h>
 
 #include "../../core/overlay.h"
+#include "vdc.h"
+#include "egavdc.h"
+#include "../../core/ega.h"
 
 /* The C128's overlays: one KERNAL LOAD into a fixed window.
  *
@@ -70,9 +73,40 @@ void ovl_load(uint8_t which) {
     bank_for_data();
     cbm_k_setlfs(LFN_OVL, DEV, 0);
     cbm_k_setnam(ovl_name[which]);
-    if ((uint16_t)(uintptr_t)cbm_k_load(0, __ovl_start)
-            <= (uint16_t)(uintptr_t)__ovl_start)
-        return;                     /* KERNAL error code, not an end address */
+    {
+        uint16_t end = (uint16_t)(uintptr_t)cbm_k_load(0, __ovl_start);
+        uint16_t stamp;
+        const uint8_t *tail;
+
+        if (end <= (uint16_t)(uintptr_t)__ovl_start)
+            return;                 /* KERNAL error code, not an end address */
+
+        /* THE STAMP: the low sixteen bits of ovl_load's address in the link
+           this image was cut from, appended by the Makefile as its last two
+           bytes. An overlay is linked WITH the resident half, so every call it
+           makes into resident code is a fixed address from that same link --
+           put yesterday's ovl*.prg on the disk beside today's trek128 and the
+           game jumps into the middle of some other function, with no error and
+           nothing naming either file.
+
+           It cost an afternoon on the MEGA65 and produced two wrong diagnoses
+           before the disk was even suspected, and it caught a real mismatch
+           here the day this went in. Say which file is wrong, and stop. */
+        tail  = (const uint8_t *)(uintptr_t)(end - 2);
+        stamp = (uint16_t)(tail[0] | ((uint16_t)tail[1] << 8));
+        if (stamp != (uint16_t)(uintptr_t)&ovl_load) {
+            scr_clear();
+            scr_puts(2, 2, "OVERLAY FILES ARE FROM A DIFFERENT BUILD",
+                     EGA_TO_VDC(EGA_LTRED));
+            scr_puts(2, 4, "THE OVL FILES ON THE DISK AND THE PROGRAM IN",
+                     EGA_TO_VDC(EGA_WHITE));
+            scr_puts(2, 5, "MEMORY MUST COME FROM THE SAME LINK.",
+                     EGA_TO_VDC(EGA_WHITE));
+            scr_puts(2, 7, "REBUILD THE D64 AND START AGAIN.",
+                     EGA_TO_VDC(EGA_LTCYAN));
+            for (;;) { }
+        }
+    }
 
     live = which;
 }

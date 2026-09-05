@@ -80,16 +80,29 @@ OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1
 # must start the next recipe line, and exactly one objcopy went missing. Worse,
 # the failure hid: a stale .raw from a hand-run objcopy made the build pass.
 # This is the idiom the d64 rule below already uses, and it reads one list.
+# EACH IMAGE CARRIES A STAMP -- the low sixteen bits of ovl_load's address in
+# the link it was cut from, appended as its last two bytes. src/overlay.c
+# checks it after every LOAD.
+#
+# WHY: an overlay is linked WITH the resident half, so every call it makes into
+# resident code is a fixed address from that same link. Put yesterday's ovl*.prg
+# on the disk beside today's trek128 and the game jumps into the middle of some
+# other function -- no error, nothing naming either file. On the MEGA65 that
+# cost an afternoon and produced two wrong diagnoses; the C128 has the identical
+# hazard and had no guard at all. Hit here for real on 2026-09-04, driving a
+# DEBUG binary against a d64 built from the RELEASE overlays.
 define OVL_IMAGES
-	@for o in $(OVERLAYS); do \
+	@stamp=`$(NM) $(1) | awk '$$3 == "ovl_load" { print $$1 }'`; \
+	for o in $(OVERLAYS); do \
 	    $(OBJCOPY) --dump-section=.ovl_$$o=build/ovl_$$o.raw $(1) /dev/null || exit 1; \
 	    python3 -c "import sys; \
-	        n = sys.argv[1]; \
+	        n = sys.argv[1]; a = int(sys.argv[2], 16); \
 	        d = open('build/ovl_%s.raw' % n, 'rb').read(); \
 	        w = int('$(OVL_WINDOW)', 16); \
+	        d = d + bytes([a & 0xFF, (a >> 8) & 0xFF]); \
 	        open('build/ovl%s.prg' % n, 'wb').write(bytes([0x00,0x40]) + d); \
-	        print('  overlay %s: %d bytes, window is %d' % (n, len(d), w)); \
-	        sys.exit('overlay %s does not fit the window' % n) if len(d) > w else None" $$o || exit 1; \
+	        print('  overlay %s: %d bytes + stamp, window is %d' % (n, len(d) - 2, w)); \
+	        sys.exit('overlay %s does not fit the window' % n) if len(d) > w else None" $$o $$stamp || exit 1; \
 	done
 endef
 
