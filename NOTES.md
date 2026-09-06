@@ -6135,6 +6135,24 @@ SIDE, so panels sharing a row share the four. That is the identical objection.
 
 **So the IIgs joins the Atari ST line in Tier 3.** Not on paper this time.
 
+### CONFIRMED on a verified romset, and the stand-in was not load-bearing
+
+The first run used a synthesized `megaii.chr`, which is a caveat worth
+retiring rather than explaining away. **Ample** (`~/ample/Ample.app`) bundles
+its own MAME **0.289** and its own romset at
+`~/Library/Application Support/Ample/roms`, where `apple2gs.zip` carries the
+real `megaii.chr` AND the `344s0047.bin` that 0.289 asks for instead --
+`-verifyroms` says **"romset apple2gs is good"**.
+
+Both measurements were re-run there. **Identical:** 15/4/4/4/4 with sixteen
+distinct entries, 4/1/1/1/1 with the four replicated, content 640 px wide.
+Different MAME version, different and fully verified ROMs, same numbers. The
+conclusion does not rest on a fabricated file.
+
+**Ample's MAME is the IIgs instrument of record**, because its romset verifies
+clean. The notes below are kept for the 0.281 route in case only that
+collection is to hand.
+
 ### The MAME harness, which is the reusable part
 
 MAME is the IIgs instrument, not GSplus -- `-autoboot_script` plus
