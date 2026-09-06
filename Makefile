@@ -17,7 +17,12 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check check-tables tiers exit-test sound-check clean
+.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check clean
+
+c89-check:
+	@echo "port-check: the core must stay C89 (cc65 needs it)"
+	@cc -std=c89 -fsyntax-only -Werror=declaration-after-statement \
+	    -I core core/*.c
 
 all: test port-check check-tables tiers
 
@@ -82,7 +87,13 @@ check-tables:
 #
 # Skipped with a note if the cross compiler is absent, so a machine without it
 # can still run `make`.
-port-check:
+# C89, AND IT IS NOT PEDANTRY. cc65 is C89 and rejects a declaration after a
+# statement; it is the toolchain the F256 currently needs, and the only one on
+# the list that cares. THREE VIOLATIONS HAD ACCUMULATED IN core/trek.c by
+# 2026-09-05, one of them three lines below a comment explaining the rule --
+# because the rule was only ever a comment. The 68000 pass below cannot catch
+# them: gcc there is C99 and perfectly happy. This is the check that closes it.
+port-check: c89-check
 	@if [ -x "$(M68K)" ]; then \
 	    echo "port-check: compiling the core for 68000"; \
 	    $(M68K) -c -O2 -Wall -Wextra -Werror -o /dev/null core/trek.c && \

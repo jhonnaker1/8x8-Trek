@@ -478,27 +478,23 @@ void trek_turn_end(void) {
 }
 
 void trek_advance_time(uint16_t tenths) {
+    /* EVERY DECLARATION IS UP HERE, and that is a portability rule rather than
+       a style. cc65 is C89 and rejects a declaration after a statement, and it
+       is the toolchain the F256 currently needs. This block used to sit below
+       the laser-cooling scope below, which made a statement precede it; the
+       comment warning about exactly that was three lines away and the code
+       still drifted past it, because NOTHING CHECKS IT -- `make port-check`
+       compiles for the 68000 with gcc, which is C99 and happy either way.
+       Caught 2026-09-05 by putting the core through cc65 while scoping the
+       F256. */
     uint16_t gain = (uint16_t)(tenths * (ENERGY_PER_DAY / 10));
-
-    /* The banks cool with the clock as well as with the turn -- 360 points a
-       stardate, at 0x0201B3, applied in the same routine as the repair. The
-       clamp keeps the product inside sixteen bits; anything past two
-       stardates has already cooled them to nothing. */
-    {
-        uint16_t cool = (uint16_t)((tenths > 180 ? 180 : tenths)
-                                   * (LASER_HEAT_COOL_DAY / 10));
-        ship.laser_heat = (uint16_t)(cool >= ship.laser_heat
-                                     ? 0 : ship.laser_heat - cool);
-    }
+    uint16_t cool = (uint16_t)((tenths > 180 ? 180 : tenths)
+                               * (LASER_HEAT_COOL_DAY / 10));
 
     /* Repair is a FOUR-ENTRY RATE TABLE, not a stack of multipliers. Pick the
        row -- docked or not, focused or not -- and apply it. Composing the two
        instead shipped a combined rate near 7x against the manual's 5x; the
-       table and the arithmetic that refutes the product are in trek.h.
-
-       Declarations first: cc65 is C89 and rejects a statement before one,
-       while the native build is C99 and does not. `make test` passing is not
-       evidence that the port compiles. */
+       table and the arithmetic that refutes the product are in trek.h. */
     uint8_t  docked = (uint8_t)(ship.docked == BASE_STARBASE);
     uint16_t rate   = docked ? REPAIR_PER_STARDATE_DOCKED
                              : REPAIR_PER_STARDATE;
@@ -513,6 +509,13 @@ void trek_advance_time(uint16_t tenths) {
     uint16_t mend;
 
     uint8_t i;
+
+    /* The banks cool with the clock as well as with the turn -- 360 points a
+       stardate, at 0x0201B3, applied in the same routine as the repair. The
+       clamp keeps the product inside sixteen bits; anything past two
+       stardates has already cooled them to nothing. */
+    ship.laser_heat = (uint16_t)(cool >= ship.laser_heat
+                                 ? 0 : ship.laser_heat - cool);
 
     ship.stardate = (uint16_t)(ship.stardate + tenths);
 
@@ -1550,12 +1553,12 @@ static uint8_t enter_black_hole(void) {
 }
 
 uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
+    uint16_t d16, cost;
+    uint8_t blocked;
+
     /* [0x26E3] in fn 0x0C609: moving buys a 40%% chance the enemy turn is
        skipped. Set on every path that actually moves the ship. */
     ship.moved = 1;
-
-    uint16_t d16, cost;
-    uint8_t blocked;
 
     if (sy >= QUAD_DIM || sx >= QUAD_DIM) return MOVE_BAD_COORDS;
     if (sy == ship.sec_y && sx == ship.sec_x) return MOVE_SAME_PLACE;
@@ -1727,12 +1730,12 @@ static uint16_t warp_hundredths(uint16_t d16) {
 }
 
 uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
+    uint16_t d16, cost;
+    uint8_t ay1, ax1;
+
     /* [0x26E3] in fn 0x0C609: moving buys a 40%% chance the enemy turn is
        skipped. Set on every path that actually moves the ship. */
     ship.moved = 1;
-
-    uint16_t d16, cost;
-    uint8_t ay1, ax1;
 
     if (qy >= GAL_DIM || qx >= GAL_DIM ||
         sy >= QUAD_DIM || sx >= QUAD_DIM) return MOVE_BAD_COORDS;
