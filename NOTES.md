@@ -6360,3 +6360,96 @@ and the MEGA65 is the reason to believe it.** Its screen layer really was a
 -- a library clobbering the compiler's pseudo-registers, a hypervisor that
 never freed a descriptor, a raster counter that wrapped twice per frame. Budget
 the X16 for its own three of those, not for the seven files above.
+
+## SCOPE: Atari 800XL + VBXE (written 2026-09-05, NOT STARTED)
+
+**AND IT IS NOT A BITMAP TARGET.** That is the headline, because this file and
+the README have said the opposite since 2026-08-23: "the two bitmap targets go
+last, together -- Amiga and VBXE. Both need a font, a glyph blitter, and a
+dirty-cell scheme." VBXE has **a real character-plus-attribute text mode** --
+80 columns, per-cell foreground AND background, from a 1024-colour palette.
+`commodore-uno/atari/src/vbxevid.h` says so plainly and its `vbxevid.c` drives
+it. The bitmap classification is not wrong about VBXE's pixel modes existing;
+it picked the wrong mode, and so put the target in the wrong cost class.
+
+So this is a `vdc.c` rewrite, like the MEGA65 and the X16 -- not the font and
+blitter work the Amiga genuinely needs. **The Amiga is the only true bitmap
+target left.**
+
+### What is already true, measured
+
+**The core compiles.** `mos-atari8-dos-clang -Wall -Werror -Oz`: `trek.c`,
+`planet.c`, `hof.c`, `serial.c`, four for four, no shims.
+
+**It is the roomiest 8-bit target yet.** `atari8-dos/lib/link.ld` gives
+`ram : ORIGIN = 0x2000, LENGTH = 0xA000` = **40,960 bytes**, against the C128's
+37,823 (which holds the whole game) and the X16's 38,655. **And the screen
+lives in VBXE's own 512K VRAM, so the framebuffer costs no main RAM at all** --
+the C128 spends nothing there either, but only because the VDC has its own.
+
+**Colour is a non-issue, and better than a non-issue.** Per-cell fg and bg from
+a 1024-colour (21-bit) palette is more than EGA needs, so load EGA's sixteen
+and `TREK_COLOUR_IS_EGA` makes the mapping the identity, as on the MEGA65.
+
+**Far memory has an obvious home.** VBXE's 512K VRAM, reached through the MEMAC
+window, is bank 1 with more room -- and the MESSAGE LOG can live there too,
+which is the same trick the C128 plays with spare VDC RAM.
+
+### THE ONE REAL RISK: 24 rows against a 25-row console
+
+`layout.c` puts the bottom band on **rows 17..24** -- twenty-five rows. Uno's
+VBXE driver is `#define ROWS 24`, "24 rows x 8 scanlines = 192 scanlines, the
+full NTSC/PAL Atari display height".
+
+**But the row count is an XDL parameter, not a hardware ceiling.** Its own
+comment retracts the obvious worry: a single `XDLC_RPTL` of `ROWS*8-1` covers
+all the rows, and "the earlier 'single entry only covered ~10 rows' symptom was
+really this same CHBASE-timing bug, not an RPTL-coverage limit."
+
+**And the arithmetic is suggestive: 25 x 8 = 200 = 24 rows PLUS the 8-scanline
+border entry that XDL currently spends on a top margin.** So a 25th row may
+cost exactly that border and nothing else. **That is a hypothesis, not a
+result** -- it is the first thing to measure, before any code is written,
+because the answer decides whether this port is a rewrite of one file or a
+redesign of the console.
+
+If 25 rows will not come, the fallback is not obvious and should not be assumed
+away: the nine panels are dimensioned in `layout.c` and losing a row is not a
+cosmetic trim.
+
+### The reference already carries two traps worth days
+
+`commodore-uno/atari/src/vbxevid.c` documents both, each found the hard way:
+
+  * **The FX core exposes CSEL/PSEL/CR/CG/CB directly at $D644-$D648.** The
+    older VBXE manual documents those same addresses as an MSEL/MB0-3 "commit"
+    protocol; following the manual scrambles the palette so text renders in a
+    colour indistinguishable from its background -- which looks like blank
+    glyphs, not like a palette bug.
+  * **MEMAC window A is $D65E/$D65F.** The v1.0-beta manual's `MA_CPU` at
+    $D64C **does not exist** on the FX core -- Altirra's register switch has no
+    case for it, so writes are silently dropped, the window never opens, and
+    every "VRAM write" lands in plain Atari RAM. Same-window read-backs then
+    look correct, which is what makes it expensive.
+  * A third, from the XDL: **CHBASE must be programmed by a PRIOR XDL entry**,
+    not the one that turns text mode on, or every glyph comes out blank with
+    correct backgrounds.
+
+### The rig
+
+AltirraSDL is installed, `ATARIXL.ROM` is on disk in three places, and this
+session has an **`altirra-bridge` skill** for driving AltirraSDL programmatically
+-- screenshots, keyboard/joystick injection, frame-stepping, CPU and memory
+read/write, breakpoints, symbol loading. That is a complete instrument, and
+unlike the MEGA65's it exists before the port does.
+
+### Where this leaves the order
+
+If 25 rows are reachable, VBXE is a text sibling and belongs with the X16 and
+F256, not at the end with the Amiga. On the evidence so far it may be the
+SECOND easiest target: more code space than the X16, colour that needs no
+mapping, a worked reference driver, and a first-class rig. Its disadvantages
+against the X16 are that the KERNAL disk seam does not transfer (Atari DOS is
+not CBM), and that it needs hardware the base machine does not have.
+
+**Nothing here is a decision. The row question comes first.**
