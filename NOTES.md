@@ -6239,3 +6239,124 @@ when both are given -- the machine sits at the BASIC prompt looking like the
 program failed. And `natkeyboard:post_coded` needs `{ENTER}`: a bare `\n`
 types **nothing**, so every command runs together on one line and none of them
 execute, which looks identical to a typing-speed problem.
+
+## SCOPE: the Commander X16, the next port (written 2026-09-05, NOT STARTED)
+
+Chosen by measurement rather than by the 2026-08-23 ordering, though it agrees.
+
+### Why this one
+
+**The whole core compiles for it today.** `mos-cx16-clang -Wall -Werror -Oz` on
+`trek.c`, `planet.c`, `hof.c`, `serial.c`: four for four, first try, no shims.
+The CoCo 3 needed a `<stdint.h>` shim and a rewritten static assert to reach
+the same point.
+
+**The code space is the same shape, slightly roomier.** `cx16/lib/link.ld` has
+`ram : ORIGIN = 0x0801, LENGTH = 0x96FF` = **38,655 bytes**, against the C128's
+37,823 -- which currently holds the entire game with 211 to spare. So the
+ten-overlay machinery transfers rather than being redesigned.
+
+**The disk seam should nearly copy across.** Every KERNAL entry
+`c128/src/storage.c` uses -- `setlfs`, `setnam`, `open`, `ckout`, `bsout`,
+`load`, `readst` -- exists for the X16 in llvm-mos. That is the seam that cost
+four bugs on the C128 and is still unfinished on the MEGA65.
+
+**`core/farmem.h` already names its banking model**, and has since the seam was
+designed: "X16 -- 8K pages at $A000 out of 512K, or VERA's 128K".
+
+### The platform surface, DERIVED not assumed
+
+Grepping every `vdc_/scr_/snd_/kb_/plat_/far_/ovl_` call in the shared sources
+gives the real list, and it is bigger than the "four primitives" the docs
+advertise:
+
+    scr_puts 131   scr_put 73   scr_hline 13   scr_clear 10   scr_vline 6
+    scr_fill_rect 4   wait_vsync 1   vdc_init 1   vdc_shutdown 1
+    kb_waitkey 17
+    snd_beep 12  snd_effect 9  snd_music 4  + init/off/music_data/poll/
+                 enabled/toggle
+    plat_read_all 3  plat_write_all 2  plat_open/read/close 1 each
+    far_read 3  far_load 2  far_size
+    ovl_load 11
+    **vdc_data_read 4   vdc_data_write 3   vdc_set_address 2**
+
+**That last row is the trap.** They look like C128 register pokes leaking into
+shared code; they are not. They are the MESSAGE LOG, which the C128 keeps in
+spare VDC video RAM -- storage that costs no main memory. The MEGA65 backs the
+same three calls with a banked-RAM cursor in `m65mem.c`. So they are a generic
+byte-stream store with a misleading name, and **the X16 has the closest
+analogue of any target: VERA's 128K, of which the text screen uses a
+fraction.**
+
+### The files, sized against both precedents
+
+MEGA65's platform layer is 1,026 lines, the C128's 1,322. Expect the same
+shape:
+
+    x16vera.c     video + the log byte-stream        ~200   REFERENCE EXISTS
+    x16input.c    kb_waitkey via the KERNAL           ~80
+    x16snd.c      the nine sound entry points        ~250   REFERENCE EXISTS
+    x16storage.c  the disk seam                      ~350   NEAR-COPY of c128
+    x16mem.c      far_load/far_size/far_read         ~200
+    x16.ld        window + ten staging regions       ~100   pattern established
+    overlay.c     cbm_k_load based                   ~110   NEAR-COPY of c128
+
+`commodore-uno/x16/src/x16vera.c` already drives VERA text with a programmed
+palette and a `(bg<<4)|fg` cell byte, and `x16snd.c` already drives the PSG.
+Both are cc65 and would be rewritten for llvm-mos, but the register work is
+solved and does not need rediscovering.
+
+### The four real risks, in order
+
+1. **The 8K window versus a flat bank.** The C128's far memory is a flat 64K
+   reached by FETCH/STASH; the X16 pages 8K at `$A000`. `far_read(off,dst,len)`
+   must therefore straddle page boundaries, which the C128 implementation never
+   has to. The string pool is 7,275 bytes -- just under one page, so the very
+   first read that crosses `$2000` is the one that will be wrong. **Design this
+   first and test it on a deliberately straddling read.**
+2. **Sound will have a tempo bug.** It always does. The MEGA65 lost a day to a
+   raster that wraps twice per frame; the C128 to a driver three semitones from
+   its cause. VERA's PSG is not a SID and the `snd_poll` timing model must be
+   re-fitted. Do it LAST, so it cannot block the rest.
+3. **Where the message log lives.** VERA RAM (closest to the C128) or a banked
+   page. Decide before `x16vera.c` is written, because it changes that file.
+4. **Code space.** 38,655 against a game that needs 37,612 on the C128 leaves
+   about 1K -- but the X16's zero page and golden RAM are not the C128's. **Link
+   the whole thing early**, even against stub platform files, rather than
+   discovering it after the overlays are cut.
+
+Colour is NOT a risk: VERA has 256 entries and the palette is programmable, so
+load EGA's sixteen and `TREK_COLOUR_IS_EGA` makes the mapping the identity,
+exactly as on the MEGA65.
+
+### The rig exists UP FRONT, which the MEGA65's did not
+
+`~/x16emu_macos_m1-r48/x16emu` offers, without any harness work:
+
+    -prg <file> -run          load and run
+    -warp                     fast
+    -dump {C|R|B|V}           CPU, RAM, BANKED RAM and VRAM -- so the string
+                              pool, the overlay images and the message log can
+                              be checked BYTE-EXACT, not by looking at a screen
+    -debug [<addr>]           debugger, with a breakpoint
+    -gif <file>[,wait]        record; POKE $9FB5,1 captures a single frame
+
+`-dump B` and `-dump V` are the important ones: they are what took three days to
+find an equivalent of on the MEGA65.
+
+### Build order, mirroring what actually worked
+
+1. `x16.ld` + a smoke binary that draws the console frame and sets the palette;
+   screenshot it and measure all sixteen colours onto their EGA index.
+2. Storage seam, then far memory, then the string pool -- verified byte-exact
+   against the file with `-dump B`.
+3. Overlays, with the build stamp from day one.
+4. Input, then link the whole game.
+5. Sound.
+
+**On the estimate: this project's estimates have run about 3x low throughout,
+and the MEGA65 is the reason to believe it.** Its screen layer really was a
+`vdc.c` rewrite; the port still cost days, and none of them were display work
+-- a library clobbering the compiler's pseudo-registers, a hypervisor that
+never freed a descriptor, a raster counter that wrapped twice per frame. Budget
+the X16 for its own three of those, not for the seven files above.
