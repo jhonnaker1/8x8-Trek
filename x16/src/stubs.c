@@ -31,9 +31,6 @@ void snd_toggle(void) {}
 
 
 
-/* Without TREK_OVERLAYS the ten OVL_LOADER stubs in main.c still call this;
-   linking everything resident is what makes the total meaningful. */
-void ovl_load(unsigned char id) { (void)id; }
 
 /* A VARIABLE, not a function -- which is why the scope's "platform surface,
    derived not assumed" missed it: that grep looked for call syntax only.

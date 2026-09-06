@@ -33,11 +33,11 @@
 
 static uint16_t far_len = 0;
 
-static void far_move(uint16_t off, unsigned char *p, uint8_t len, uint8_t writing) {
+static void far_move(uint16_t off, unsigned char *p, uint16_t len, uint8_t writing) {
     while (len) {
         uint16_t within = (uint16_t)(off & WIN_MASK);
         uint16_t avail  = (uint16_t)(WIN_SIZE - within);
-        uint8_t  n      = (len < avail) ? len : (uint8_t)avail;
+        uint16_t n      = (len < avail) ? len : avail;
 
         BANK_REG = (unsigned char)(FIRST_BANK + (off >> WIN_BITS));
         if (writing) memcpy(WIN + within, p, n);
@@ -45,11 +45,19 @@ static void far_move(uint16_t off, unsigned char *p, uint8_t len, uint8_t writin
 
         p   += n;
         off  = (uint16_t)(off + n);
-        len  = (uint8_t)(len - n);
+        len  = (uint16_t)(len - n);
     }
 }
 
 void far_read(uint16_t off, void *dst, uint8_t len) {
+    far_move(off, (unsigned char *)dst, (uint16_t)len, 0);
+}
+
+/* BULK COPY, local to this port. far_read's contract caps len at 255 because
+   the shared seam is built for records -- a pooled string is 63 bytes. An
+   overlay image is 4K, so the loader needs a wider door. Same straddling
+   logic; nothing about the seam's contract changes. */
+void far_bulk(uint16_t off, void *dst, uint16_t len) {
     far_move(off, (unsigned char *)dst, len, 0);
 }
 
@@ -68,7 +76,7 @@ uint16_t far_load(const char *name) {
     for (;;) {
         n = plat_read(buf, (uint16_t)sizeof buf);
         if (n == 0) break;
-        far_move(far_len, buf, (uint8_t)n, 1);
+        far_move(far_len, buf, n, 1);
         far_len = (uint16_t)(far_len + n);
     }
     plat_close();

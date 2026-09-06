@@ -6895,3 +6895,57 @@ so the tested path is the only path.
 
 Full link with real far memory: overflow 19,839 bytes, so ~20K to overlay
 against the C128's 29,286. The fit conclusion is unchanged.
+
+## X16 overlays, and a scope figure that was apples-to-oranges (2026-09-05)
+
+The overlay machinery is built: `x16.ld` with one 4K window and ten staging
+regions, `x16ovl.c` with the build stamp from day one, and the Makefile cutting
+ten images into `OVERLAYS.BIN`. **It took the resident overflow from 19,839
+bytes to 813.**
+
+**SHAPED LIKE THE MEGA65'S, NOT THE C128'S.** The C128 loads each overlay off
+disk on every swap; this port holds all ten images in banked RAM and copies the
+wanted one into a low-RAM window, so a swap is a memcpy. The images ride in the
+far store as one more tenant beside the string pool and the music, which means
+they arrive through the storage and far-memory seams that are already tested
+rather than through a third path.
+
+**The window is in LOW RAM, and that is forced.** `$A000..$BFFF` is the banked
+window the images are read THROUGH, so the window they are copied INTO cannot
+live there. It sits at the top of low RAM, below the soft stack.
+
+### THE SCOPE'S SPACE FIGURE WAS WRONG, and this is how it showed up
+
+The scope said the X16 was "the same shape as the C128's, slightly roomier --
+38,655 against 37,823". **That compared the X16's TOTAL against the C128's
+RESIDENT-ONLY.** The C128 carves its window out of a larger region:
+
+    C128 ram region      37,823        X16 total region     38,655
+    C128 window           4,096        X16 window            4,096
+    C128 TOTAL           41,919        X16 resident         34,559
+
+**The X16 has 3,264 bytes LESS total space than the C128, not 832 more.** So
+the same overlay split that fits the C128 with 211 bytes spare cannot fit here,
+and the 813-byte overflow is exactly that shortfall minus what the split
+already absorbs.
+
+That is the second time this week a quoted linker figure has not meant what it
+looked like -- the Atari's window silently owned 8K of the address space, and
+here the comparison was against the wrong half. **State what a region EXCLUDES,
+not just its length.**
+
+### What closes the last 813 bytes
+
+Two options, and the first helps every port:
+
+  * **Move one more function into an overlay.** The C128 has 211 bytes free
+    and the MEGA65 4,244, so a further split helps the tightest port too. But
+    the candidate must be MEASURED, not reasoned about -- the fourth overlay
+    pass on the C128 named three candidates and all three were wrong, costing
+    863 bytes. The call graph decides: a shared callee must stay resident, and
+    a function that calls `ovl_load` cannot live in an overlay.
+  * **Move a `.bss` buffer into banked RAM**, which is X16-only and does not
+    help the others. The map is LTO-merged so per-symbol `.bss` sizes are not
+    broken out; sizing this needs `-fno-lto` or a per-object link first.
+
+**Not started. The game target does not link yet, by 813 bytes.**
