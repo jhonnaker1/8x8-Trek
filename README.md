@@ -209,9 +209,17 @@ Ranking targets is a question with no useful answer, so they are split by
    raster counter that wraps twice per frame and so ran the music at double
    speed. Budget the next sibling for its own three of those.
 
-2. **The bitmap target goes last** — the Amiga, and it is now the only one.
-   It needs a layer the others do not: a font, a glyph blitter, and a
-   dirty-cell scheme so the port is not repainting 2000 cells a frame.
+2. **The Amiga is the only bitmap target left** — and scoping it on
+   2026-09-05 undercut the reason it was put last. There is no per-frame
+   repaint to avoid (`wait_vsync` is never called from shared code; the console
+   is event-driven, one cell at a time), and the 8×8 font comes free from ROM.
+   What it actually needs is thirteen original box-drawing glyphs — about 104
+   bytes — and a sound re-fit for Paula's sampled audio.
+
+   Against that it is the only remaining target with **more memory than the
+   game needs**, which deletes the overlay machinery outright; the only one
+   whose portability contract is already tested on every build; and it has the
+   best instrument on the project in Amiberry. See `NOTES.md`.
 
    **VBXE used to sit beside it here, and that was a mistake of classification
    rather than of judgement.** VBXE has a real character-plus-attribute text

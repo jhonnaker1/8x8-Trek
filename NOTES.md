@@ -6642,3 +6642,104 @@ against fifteen.
     X16      next -- scoped
     VBXE     scoped, and a TEXT target, not the bitmap one this file called it
     Amiga    last, and now the only true bitmap target
+
+## SCOPE: the Amiga (written 2026-09-05, NOT STARTED)
+
+**The last target, and on this evidence the CHEAPEST of the three remaining --
+which is the opposite of what the ordering has said since August.**
+
+### Two things the order got wrong about it
+
+**"Both need a font, a glyph blitter, and a dirty-cell scheme so the port is
+not repainting 2000 cells a frame."** That one sentence carried two errors, and
+the VBXE half was corrected earlier today. The Amiga half is wrong too:
+
+  * **There is no per-frame repaint to avoid.** `wait_vsync` is never called
+    from any shared source -- the single grep hit is a COMMENT mentioning it.
+    The console is entirely event-driven: `scr_put` writes one cell when
+    something changes, exactly as on the C128 and MEGA65. **A dirty-cell scheme
+    solves a problem this codebase does not have.**
+  * **The font is nearly free.** Uno's `amiga/src/gfx.c` draws with
+    `topaz.font` 8/8 out of ROM -- definitionally 8x8, baseline 6, always
+    present -- through `graphics.library`'s `Text()`. No font to author for
+    ASCII.
+
+So the video layer is: open a 640x200 four-bitplane screen, load EGA's palette,
+and implement `scr_put` as a glyph draw. That is a `vdc.c` rewrite like every
+other sibling.
+
+### The numbers
+
+    640x200, 4 bitplanes   64,000 bytes of chip RAM -- and 4 planes at 640
+                           wide is exactly the OCS/ECS hires maximum, so
+                           SIXTEEN colours, against the fifteen the console
+                           uses. One to spare.
+    topaz 8x8              in ROM, costs nothing
+    original glyphs        ~13, about 104 bytes -- see below
+
+**AND NO OVERLAYS. NO FAR MEMORY. NO BANKING.** `core/farmem.h` has said
+"Amiga -- no banking needed, a plain array" since the seam was designed. That
+deletes the single most expensive machinery in every 8-bit port here: ten
+overlay windows, ten staging regions, the resident/overlay split, the build
+stamp, `ovl_load`, and the constant budget arithmetic that has dominated this
+project. **Nothing else on the list offers that.**
+
+### The one asset that must be original
+
+The box-drawing glyphs are **C128 SCREEN CODES baked into shared `layout.h`** --
+`G_HLINE` 64, `G_VLINE` 93, `G_TL` 112 and so on, twelve of them, plus raw 81
+(the filled ball) and 160 (solid block) used directly in `ui.c`. The MEGA65 gets
+away with this because the C65 charset is character-for-character the C64's.
+**topaz has letters at those code points**, so borders would render as `@`, `]`
+and `p`.
+
+That needs about **thirteen 8x8 glyphs, roughly 104 bytes**, drawn as this
+project's own artwork. It is NOT a 256-glyph font, and it must NOT be lifted
+from Commodore's character ROM -- the same rule that made `tools/make_music.py`
+compose rather than extract. VICE ships that ROM and `test_panels.c` already
+reads it to CHECK our screen codes; checking against it is fine, shipping it is
+not.
+
+### Sound is the real work, as always
+
+Paula is four channels of **sampled** audio, not a synthesiser -- the furthest
+from the SID of any target so far. The nine-function seam has to be re-fitted:
+a waveform sample plus a period per note, and a timing source. Uno's
+`amigasound.c` is a starting point.
+
+**Budget a tempo bug.** The C128 lost time to a driver three semitones from its
+cause; the MEGA65 to a raster that wraps twice per frame. Do sound LAST so it
+cannot block the rest.
+
+### Storage is the easiest of any port
+
+AmigaDOS `Open`/`Read`/`Write`/`Close` map straight onto the five `plat_*`
+functions, and unlike every 8-bit target there is no KERNAL, no hypervisor, no
+device number and no 8K window to negotiate. **`plat_write_all()` would
+actually work** -- it still does not on the MEGA65.
+
+### The rig is the best on the project
+
+Amiberry, measured on 2026-09-05: `-G` starts without the GUI and it opens a
+Unix socket at `/tmp/amiberry.sock` unasked, carrying `SCREENSHOT <path>`,
+`READ_MEM`/`WRITE_MEM`, `GET_CPU_REGS`, `DISASSEMBLE`, breakpoints,
+`FRAME_ADVANCE`, `SEND_KEY`. **The protocol is TAB-separated and nothing says
+so** -- a space-separated command returns `ERROR Unknown command`, which reads
+exactly like an unsupported feature. And `-m VOLNAME:mount_point` mounts a HOST
+DIRECTORY as an Amiga volume, so there is no ADF to build at all.
+
+### What is NOT a consideration
+
+**Boss mode.** This file used to note the Amiga as the one target where it
+could be done properly, since AmigaDOS can spawn a shell and return. Jamie has
+ruled boss mode out on every platform, so that advantage is moot rather than
+pending.
+
+### Recommendation
+
+**Go straight at it after the X16, ahead of VBXE.** It is the only remaining
+target with more memory than the game needs, the only one that deletes the
+overlay machinery outright, the only one whose portability contract is already
+tested on every build (`make port-check` has compiled the core for 68000 since
+before any port existed), and it has the best instrument. The costs are a
+sound re-fit and thirteen glyphs.
