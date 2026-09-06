@@ -5965,3 +5965,74 @@ and `atari8-*` platforms, so X16 and VBXE are clean; **it has no F256 platform
 at all**, and Uno's support there is a hand-built linker config, PGZ startup
 and kernel shim under `f256/toolchain/`. That is the one target where the
 toolchain question is real work rather than a path.
+
+## Amiberry is the Amiga instrument, and the IIgs was never considered (2026-09-05)
+
+Both raised by Jamie, and both were gaps rather than decisions.
+
+### Amiberry: a better instrument than this project has for the C128
+
+`/Applications/Amiberry.app` (v8.3.0) had been overlooked because the earlier
+readiness check looked at `PATH` and found only `fs-uae`. It is the Amiga
+target's answer, and it is not close:
+
+    Amiberry --model A1200 -r <kick.rom> -G -s use_gui=no
+
+`-G` starts emulation without the GUI, and on startup it **creates a Unix
+socket at `/tmp/amiberry.sock` with no flag asked for**. Over that socket:
+
+    SCREENSHOT <path>              a PNG, on demand, headless
+    READ_MEM <addr> <width>        and WRITE_MEM -- poke state, read it back
+    GET_CPU_REGS, DISASSEMBLE <addr> [count]
+    SET_BREAKPOINT / CLEAR_BREAKPOINT / LIST_BREAKPOINTS
+    DEBUG_STEP [count], DEBUG_STEP_OVER, DEBUG_CONTINUE, FRAME_ADVANCE [n]
+    SEND_KEY <code> <state>, SEND_MOUSE_ABS <x> <y> <buttons>
+    INSERTFLOPPY / INSERT_WHDLOAD / SAVESTATE / LOADSTATE
+
+That is screenshots, memory, breakpoints, deterministic frame stepping and key
+injection **on one socket** -- more than VICE's binary monitor gives the C128
+and more than Xemu's uartmon gives the MEGA65. Also `-m VOLNAME:mount_point`
+mounts a HOST DIRECTORY as an Amiga volume, so there is no ADF to build: the
+same trick that made the MEGA65 tractable when Xemu took `-sdimg` as a folder.
+
+**THE PROTOCOL IS TAB-SEPARATED, and nothing says so.** `--help` does not
+mention the socket at all, and a space-separated command comes back
+`ERROR Unknown command` -- which reads exactly like an unsupported feature.
+Every argument-less command works over spaces, so the first ten minutes look
+fine and then every useful command appears to be missing:
+
+    GET_WARP\n            -> OK   0
+    SET_WARP 0\n          -> ERROR  Unknown command: SET_WARP 0
+    SET_WARP\t0\n         -> OK
+
+Verified end to end on 2026-09-05: A1200 with Kickstart 3.x from
+`~/FS-UAE-Silicon/Kickstarts/kicka1200.rom`, booted to the AmigaDOS shell, and
+`SCREENSHOT\t<path>` wrote a 756x576 PNG of it.
+
+### Apple IIgs -- an open question, not a rejection
+
+The notes rule out the **Apple IIe** (80-column card is text-only monochrome,
+double hi-res artifacted to ~140 real colour pixels). **The IIgs has never been
+considered at all**, and it is a different machine: 65816, Ensoniq sound, and
+Super Hi-Res.
+
+On paper it lands where the Atari ST did -- SHR is 320x200 in 16 colours (40
+columns) or 640x200 in 4 (80 columns) -- and the ST is out for exactly that.
+**But the IIgs has two escapes the ST does not**: per-scanline palettes via the
+SCB, and the 640-mode rule where a pixel's palette index also depends on its
+position within the byte, which widens the count horizontally. The ST was
+rejected because the console's panels sit side by side, so one scanline crosses
+three of them and per-line tricks cannot help. A per-PIXEL effect is a
+different argument, and it has not been tested.
+
+**So this is unmeasured, and it should get what the CoCo 3 got: boot it.**
+Tooling is present -- `/Applications/GSplus.app` plus `~/GSPlus/APPLE2GS.ROM2`
+and System 6.0.4 images under `~/UthernetII/speccies_IIgs_starter_kit`. GSplus
+takes `-ssdir` (screenshot directory) and `-debugport`, so it is automatable,
+but wiring that up is its own job of the shape Xemu was. **MAME is NOT the
+route: `mame apple2gs -verifyroms` says the romset is not present.**
+
+Toolchain, checked rather than assumed: llvm-mos lists **`mosw65816`**, so the
+CPU is covered by the compiler this project already uses. There is no
+`apple2gs` platform in `mos-platform/`, which puts it in the same hand-built
+linker-config bucket as the F256.
