@@ -2267,7 +2267,21 @@ Not missing features -- implemented things that do not match the original.
    reaching for: **VBXE sits next to the Amiga**, at the end, because they
    share a problem -- not because either is the hardest target.
 
+   **[SUPERSEDED 2026-09-05. They do NOT share a problem: VBXE has a real
+   character-plus-attribute text mode, and the Amiga needs neither a
+   dirty-cell scheme nor an authored font. The order is now C128 -> MEGA65
+   -> X16 -> Amiga -> VBXE, and the two are first-and-last of what remains.
+   See "The order, rewritten by measurement" at the end of this file.]**
+
    ### The portability argument for doing the Amiga early is weaker than it looks
+
+   **[STILL VALID 2026-09-05, and the Amiga moved up anyway -- for a DIFFERENT
+   reason. This section rebuts the PORTABILITY case, and the rebuttal holds:
+   `make port-check` really does cover the compile axis on every build. The
+   Amiga is now second because it DELETES the overlay machinery -- no banking,
+   no windows, no staging regions, no budget arithmetic -- which is a cost
+   argument, not a portability one. Keeping this section because it is still
+   the right answer to the question it asks.]**
 
    Worth writing down, because it is the instinct that would otherwise make the
    68000 leg port #2. The reasoning goes: a big-endian 32-bit target with a
