@@ -6169,3 +6169,48 @@ generator: text glyphs, nothing to do with Super Hi-Res. So a stand-in built by
 repeating the 4K charset four times is sound for this measurement, was kept in
 a private `-rompath` so the real romset is untouched -- and rendered the boot
 text correctly anyway.
+
+## The CoCo 3, re-measured on the IIgs rig (2026-09-05)
+
+Asked because the IIgs exercise made the earlier CoCo 3 check look thin by
+comparison. **It was: the 2026-08-22 result is prose in this file with no
+recorded colour values, no MEASURED.md entry, and one load-bearing claim --
+"the palette slots are themselves reprogrammable from 64" -- sitting next to
+the measurement rather than inside it.** So it was redone on the same rig the
+IIgs got, which makes the two directly comparable.
+
+**Ample's MAME has the CoCo ROMs** (`romset coco3 [coco] is good`), so the rig
+is identical: `-autoboot_command` types the BASIC, `-seconds_to_run` ends the
+run, `-snapshot_directory` catches the frame, and the colours are counted off
+the PNG.
+
+    WIDTH 80 : CLS 0
+    PALETTE 8..15 <- 0, 9, 18, 27, 36, 45, 54, 63
+    FOR F=0 TO 7 : ATTR F,0 : PRINT"MONGOL"; : NEXT
+
+**Result: eight distinct foreground colours on one row, at 80 columns.** The
+band holds seven visible hues plus the black background -- eight, because one
+of the eight palette slots was deliberately set to black and is invisible
+against it:
+
+    #5C008B  #288F00  #5E2CFF  #B4A700  #36B3F7  #FEA08D  #FFFFFF  (+ #000000)
+
+**And the palette really is reprogrammable.** That is the claim that had never
+been checked: the eight hues above are the ones `PALETTE n,c` was told to
+install, changed from BASIC at run time. It holds.
+
+**THE STRUCTURAL POINT, and it is why one machine qualifies and the other does
+not.** The CoCo 3's colour is a **per-cell attribute byte** -- three bits of
+foreground, three of background -- so a colour can go in ANY cell. The IIgs's
+four-colour ceiling came from palette groups bound to a pixel's POSITION
+within a byte, which is a constraint the CoCo simply does not have. Eight,
+anywhere, versus four, anywhere. Both measured the same way, on the same
+emulator, a day apart.
+
+**One detail deliberately left open: WHICH eight.** The rendered values above
+are not the pure red/green/blue/cyan/magenta/yellow those palette bytes encode
+on an RGB monitor, which says MAME is rendering the CoCo's COMPOSITE output.
+MAME 0.289 exposes no command-line switch for monitor type, so the mapping from
+palette byte to hue on an RGB monitor is unconfirmed here. That affects which
+eight to pick, not how many are available, and the tier does not turn on it --
+but "pick the closest eight to EGA's set" is not yet a measured statement.
