@@ -6207,10 +6207,35 @@ within a byte, which is a constraint the CoCo simply does not have. Eight,
 anywhere, versus four, anywhere. Both measured the same way, on the same
 emulator, a day apart.
 
-**One detail deliberately left open: WHICH eight.** The rendered values above
-are not the pure red/green/blue/cyan/magenta/yellow those palette bytes encode
-on an RGB monitor, which says MAME is rendering the CoCo's COMPOSITE output.
-MAME 0.289 exposes no command-line switch for monitor type, so the mapping from
-palette byte to hue on an RGB monitor is unconfirmed here. That affects which
-eight to pick, not how many are available, and the tier does not turn on it --
-but "pick the closest eight to EGA's set" is not yet a measured statement.
+### WHICH eight -- settled, and the answer is better than "closest"
+
+The values above are MAME's COMPOSITE rendering. Monitor type is not a
+command-line switch; it is a machine configuration, `:screen_config` /
+"Monitor Type", **0 = Composite (the default) and 1 = RGB**, and Lua can set it
+at run time:
+
+    for fname, f in pairs(manager.machine.ioport.ports[":screen_config"].fields) do
+      if fname == "Monitor Type" then f.user_value = 1 end
+    end
+
+With palette bytes 0, 9, 18, 27, 36, 45, 54, 63 on an RGB monitor:
+
+    #000000 black    #00FF00 green    #FF0000 red        #FFFF00 yellow
+    #0000FF blue     #00FFFF cyan     #FF00FF magenta    #FFFFFF white
+
+**All eight EXACT.** So the note that stood unverified for two weeks -- "pick
+the closest eight to EGA's set" -- undersold it: the CoCo 3 does not
+approximate those eight, it produces them, and the `R1G1B1R0G0B0` encoding is
+confirmed (both bits of a channel set = full intensity). Composite gives eight
+distinct hues too, but skewed: `#5C008B` for blue, `#288F00` for green.
+
+**HARNESS TRAP: MAME DEFAULTS TO COMPOSITE.** Anyone checking this port's
+colours in MAME and not setting Monitor Type will see the skewed set and
+conclude the palette is wrong. It is not; the monitor is.
+
+**Two more traps, both of which cost a run each.** `-autoboot_script`
+**REPLACES** MAME's autoboot plugin, so `-autoboot_command` is silently ignored
+when both are given -- the machine sits at the BASIC prompt looking like the
+program failed. And `natkeyboard:post_coded` needs `{ENTER}`: a bare `\n`
+types **nothing**, so every command runs together on one line and none of them
+execute, which looks identical to a typing-speed problem.

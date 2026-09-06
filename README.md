@@ -155,9 +155,11 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)**, HR mode | 640×N bitmap, 16 colours | 6502 | Designed |
 
-**Tier 2 — CoCo 3.** Verified on a real ROM in XRoar: `WIDTH 80` plus `ATTR`
-gives eight distinct hues from a reprogrammable 64-colour palette. Eight is
-exactly what the console needs, so it fits — tightly. A fourth CPU family
+**Tier 2 — CoCo 3.** `WIDTH 80` plus `ATTR` gives eight foreground colours,
+one per character cell, from a reprogrammable 64-colour palette. Measured in
+MAME on 2026-09-05: on an **RGB monitor** those eight come out as black, blue,
+green, cyan, red, magenta, yellow and white — **exact**, not approximated.
+Eight is exactly what the console needs, so it fits — tightly. A fourth CPU family
 (6809), toolchain already proven here.
 
 **Tier 3 and out.** MSX2 has 80 columns but the colour collapses. The whole
