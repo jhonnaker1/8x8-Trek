@@ -158,6 +158,15 @@ data: $(GAME_OUT)
 run: data
 	cd $(DATA) && $(X16EMU)/x16emu -prg trekx16.prg -run
 
+# WHAT DOES A KEY ACTUALLY RETURN? -- prints the raw byte GETIN hands back,
+# in hex, for every key pressed. Run it, type, read the screen. This is the
+# instrument that caught the case bug: the header comment in src/x16input.c
+# had REASONED that GETIN speaks PETSCII, and it does not.
+keyprobe: src/keyprobe.c
+	@mkdir -p build
+	$(X16CC) -Wall -Oz -o build/keyprobe.prg src/keyprobe.c
+	@echo "run it, type keys, read the hex off the screen"
+
 # A BUILD THAT PLAYS ITSELF to the console, so this port can be screenshotted
 # without a human. x16emu has no key-injection and no memory poke, so the keys
 # are compiled in rather than driven from outside -- see TREK_AUTOPLAY in
