@@ -2676,8 +2676,17 @@ uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
        so there is nothing to reproduce. Refuse it. */
     if (sy == ship.sec_y && sx == ship.sec_x) return TORP_MISS;
 
-    y = (int16_t)((ship.sec_y + 1) << 8);
-    x = (int16_t)((ship.sec_x + 1) << 8);
+    /* THE CAST GOES ON THE OPERAND, NOT THE RESULT, and that is not a style
+       choice. C promotes the byte to int before the shift, so the original
+       ((sec_y + 1) << 8) is correct under llvm-mos and gcc -- but cmoc, the
+       6809 compiler the CoCo 3 port would use, shifts in 8 bits and then
+       widens. It emits CLRB/CLRA and the answer is ALWAYS ZERO: torpedoes
+       would aim from (0,0) instead of the ship. Checked in the generated
+       6809, not inferred from its warning. Every other shift in this file
+       already casts first -- see stepy/stepx below -- so these two were the
+       outliers. Costs nothing where promotion already happens. */
+    y = (int16_t)((uint16_t)(ship.sec_y + 1) << 8);
+    x = (int16_t)((uint16_t)(ship.sec_x + 1) << 8);
 
     /* "Firing torpedos through the shields tends to throw them somewhat off
        course" (manual). It is charge/25000 of a cell, once, at launch -- so a

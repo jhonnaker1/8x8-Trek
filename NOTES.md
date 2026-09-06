@@ -5865,3 +5865,82 @@ flat-envelope pulse, deliberately PC-speaker-like. A table indexed by track --
 triangle and a soft attack for the title, noise for the torpedo, sawtooth for
 the klaxon -- is a small change to `snd_init`/`voice_note` and the biggest
 remaining audible win.
+
+## The core compiles for 6809, and cmoc found a bug doing it (2026-09-05)
+
+The CoCo 3 port needs a **fourth CPU family**, so `core/` was put through
+`cmoc` (0.1.86, `~/cmoc/bin/cmoc`) long before anyone starts writing
+`cocovid.c`. Three of four files compile as they stand: `trek.c`, `planet.c`
+and `hof.c`. What it takes, and what it found:
+
+**A `<stdint.h>` shim, and that is the whole header story.** `core/` includes
+exactly one system header. cmoc preprocesses with a plain host `cc -E`, which
+falls through to the macOS SDK and dies on `sys/cdefs.h` -- so a directory
+holding a five-typedef `stdint.h`, shadowed by an earlier `-I`, is all that is
+needed. `commodore-uno/coco/src/compat/stdlib.h` is the same trick for the same
+reason and says so at length; this is the EGA Trek equivalent.
+
+**`serial.c` does NOT compile, and it is the static assert.**
+
+    typedef char save_size_tracks_planet_max[
+        (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
+
+cmoc will not evaluate that constant expression -- "invalid size expression for
+dimension 1". **Do not just delete it on that target**: it is the guard that
+catches `SAVE_FIXED_BYTES` drifting out of step with the field list, which has
+already been wrong once. Whoever does the CoCo owes it a different assert form,
+not a deletion.
+
+### The bug, which is the part that was worth the exercise
+
+cmoc warned `shift always gives zero` at what were `trek.c:2679-2680`:
+
+    y = (int16_t)((ship.sec_y + 1) << 8);
+
+C promotes the byte to `int` before the shift, so that is **correct** under
+llvm-mos and gcc. cmoc does not promote. Read out of its generated 6809 rather
+than inferred from the warning:
+
+    CLRB            shift B 8 or more bits left
+    CLRA            cast from byte
+    STD  _out+0,PCR
+
+It shifts in eight bits and then widens: the answer is **always zero**, and
+torpedo aiming would start at (0,0) instead of the ship's cell. Every other
+shift in the file already casts the OPERAND -- `stepy`/`stepx` twenty lines
+below, `serial.c:28`, `ui.c:916` -- so these two, casting the RESULT, were the
+outliers. Fixed to match, verified in the codegen (`LDB / ADDB / TFR B,A /
+CLRB` is a real 16-bit shift), and it cost **zero bytes** on the C128:
+`__data_end` is `$AEED` before and after, which is what a no-op looks like when
+promotion was already happening.
+
+**The general lesson is about the method, not the CoCo.** A second compiler on
+a different CPU is a discriminator that no amount of re-reading finds, and this
+one was free -- `make port-check` has been compiling the core for the 68000 on
+every build since before any port existed, for exactly this reason, and it
+never saw this because gcc is conforming here. **A conforming compiler cannot
+find a bug that only a non-conforming one exposes.**
+
+### Toolchains: all present, and PATH is the wrong place to look
+
+Correcting a claim made and retracted the same day. X16, F256 and CoCo 3 were
+reported as having no toolchain or emulator; every one of them is installed, in
+a per-user prefix that the `commodore-uno` Makefiles name explicitly:
+
+    X16 emulator    /Users/jhonnaker/x16emu_macos_m1-r48/x16emu
+    cmoc 0.1.86     ~/cmoc/bin/cmoc      (export PKGDATADIR=~/cmoc/share/cmoc)
+    F256            ~/Downloads/mame-foenix256k -- mame, f256k.zip, sdcard.img
+    CoCo 3 ROM      commodore-uno/coco/rom/coco3.rom
+    Atari XL ROM    ~/Downloads/emuROMs/ATARIXL.ROM
+    Amiga           m68k-amigaos-gcc 6.5.0, fs-uae and WinUAE
+
+**Ask the repo, not the PATH.** `commodore-uno/<port>/Makefile` names the
+prefix for every target and is the authoritative list.
+
+One thing that list does NOT settle: Uno reaches F256 and the Atari through
+**cc65**, which this port deliberately left in August (210 bytes of MAIN free,
+and four separate bugs from its character-set translation). llvm-mos has `cx16`
+and `atari8-*` platforms, so X16 and VBXE are clean; **it has no F256 platform
+at all**, and Uno's support there is a hand-built linker config, PGZ startup
+and kernel shim under `f256/toolchain/`. That is the one target where the
+toolchain question is real work rather than a path.
