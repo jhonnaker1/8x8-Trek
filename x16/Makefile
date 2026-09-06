@@ -28,7 +28,7 @@ OVL_WINDOW = 4032
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke charset game run-charset run-smoke run-game clean
+.PHONY: all smoke charset game music run-charset run-smoke run-game clean
 
 all: smoke
 
@@ -98,10 +98,15 @@ $(MEM_OUT): $(MEM_SRC)
 # out separately, concatenated into OVERLAYS.BIN. Both existing ports do this
 # and for the same reason -- an overlay is linked WITH the resident half, so
 # the two halves are only valid together.
+# GENERATED, not committed -- tools/make_music.py composes this port's own
+# music. See .gitignore.
+music src/music_data.c src/music_data.h:
+	cd .. && python3 tools/make_music.py && cp c128/src/music_data.c c128/src/music_data.h x16/src/
+
 GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/x16vera.c src/x16storage.c src/x16mem.c src/x16ovl.c src/x16input.c src/stubs.c
+           src/x16vera.c src/x16storage.c src/x16mem.c src/x16ovl.c src/x16input.c src/x16snd.c src/music_data.c
 GAME_OUT = build/trekx16.prg
 
 game: $(GAME_OUT)
