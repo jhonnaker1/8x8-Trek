@@ -15,6 +15,12 @@
 #define VERA_DATA0   (*(volatile unsigned char *)0x9F23)
 #define VERA_CTRL    (*(volatile unsigned char *)0x9F25)
 
+/* DCSEL=0 display-composer registers. DC_VSCALE is a fractional vertical
+   zoom: 128 is 1:1, which is what gives the default 480 lines and so 60 text
+   rows of 8 pixels. */
+#define VERA_DC_VSCALE (*(volatile unsigned char *)0x9F2B)
+#define VSCALE_2X 64
+
 #define VRAM_TEXT    0x1B000UL   /* KERNAL's text map: cell = char, colour */
 #define VRAM_PAL     0x1FA00UL   /* 256 entries x 2 bytes */
 #define MAP_STRIDE   128         /* CELLS per row, not columns -- see the .h */
@@ -111,6 +117,14 @@ static unsigned long cell_addr(unsigned char x, unsigned char y) {
     return VRAM_TEXT + ((unsigned long)y * MAP_STRIDE + x) * 2UL;
 }
 
+/* THE CONSOLE IS 80x25 AND VERA'S TEXT MODE IS 80x60, so at 1:1 the game drew
+   in the top 25 rows and left the bottom 35 empty -- correct, and a waste of
+   the screen. Halving the vertical scale doubles each row's height: 240 lines,
+   30 rows of 16 pixels, of which the console uses 25. Columns are untouched at
+   80. This is display-side only; the text map, its 128-cell stride and every
+   address in this file are unaffected. */
+static void stretch_rows(void) { VERA_DC_VSCALE = VSCALE_2X; }
+
 void vdc_init(void) {
     /* GOLDEN RAM IS OUTSIDE .bss, SO THE CRT DOES NOT ZERO IT. x16.ld moves
        io_buf and the hall-of-fame table to $0400..$07FF to reclaim 906 bytes
@@ -119,6 +133,7 @@ void vdc_init(void) {
        skipped. First statement in the first function the game calls. */
     memset((void *)0x0400, 0, 0x0400);
 
+    stretch_rows();
     set_screencode_charset();
     load_ega_palette();
     scr_clear();
