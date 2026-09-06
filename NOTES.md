@@ -22,6 +22,8 @@ shared core plus a per-platform video/sound/input layer.
 
 > **Superseded 2026-08-23 as to what comes after the C128.** The order is now
 > C128 -> MEGA65 -> (X16, F256, CoCo 3) -> Amiga + VBXE together; see item 8
+> **SUPERSEDED 2026-09-05: F256 and CoCo 3 dropped, VBXE is a TEXT target.
+> Now C128 -> MEGA65 -> (X16, VBXE) -> Amiga last.**
 > under *Open questions* for the reasoning. Everything below about the C128
 > being first, and about DOS-EGA not being a build target, still stands.
 
@@ -2246,6 +2248,7 @@ Not missing features -- implemented things that do not match the original.
    **The six are not comparable, so split them by what they cost.**
 
    *Text-mode siblings* -- X16, F256, MEGA65, and CoCo 3 down in Tier 2. Each
+   [F256 and CoCo 3 dropped 2026-09-05; VBXE joined this group.] Each
    puts the console on a hardware text grid with per-cell colour, so the
    platform layer is a rewrite of `c128/src/vdc.c` against the same four
    primitives. MEGA65's `m65native.c` already exposes `scr_put(x, y, ch,
@@ -2296,6 +2299,7 @@ Not missing features -- implemented things that do not match the original.
    ### The order
 
        C128 -> MEGA65 -> (X16, F256, then CoCo 3) -> Amiga + VBXE together
+       [SUPERSEDED 2026-09-05: C128 -> MEGA65 -> (X16, VBXE) -> Amiga]
 
    MEGA65 as port #2 is a modest claim and the limits should be stated. It does
    **not** unblock the C128 briefing -- that still has to fit on the C128, which
@@ -2350,7 +2354,9 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   confirm the width. The ruler fills the line and the capture holds **eight
   distinct hues**, which is the attribute byte's three bits each of foreground
   and background, indexing palette slots that are themselves reprogrammable
-  from 64. Eight is exactly what the console needs -- white values, cyan
+  from 64. **DROPPED 2026-09-05 -- see the correction below: the console uses
+  FIFTEEN colours, not eight, so this entry's whole premise was wrong.** What
+  it used to say: eight is exactly what the console needs -- white values, cyan
   labels, green healthy systems, yellow stars, red Mongols, magenta, grey,
   black -- so it fits, tightly, and the palette being programmable means we can
   pick the closest eight to EGA's set. A fourth CPU family (6809) with a
@@ -6124,7 +6130,8 @@ whole answer. A cell eight pixels wide spans pixel positions 0,1,2,3,0,1,2,3,
 so a uniformly-coloured glyph needs its colour present in every group; each
 group holds four entries; **four is the ceiling for freely-placeable colour.**
 
-The console needs eight -- white values, cyan labels, green healthy systems,
+The console needs FIFTEEN (counted 2026-09-05; this line used to say eight,
+which understated the case) -- white values, cyan labels, green healthy systems,
 yellow stars, red Mongols, magenta, grey, black. The CoCo 3 has exactly eight
 and qualified. The IIgs has four, which is the Atari ST's number, and the ST
 is out for it. Per-scanline SCB palettes do not rescue it: a text row is eight
@@ -6570,3 +6577,68 @@ a toolchain built before a port can start, and the only one where the answer to
 deciding experiment is cheap and should come first: **link a complete cc65
 build of the core plus the shared UI and compare it against the C128's 37,612.**
 Everything else waits on that number.
+
+
+## THREE TARGETS DROPPED, and a false premise behind one of them (2026-09-05)
+
+Jamie's call, each for its own reason. Two were measured out this month; the
+third had been kept alive by a claim that turns out to be wrong.
+
+### The claim: "eight is exactly what the console needs"
+
+**It is not. The console uses FIFTEEN of EGA's sixteen colours** -- every one
+except black, which is the background. Counted from the shared sources by
+resolving the semantic aliases, not estimated:
+
+    EGA_BLUE GREEN CYAN RED MAGENTA BROWN LTGRAY DKGRAY
+    LTBLUE LTGREEN LTCYAN LTRED LTMAGENTA YELLOW WHITE
+
+The dark/bright pairs are NOT decoration. `EGA_MONGOL_BATTLESHIP` is LTBLUE,
+`EGA_MONGOL_COMMAND` is RED, `EGA_MONGOL_SCOUT` is MAGENTA and
+`EGA_MONGOL_SUPPLY` is GREEN -- **the four enemy ship types are told apart by
+colour alone**, and collapsing a palette merges them.
+
+That sentence had been in the README and this file since August, was quoted in
+the CoCo 3 tier entry and again in the IIgs verdict, and **it was load-bearing
+for exactly one decision: keeping the CoCo 3 on the list.** It went unchecked
+because it reads like a summary of a design, and nobody counts a design.
+Jamie asked "I thought the CoCo 3 could only do 8 colours" and that is what
+found it.
+
+### CoCo 3 -- out
+
+Not a failed measurement: it passed the one it was given. `WIDTH 80` plus
+`ATTR` really does give eight per-cell foreground colours, and on an RGB
+monitor they are EXACT EGA hues. But eight is not fifteen, so every dark/bright
+pair collapses and the Mongol ship types stop being distinguishable.
+
+The rest of the cost then stops being worth paying: a fourth CPU family whose
+only compiler, CMOC, is non-conforming -- it silently miscompiled
+`(sec_y + 1) << 8` in eight bits, which would have aimed every torpedo from
+(0,0), and it cannot evaluate the save-record static assert. **Both of those
+were worth the exercise on their own** -- the shift is fixed defensively for
+every port, and the assert now survives four compilers.
+
+### Foenix F256 -- out
+
+llvm-mos has no F256 platform, so the toolchain has to be built before the port
+can start; cc65 is the only route today, and this project left cc65 with 210
+bytes of the C128's budget free while llvm-mos bought back about 6K. Whether
+the game fits at all under cc65 is unknown rather than tight -- and the attempt
+to measure it was inconclusive for instrument reasons recorded in the F256
+scope above. **Scoping it was still worth it**: it is what found three C89
+violations in the core and produced `make c89-check`.
+
+### Apple IIgs -- out
+
+Measured twice, on two MAME versions, one with a fully verified romset. 640
+mode gives sixteen colours per scanline but only FOUR placeable at any x. Four
+against fifteen.
+
+### What is left
+
+    C128     released
+    MEGA65   playable
+    X16      next -- scoped
+    VBXE     scoped, and a TEXT target, not the bitmap one this file called it
+    Amiga    last, and now the only true bitmap target

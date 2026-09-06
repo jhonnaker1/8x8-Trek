@@ -151,32 +151,51 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.9.0](../../releases/latest) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Playable** — console, sound and overlays; no save yet |
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | Designed |
-| **Foenix F256** | Vicky text 80×60, per-cell colour via CLUTs | 65C02 | Designed |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | Designed |
 
-**Tier 2 — CoCo 3.** `WIDTH 80` plus `ATTR` gives eight foreground colours,
-one per character cell, from a reprogrammable 64-colour palette. Measured in
-MAME on 2026-09-05: on an **RGB monitor** those eight come out as black, blue,
-green, cyan, red, magenta, yellow and white — **exact**, not approximated.
-Eight is exactly what the console needs, so it fits — tightly. A fourth CPU family
-(6809), toolchain already proven here.
+**How much colour the console actually needs: fifteen.** Counted from the
+shared sources on 2026-09-05 rather than assumed — every EGA colour except
+black, which is the background. It distinguishes `RED` from `LTRED`, `BLUE`
+from `LTBLUE`, and so on, and it uses those pairs to mean different things:
+the four Mongol ship types are told apart by colour alone. An earlier version
+of this section claimed the console needed only eight. **It does not, and that
+claim is what had kept a machine on the list that cannot run it.**
 
-**Tier 3 and out.** MSX2 has 80 columns but the colour collapses. The whole
-Atari ST line is out — 640×200 costs all but four colours (Jamie's call) — and
-the **Apple IIgs** joins it on the same count, measured in MAME on 2026-09-05:
-its 640 mode shows sixteen colours per scanline but only **four** that can be
-placed at any x, which is what a character console needs. The
-stock Atari 800XL is out too: ANTIC stops at 40 columns, and only VBXE brings
-it back in. The 40-column colour machines (C64, Plus/4, CBM-II) are viable but
-would need a paged UI, because a nine-panel console does not fit in 40 columns.
+**Tier 3 and out.** Each of these was ruled out for its own reason, and three
+of them were settled by measurement in September 2026.
 
-### The order, decided 2026-08-23
+- **Tandy CoCo 3** — `WIDTH 80` plus `ATTR` gives **eight** foreground colours
+  per cell, and measured in MAME on an RGB monitor those eight are exact EGA
+  hues rather than approximations. Eight is still not fifteen: every
+  dark/bright pair would collapse, and with it the distinction between Mongol
+  ship types. Add a fourth CPU family (6809) whose only compiler, CMOC, is
+  non-conforming — it silently miscompiled a shift in the shared core, and
+  cannot evaluate the save-record static assert — and the cost stops being
+  worth it. (Both of those were found here and fixed for everyone; see
+  `NOTES.md`.)
+- **Foenix F256** — llvm-mos has no F256 platform, so the toolchain would have
+  to be built before the port could start, and cc65 is the only route today.
+  This project left cc65 in August with **210 bytes** of the C128's main
+  budget free, and llvm-mos bought about 6K back. Whether the game fits at all
+  under cc65 is genuinely unknown rather than merely tight.
+- **Apple IIgs** — measured in MAME on 2026-09-05. Its 640 mode shows sixteen
+  colours on a scanline but only **four** that can be placed at any x, because
+  the palette groups are bound to a pixel's position within a byte. Four
+  against fifteen.
+- **The whole Atari ST line** — 640×200 costs all but four colours (Jamie's
+  call). **MSX2** has 80 columns but the colour collapses. The **stock Atari
+  800XL** stops at 40 columns; only VBXE brings it back. The 40-column colour
+  machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
+  a nine-panel console does not fit in 40 columns.
 
-Ranking six targets is a question with no useful answer, so they are split by
-**what they cost** instead:
+### The order, decided 2026-08-23, revised 2026-09-05
 
-1. **The text-mode siblings go first** — MEGA65, X16, F256, and CoCo 3. Each
+Ranking targets is a question with no useful answer, so they are split by
+**what they cost** instead. Three machines left the list entirely in September
+(above), and VBXE moved between the groups when its text mode was measured:
+
+1. **The text-mode siblings go first** — MEGA65, X16 and VBXE. Each
    puts the console on a hardware text grid, so the platform layer is a rewrite
    of `c128/src/vdc.c` against the same four primitives. MEGA65's `m65vid.c`
    exposes `scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and
@@ -190,14 +209,18 @@ Ranking six targets is a question with no useful answer, so they are split by
    raster counter that wraps twice per frame and so ran the music at double
    speed. Budget the next sibling for its own three of those.
 
-2. **The two bitmap targets go last, together** — Amiga and VBXE. Both need a
-   layer the others do not: a font, a glyph blitter, and a dirty-cell scheme so
-   the port is not repainting 2000 cells a frame. That is the same design work
-   twice, and separating them by three text ports would mean designing it,
-   forgetting it, and rediscovering it.
+2. **The bitmap target goes last** — the Amiga, and it is now the only one.
+   It needs a layer the others do not: a font, a glyph blitter, and a
+   dirty-cell scheme so the port is not repainting 2000 cells a frame.
 
-So **VBXE sits next to the Amiga, at the end** — because they share a problem,
-not because either is the hardest target.
+   **VBXE used to sit beside it here, and that was a mistake of classification
+   rather than of judgement.** VBXE has a real character-plus-attribute text
+   mode — 80×25 with per-cell foreground and background from 1024 colours,
+   confirmed on hardware emulation on 2026-09-05, including that the console's
+   full twenty-five rows fit. It is a `vdc.c` rewrite like its siblings, not a
+   blitter project. What it does have is the tightest code budget of any target
+   so far: VBXE's VRAM window occupies `$2000-$3FFF` of the 6502 address space,
+   leaving 32,768 bytes against the 37,612 the C128 build needs.
 
 The core obeys 8-bit rules from line one even where the host doesn't force it —
 no `float`, `double`, `malloc` or `long`; explicit-width types throughout; 8.8

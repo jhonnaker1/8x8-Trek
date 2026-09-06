@@ -15,8 +15,8 @@
  *     C128        bank 1's 64K through the KERNAL's FETCH/STASH
  *     X16         8K pages at $A000 out of 512K, or VERA's 128K
  *     Atari 130XE 16K banks at $4000
- *     CoCo 3      8K pages through the MMU
- *     F256        8K pages through the MMU
+ *     CoCo 3      8K pages through the MMU   (target dropped 2026-09-05)
+ *     F256        8K pages through the MMU   (target dropped 2026-09-05)
  *     MEGA65      no banking needed -- a plain array
  *     Amiga       no banking needed -- a plain array
  *
