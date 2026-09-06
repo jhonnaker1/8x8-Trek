@@ -6025,11 +6025,10 @@ rejected because the console's panels sit side by side, so one scanline crosses
 three of them and per-line tricks cannot help. A per-PIXEL effect is a
 different argument, and it has not been tested.
 
-**STILL UNMEASURED as of 2026-09-05.** A harness attempt got most of the way
-and stopped on one specific thing; what was learned is below so the next
-attempt does not re-derive it.
-
-**So this is unmeasured, and it should get what the CoCo 3 got: boot it.**
+**MEASURED 2026-09-05, and it is OUT -- for the Atari ST's reason exactly.**
+The hypothesis above was tested on a real IIgs in MAME and is wrong in the way
+that matters. See "The IIgs, measured" below. The GSplus harness notes that
+follow are superseded by MAME and kept only for the traps in them.
 Tooling is present -- `/Applications/GSplus.app` plus `~/GSPlus/APPLE2GS.ROM2`
 and System 6.0.4 images under `~/UthernetII/speccies_IIgs_starter_kit`. GSplus
 takes `-ssdir` (screenshot directory) and `-debugport`, so it is automatable,
@@ -6086,3 +6085,69 @@ GSplus still running and looking healthy. A probe script that opens a
 connection per command therefore burns the console on its first call and every
 later one is "connection refused" -- which reads exactly like a crashed
 emulator. **Hold one connection open for the whole session.**
+
+## The IIgs, measured: 640 mode gives FOUR usable colours (2026-09-05)
+
+Booted a real Apple IIgs ROM 03 in MAME and put Super Hi-Res 640 mode on the
+screen directly, the same way the CoCo 3 earned its place. **The IIgs is OUT,
+and for the Atari ST's reason exactly** -- but the hypothesis that reopened it
+was worth testing, because half of it is true.
+
+**The setup.** `-autoboot_script` Lua writes `$C029 = $C1` (SHR on), fills the
+SCBs at `$E1/9D00` with `$80` (640 mode, palette 0), writes a sixteen-entry
+palette at `$E1/9E00`, and fills scanlines at `$E1/2000`. No disk, no 65816
+program, no toolchain. `manager.machine.video:snapshot()` then writes the PNG
+and the colours are counted off it.
+
+**Run 1 -- sixteen DISTINCT palette entries.** Content measured 640 pixels wide
+exactly (x=32..671 of a 704-wide capture).
+
+    line of varying bytes      15 distinct colours on ONE scanline
+    0x00 (value 0 everywhere)   4 distinct: #000000 #FF0000 #000088 #880088
+    0x55 (value 1 everywhere)   4 distinct: #0000FF #FF00FF #008800 #888800
+    0xAA (value 2 everywhere)   4 distinct: #00FF00 #FFFF00 #008888 #888888
+    0xFF (value 3 everywhere)   4 distinct: #00FFFF #FFFFFF #880000 #FF8800
+
+So the positional-palette rule is REAL: sixteen colours can share a scanline,
+and each of the four pixel positions in a byte draws from its own group of
+four. **That is the part of the hypothesis that was right.**
+
+**Run 2 -- the same four colours replicated into all four groups**, which is
+what a character console actually needs, because a glyph must keep its colour
+wherever it lands:
+
+    0x00 -> 1 distinct (#000000)      0xAA -> 1 distinct (#00FFFF)
+    0x55 -> 1 distinct (#FFFFFF)      0xFF -> 1 distinct (#FF0000)
+
+Position-independent at last -- **and there are four of them.** That is the
+whole answer. A cell eight pixels wide spans pixel positions 0,1,2,3,0,1,2,3,
+so a uniformly-coloured glyph needs its colour present in every group; each
+group holds four entries; **four is the ceiling for freely-placeable colour.**
+
+The console needs eight -- white values, cyan labels, green healthy systems,
+yellow stars, red Mongols, magenta, grey, black. The CoCo 3 has exactly eight
+and qualified. The IIgs has four, which is the Atari ST's number, and the ST
+is out for it. Per-scanline SCB palettes do not rescue it: a text row is eight
+scanlines so each ROW could have its own four, but the nine panels sit SIDE BY
+SIDE, so panels sharing a row share the four. That is the identical objection.
+
+320 mode is 16 colours and 40 columns, which fails the other hard rule.
+
+**So the IIgs joins the Atari ST line in Tier 3.** Not on paper this time.
+
+### The MAME harness, which is the reusable part
+
+MAME is the IIgs instrument, not GSplus -- `-autoboot_script` plus
+`-seconds_to_run` plus `-snapshot_directory` is a complete measurement rig with
+no console to negotiate, and it ran at 1,800-2,000% speed.
+
+**ONE OBSTACLE, and it is not what `-verifyroms` makes it look like.** The
+romset in `~/mame0281-arm64/roms/apple2gs.zip` predates this MAME: it carries
+`apple2gs.chr` (4K) where 0.281 wants **`megaii.chr` (16K)**, which is a
+BAD_DUMP in MAME's own list and is in no other set in the collection.
+`-verifyroms` therefore says "romset is bad" and stops -- but **MAME still RUNS
+with a wrong CRC**, it only warns. And `megaii.chr` is the Mega II CHARACTER
+generator: text glyphs, nothing to do with Super Hi-Res. So a stand-in built by
+repeating the 4K charset four times is sound for this measurement, was kept in
+a private `-rompath` so the real romset is untouched -- and rendered the boot
+text correctly anyway.

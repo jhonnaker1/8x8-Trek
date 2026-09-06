@@ -161,7 +161,10 @@ exactly what the console needs, so it fits — tightly. A fourth CPU family
 (6809), toolchain already proven here.
 
 **Tier 3 and out.** MSX2 has 80 columns but the colour collapses. The whole
-Atari ST line is out — 640×200 costs all but four colours (Jamie's call). The
+Atari ST line is out — 640×200 costs all but four colours (Jamie's call) — and
+the **Apple IIgs** joins it on the same count, measured in MAME on 2026-09-05:
+its 640 mode shows sixteen colours per scanline but only **four** that can be
+placed at any x, which is what a character console needs. The
 stock Atari 800XL is out too: ANTIC stops at 40 columns, and only VBXE brings
 it back in. The 40-column colour machines (C64, Plus/4, CBM-II) are viable but
 would need a paged UI, because a nine-panel console does not fit in 40 columns.
