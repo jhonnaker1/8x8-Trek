@@ -54,7 +54,7 @@ clean:
 FULL_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/x16vera.c src/x16storage.c src/stubs.c
+           src/x16vera.c src/x16storage.c src/x16mem.c src/stubs.c
 FULL_OUT = build/full.prg
 
 full: $(FULL_OUT)
@@ -74,3 +74,12 @@ storetest: $(STORE_OUT)
 $(STORE_OUT): $(STORE_SRC)
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(STORE_SRC)
+
+MEM_SRC = src/memtest.c src/x16mem.c src/x16storage.c
+MEM_OUT = build/memtest.prg
+
+memtest: $(MEM_OUT)
+
+$(MEM_OUT): $(MEM_SRC)
+	@mkdir -p build
+	$(X16CC) $(CFLAGS) -o $@ $(MEM_SRC)

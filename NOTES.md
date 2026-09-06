@@ -6853,3 +6853,45 @@ stub measures nothing.**
 list -- which looked for call syntax -- missed it. main.c seeds the RNG from
 it. Deriving a surface from source is still better than assuming one, but
 grep for the shape you are looking for, not just the common one.
+
+## X16 far memory: the top risk, closed (2026-09-05)
+
+The scope ranked this first: the C128's far store is a FLAT 64K bank reached
+through FETCH/STASH, so a read never crosses anything, while the X16 pages
+**8K at a time** into a window at `$A000` selected by the bank register at
+`$00`. A read of `len` bytes at offset `off` can therefore span two banks --
+a case the C128 implementation contains no code for, because it cannot happen
+there. And the scope named where it would bite: the string pool is 7,275
+bytes, just under one page, so **the first read to cross `$2000` is the one
+that breaks, and it breaks for the music rather than the prose.**
+
+`far_move` loops, clipping each pass at the window edge, and serves both
+`far_read` and the write side of `far_load`.
+
+**MEASURED, then VERIFIED BY BREAKING IT.** The test loads a 6,000-byte file
+TWICE so the store spans banks 1 and 2, then reads four windows:
+
+    within-bank   off $0064  -- control, no boundary
+    at-boundary   off $1FE0  -- 64 bytes across $2000
+    one-byte-over off $1FFF  -- the tightest straddle there is
+    second-bank   off $2328  -- wholly inside bank 2
+
+All four pass. Then the clipping was removed -- one bank select and one
+memcpy, which is what a naive port of the C128 version looks like -- and:
+
+    within-bank   bad=0000  PASS      <- controls stayed green
+    at-boundary   bad=001F  FAIL
+    one-byte-over bad=0001  FAIL
+    second-bank   bad=0000  PASS
+
+**Only the straddling cases went red**, which is what makes the green run
+evidence rather than decoration. A test that has only ever been seen to pass
+says nothing about whether it can reach the bug.
+
+`far_load` appends rather than loading at 0 -- the store has more than one
+tenant, and an earlier version of the C128's overwrote the prose with the
+music. It reads through the storage seam rather than duplicating KERNAL calls,
+so the tested path is the only path.
+
+Full link with real far memory: overflow 19,839 bytes, so ~20K to overlay
+against the C128's 29,286. The fit conclusion is unchanged.

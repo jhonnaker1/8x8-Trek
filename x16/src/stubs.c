@@ -16,7 +16,6 @@
    volatile makes the optimiser keep the code that consumes it. */
 volatile unsigned char opaque = 0;
 volatile unsigned int  opaque16 = 0;
-#include "../../core/farmem.h"
 
 char kb_waitkey(void) { return (char)opaque; }
 
@@ -31,13 +30,6 @@ uint8_t snd_enabled(void) { return opaque; }
 void snd_toggle(void) {}
 
 
-uint16_t far_load(const char *n) { (void)n; return opaque16; }
-uint16_t far_size(void) { return opaque16; }
-void far_read(uint16_t off, void *dst, uint8_t len) {
-    uint8_t i; unsigned char *d = (unsigned char *)dst;
-    (void)off;
-    for (i = 0; i < len; i++) d[i] = opaque;   /* really writes: pool stays live */
-}
 
 /* Without TREK_OVERLAYS the ten OVL_LOADER stubs in main.c still call this;
    linking everything resident is what makes the total meaningful. */
