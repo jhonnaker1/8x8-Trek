@@ -22,8 +22,9 @@ shared core plus a per-platform video/sound/input layer.
 
 > **Superseded 2026-08-23 as to what comes after the C128.** The order is now
 > C128 -> MEGA65 -> (X16, F256, CoCo 3) -> Amiga + VBXE together; see item 8
-> **SUPERSEDED 2026-09-05: F256 and CoCo 3 dropped, VBXE is a TEXT target.
-> Now C128 -> MEGA65 -> (X16, VBXE) -> Amiga last.**
+> **SUPERSEDED 2026-09-05: F256 and CoCo 3 dropped, VBXE is a TEXT target,
+> and the Amiga is CHEAPEST of the three left rather than dearest.
+> Now C128 -> MEGA65 -> X16 -> Amiga -> VBXE.**
 > under *Open questions* for the reasoning. Everything below about the C128
 > being first, and about DOS-EGA not being a build target, still stands.
 
@@ -2299,7 +2300,7 @@ Not missing features -- implemented things that do not match the original.
    ### The order
 
        C128 -> MEGA65 -> (X16, F256, then CoCo 3) -> Amiga + VBXE together
-       [SUPERSEDED 2026-09-05: C128 -> MEGA65 -> (X16, VBXE) -> Amiga]
+       [SUPERSEDED 2026-09-05: C128 -> MEGA65 -> X16 -> Amiga -> VBXE]
 
    MEGA65 as port #2 is a modest claim and the limits should be stated. It does
    **not** unblock the C128 briefing -- that still has to fit on the C128, which
@@ -6640,8 +6641,8 @@ against fifteen.
     C128     released
     MEGA65   playable
     X16      next -- scoped
-    VBXE     scoped, and a TEXT target, not the bitmap one this file called it
-    Amiga    last, and now the only true bitmap target
+    Amiga    second -- scoped; it DELETES the overlay machinery
+    VBXE     last -- scoped; a TEXT target, but the tightest code budget yet
 
 ## SCOPE: the Amiga (written 2026-09-05, NOT STARTED)
 
@@ -6743,3 +6744,34 @@ overlay machinery outright, the only one whose portability contract is already
 tested on every build (`make port-check` has compiled the core for 68000 since
 before any port existed), and it has the best instrument. The costs are a
 sound re-fit and thirteen glyphs.
+
+
+## The order, rewritten by measurement (2026-09-05)
+
+    C128 -> MEGA65 -> X16 -> Amiga -> VBXE
+
+The August split was "text-mode siblings first, the two bitmap targets last
+together". **Measuring the targets dissolved that grouping entirely**, and it
+is worth recording how, because every correction ran the same way: a plausible
+sentence written once, quoted afterwards, never checked.
+
+  * **VBXE is not a bitmap target.** It has a real character-plus-attribute
+    text mode, and all twenty-five console rows fit.
+  * **The Amiga does not need a dirty-cell scheme.** `wait_vsync` is never
+    called from shared code; the console is event-driven. It does not need a
+    font either -- topaz 8x8 is in ROM.
+  * **The console does not need eight colours, it needs fifteen** -- which is
+    what removed the CoCo 3.
+  * **A linker region is nominal, not available.** VBXE's window silently owns
+    8K of the address space, turning the Atari from the roomiest target into
+    the tightest.
+
+So the two "bitmap targets that go last together" are now first-and-last of
+what remains, and neither for a display reason: **the Amiga goes early because
+it DELETES the overlay machinery** -- `farmem.h`'s "no banking needed, a plain
+array" is worth more than any display advantage on this list -- **and VBXE goes
+last because it has 32,768 bytes against the 37,612 the C128 build needs.**
+
+The one thing the August note got right and this does not change: the screen
+layer is mechanical and nothing else is. Budget each remaining port for its own
+three surprises, not for a `vdc.c` rewrite.

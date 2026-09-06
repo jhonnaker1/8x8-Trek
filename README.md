@@ -189,46 +189,50 @@ of them were settled by measurement in September 2026.
   machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
   a nine-panel console does not fit in 40 columns.
 
-### The order, decided 2026-08-23, revised 2026-09-05
+### The order, decided 2026-08-23, rewritten 2026-09-05
 
-Ranking targets is a question with no useful answer, so they are split by
-**what they cost** instead. Three machines left the list entirely in September
-(above), and VBXE moved between the groups when its text mode was measured:
+The original split targets into "text-mode siblings first, the two bitmap ones
+last together". **Measuring them dissolved that grouping.** VBXE turned out to
+have a real text mode, the Amiga turned out not to need the dirty-cell scheme
+it was penalised for, and three machines left the list altogether. What is left
+is ordered by **what each actually costs**, cheapest first:
 
-1. **The text-mode siblings go first** — MEGA65, X16 and VBXE. Each
-   puts the console on a hardware text grid, so the platform layer is a rewrite
-   of `c128/src/vdc.c` against the same four primitives. MEGA65's `m65vid.c`
-   exposes `scr_put(x, y, ch, color)`, `scr_puts`, `scr_clear` and
-   `wait_vsync` — the same names with the same signatures, and the shared
-   `ui.c`, `main.c`, `strpool.c` and `layout.c` compiled for it unchanged.
+1. **Commander X16** — the same compiler family as both existing ports, so
+   everything learned about llvm-mos carries over. The core compiles for it
+   today, untouched. Its code space is the same shape as the C128's, so the
+   overlay machinery transfers rather than being redesigned, and **every KERNAL
+   call the C128 disk seam uses exists for it** — that is the seam that cost
+   four bugs on the C128 and is still unfinished on the MEGA65. Sixteen
+   colours, so no mapping. `x16emu` gives `-dump` of RAM, banked RAM and VRAM,
+   so the string pool and overlays can be checked byte-exact.
 
-   **The screen layer really was mechanical; nothing else was.** Doing the
-   MEGA65 for real cost far more than a `vdc.c` rewrite, and none of it was
-   display work: a hand-written library clobbering the compiler's zero-page
-   pseudo-registers, a hypervisor that never freed a file descriptor, and a
-   raster counter that wraps twice per frame and so ran the music at double
-   speed. Budget the next sibling for its own three of those.
+2. **Amiga** (OCS/ECS, KS2.0+) — because it **deletes** the most expensive
+   machinery in the project rather than porting it. `core/farmem.h` has always
+   said "Amiga — no banking needed, a plain array": no overlays, no far memory,
+   no staging regions, no build stamp, none of the budget arithmetic. It is the
+   only remaining target with more memory than the game needs. Its portability
+   contract is already tested on every build — `make port-check` has compiled
+   the core for the 68000 since before any port existed — and Amiberry is the
+   best instrument here: screenshots, memory read/write, breakpoints, frame
+   stepping and key injection over one socket, plus host-directory mounting so
+   there is no disk image to build. Costs: thirteen original box-drawing glyphs
+   (~104 bytes) and a sound re-fit for Paula's sampled audio.
 
-2. **The Amiga is the only bitmap target left** — and scoping it on
-   2026-09-05 undercut the reason it was put last. There is no per-frame
-   repaint to avoid (`wait_vsync` is never called from shared code; the console
-   is event-driven, one cell at a time), and the 8×8 font comes free from ROM.
-   What it actually needs is thirteen original box-drawing glyphs — about 104
-   bytes — and a sound re-fit for Paula's sampled audio.
+3. **Atari 800XL + VBXE** — last, and **not** because of the display. Its text
+   mode is real: 80×25 with per-cell foreground and background from 1024
+   colours, confirmed on hardware emulation including that all twenty-five rows
+   fit. It is last because it has **the tightest code budget of any target so
+   far**: VBXE's VRAM window occupies `$2000–$3FFF` of the 6502 address space,
+   leaving 32,768 bytes against the 37,612 the C128 build needs. More code
+   would have to move into overlays than on any port yet built. It also needs
+   hardware the base machine does not have.
 
-   Against that it is the only remaining target with **more memory than the
-   game needs**, which deletes the overlay machinery outright; the only one
-   whose portability contract is already tested on every build; and it has the
-   best instrument on the project in Amiberry. See `NOTES.md`.
-
-   **VBXE used to sit beside it here, and that was a mistake of classification
-   rather than of judgement.** VBXE has a real character-plus-attribute text
-   mode — 80×25 with per-cell foreground and background from 1024 colours,
-   confirmed on hardware emulation on 2026-09-05, including that the console's
-   full twenty-five rows fit. It is a `vdc.c` rewrite like its siblings, not a
-   blitter project. What it does have is the tightest code budget of any target
-   so far: VBXE's VRAM window occupies `$2000-$3FFF` of the 6502 address space,
-   leaving 32,768 bytes against the 37,612 the C128 build needs.
+**The screen layer really was mechanical; nothing else was.** Doing the MEGA65
+for real cost far more than a `vdc.c` rewrite, and none of it was display work:
+a hand-written library clobbering the compiler's zero-page pseudo-registers, a
+hypervisor that never freed a file descriptor, and a raster counter that wraps
+twice per frame and so ran the music at double speed. Budget each of these for
+its own three of those.
 
 The core obeys 8-bit rules from line one even where the host doesn't force it —
 no `float`, `double`, `malloc` or `long`; explicit-width types throughout; 8.8
