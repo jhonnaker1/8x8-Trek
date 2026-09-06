@@ -19,7 +19,7 @@ OVLFLAGS = $(CFLAGS) -DTREK_OVERLAYS -DOVL_WINDOW=$(OVL_WINDOW)
 LDFLAGS  = -T x16.ld -Wl,--no-check-sections
 OBJCOPY  = $(LLVM_MOS)/bin/llvm-objcopy
 NM       = $(LLVM_MOS)/bin/llvm-nm
-OVERLAYS = eval hof front info repair msgs planet cmds title events
+OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 
 # THE WINDOW SIZE, stated once. x16.ld must carry the same number; this is
 # what the loader compiles against and what the image cutter enforces.

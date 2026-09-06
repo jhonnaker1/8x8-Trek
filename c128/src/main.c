@@ -27,6 +27,7 @@ OVL_LOADER load_planet(void) { ovl_load(OVL_PLANET); }
 OVL_LOADER load_cmds(void)   { ovl_load(OVL_CMDS); }
 OVL_LOADER load_title(void)  { ovl_load(OVL_TITLE); }
 OVL_LOADER load_events(void) { ovl_load(OVL_EVENTS); }
+OVL_LOADER load_xtra(void)   { ovl_load(OVL_XTRA);   }
 
 /* 8x8 Trek -- C128 VDC port, milestone 2.
  *
@@ -1948,8 +1949,18 @@ int main(void) {
            see ui_setup(). Calling trek_new_game() here would generate a fresh
            one straight over the top of it, which is the whole reason Setup
            carries the flag rather than main guessing from the level. */
-        if (!setup.restored)
+        if (!setup.restored) {
+            /* trek_new_game lives in OVL_XTRA, and main is RESIDENT, which is
+               what lets it be paged in here. See core/overlay.h.
+
+               BRACES ADDED WITH THE LOADER CALL: this `if` had a single
+               statement and no braces, so inserting the page-in above it
+               silently took trek_new_game OUT of the conditional -- a restored
+               game would have had its state overwritten by a fresh one.
+               -Wmisleading-indentation caught it. */
+            load_xtra();
             trek_new_game(setup.level, setup.seed);
+        }
 
         /* And the fourth thing a restore gates -- see enemy_turn(). */
         restored_free_turn = setup.restored;

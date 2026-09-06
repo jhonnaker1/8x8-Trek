@@ -262,7 +262,7 @@ uint8_t  warp_hurt;
 uint8_t  laser_overheated;
 uint8_t  bases_lost = 0;
 
-void trek_new_game(uint8_t level, uint16_t seed) {
+OVL_CODE("xtra") void trek_new_game(uint8_t level, uint16_t seed) {
     uint8_t i, q, bases, placed, last_y, last_x;
     uint16_t total;
 

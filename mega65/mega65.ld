@@ -67,6 +67,7 @@ MEMORY {
     ovlimg7 (rw) : ORIGIN = 0x57000, LENGTH = 0x1000
     ovlimg8 (rw) : ORIGIN = 0x58000, LENGTH = 0x1000
     ovlimg9 (rw) : ORIGIN = 0x59000, LENGTH = 0x1000
+    ovlimg10 (rw): ORIGIN = 0x5a000, LENGTH = 0x1000
 }
 
 INCLUDE commodore.ld
@@ -87,6 +88,7 @@ SECTIONS {
     .ovl_cmds   ORIGIN(window) : { *(.ovl.cmds)   } >window AT>ovlimg7
     .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
     .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
+    .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
 }
 
 __ovl_start = ORIGIN(window);

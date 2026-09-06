@@ -59,6 +59,7 @@ MEMORY {
     ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x0ec0
     ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x0ec0
     ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x0ec0
+    ovlimg10 (rw): ORIGIN = 0x10a000, LENGTH = 0x0ec0
 }
 
 SECTIONS {
@@ -101,6 +102,7 @@ SECTIONS {
     .ovl_cmds   ORIGIN(window) : { *(.ovl.cmds)   } >window AT>ovlimg7
     .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
     .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
+    .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
 }
 
 __ovl_start = ORIGIN(window);

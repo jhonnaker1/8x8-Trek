@@ -44,7 +44,7 @@ CFLAGS = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS \
          -I $(LIBC_INC) -I src -I ../c128/src -I ../core
 LDFLAGS = -T mega65.ld -Wl,--no-check-sections
 OBJCOPY = $(LLVM_MOS)/bin/llvm-objcopy
-OVERLAYS = eval hof front info repair msgs planet cmds title events
+OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 
 SMOKE2_SRC = src/smoke2.c src/m65vid.c ../c128/src/layout.c ../c128/src/strpool.c \
              src/m65mem.c src/m65storage.c src/m65snd.c src/music_data.c \

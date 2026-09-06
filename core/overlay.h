@@ -88,7 +88,19 @@
    or three words. Nothing is loaded on a turn where nothing is due, which is
    almost every turn. */
 #define OVL_EVENTS 9    /* run_events, the scheduled-event switch */
-#define OVL_COUNT  10
+
+/* THE ELEVENTH, added 2026-09-05 for the X16 and useful to every port.
+   `trek_new_game` is 1,382 bytes, runs once per game, and is called from
+   `main` -- which is RESIDENT, and that is what makes it eligible: an overlay
+   may not call into another overlay, so a candidate has to be reachable from
+   resident code that can page it in first.
+
+   The C128 had 211 bytes of resident free and the X16 was 530 short with stub
+   sound and input still to come; this is the structural answer both needed,
+   and it is cheapest here because the X16 keeps its images in banked RAM
+   rather than as separate disk files. */
+#define OVL_XTRA   10   /* trek_new_game */
+#define OVL_COUNT  11
 
 #define OVL_NONE   0xFF
 
