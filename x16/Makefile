@@ -23,7 +23,7 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events
 
 # THE WINDOW SIZE, stated once. x16.ld must carry the same number; this is
 # what the loader compiles against and what the image cutter enforces.
-OVL_WINDOW = 4032
+OVL_WINDOW = 3776
 
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
