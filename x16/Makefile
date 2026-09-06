@@ -54,7 +54,7 @@ clean:
 FULL_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/x16vera.c src/stubs.c
+           src/x16vera.c src/x16storage.c src/stubs.c
 FULL_OUT = build/full.prg
 
 full: $(FULL_OUT)
@@ -65,3 +65,12 @@ $(FULL_OUT): $(FULL_SRC) src/x16vera.h
 	@python3 -c "import os; \
 	    n=os.path.getsize('$@')-2; lim=0x96FF; \
 	    print('x16: FULL LINK %d bytes of %d, %d free' % (n, lim, lim-n))"
+
+STORE_SRC = src/storetest.c src/x16storage.c
+STORE_OUT = build/storetest.prg
+
+storetest: $(STORE_OUT)
+
+$(STORE_OUT): $(STORE_SRC)
+	@mkdir -p build
+	$(X16CC) $(CFLAGS) -o $@ $(STORE_SRC)

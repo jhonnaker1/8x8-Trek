@@ -16,7 +16,6 @@
    volatile makes the optimiser keep the code that consumes it. */
 volatile unsigned char opaque = 0;
 volatile unsigned int  opaque16 = 0;
-#include "../../core/storage.h"
 #include "../../core/farmem.h"
 
 char kb_waitkey(void) { return (char)opaque; }
@@ -31,13 +30,6 @@ void snd_poll(void) {}
 uint8_t snd_enabled(void) { return opaque; }
 void snd_toggle(void) {}
 
-uint8_t plat_read_all(const char *n, void *b, uint16_t m, uint16_t *g)
-    { (void)n; (void)b; (void)m; if (g) *g = opaque16; return opaque; }
-uint8_t plat_write_all(const char *n, const void *b, uint16_t l)
-    { (void)n; (void)b; (void)l; return opaque; }
-uint8_t plat_open(const char *n) { (void)n; return opaque; }
-uint16_t plat_read(void *b, uint16_t l) { (void)b; (void)l; return opaque16; }
-void plat_close(void) {}
 
 uint16_t far_load(const char *n) { (void)n; return opaque16; }
 uint16_t far_size(void) { return opaque16; }
