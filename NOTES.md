@@ -6486,3 +6486,87 @@ against the X16 are that the KERNAL disk seam does not transfer (Atari DOS is
 not CBM), and that it needs hardware the base machine does not have.
 
 **Nothing here is a decision. The row question comes first.**
+
+## SCOPE: the Foenix F256K (written 2026-09-05, NOT STARTED)
+
+**The hardest of the remaining 65xx targets, and the toolchain IS the port.**
+
+### What is already true
+
+**The core compiles under cc65 -- as of today, and not before.** Scoping this
+target is what found three C89 violations in `core/trek.c`; see the entry
+above. `cc65 --cpu 65C02 -t none -Os` now takes all four core files. `make
+c89-check` keeps it that way.
+
+**The PETSCII trap does not apply here.** This project left cc65 in August for
+two reasons, and one of them is void on this target: cc65's character-set
+translation is a property of its *Commodore* targets, and Uno builds the F256
+with `-t none`, which has no charmap at all. Four bugs of that class simply
+cannot occur.
+
+**Uno has a working F256 port**, and with it a hand-built toolchain in
+`commodore-uno/f256/toolchain/`: `f256jr_pgz.cfg` (linker config), `f256jr.lib`,
+`pgz.s` (PGZ startup) and `kernel.c` + `api.h` (the Foenix kernel shim). That
+is the part nobody else has done.
+
+**`core/farmem.h` already names its banking model**: "F256 -- 8K pages through
+the MMU", one of the four targets the seam was designed around.
+
+**The emulator is a MAME build** at `~/Downloads/mame-foenix256k`, with
+`f256k.zip` and an `sdcard.img` beside it -- and MAME is now a proven
+instrument here, having settled both the IIgs and the CoCo 3.
+
+### THE RISK THAT DECIDES IT: code size
+
+The other reason this project left cc65 was size -- the C128 had **210 bytes of
+MAIN free** under it, and llvm-mos bought roughly 6K. Uno measured llvm-mos
+binaries **2.3x tighter** than cc65's for the same game.
+
+**llvm-mos has no F256 platform.** `mos-platform/` has `cx16` and `atari8-*`
+but nothing for Foenix. So the choice is:
+
+  * **Take cc65**, and find out whether a game that needs 37,612 bytes of
+    resident code on the C128 fits a 6502 address space when compiled by a
+    compiler that may be twice as fat. On the Uno ratio it does not, and no
+    amount of overlaying fixes a resident half that doubles.
+  * **Write an llvm-mos F256 platform** -- linker script, startup, and a port
+    of Uno's kernel shim. Bounded, but it is a toolchain project before it is
+    a game port, and no other target on the list needs one.
+
+**A MEASUREMENT WAS ATTEMPTED AND IS INCONCLUSIVE, which is worth recording so
+nobody repeats it.** Comparing object files gives cc65 27,686 bytes of CODE
+against llvm-mos's 30,912 -- cc65 apparently 10% SMALLER, which is the opposite
+of every other datum. It is an artefact: `trek.c` alone makes **1,104 calls
+into cc65's runtime library** (`ldaxysp`, `pushax`, `tosaddax`, `mulax`...),
+and those routines are pulled in at LINK time, so they are absent from the
+segment being measured. llvm-mos's own advantage is likewise a link-time,
+whole-program effect that `-fno-lto` suppresses. **Neither side is measurable
+without a full link, and the Uno figure is the better-founded number until one
+is done.** That link is the first thing to do here, before any other work.
+
+### The other unknowns
+
+**Address space.** The F256's MMU pages 8K at a time, and the Atari has just
+taught this project that a linker script's nominal region is not what is
+available -- VBXE's window silently owned $2000..$3FFF and cost 8K of the
+figure this file had quoted. Find out what the F256's MMU windows and its I/O
+page cost before quoting any number.
+
+**F256K versus F256jr.** Uno targets the **jr** (`-D_F256JR_`, `f256jr.lib`,
+`f256jr_pgz.cfg`); Jamie's MAME romset is **`f256k`**. They share Vicky and the
+kernel but the memory maps and the keyboard differ, so the linker config is a
+starting point rather than a drop-in.
+
+**Video** is Vicky text at 80x60 with per-cell colour through CLUTs, so the
+console's 80x25 fits with room to spare and the colour question does not arise
+-- but that is read from the target table, not measured, and this session has
+now twice found a display claim to be wrong in the direction that mattered.
+
+### Recommendation
+
+**Last of the 65xx targets, after X16 and VBXE.** It is the only one that needs
+a toolchain built before a port can start, and the only one where the answer to
+"does the game fit" is genuinely unknown rather than merely tight. The
+deciding experiment is cheap and should come first: **link a complete cc65
+build of the core plus the shared UI and compare it against the C128's 37,612.**
+Everything else waits on that number.
