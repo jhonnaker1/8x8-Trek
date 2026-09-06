@@ -28,7 +28,7 @@ OVL_WINDOW = 4032
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke charset game music run-charset run-smoke run-game clean
+.PHONY: all smoke charset game music data run clean run-charset run-smoke run-game clean
 
 all: smoke
 
@@ -134,3 +134,26 @@ $(GAME_OUT): $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
 	@python3 -c "import os; n=os.path.getsize('$(GAME_OUT)')-2; lim=0x96ff-$(OVL_WINDOW);   # tracks the window, not a copy of it \
 	    print('x16: resident %d of %d, %d free' % (n, lim, lim-n)); \
 	    print('x16: OVERLAYS.BIN %d bytes' % os.path.getsize('build/OVERLAYS.BIN'))"
+
+# THE DATA FILES, in a directory x16emu serves as device 8 through HostFS --
+# so no disk image is needed and the same code path works against an SD card
+# image later. mega65/Makefile assembles the identical set.
+DATA ?= build/data
+
+data: $(GAME_OUT)
+	@mkdir -p $(DATA)
+	@cd .. && python3 tools/gen_strings.py >/dev/null && python3 tools/make_music.py >/dev/null
+	@# THE POOL IS SHARED; THE TWO STRINGS THAT NAME THE MACHINE ARE NOT.
+	@# Same ids, same count, same strdata.h -- see src/strings.override.txt.
+	@cd .. && python3 tools/gen_strings.py --override x16/src/strings.override.txt \
+	    x16/build/strings.dat
+	@cp build/strings.dat        $(DATA)/STRINGS.DAT
+	@cp ../c128/build/music.dat  $(DATA)/MUSIC.DAT
+	@cp ../c128/src/briefing.txt $(DATA)/BRIEF.TXT
+	@cp build/OVERLAYS.BIN       $(DATA)/OVERLAYS.BIN
+	@cp $(GAME_OUT)              $(DATA)/
+	@ln -sf $(X16EMU)/rom.bin    $(DATA)/rom.bin
+	@ls -l $(DATA) | grep -v total
+
+run: data
+	cd $(DATA) && $(X16EMU)/x16emu -prg trekx16.prg -run
