@@ -30,7 +30,7 @@
  *     ovl_load(OVL_EVAL);
  *     ui_evaluation();
  *
- * THREE RULES, AND THEY ARE NOT OPTIONAL.
+ * FOUR RULES, AND THEY ARE NOT OPTIONAL.
  *
  *   1. Every overlay function is `noinline`. Without it the compiler inlines
  *      it into a resident caller and the overlay is silently EMPTY -- which
@@ -41,6 +41,26 @@
  *   3. One entry point per overlay, reached through a resident stub that does
  *      the load and the call together. That is what makes "forgot to load it"
  *      impossible rather than merely unlikely.
+ *   4. ONLY main() MAY CALL INTO AN OVERLAY. Every other resident function
+ *      must stay resident all the way down, because the load/call pairing
+ *      lives in main() and nowhere else -- a resident function that reaches
+ *      into a window is a function whose correctness depends on which overlay
+ *      happens to be loaded when someone calls it, which nothing states and
+ *      nothing enforces.
+ *
+ *      ADDED 2026-09-06, after the first game anyone played to the end
+ *      dropped the machine into its monitor. trek_score() was resident and
+ *      its whole body was trek_score_sheet(), which is OVL_CODE("eval"); it
+ *      was called one statement after load_hof() had swapped the window, so
+ *      the call went to the address trek_score_sheet has in the EVAL layout,
+ *      the shorter hof image does not reach that far, and the CPU ran into
+ *      unwritten bytes. All three ports carried it. The fix was to annotate
+ *      trek_score() as well, which turns a hidden dependency into a call
+ *      main() can see it must pair with a load.
+ *
+ *      `make verify` enforces this on all three ports, from -fno-lto objects
+ *      -- because in the shipped binary LTO folds the offending caller into
+ *      main() and the bad call becomes indistinguishable from the good ones.
  *
  * An overlay's statics do not survive a swap.
  */

@@ -158,7 +158,18 @@ DISK = build/disk
 # `.ovl_*` sections, and nothing looking at them. tools/verify_prg.py says what
 # it checks and, just as importantly, what it deliberately leaves to
 # `make -C c128 verify` because the sources are shared.
-verify: $(OUT)
+# OBJECTS WITHOUT LTO, so verify can read the call graph AS WRITTEN -- rule 4
+# is invisible in the linked binary because LTO folds the offending caller
+# into main(). See tools/overlay_check.py.
+NOLTO = build/nolto
+
+nolto: $(SRC)
+	@mkdir -p $(NOLTO)
+	@for f in $(SHARED) $(filter %.c,$(PLATFORM)); do \
+	    $(M65CC) -c -fno-lto $(CFLAGS) -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
+	done
+
+verify: $(OUT) nolto
 	python3 tools/verify_prg.py
 
 # `disk` depends on verify so a binary that cannot run -- wrong load address,

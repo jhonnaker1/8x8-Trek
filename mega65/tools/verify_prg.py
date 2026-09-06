@@ -192,6 +192,7 @@ def main():
     overlay_check.check_overlay_layout(MAP, region("window")[1], die,
                                        reserve=STAMP)
     overlay_check.check_overlay_calls(ELF, OBJDUMP, die)
+    overlay_check.check_resident_calls(M65 / "build" / "nolto", OBJDUMP, die)
     check_images()
     check_stamp()
     return 0

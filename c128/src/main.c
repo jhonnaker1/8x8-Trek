@@ -1884,6 +1884,7 @@ static void do_torpedo(const char *line) {
 
 int main(void) {
     unsigned char c;
+    int16_t final_score;
 
 #ifdef TREK_DEBUG_INPUT
     /* This assignment exists to make kb_inject appear in the link map.
@@ -2097,8 +2098,25 @@ int main(void) {
            OVL_EVAL, so one load covers the pair. */
         if (ship.lost) ui_loss_memo();
         ui_evaluation();
+        /* THE SCORE IS TAKEN HERE, WHILE OVL_EVAL IS STILL IN THE WINDOW, and
+           moving this line below load_hof() crashes the machine.
+
+           trek_score() is RESIDENT but its whole body is trek_score_sheet(),
+           which is OVL_CODE("eval") -- so calling it is a call into the eval
+           window whether or not that is obvious at the call site. It used to
+           sit inside the ui_hall_of_fame() argument list, one statement after
+           load_hof() had already swapped the window: the call went to the
+           address trek_score_sheet has in the EVAL layout, the shorter hof
+           image does not reach that far, and the CPU ran off into unwritten
+           window bytes. MEASURED on the X16 2026-09-06, PC=$983F+1, exactly
+           trek_score_sheet's address there. The C128 and MEGA65 links have
+           the same call in the same order at different addresses, so this was
+           never an X16 fault -- the X16 is only where a game was played to
+           the end first. RULE 4 in core/overlay.h now, and `make verify`
+           fails a resident caller outside main.c. */
+        final_score = trek_score();
         load_hof();
-        ui_hall_of_fame(setup.name, setup.level, trek_score());
+        ui_hall_of_fame(setup.name, setup.level, final_score);
 
         if (!ui_play_again()) break;
     }

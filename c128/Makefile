@@ -145,7 +145,21 @@ test:
 # above passes whether or not the encoding is right -- three bugs in this port
 # proved that the hard way. `run` depends on this, so a binary with a PETSCII
 # key table can never reach the emulator.
-verify: $(OUT)
+# OBJECTS WITHOUT LTO, built only so `make verify` can read the call graph AS
+# WRITTEN. Rule 4 -- only main() may call into an overlay -- is invisible in
+# the shipped binary, because LTO inlines the offending resident function into
+# main and the bad call then looks like the thirteen good ones. See
+# tools/overlay_check.py; a crash on the X16 is what bought this.
+NOLTO = build/nolto
+
+nolto: $(SRC) $(HDR)
+	@mkdir -p $(NOLTO)
+	@for f in $(SRC); do \
+	    $(MOSCC) -c -fno-lto -Oz -I src -I ../core -Wall -Werror \
+	        -DTREK_OVERLAYS -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
+	done
+
+verify: $(OUT) nolto
 	@# LOWRAM HEADROOM. Added 2026-08-27 after the save record was packed and
 	@# the 192 bytes it freed turned out to land in a pool NOBODY WAS
 	@# WATCHING: writable data lives in lowram, 0x1300..0x1C00, and it had 77

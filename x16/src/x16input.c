@@ -68,6 +68,13 @@ static const char autoplay[] = {
                                machine with a voice sounding, and the exact
                                keys that then answered NO SUCH ORDER. The
                                console reads WARP 5.0 when both are fixed. */
+    's', 13, 'x', 13,       /* SELF DESTRUCT. The password is what the setup
+                               screen took above -- 'x' answered the PASSWORD
+                               field, not an "accept" that does not exist. */
+    13, 13, 13, 13, 13      /* through the loss memo, the evaluation and the
+                               hall of fame, to the PLAY AGAIN prompt, which
+                               is where the machine dropped into the monitor
+                               at PC=$9840 -- inside the overlay window. */
 };
 static unsigned char ap_at = 0;
 #endif

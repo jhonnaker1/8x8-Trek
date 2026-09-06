@@ -2927,7 +2927,17 @@ void trek_score_sheet(ScoreSheet *s) {
 }
 
 /* Derived from the sheet rather than computed separately, so the total the
-   player is shown and the total recorded are the same arithmetic. */
+   player is shown and the total recorded are the same arithmetic.
+
+   IN THE EVAL OVERLAY TOO, and it has to be: its whole body is a call to
+   trek_score_sheet(), which is OVL_CODE("eval"). Left resident, it was a
+   RESIDENT function that only worked while one particular overlay happened
+   to be in the window -- and on 2026-09-06 it was called one statement after
+   load_hof() had swapped that window, which ran the CPU off into unwritten
+   bytes and dropped the machine into its monitor. Annotating it puts the
+   call where main.c can see it needs pairing with a load, which is the only
+   place that pairing can be checked. */
+OVL_CODE("eval")
 int16_t trek_score(void) {
     ScoreSheet s;
     trek_score_sheet(&s);

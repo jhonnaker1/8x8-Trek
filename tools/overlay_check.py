@@ -164,3 +164,81 @@ def check_overlay_layout(mapfile, window, die, label="verify", reserve=0):
     big = max(s for _, _, _, s in ovl)
     print("%s: %d overlays at $%04x, distinct load addresses, largest %d of %d bytes"
           % (label, len(ovl), ovl[0][1], big, window - reserve))
+
+
+def check_resident_calls(objdir, objdump, die, label="verify", allow=("main",)):
+    """RULE 4: only main() may call into an overlay from resident code.
+
+    A resident->overlay call is the whole mechanism, so it cannot be banned --
+    but it is safe ONLY when the caller has just loaded that overlay, and the
+    load/call pairs all live in main(). Any OTHER resident function that calls
+    an overlay function is a function whose correctness depends on which
+    window happens to be loaded when someone calls it, which nothing states
+    and nothing checks.
+
+    FOUND THE HARD WAY 2026-09-06, on the first game ever played to the end:
+
+        int16_t trek_score(void) {          /* resident */
+            ScoreSheet s;
+            trek_score_sheet(&s);           /* OVL_CODE("eval") */
+            return s.total;
+        }
+
+    and main.c had `load_hof(); ui_hall_of_fame(name, level, trek_score());`.
+    The window already held the hall of fame, the call went to the address
+    trek_score_sheet has in the EVAL layout, the shorter hof image does not
+    reach that far, and the CPU ran into unwritten window bytes. The C128 and
+    MEGA65 carry the same call in the same order -- this was never an X16
+    fault, only the first port anyone finished a game on.
+
+    WHY THE OTHER TWO CHECKS MISS IT: check_overlay_calls asks what OVERLAY
+    code calls, and the caller here is resident. And it cannot be asked of the
+    final binary at all -- LTO inlines trek_score into main, at which point
+    the call is indistinguishable from the thirteen legitimate ones. So this
+    reads the call graph AS WRITTEN, from -fno-lto objects, before the
+    optimiser folds the evidence away.
+    """
+    import glob
+    import os
+
+    sec_of = {}
+    objs = sorted(glob.glob(os.path.join(str(objdir), "*.o")))
+    if not objs:
+        die("%s: no -fno-lto objects in %s -- rule 4 went unchecked" %
+            (label, objdir))
+    for o in objs:
+        out = subprocess.run([objdump, "--syms", o],
+                             capture_output=True, text=True).stdout
+        for ln in out.splitlines():
+            m = re.match(r"^([0-9a-f]{8})\s+\S*\s+F\s+(\.\S+)\s+[0-9a-f]{8}\s+(\S+)", ln)
+            if m:
+                sec_of[m.group(3)] = m.group(2)
+
+    bad = set()
+    for o in objs:
+        d = subprocess.run([objdump, "-dr", o],
+                           capture_output=True, text=True).stdout
+        caller, sec = None, None
+        for ln in d.splitlines():
+            m = re.match(r"^Disassembly of section (\S+):", ln)
+            if m:
+                sec = m.group(1)
+                continue
+            m = re.match(r"^[0-9a-f]+\s+<(\S+)>:", ln)
+            if m:
+                caller = m.group(1)
+                continue
+            m = re.search(r"R_MOS\S*\s+(\S+)", ln)
+            if not (m and caller and sec) or sec.startswith(".ovl."):
+                continue
+            target = m.group(1).split("+")[0]
+            if sec_of.get(target, "").startswith(".ovl.") and caller not in allow:
+                bad.add((os.path.basename(o), caller, target, sec_of[target]))
+
+    if bad:
+        for o, c, t, s in sorted(bad):
+            print("%s: RESIDENT %s (%s) calls %s in %s" % (label, c, o, t, s))
+        die("%s: rule 4 -- only %s may call into an overlay" %
+            (label, "/".join(allow)))
+    print("%s: rule 4 ok -- no resident caller outside %s reaches an overlay" %
+          (label, "/".join(allow)))

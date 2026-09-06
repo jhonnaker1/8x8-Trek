@@ -407,6 +407,14 @@ def check_overlay_calls():
     overlay_check.check_overlay_calls(elf, OBJDUMP, die)
 
 
+def check_resident_calls():
+    """Rule 4 of core/overlay.h. See tools/overlay_check.py for the crash."""
+    objdir = C128 / "build" / "nolto"
+    if not objdir.is_dir():
+        die("build/nolto missing -- `make nolto` first, or rule 4 is unchecked")
+    overlay_check.check_resident_calls(objdir, OBJDUMP, die)
+
+
 def check_confirm_widths():
     """A ui_confirm() prompt must fit the COMMAND panel.
 
@@ -724,6 +732,7 @@ def main():
     check_message_widths()
     check_linebuf()
     check_overlay_calls()
+    check_resident_calls()
     check_confirm_widths()
     check_dialog_widths()
     check_confirm_not_in_dialog()

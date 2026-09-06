@@ -158,6 +158,23 @@ data: $(GAME_OUT)
 run: data
 	cd $(DATA) && $(X16EMU)/x16emu -prg trekx16.prg -run
 
+# OBJECTS WITHOUT LTO, built only so verify can read the call graph AS
+# WRITTEN. LTO inlines a resident function into main(), at which point a call
+# that only works with one particular overlay loaded is indistinguishable from
+# the thirteen that are correct -- which is exactly how the hall-of-fame crash
+# got out. See tools/overlay_check.py, rule 4.
+NOLTO = build/nolto
+
+nolto: $(GAME_SRC)
+	@mkdir -p $(NOLTO)
+	@for f in $(GAME_SRC); do \
+	    $(X16CC) -c -fno-lto $(OVLFLAGS) -o $(NOLTO)/`basename $$f .c`.o $$f \
+	        || exit 1; \
+	done
+
+verify: $(GAME_OUT) nolto
+	python3 tools/verify_prg.py
+
 # WHAT DOES A KEY ACTUALLY RETURN? -- prints the raw byte GETIN hands back,
 # in hex, for every key pressed. Run it, type, read the screen. This is the
 # instrument that caught the case bug: the header comment in src/x16input.c
