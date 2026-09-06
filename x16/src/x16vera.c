@@ -14,7 +14,6 @@
 #define VERA_ADDR_H  (*(volatile unsigned char *)0x9F22)
 #define VERA_DATA0   (*(volatile unsigned char *)0x9F23)
 #define VERA_CTRL    (*(volatile unsigned char *)0x9F25)
-#define VERA_SCANLINE (*(volatile unsigned char *)0x9F28)  /* DC_VSCALE area */
 
 #define VRAM_TEXT    0x1B000UL   /* KERNAL's text map: cell = char, colour */
 #define VRAM_PAL     0x1FA00UL   /* 256 entries x 2 bytes */
@@ -99,6 +98,15 @@ static unsigned char ascii_to_screencode(char c) {
     return 32;
 }
 
+/* RDTIM ($FFDE) returns A=high, X=mid, Y=low; the low byte advances 60 times
+   a second. Shared in spirit with x16snd.c, which paces the music the same
+   way -- both static, so no symbol clash. */
+static unsigned char jiffy_low(void) {
+    unsigned char y;
+    __asm__ volatile("jsr $FFDE\n sty %0\n" : "=r"(y) :: "a", "x", "y");
+    return y;
+}
+
 static unsigned long cell_addr(unsigned char x, unsigned char y) {
     return VRAM_TEXT + ((unsigned long)y * MAP_STRIDE + x) * 2UL;
 }
@@ -120,9 +128,21 @@ void vdc_shutdown(void) {
     scr_clear();
 }
 
-/* Frame pace off VERA's scanline counter, as the other ports pace off theirs. */
+/* Waits one frame, off the KERNAL's jiffy clock.
+ *
+ * IT USED TO SPIN ON $9F28 as if that were a scanline counter. It is not --
+ * with DCSEL=0 that address is IRQ_LINE_L, so the loop could never terminate.
+ * Nothing in the shared UI calls wait_vsync (the console is entirely
+ * event-driven; the only grep hit anywhere is a comment), so the hang was
+ * latent rather than live -- but an API function that cannot return is a trap
+ * left for whoever calls it first.
+ *
+ * RDTIM is the same source x16snd.c paces the music from, and it is
+ * unambiguous where a raster counter is not: 60 ticks a second, no wrap to
+ * misread. */
 void wait_vsync(void) {
-    while (VERA_SCANLINE != 0) { }
+    unsigned char start = jiffy_low();
+    while (jiffy_low() == start) { }
 }
 
 /* ALL SIXTY ROWS, not VDC_ROWS. VERA's text mode is 80x60 and the console
