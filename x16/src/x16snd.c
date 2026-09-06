@@ -72,7 +72,6 @@
 #define VOLUME  40
 
 static uint8_t enabled = 1;
-static unsigned char last_jiffy;
 static unsigned int  acc;
 static unsigned int  mus, mus_head, mus_base;
 static unsigned char mus_on, mus_ok, note_left;
@@ -101,18 +100,37 @@ static void voice_note(unsigned char v, unsigned char tenths) {
     psg(v, 2, (unsigned char)(VOL_ON | VOLUME));
 }
 
-/* RDTIM: A=high, X=mid, Y=low. The low byte is enough -- it wraps every 256
-   jiffies, about 4.3 seconds, and this is polled far faster than that. */
-static unsigned char jiffy(void) {
-    unsigned char y;
-    __asm__ volatile("jsr $FFDE\n sty %0\n" : "=r"(y) :: "a", "x", "y");
-    return y;
+/* THE FRAME TICK, AND THE JIFFY CLOCK WAS THE WRONG CHOICE.
+ *
+ * This paced off RDTIM ($FFDE) on the reasoning that a jiffy clock is
+ * unambiguous where a raster counter is not. MEASURED ON THE MACHINE after
+ * Jamie reported no music and a freeze: RDTIM returns A=X=Y=00 forever, before
+ * or after a CLI. The X16 KERNAL's jiffy is not maintained for a program that
+ * has taken the machine over, and VERA's VSYNC flag never sets either -- 0
+ * times in 150,000 polls.
+ *
+ * That one dead clock explains both faults. snd_poll() saw zero elapsed frames
+ * so the music never ticked, and snd_beep() spun waiting for a jiffy that
+ * would never move -- with the voice already ON, which is the buzzing.
+ *
+ * What DOES tick without interrupts is VERA's LINE flag, ISR bit 1: it sets
+ * when the raster reaches IRQ_LINE, once a frame, and stays set until written
+ * back. Measured re-arming 7 times across the same loop that saw VSYNC zero.
+ * The raw scanline at $9F28 also moves, but its low byte wraps TWICE per frame
+ * at 480 lines -- which is precisely the bug that cost the MEGA65 a day, so it
+ * is not used. */
+#define VERA_ISR (*(volatile unsigned char *)0x9F27)
+#define ISR_LINE 0x02
+
+static unsigned char frame_tick(void) {
+    if (VERA_ISR & ISR_LINE) { VERA_ISR = ISR_LINE; return 1; }
+    return 0;
 }
 
 void snd_init(void) {
     unsigned char v;
     for (v = 0; v < 16; v++) { psg(v, 2, 0); }   /* silence every voice */
-    last_jiffy = jiffy();
+    VERA_ISR = ISR_LINE;                         /* start from a known state */
     acc = 0;
 }
 
@@ -143,13 +161,18 @@ void snd_effect(uint8_t track) {
     sfx_left = 0;
 }
 
+/* BOUNDED, and that is not defensive programming for its own sake: the
+   unbounded version of this loop is what froze the machine with a voice
+   sounding. A beep that ends early is a blemish; one that never ends is the
+   bug Jamie hit. The spin cap is generous -- far longer than six frames -- and
+   only reached if the frame source dies again. */
 void snd_beep(void) {
-    unsigned char start;
+    unsigned char frames = 0;
+    unsigned int guard = 0;
     if (!enabled) return;
     sfx_on = 0;                    /* a refusal cancels whatever was playing */
     voice_note(V_SFX, 20);
-    start = jiffy();
-    while ((unsigned char)(jiffy() - start) < 6) { }
+    while (frames < 6 && ++guard) { if (frame_tick()) frames++; }
     voice_off(V_SFX);
 }
 
@@ -187,19 +210,9 @@ static void music_tick(void) {
 }
 
 void snd_poll(void) {
-    unsigned char now, elapsed;
-
     if (!enabled || (!mus_on && !sfx_on)) return;
+    if (!frame_tick()) return;
 
-    now = jiffy();
-    elapsed = (unsigned char)(now - last_jiffy);
-    if (!elapsed) return;
-    last_jiffy = now;
-
-    /* Every elapsed frame is accounted for, not just the fact that one was.
-       A poll that arrives late catches up rather than dropping tempo. */
-    while (elapsed--) {
-        acc += snd_tick_num(REGION_NTSC);
-        while (acc >= SND_TICK_DEN) { acc -= SND_TICK_DEN; music_tick(); }
-    }
+    acc += snd_tick_num(REGION_NTSC);
+    while (acc >= SND_TICK_DEN) { acc -= SND_TICK_DEN; music_tick(); }
 }

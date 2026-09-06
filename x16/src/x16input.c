@@ -27,11 +27,24 @@
 
 uint16_t kb_entropy;
 
-#ifdef TREK_DEBUG_INPUT
-/* Scripted input for debug builds, the same byte both other ports carry and
-   poked the same way -- a driver writes a key here and waits for the game to
-   zero it. x16emu can write memory but cannot fake a keypress. */
-volatile unsigned char kb_inject = 0;
+#ifdef TREK_AUTOPLAY
+/* SCRIPTED INPUT, COMPILED IN -- because x16emu offers no way to poke memory
+   or fake a keypress from outside, so the MEGA65's kb_inject trick (a driver
+   writes a byte, the game zeroes it) has no transport here. The keys are a
+   table instead, and kb_waitkey serves them in order then blocks.
+   Debug builds only; the game build has none of this. */
+static const char autoplay[] = {
+    13,                     /* title -> setup            */
+    'N', 13,                /* no briefing               */
+    'N', 13,                /* no restore                */
+    'J','A','M','I','E', 13,/* commander name            */
+    '3', 13,                /* skill level               */
+    'X', 13,                /* accept and start          */
+    'W', '5', 13            /* WARP 5 -- the exact keys that froze the
+                               machine with a voice sounding. If the build
+                               gets past this, the dead-clock fix holds. */
+};
+static unsigned char ap_at = 0;
 #endif
 
 static unsigned char getin(void) {
@@ -51,8 +64,8 @@ static char translate(unsigned char c) {
 char kb_waitkey(void) {
     unsigned char c;
 
-#ifdef TREK_DEBUG_INPUT
-    if (kb_inject) { c = kb_inject; kb_inject = 0; return translate(c); }
+#ifdef TREK_AUTOPLAY
+    if (ap_at < sizeof autoplay) return autoplay[ap_at++];
 #endif
 
     /* kb_entropy is bumped once per pass and sampled when the player answers.

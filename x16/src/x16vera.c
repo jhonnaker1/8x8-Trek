@@ -104,14 +104,12 @@ static unsigned char ascii_to_screencode(char c) {
     return 32;
 }
 
-/* RDTIM ($FFDE) returns A=high, X=mid, Y=low; the low byte advances 60 times
-   a second. Shared in spirit with x16snd.c, which paces the music the same
-   way -- both static, so no symbol clash. */
-static unsigned char jiffy_low(void) {
-    unsigned char y;
-    __asm__ volatile("jsr $FFDE\n sty %0\n" : "=r"(y) :: "a", "x", "y");
-    return y;
-}
+/* VERA's LINE flag, the same frame source x16snd.c uses -- see the long note
+   there. The KERNAL's jiffy clock does NOT run for a program that has taken
+   the machine over: RDTIM returns zero forever, which is what left the music
+   silent and froze snd_beep. */
+#define VERA_ISR (*(volatile unsigned char *)0x9F27)
+#define ISR_LINE 0x02
 
 static unsigned long cell_addr(unsigned char x, unsigned char y) {
     return VRAM_TEXT + ((unsigned long)y * MAP_STRIDE + x) * 2UL;
@@ -156,8 +154,10 @@ void vdc_shutdown(void) {
  * unambiguous where a raster counter is not: 60 ticks a second, no wrap to
  * misread. */
 void wait_vsync(void) {
-    unsigned char start = jiffy_low();
-    while (jiffy_low() == start) { }
+    unsigned int guard = 0;
+    VERA_ISR = ISR_LINE;
+    while (!(VERA_ISR & ISR_LINE) && ++guard) { }   /* bounded: never hang */
+    VERA_ISR = ISR_LINE;
 }
 
 /* ALL SIXTY ROWS, not VDC_ROWS. VERA's text mode is 80x60 and the console

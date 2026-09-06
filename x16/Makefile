@@ -28,7 +28,7 @@ OVL_WINDOW = 4032
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke charset game music data run clean run-charset run-smoke run-game clean
+.PHONY: all smoke charset game music data run autoplay clean run-charset run-smoke run-game clean
 
 all: smoke
 
@@ -157,3 +157,29 @@ data: $(GAME_OUT)
 
 run: data
 	cd $(DATA) && $(X16EMU)/x16emu -prg trekx16.prg -run
+
+# A BUILD THAT PLAYS ITSELF to the console, so this port can be screenshotted
+# without a human. x16emu has no key-injection and no memory poke, so the keys
+# are compiled in rather than driven from outside -- see TREK_AUTOPLAY in
+# src/x16input.c. Never part of the game build.
+AUTO_OUT = build/autoplay.prg
+
+autoplay: $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
+	@mkdir -p build $(DATA)
+	$(X16CC) $(OVLFLAGS) -DTREK_AUTOPLAY $(LDFLAGS) -o build/auto.elf $(GAME_SRC)
+	$(OBJCOPY) -O binary "--remove-section=.ovl_*" build/auto.elf build/auto.res
+	@python3 -c "d=open('build/auto.res','rb').read(); \
+	    open('$(AUTO_OUT)','wb').write(bytes([0x01,0x08]) + d)"
+	@rm -f build/AUTO_OVL.BIN
+	@for o in $(OVERLAYS); do \
+	    $(OBJCOPY) -O binary --only-section=.ovl_$$o build/auto.elf build/a_$$o.bin; \
+	    python3 -c "import sys; d=open('build/a_$$o.bin','rb').read(); \
+	        open('build/AUTO_OVL.BIN','ab').write(d + b'\\0'*($(OVL_WINDOW)-len(d)))"; \
+	done
+	@python3 -c "import subprocess; \
+	    nm=subprocess.check_output(['$(NM)','build/auto.elf']).decode(); \
+	    a=[int(l.split()[0],16) for l in nm.splitlines() if l.split()[-1:]==['ovl_anchor']][0]; \
+	    f=open('build/AUTO_OVL.BIN','r+b'); f.seek(-2,2); \
+	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close()"
+	@cp $(AUTO_OUT) $(DATA)/ && cp build/AUTO_OVL.BIN $(DATA)/OVERLAYS.BIN
+	@echo "autoplay built; OVERLAYS.BIN in $(DATA) is now the AUTOPLAY set"
