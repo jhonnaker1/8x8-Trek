@@ -41,3 +41,4 @@ build/
 # Python bytecode from tools/
 __pycache__/
 *.pyc
+x16/build/
