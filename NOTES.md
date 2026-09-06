@@ -5880,16 +5880,37 @@ holding a five-typedef `stdint.h`, shadowed by an earlier `-I`, is all that is
 needed. `commodore-uno/coco/src/compat/stdlib.h` is the same trick for the same
 reason and says so at length; this is the EGA Trek equivalent.
 
-**`serial.c` does NOT compile, and it is the static assert.**
+**`serial.c` needed a new static assert, and two obvious rewrites were traps.**
+It used to say
 
     typedef char save_size_tracks_planet_max[
         (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
 
-cmoc will not evaluate that constant expression -- "invalid size expression for
-dimension 1". **Do not just delete it on that target**: it is the guard that
-catches `SAVE_FIXED_BYTES` drifting out of step with the field list, which has
-already been wrong once. Whoever does the CoCo owes it a different assert form,
-not a deletion.
+and cmoc rejects that outright -- "invalid size expression for dimension 1" --
+**whether the condition is true or false**, so `serial.c` did not compile on
+6809 at all.
+
+The trap is what you reach for next. cmoc accepts `typedef char x[-1]` AND
+`enum { x = 1/0 }` without a murmur, so a static assert rebuilt on either one
+**compiles in both states**: a guard that cannot fail, on the one target that
+needed it. Both were tried and both were dead.
+
+What all four compilers do reject is a **negative bit-field width**:
+
+    struct save_size_check {
+        int trek_save_size_disagrees_with_planet_max :
+            1 - 2 * !(TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX);
+    };
+
+No conditional operator, no storage, and the message rides in the field name
+because that is what the compiler prints. Verified by BREAKING it -- with
+`SAVE_FIXED_BYTES` set to 505, native cc, llvm-mos (C128 and MEGA65) and cmoc
+all fail the build; restored to 506, all four pass. **The whole core now
+compiles for 6809.**
+
+The leftover cmoc warnings are signed/unsigned ternary mismatches
+(`trek.c:41`, `:249`, ...) where it reports which type it picked. They are
+informational, not the always-zero class, and nothing acts on them yet.
 
 ### The bug, which is the part that was worth the exercise
 

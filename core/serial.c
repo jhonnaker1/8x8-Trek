@@ -35,9 +35,23 @@ static uint16_t get16(void) {
    constant -- and the only thing that caught it was test_serial ABORTING,
    which is a crash rather than a failure.
 
-   A negative array size is the portable way to fail a build on a constant,
-   and it fails at the right moment: change PLANET_MAX and this stops
-   compiling until TREK_SAVE_SIZE is brought along.
+   A NEGATIVE BIT-FIELD WIDTH is the portable way to fail a build on a
+   constant, and it fails at the right moment: change PLANET_MAX and this stops
+   compiling until TREK_SAVE_SIZE is brought along. The message rides in the
+   FIELD NAME, because that is what the compiler prints.
+
+   IT WAS A NEGATIVE ARRAY SIZE UNTIL 2026-09-05, and that form does not
+   survive a fourth compiler. cmoc -- 6809, which the CoCo 3 port needs --
+   rejects `typedef char x[(c) ? 1 : -1]` outright with "invalid size
+   expression", TRUE OR FALSE, so serial.c would not compile there at all.
+   Two rewrites that look right are WORSE THAN THE BUG: cmoc accepts both
+   `typedef char x[-1]` and `enum { x = 1/0 }` without complaint, so an
+   assertion built on either COMPILES IN BOTH STATES -- a guard that cannot
+   fail, giving false confidence on the one target that needed it.
+
+   The bit-field is the form all four reject. Verified by BREAKING it: with
+   SAVE_FIXED_BYTES deliberately wrong, native cc, llvm-mos and cmoc all fail
+   the build; with it right, all three pass.
 
    WHAT IT DOES NOT CATCH, learned 2026-09-02: adding a FIELD. The assertion
    ties TREK_SAVE_SIZE to PLANET_MAX, so a record that grows by one byte with
@@ -46,8 +60,10 @@ static uint16_t get16(void) {
    plasma bolt shield -- and test_serial now reports the real length instead of
    aborting when it does not. */
 #define SAVE_FIXED_BYTES 506
-typedef char save_size_tracks_planet_max[
-    (TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX) ? 1 : -1];
+struct save_size_check {
+    int trek_save_size_disagrees_with_planet_max :
+        1 - 2 * !(TREK_SAVE_SIZE == SAVE_FIXED_BYTES + 5 * PLANET_MAX);
+};
 
 /* The field list appears TWICE, once to save and once to load, and that is
    deliberate rather than lazy.
