@@ -13,6 +13,21 @@
  * DIFFERENCE rather than testing for change means a poll that misses a frame
  * catches up instead of losing tempo.
  *
+ * NO REGION DETECTION, AND THAT IS A PLATFORM FACT RATHER THAN A SHORTCUT --
+ * which is worth saying plainly, because m65snd.c's header records that this
+ * same file once claimed "NO REGION DETECTION" for the MEGA65 on reasoning
+ * that turned out to be wrong. There the argument was about the SID clock and
+ * so about PITCH, while snd_tick_num() converts FRAMES to the original's
+ * 18.2Hz ticks -- and frames are 50 a second on PAL against 60 on NTSC. Using
+ * the NTSC numerator on a PAL machine ran the music 19% fast.
+ *
+ * The X16 cannot be in that position: VERA drives VGA or NTSC composite and
+ * has NO 50Hz mode at all -- x16emu's own video modes are `@vga` and `@ntsc`
+ * and nothing else. So 60 frames a second is the only case, and REGION_NTSC
+ * below is the right constant rather than a default nobody checked. If VERA
+ * ever gains a 50Hz output, this is the line that breaks, and the fix is to
+ * measure the rate rather than to add a region flag.
+ *
  * VERA'S PSG lives in VRAM at $1F9C0, four bytes per voice: frequency low,
  * frequency high, volume with pan in the top two bits, then waveform with
  * pulse width. A note byte in MUSIC.DAT is a frequency in TENS OF HZ -- the
