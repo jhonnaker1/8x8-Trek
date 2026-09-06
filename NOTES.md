@@ -6025,6 +6025,10 @@ rejected because the console's panels sit side by side, so one scanline crosses
 three of them and per-line tricks cannot help. A per-PIXEL effect is a
 different argument, and it has not been tested.
 
+**STILL UNMEASURED as of 2026-09-05.** A harness attempt got most of the way
+and stopped on one specific thing; what was learned is below so the next
+attempt does not re-derive it.
+
 **So this is unmeasured, and it should get what the CoCo 3 got: boot it.**
 Tooling is present -- `/Applications/GSplus.app` plus `~/GSPlus/APPLE2GS.ROM2`
 and System 6.0.4 images under `~/UthernetII/speccies_IIgs_starter_kit`. GSplus
@@ -6036,3 +6040,49 @@ Toolchain, checked rather than assumed: llvm-mos lists **`mosw65816`**, so the
 CPU is covered by the compiler this project already uses. There is no
 `apple2gs` platform in `mos-platform/`, which puts it in the same hand-built
 linker-config bucket as the F256.
+
+
+## The GSplus harness: how far it got, and the one thing blocking it (2026-09-05)
+
+Attempted so the IIgs display question could be settled by measurement. **It is
+not settled** -- this is a handover, not a result.
+
+**What works.** GSplus runs headlessly enough from a shell with the user's own
+firmware: copy `~/GSPlus/APPLE2GS.ROM2` into the working directory as `ROM.03`
+(it is 262,144 bytes, which is a ROM 03; GSplus searches its CWD for `ROM`,
+`ROM.01`, `ROM.03`) and launch with
+
+    cd <workdir> && gsplus -debugport 8888 -ssdir <dir>
+
+`-ssdir` sets where screenshots land (`<prefix>%04d.png`) and `-debugport`
+opens a TCP listener, confirmed with `lsof -nP -iTCP:8888`.
+
+**The debugger is the right instrument IF it can be reached.** Its vocabulary,
+read out of the binary, is an Apple II monitor:
+
+    [bank]/[a1].[a2]ul<file>    LOAD a memory range FROM a file
+    [bank]/[a1].[a2]us<file>    save a memory range to a file
+    [bank]/[addr]B / D / L      breakpoint, delete, disassemble
+    g / s                       go, step
+    v                           show video information
+
+`ul` is the whole game: SHR is pixels at `$E1/2000`, SCBs at `$E1/9D00` and
+palettes at `$E1/9E00`, so the colour question can be answered by **loading a
+prepared image straight into those three ranges and screenshotting** -- no
+65816 program, no disk, no toolchain. That is why this route was chosen.
+
+**THE BLOCKER: the socket accepts a connection and then says nothing.** No
+banner, no prompt, no reply to `h` or `v`, over `\n` or `\r\n`. The binary
+contains "Send telnet reqs", so a telnet-aware client was tried too -- **zero
+bytes arrive, negotiation included**. The console appears to exist only once
+the emulator has been HALTED INTO the debugger; the socket is the console's
+transport, not a way to enter it. The likely levers are the config's "Code Red
+Halts,0,Do not stop on bad accesses,1,Enter debugger on bad accesses" and the
+`-badrd` / `-noignbadacc` / `-noignhalt` switches, or a key in the window.
+
+**AND IT IS A ONE-SHOT LISTENER.** It accepts a single connection; closing it
+prints "Console closed." and the port refuses everything afterwards, with
+GSplus still running and looking healthy. A probe script that opens a
+connection per command therefore burns the console on its first call and every
+later one is "connection refused" -- which reads exactly like a crashed
+emulator. **Hold one connection open for the whole session.**
