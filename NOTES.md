@@ -6381,11 +6381,31 @@ target left.**
 **The core compiles.** `mos-atari8-dos-clang -Wall -Werror -Oz`: `trek.c`,
 `planet.c`, `hof.c`, `serial.c`, four for four, no shims.
 
-**It is the roomiest 8-bit target yet.** `atari8-dos/lib/link.ld` gives
-`ram : ORIGIN = 0x2000, LENGTH = 0xA000` = **40,960 bytes**, against the C128's
-37,823 (which holds the whole game) and the X16's 38,655. **And the screen
-lives in VBXE's own 512K VRAM, so the framebuffer costs no main RAM at all** --
-the C128 spends nothing there either, but only because the VDC has its own.
+**Code space -- AND THE FIRST NUMBER HERE WAS WRONG.** `atari8-dos/link.ld`
+says `ram : ORIGIN = 0x2000, LENGTH = 0xA000` = 40,960 bytes, and this scope
+originally quoted that as "the roomiest 8-bit target yet". **It is not, because
+that region is not all available.** VBXE's MEMAC window is mapped INTO the 6502
+address space -- `vbxevid.c` opens it with `MEMAC_CONTROL = 0x29`, "window at
+$2000, CPU enable, 8K" -- so `$2000..$3FFF` belongs to VRAM, not to the
+program. Uno's Makefile links every VBXE build with `--start-addr 0x4000` for
+exactly this reason.
+
+**FOUND BY CRASHING INTO IT.** A test built without that flag loaded at $2000,
+`vbxe_init()` then mapped the window over its own code, and execution fell into
+VRAM: `PC=$25ED illegal=1`. The emulator's own Program Error dialog is what
+reported it.
+
+So the real figure is **$4000..$BFFF = 32,768 bytes** with an 8K window --
+about 4.8K LESS than the C128's 37,823, which currently holds the game with 211
+bytes spare. The window size is configurable (`bits0-1 = 4K << n`), so a 4K
+window at $2000 would give `$3000..$BFFF` = 36,864, still under the C128.
+**Either way this is the TIGHTEST target so far, not the roomiest, and more
+code would have to move into overlays than on any existing port.** Measure it
+properly before committing: link the whole game early, as the X16 scope also
+says.
+
+The screen itself still costs no main RAM -- it lives in VBXE's 512K VRAM --
+and far memory and the message log can live there too.
 
 **Colour is a non-issue, and better than a non-issue.** Per-cell fg and bg from
 a 1024-colour (21-bit) palette is more than EGA needs, so load EGA's sixteen
@@ -6395,7 +6415,20 @@ and `TREK_COLOUR_IS_EGA` makes the mapping the identity, as on the MEGA65.
 window, is bank 1 with more room -- and the MESSAGE LOG can live there too,
 which is the same trick the C128 plays with spare VDC RAM.
 
-### THE ONE REAL RISK: 24 rows against a 25-row console
+### THE ROW QUESTION: SETTLED 2026-09-05 -- 25 ROWS WORK
+
+Measured on real hardware emulation, not argued. `ROWS` set to 25 in Uno's
+VBXE driver, a test program filling every row with its own number and colour,
+run in AltirraSDL (XL / NTSC / 1088K / VBXE) through the AltirraBridge:
+**ROW 00 through ROW 24 all render, 80 columns wide.** The console fits as
+designed and no redesign is needed. The 8-scanline top border is what pays for
+the 25th row, exactly as the arithmetic suggested (25 x 8 = 200 = 24 rows plus
+that border).
+
+**So VBXE is confirmed a TEXT sibling.** The section below is kept because it
+records what the worry was and why it was worth checking.
+
+### The worry, as it stood before the measurement
 
 `layout.c` puts the bottom band on **rows 17..24** -- twenty-five rows. Uno's
 VBXE driver is `#define ROWS 24`, "24 rows x 8 scanlines = 192 scanlines, the

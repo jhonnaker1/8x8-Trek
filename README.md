@@ -153,7 +153,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | Designed |
 | **Foenix F256** | Vicky text 80×60, per-cell colour via CLUTs | 65C02 | Designed |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)**, HR mode | 640×N bitmap, 16 colours | 6502 | Designed |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | Designed |
 
 **Tier 2 — CoCo 3.** `WIDTH 80` plus `ATTR` gives eight foreground colours,
 one per character cell, from a reprogrammable 64-colour palette. Measured in
