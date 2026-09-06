@@ -23,7 +23,7 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 
 # THE WINDOW SIZE, stated once. x16.ld must carry the same number; this is
 # what the loader compiles against and what the image cutter enforces.
-OVL_WINDOW = 3776
+OVL_WINDOW = 4032
 
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
@@ -101,7 +101,7 @@ $(MEM_OUT): $(MEM_SRC)
 GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/x16vera.c src/x16storage.c src/x16mem.c src/x16ovl.c src/stubs.c
+           src/x16vera.c src/x16storage.c src/x16mem.c src/x16ovl.c src/x16input.c src/stubs.c
 GAME_OUT = build/trekx16.prg
 
 game: $(GAME_OUT)
@@ -126,6 +126,6 @@ $(GAME_OUT): $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
 	    f=open('build/OVERLAYS.BIN','r+b'); f.seek(-2,2); \
 	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close(); \
 	    print('x16: overlay stamp', hex(a))"
-	@python3 -c "import os; n=os.path.getsize('$(GAME_OUT)')-2; lim=0x96ff-0x1000; \
+	@python3 -c "import os; n=os.path.getsize('$(GAME_OUT)')-2; lim=0x96ff-$(OVL_WINDOW);   # tracks the window, not a copy of it \
 	    print('x16: resident %d of %d, %d free' % (n, lim, lim-n)); \
 	    print('x16: OVERLAYS.BIN %d bytes' % os.path.getsize('build/OVERLAYS.BIN'))"

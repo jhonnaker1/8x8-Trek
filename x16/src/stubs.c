@@ -17,7 +17,6 @@
 volatile unsigned char opaque = 0;
 volatile unsigned int  opaque16 = 0;
 
-char kb_waitkey(void) { return (char)opaque; }
 
 void snd_init(void) {}
 void snd_off(void) {}
@@ -32,7 +31,3 @@ void snd_toggle(void) {}
 
 
 
-/* A VARIABLE, not a function -- which is why the scope's "platform surface,
-   derived not assumed" missed it: that grep looked for call syntax only.
-   main.c seeds the RNG from it, and it counts across games. */
-uint16_t kb_entropy;

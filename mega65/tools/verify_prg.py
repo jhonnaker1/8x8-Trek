@@ -57,7 +57,7 @@ NM = str(LLVM_MOS / "bin" / "llvm-nm")
 # The Makefile's own OVERLAYS list, in order -- the stamp goes in the LAST
 # slot, so the order is not cosmetic.
 OVERLAYS = ["eval", "hof", "front", "info", "repair",
-            "msgs", "planet", "cmds", "title", "events"]
+            "msgs", "planet", "cmds", "title", "events", "xtra"]
 
 STAMP = 2          # bytes of build stamp written into the image's tail
 
