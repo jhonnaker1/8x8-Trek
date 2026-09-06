@@ -6789,3 +6789,67 @@ last because it has 32,768 bytes against the 37,612 the C128 build needs.**
 The one thing the August note got right and this does not change: the screen
 layer is mechanical and nothing else is. Budget each remaining port for its own
 three surprises, not for a `vdc.c` rewrite.
+
+
+## X16: first light, and the early link answers the fit question (2026-09-05)
+
+### First light works
+
+Video, the EGA palette and the console's own box-drawing glyphs, all confirmed
+on screen. The palette is exact -- including brown, which is the one EGA colour
+that catches emulators out -- because VERA's guns are 4-bit and EGA's levels
+(0x00/0x55/0xAA/0xFF) are every one a duplicated nibble, so taking the high
+nibble is exact rather than a rounding.
+
+**The charset cost five attempts and the answer was in m65vid.c's comments.**
+The X16 boots in **ISO-8859-1**, which has no box-drawing glyphs at all: tile
+$C0 is `A-grave` (measured -- `30 18 3C 24 66 7E 66 00`, the same bitmap as
+tile $41's `A` with an accent stroke over it). `screen_set_charset` takes **2**,
+not 1, and charset 2 indexes by **C64 SCREEN CODE** -- tile $B0 is a reversed
+digit `0`, $C0 a reversed horizontal line -- which is exactly the currency
+`layout.h` already speaks. **So glyphs need NO translation.**
+
+The real bug was where the ASCII conversion lived. `m65vid.c` states the rule:
+"STRINGS are converted, GLYPHS are not. The box-drawing codes live at 64..127,
+which is exactly the range this rewrites." It belongs in `scr_puts`; it had
+been put in `scr_put`, and three attempts then went into adjusting a mapping
+rather than asking where it sat.
+
+**What actually cracked it was a CONTROL.** Two probes searched the font in
+VRAM and reported nothing conclusive; the one that worked dumped raw tile bytes
+for a KNOWN glyph alongside the unknown ones. Tile $41 came back as an
+unmistakable `A`, which proved the read was sound and made $C0's accented `A`
+readable as an answer rather than as noise.
+
+### The early link: it fits, with less overlaying than the C128
+
+The scope for this port said to link the whole game early rather than trust
+`cx16/lib/link.ld`'s 38,655, because the Atari had just shown that a linker
+region is nominal and not available. Done, against opaque stubs:
+
+    C128 resident       37,612
+    C128 overlaid       29,286   (ten windows)
+    C128 total code     66,898
+
+    X16 flat region     38,655
+    X16 full flat link  56,459   (.data overflowed by 17,804)
+    X16 must overlay    ~18,000  -- LESS than the C128 already does
+
+**So the game fits the X16 on the existing overlay machinery, and needs about
+11K less moved into windows than the C128 carries today.** The 38,655 figure
+survives contact, unlike the Atari's.
+
+**THE FIRST ATTEMPT AT THIS MEASUREMENT WAS AN ARTEFACT AND SAID 1,564 BYTES.**
+The stubs returned constants, so `-Oz` with LTO folded the game away:
+`kb_waitkey()` returning 0 kills the command loop, `plat_read_all()` failing
+kills every load path, `far_read()` doing nothing empties the string pool. The
+stubs now route every return through a `volatile` and `far_read` really writes,
+which keeps the consuming code alive. **A stub that is too honest about being a
+stub measures nothing.**
+
+### And the "platform surface, derived not assumed" was itself incomplete
+
+`kb_entropy` is a **variable**, not a function, so the grep that built that
+list -- which looked for call syntax -- missed it. main.c seeds the RNG from
+it. Deriving a surface from source is still better than assuming one, but
+grep for the shape you are looking for, not just the common one.

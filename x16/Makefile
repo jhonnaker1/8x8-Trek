@@ -47,3 +47,21 @@ run-smoke: $(SMOKE_OUT)
 
 clean:
 	rm -rf build
+
+# THE EARLY LINK. Not a runnable game -- every seam below the console is a
+# stub. It exists to answer one question before any of them is written: does
+# the whole thing FIT? See NOTES.md, "SCOPE: the Commander X16", risk 4.
+FULL_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
+           ../c128/src/strpool.c \
+           ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
+           src/x16vera.c src/stubs.c
+FULL_OUT = build/full.prg
+
+full: $(FULL_OUT)
+
+$(FULL_OUT): $(FULL_SRC) src/x16vera.h
+	@mkdir -p build
+	$(X16CC) $(CFLAGS) -o $@ $(FULL_SRC)
+	@python3 -c "import os; \
+	    n=os.path.getsize('$@')-2; lim=0x96FF; \
+	    print('x16: FULL LINK %d bytes of %d, %d free' % (n, lim, lim-n))"
