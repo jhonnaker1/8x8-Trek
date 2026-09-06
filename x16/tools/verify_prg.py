@@ -78,6 +78,55 @@ def check_window():
     return size
 
 
+def check_headroom(size):
+    """THE TWO POOLS THIS PORT CAN RUN OUT OF, reported every build.
+
+    LOW RAM is the tight one and it is not simply "free space": everything
+    between the last variable and __stack is where the SOFT STACK runs, and
+    llvm-mos does not check it. On 2026-09-06 a 68-byte cosmetic fix took the
+    gap from 154 bytes to 86 before it was noticed, which is the reason this
+    exists -- a resource nobody reports is a resource nobody manages, the same
+    lesson the C128's lowram check was written for.
+
+    THE WINDOW is the other, and it moves the opposite way: the two share a
+    boundary, so bytes trimmed off the window land in low RAM one for one.
+    Printing them together is what makes that trade visible.
+    """
+    nm = subprocess.run([str(LLVM_MOS / "bin" / "llvm-nm"), "--numeric-sort",
+                         str(ELF)], capture_output=True, text=True).stdout
+    stack = None
+    for ln in nm.splitlines():
+        p = ln.split()
+        if p[-1:] == ["__stack"]:
+            stack = int(p[0], 16)
+    hdr = subprocess.run([OBJDUMP, "-h", str(ELF)],
+                         capture_output=True, text=True).stdout
+    last, biggest, bigname = 0, 0, "?"
+    for ln in hdr.splitlines():
+        f = ln.split()
+        if len(f) < 5 or not f[0].isdigit():
+            continue
+        name, sz, vma = f[1], int(f[2], 16), int(f[3], 16)
+        if name.startswith(".ovl_"):
+            if sz > biggest:
+                biggest, bigname = sz, name[5:]
+        elif name in (".text", ".data", ".bss", ".noinit"):
+            last = max(last, vma + sz)
+    if stack is None:
+        die("no __stack in the link -- cannot bound low RAM")
+    gap = stack - last
+    print("verify: low RAM ends $%04X, __stack $%04X -- %d bytes for the "
+          "soft stack" % (last, stack, gap))
+    if gap < 0:
+        die("low RAM has overrun the overlay window")
+    if gap < 64:
+        die("only %d bytes below __stack -- the soft stack has no room" % gap)
+    print("verify: largest overlay %s %d + 2 stamp of %d, %d spare"
+          % (bigname, biggest, size, size - biggest - 2))
+    if biggest + 2 > size:
+        die("overlay %s does not fit the window" % bigname)
+
+
 def check_images(size):
     """Every slot in OVERLAYS.BIN byte-identical to the section it came from.
 
@@ -117,6 +166,7 @@ def main():
     size = check_window()
     overlay_check.check_overlay_calls(ELF, OBJDUMP, die)
     overlay_check.check_resident_calls(NOLTO, OBJDUMP, die)
+    check_headroom(size)
     check_images(size)
 
 

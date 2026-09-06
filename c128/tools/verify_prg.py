@@ -407,6 +407,98 @@ def check_overlay_calls():
     overlay_check.check_overlay_calls(elf, OBJDUMP, die)
 
 
+def check_junctions():
+    """The nine junction cells in layout.c, recomputed from the panel table.
+
+    WHY A TABLE AT ALL: the general form of this -- ask every panel what
+    strokes it puts through a cell, index a glyph by the four bits -- was
+    written and measured at 209 bytes of resident code. The X16 has about 150
+    bytes between its last variable and its stack, so the table won. What a
+    hand table costs is the risk of going stale the first time a panel moves,
+    and this is that risk paid off: the same arithmetic, in Python, where
+    bytes are free.
+
+    IT ALSO CHECKS AGREEMENT. Where two panels share a corner cell they must
+    want the same glyph; if they ever disagree the geometry itself is wrong
+    and no table can paper over it.
+    """
+    src = (C128 / "src" / "layout.c").read_text()
+
+    m = re.search(r"const Panel panels\[PANEL_COUNT\] = \{(.*?)\n\};",
+                  src, re.S)
+    if not m:
+        die("cannot find the panel table in layout.c")
+    body = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
+    rects = []
+    for grp in re.findall(r"\{([^}]*)\}", body):
+        f = [t.strip() for t in grp.split(",")]
+        rects.append((int(f[0]), int(f[1]), int(f[2]), int(f[3])))
+    if len(rects) < 2:
+        die("parsed %d panels out of layout.c -- the table shape changed"
+            % len(rects))
+
+    UP, DOWN, LEFT, RIGHT = 1, 2, 4, 8
+    glyph = {UP | DOWN: "G_VLINE", LEFT | RIGHT: "G_HLINE",
+             DOWN | RIGHT: "G_TL", DOWN | LEFT: "G_TR",
+             UP | RIGHT: "G_BL", UP | LEFT: "G_BR",
+             UP | DOWN | RIGHT: "G_TEE_L", UP | DOWN | LEFT: "G_TEE_R",
+             UP | LEFT | RIGHT: "G_TEE_U", DOWN | LEFT | RIGHT: "G_TEE_D",
+             15: "G_CROSS"}
+    plain = {"G_TL", "G_TR", "G_BL", "G_BR"}
+
+    def strokes(x, y):
+        mask = 0
+        for px, py, w, h in rects:
+            rx, by = px + w - 1, py + h - 1
+            if not (px <= x <= rx and py <= y <= by):
+                continue
+            if y == py or y == by:
+                if x < rx:
+                    mask |= RIGHT
+                if x > px:
+                    mask |= LEFT
+            if x == px or x == rx:
+                if y < by:
+                    mask |= DOWN
+                if y > py:
+                    mask |= UP
+        return mask
+
+    want = {}
+    for px, py, w, h in rects:
+        rx, by = px + w - 1, py + h - 1
+        for x, y in ((px, py), (rx, py), (px, by), (rx, by)):
+            g = glyph.get(strokes(x, y))
+            if g is None:
+                die("no glyph for the strokes meeting at %d,%d" % (x, y))
+            if want.get((x, y), g) != g:
+                die("panels disagree about the corner at %d,%d" % (x, y))
+            if g not in plain:
+                want[(x, y)] = g
+
+    m = re.search(r"static const unsigned char junctions\[\] = \{(.*?)\n\};",
+                  src, re.S)
+    if not m:
+        die("cannot find the junctions table in layout.c")
+    body = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
+    toks = [t.strip() for t in body.replace("\n", " ").split(",") if t.strip()]
+    if len(toks) % 3:
+        die("the junctions table is not a whole number of x,y,glyph triples")
+    have = {}
+    for i in range(0, len(toks), 3):
+        have[(int(toks[i]), int(toks[i + 1]))] = toks[i + 2]
+
+    if have != want:
+        for cell in sorted(set(have) | set(want)):
+            if have.get(cell) != want.get(cell):
+                print("verify: %d,%d table says %s, the geometry says %s"
+                      % (cell[0], cell[1], have.get(cell, "nothing"),
+                         want.get(cell, "nothing")))
+        die("the junctions table no longer matches the panel geometry")
+    print("verify: %d panel junctions, all matching the geometry -- ok"
+          % len(want))
+
+
 def check_resident_calls():
     """Rule 4 of core/overlay.h. See tools/overlay_check.py for the crash."""
     objdir = C128 / "build" / "nolto"
@@ -733,6 +825,7 @@ def main():
     check_linebuf()
     check_overlay_calls()
     check_resident_calls()
+    check_junctions()
     check_confirm_widths()
     check_dialog_widths()
     check_confirm_not_in_dialog()
