@@ -15,11 +15,15 @@ X16EMU   ?= $(HOME)/x16emu_macos_m1-r48
 # MEGA65, and for the same reason.
 CFLAGS = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA \
          -I src -I ../c128/src -I ../core
-OVLFLAGS = $(CFLAGS) -DTREK_OVERLAYS
+OVLFLAGS = $(CFLAGS) -DTREK_OVERLAYS -DOVL_WINDOW=$(OVL_WINDOW)
 LDFLAGS  = -T x16.ld -Wl,--no-check-sections
 OBJCOPY  = $(LLVM_MOS)/bin/llvm-objcopy
 NM       = $(LLVM_MOS)/bin/llvm-nm
 OVERLAYS = eval hof front info repair msgs planet cmds title events
+
+# THE WINDOW SIZE, stated once. x16.ld must carry the same number; this is
+# what the loader compiles against and what the image cutter enforces.
+OVL_WINDOW = 4032
 
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
@@ -112,13 +116,13 @@ $(GAME_OUT): $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
 	@for o in $(OVERLAYS); do \
 	    $(OBJCOPY) -O binary --only-section=.ovl_$$o build/trekx16.elf build/ovl$$o.bin; \
 	    python3 -c "import sys; d=open('build/ovl$$o.bin','rb').read(); \
-	        sys.exit('overlay $$o is %d bytes, window is 4096' % len(d)) if len(d) > 4096 else None; \
-	        open('build/OVERLAYS.BIN','ab').write(d + b'\\0'*(4096-len(d)))" || exit 1; \
+	        sys.exit('overlay $$o is %d bytes, window is $(OVL_WINDOW)' % len(d)) if len(d) > $(OVL_WINDOW) else None; \
+	        open('build/OVERLAYS.BIN','ab').write(d + b'\\0'*($(OVL_WINDOW)-len(d)))" || exit 1; \
 	done
 	@# THE STAMP, into the last two bytes -- see src/x16ovl.c.
 	@python3 -c "import subprocess; \
 	    nm=subprocess.check_output(['$(NM)','build/trekx16.elf']).decode(); \
-	    a=[int(l.split()[0],16) for l in nm.splitlines() if l.split()[-1:]==['ovl_load']][0]; \
+	    a=[int(l.split()[0],16) for l in nm.splitlines() if l.split()[-1:]==['ovl_anchor']][0]; \
 	    f=open('build/OVERLAYS.BIN','r+b'); f.seek(-2,2); \
 	    f.write(bytes([a & 0xFF, (a >> 8) & 0xFF])); f.close(); \
 	    print('x16: overlay stamp', hex(a))"

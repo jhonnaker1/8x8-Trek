@@ -21,29 +21,72 @@ __basic_zp_end = 0x0080;
 
 /* 4K, matching the C128's and the MEGA65's, so an overlay that fits one fits
    all three and the budget arithmetic transfers. */
-__ovl_size = 0x1000;
+/* 4032, not 4096. The window costs resident space 1:1, and the largest
+   overlay image is 3,892 bytes on the C128 -- so 4,096 carried 204 bytes of
+   slack this port could not afford. MUST MATCH OVL_WINDOW in the Makefile,
+   which passes it to the loader and enforces it when cutting images: an
+   overlay that outgrows this fails the build with its own name. */
+__ovl_size = 0x0fc0;
 
 MEMORY {
+    /* GOLDEN RAM, $0400..$07FF. The X16 reserves this kilobyte for
+       applications and the stock linker script does not claim it, so it is a
+       free kilobyte that costs the main region nothing. The two biggest
+       buffers go here, which is what closes the last 813 bytes.
+
+       NOTE the C128 could not do this: its far store is bank 1 through
+       FETCH/STASH, not directly addressable, which is why "io_buf cannot move
+       to far memory" is recorded for that port. This is not far memory -- it
+       is ordinary RAM at a fixed address, and the objection does not carry. */
+    golden (rw)  : ORIGIN = 0x0400, LENGTH = 0x0400
+
     /* $0801 up to the window. The stock script gives ram LENGTH 0x96ff ending
        at $9F00 where __stack begins; the window takes the last 4K of that. */
-    ram    (rw)  : ORIGIN = 0x0801, LENGTH = 0x96ff - 0x1000
+    ram    (rw)  : ORIGIN = 0x0801, LENGTH = 0x96ff - 0x0fc0
 
     /* Runs here. Every overlay shares this address -- that is the whole idea. */
-    window (rwx) : ORIGIN = 0x0801 + 0x96ff - 0x1000, LENGTH = 0x1000
+    window (rwx) : ORIGIN = 0x0801 + 0x96ff - 0x0fc0, LENGTH = 0x0fc0
 
-    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = 0x1000
-    ovlimg1 (rw) : ORIGIN = 0x101000, LENGTH = 0x1000
-    ovlimg2 (rw) : ORIGIN = 0x102000, LENGTH = 0x1000
-    ovlimg3 (rw) : ORIGIN = 0x103000, LENGTH = 0x1000
-    ovlimg4 (rw) : ORIGIN = 0x104000, LENGTH = 0x1000
-    ovlimg5 (rw) : ORIGIN = 0x105000, LENGTH = 0x1000
-    ovlimg6 (rw) : ORIGIN = 0x106000, LENGTH = 0x1000
-    ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x1000
-    ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x1000
-    ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x1000
+    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = 0x0fc0
+    ovlimg1 (rw) : ORIGIN = 0x101000, LENGTH = 0x0fc0
+    ovlimg2 (rw) : ORIGIN = 0x102000, LENGTH = 0x0fc0
+    ovlimg3 (rw) : ORIGIN = 0x103000, LENGTH = 0x0fc0
+    ovlimg4 (rw) : ORIGIN = 0x104000, LENGTH = 0x0fc0
+    ovlimg5 (rw) : ORIGIN = 0x105000, LENGTH = 0x0fc0
+    ovlimg6 (rw) : ORIGIN = 0x106000, LENGTH = 0x0fc0
+    ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x0fc0
+    ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x0fc0
+    ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x0fc0
 }
 
 SECTIONS {
+    /* PLACED BY SECTION NAME, so no shared source is touched. Each object
+       gets its own .bss.<name>, so the two biggest buffers can be moved from
+       the X16's linker script alone -- ui.c and strpool.c stay identical for
+       the C128 and MEGA65.
+
+       ZERO-INIT: these leave the range the CRT's __do_zero_bss covers, so
+       x16vera.c's vdc_init() clears all of golden RAM before anything uses
+       it. Skip that and `hof` starts as garbage rather than an empty table. */
+    .golden (NOLOAD) : {
+        *(.bss.io_buf)      /* 626 -- the save/load scratch buffer   */
+        *(.bss.hof)         /* 280 -- the hall-of-fame table         */
+        *(.bss.planets)     /*  95 -- the planet table               */
+        *(.bss.cmd)         /*  16 -- the command-word buffer         */
+        *(.bss.inventory)   /*   5 -- the landing-party inventory     */
+                            /* 1022 of 1024 used, and the names above are
+                               the ones LTO actually emits -- an earlier
+                               attempt listed .bss.view_dept, which does not
+                               survive LTO under that name and silently did
+                               nothing. Read the MAP, do not guess a symbol. */
+    } > golden
+
+    /* EXPLICITLY >ram, and it must come after .golden. A section with no
+       region named inherits the LAST one used, so with .golden declared above
+       and nothing between, the BASIC header landed in golden RAM and overflowed
+       it by 10 bytes. trek128.ld places this section explicitly too. */
+    .basic_header : { *(.basic_header) } >ram
+
     /* ORIGIN(window) is written out rather than left implicit so that the run
        address is stated at every one of these, not inferred. */
     .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
@@ -62,9 +105,18 @@ __ovl_start = ORIGIN(window);
 
 INCLUDE commodore.ld
 
-__stack = 0x9f00;
+/* BELOW THE WINDOW, NOT ABOVE IT. The stock script puts __stack at $9F00, the
+   top of the whole region -- but the overlay window now occupies the last 4K,
+   so a stack growing down from $9F00 grows straight through the code it is
+   about to run. mega65.ld carries the same warning after that port hit it for
+   real: "__stack is $D000 and grows DOWN, so a window at $C000..$CFFF is
+   exactly where the stack lives. The screen went purple and stayed there." */
+__stack = 0x0801 + 0x96ff - 0x0fc0;
 
-OUTPUT_FORMAT {
-    SHORT(ORIGIN(ram))
-    TRIM(ram)
-}
+/* NO OUTPUT_FORMAT BLOCK, DELIBERATELY. The stock cx16 script ends with
+   SHORT(ORIGIN(ram)) + TRIM(ram), which emits a raw PRG -- and then there is
+   no ELF for objcopy to cut the ten window images out of, which shows up as
+   "the file was not recognized as a valid object file" on a link that
+   actually succeeded. mega65.ld drops it for the same reason; its Makefile
+   says "THE OBJCOPY STEP IS NOT OPTIONAL". The Makefile prepends the $0801
+   load address itself. */

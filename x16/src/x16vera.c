@@ -6,6 +6,7 @@
  * ADDR_H bit 0, with ADDR_H bits 4-7 holding the increment code (1 = +1).
  */
 #include <stdint.h>
+#include <string.h>
 #include "x16vera.h"
 
 #define VERA_ADDR_L  (*(volatile unsigned char *)0x9F20)
@@ -103,6 +104,13 @@ static unsigned long cell_addr(unsigned char x, unsigned char y) {
 }
 
 void vdc_init(void) {
+    /* GOLDEN RAM IS OUTSIDE .bss, SO THE CRT DOES NOT ZERO IT. x16.ld moves
+       io_buf and the hall-of-fame table to $0400..$07FF to reclaim 906 bytes
+       of the main region; that puts them outside __do_zero_bss's range, and
+       the hall of fame reads as garbage rather than an empty table if this is
+       skipped. First statement in the first function the game calls. */
+    memset((void *)0x0400, 0, 0x0400);
+
     set_screencode_charset();
     load_ega_palette();
     scr_clear();
