@@ -41,7 +41,12 @@
  *   3. One entry point per overlay, reached through a resident stub that does
  *      the load and the call together. That is what makes "forgot to load it"
  *      impossible rather than merely unlikely.
- *   4. ONLY main() MAY CALL INTO AN OVERLAY. Every other resident function
+ *   4. ONLY main() MAY CALL INTO AN OVERLAY, or a caller listed in
+ *      tools/overlay_check.py's PAIRED table with the load it pairs with.
+ *      There are two, both deliberate and both read: run_turn reaching a rare
+ *      event's prose in OVL_MSGS with load_msgs() on the line above, and
+ *      trek_run_events reaching OVL_EVENTS guarded by trek_events_due() --
+ *      the same predicate the platform loads on. Every other resident function
  *      must stay resident all the way down, because the load/call pairing
  *      lives in main() and nowhere else -- a resident function that reaches
  *      into a window is a function whose correctness depends on which overlay
@@ -61,6 +66,14 @@
  *      `make verify` enforces this on all three ports, from -fno-lto objects
  *      -- because in the shipped binary LTO folds the offending caller into
  *      main() and the bad call becomes indistinguishable from the good ones.
+ *
+ *      AND IT WAS BLIND TO MOST OF THEM UNTIL 2026-09-06. A call to a static
+ *      in the SAME object relocates against the SECTION (".ovl.msgs+0x15b"),
+ *      not against a symbol, so the check looked its target up in a symbol
+ *      map, found nothing, and said "ok". It had been reporting cross-object
+ *      calls only. Both of the exceptions above were invisible to it, and
+ *      both turned out to be correct -- but the check was weaker than every
+ *      commit message that cited it claimed.
  *
  * An overlay's statics do not survive a swap.
  */

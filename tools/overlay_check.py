@@ -166,6 +166,27 @@ def check_overlay_layout(mapfile, window, die, label="verify", reserve=0):
           % (label, len(ovl), ovl[0][1], big, window - reserve))
 
 
+# RESIDENT CALLERS OTHER THAN main() THAT ARE DELIBERATE, each paired with the
+# load that makes it safe. Every entry here is a promise that has been READ, and
+# the reason it is a list rather than a blanket exemption is that the promise is
+# the whole of the safety: the call lands on whatever is in the window.
+#
+# ADDED 2026-09-06 WITH THE FIX THAT MADE THEM VISIBLE. Neither was ever
+# reported, because both are calls to a `static` in the SAME object and llvm-mos
+# emits those as a relocation against the SECTION -- `.ovl.msgs+0x15b` -- rather
+# than against a symbol. The check looked the target up in its symbol map, found
+# nothing, and said "rule 4 ok". It had been reporting on cross-object calls
+# only, which is a small fraction of them.
+PAIRED = {
+    ("run_turn", ".ovl.msgs"):
+        "load_msgs() on the line above it, in the default: arm of the event "
+        "switch -- the only arm that can reach a rare event's prose",
+    ("trek_run_events", ".ovl.events"):
+        "guarded by trek_events_due(), which is the SAME predicate run_turn "
+        "loads OVL_EVENTS on -- see the comment at that call in core/trek.c",
+}
+
+
 def check_resident_calls(objdir, objdump, die, label="verify", allow=("main",)):
     """RULE 4: only main() may call into an overlay from resident code.
 
@@ -232,13 +253,30 @@ def check_resident_calls(objdir, objdump, die, label="verify", allow=("main",)):
             if not (m and caller and sec) or sec.startswith(".ovl."):
                 continue
             target = m.group(1).split("+")[0]
-            if sec_of.get(target, "").startswith(".ovl.") and caller not in allow:
-                bad.add((os.path.basename(o), caller, target, sec_of[target]))
+
+            # TWO WAYS A TARGET NAMES AN OVERLAY, and only the first was
+            # handled. A cross-object call relocates against the SYMBOL, which
+            # the map above resolves. A call to a `static` in the same object
+            # relocates against the SECTION -- ".ovl.msgs+0x15b" -- and there is
+            # no symbol to look up. Missing the second meant every intra-file
+            # call into an overlay went unreported.
+            if target.startswith(".ovl."):
+                osec, oname = target, target
+            elif sec_of.get(target, "").startswith(".ovl."):
+                osec, oname = sec_of[target], target
+            else:
+                continue
+
+            if caller in allow:
+                continue
+            if (caller, osec) in PAIRED:
+                continue
+            bad.add((os.path.basename(o), caller, oname, osec))
 
     if bad:
         for o, c, t, s in sorted(bad):
             print("%s: RESIDENT %s (%s) calls %s in %s" % (label, c, o, t, s))
-        die("%s: rule 4 -- only %s may call into an overlay" %
-            (label, "/".join(allow)))
-    print("%s: rule 4 ok -- no resident caller outside %s reaches an overlay" %
-          (label, "/".join(allow)))
+        die("%s: rule 4 -- only %s may call into an overlay, or an entry in "
+            "PAIRED naming the load it pairs with" % (label, "/".join(allow)))
+    print("%s: rule 4 ok -- %s plus %d paired callers reach an overlay"
+          % (label, "/".join(allow), len(PAIRED)))
