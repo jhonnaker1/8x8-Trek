@@ -35,10 +35,10 @@ MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
 
     /* $4000 up to the window. */
-    ram (rw) : ORIGIN = 0x4000, LENGTH = 0x8000 - 0x1200
+    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - 0x1200
 
     /* The window sits at the TOP of the region, below the OS ROM at $C000. */
-    window (rwx) : ORIGIN = 0x4000 + 0x8000 - 0x1200, LENGTH = 0x1200
+    window (rwx) : ORIGIN = 0x3000 + 0x9000 - 0x1200, LENGTH = 0x1200
 
     /* Staging: each overlay is linked to RUN at the window and to LOAD at its
        own address, so one link produces every image. Addresses above any real
@@ -82,7 +82,7 @@ OUTPUT_FORMAT {
     SHORT(0x02e0)    /* First byte of Run vector. */
     SHORT(0x02e1)    /* Last byte of Run vector. */
     SHORT(_start)    /* Segment to be loaded to Run vector. */
-    SHORT(0x4000)    /* Where the main segment loads -- see the note above. */
+    SHORT(0x3000)    /* Where the main segment loads -- see the note above. */
     SHORT(--__data_end - 1)
     TRIM(ram)
 }

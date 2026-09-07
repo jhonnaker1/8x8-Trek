@@ -19,7 +19,7 @@ ATARI = HERE.parents[1]
 NM = str(pathlib.Path.home() / "llvm-mos/bin/llvm-nm")
 ELF = ATARI / "build" / "early.elf"
 
-BASE, TOP = 0x4000, 0xC000          # $C000 up is the XL's OS ROM
+BASE, TOP = 0x3000, 0xC000          # $C000 up is the XL's OS ROM
 
 
 def window_size():
@@ -59,13 +59,29 @@ def main():
         print()
 
     if not over:
-        out = subprocess.run([NM, "--numeric-sort", str(ELF)],
-                             capture_output=True, text=True).stdout
-        end = max([int(l.split()[0], 16) for l in out.splitlines()
-                   if l.split()[-1:] in (["__bss_end"], ["_end"])] or [0])
-        print("  IT LINKS. resident ends $%04X, %d bytes spare" % (end, BASE + resident_space - end))
-        print("  -- and that is with NO DRIVERS. The real video, input,")
-        print("     storage, far-memory and sound layers all add to it.")
+        """READ FROM THE MAP, NOT FROM nm. The link emits an XEX through
+           OUTPUT_FORMAT, not an ELF, so llvm-nm has nothing to read -- it
+           returned an empty symbol list and this printed 'resident ends
+           $0000, 44544 bytes spare', which is a nonsense that looks like
+           good news. The map is the only thing that knows."""
+        txt = (ATARI / "build" / "early.map").read_text()
+        def sym(name):
+            m = re.search(r"^\s+([0-9a-f]+)\s+[0-9a-f]+\s+\d+\s+\d+\s+"
+                          + re.escape(name) + r"\s*=", txt, re.M)
+            return int(m.group(1), 16) if m else None
+        end = sym("__heap_start") or sym("__bss_end")
+        if end is None:
+            sys.exit("budget: no end symbol in build/early.map")
+        code_end = sym("__data_end") or end
+        window = BASE + resident_space
+        print("  IT LINKS.")
+        print("    code+rodata      $%04X..$%04X   %6d bytes" % (BASE, code_end, code_end - BASE))
+        print("    writable data    $%04X..$%04X   %6d bytes" % (code_end, end, end - code_end))
+        print("    spare below the window          %6d bytes" % (window - end))
+        print()
+        print("  AND THAT IS WITH NO DRIVERS. The X16's video, input, storage,")
+        print("  far-memory, overlay and sound layers measure 4,539 bytes, so")
+        print("  the real position is about %d bytes SHORT." % (4539 - (window - end)))
         return
 
     worst = max(v for k, v in over.items() if not k.startswith("WINDOW:")) if \
