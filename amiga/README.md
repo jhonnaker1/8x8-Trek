@@ -173,6 +173,27 @@ LOADED, TITLES ARE POOLED`. That guard in `str_load()` — refusing a pool whose
 count disagrees — is what turned a silent garbage-on-screen failure into a
 legible one, and it was written for a stale disk rather than for endianness.
 
+## The game runs
+
+`make game` links `main.c`, `ui.c`, `layout.c`, `strpool.c` and all of `core/`
+against the five Amiga files — 81K, and **no overlays to arrange**. Played on
+the machine to: the title screen, the twelve-page briefing streaming out of
+`BRIEF.TXT`, the setup screen, the nine-panel console with a live game, orders
+typed at `CMD:`, and a modal dialog.
+
+    make game data
+    # then, at the Amiga shell:
+    work:egatrek
+
+Three seams proved themselves in the real game rather than in a test: the
+briefing pages come through `plat_open`/`plat_read`, every word on screen comes
+from `STRINGS.DAT`, and the title screen **did not dismiss itself** — which is
+`kb_init()` throwing away the RETURN that launched the program.
+
+Sound is stubbed, not broken: `snd_enabled()` answers "off" and stays off,
+which is honest. `main.c` already treats missing music as a luxury it can do
+without.
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -199,13 +220,15 @@ Amiga keycodes with separate press and release, not characters.
            MEGA65
            far memory: a plain array, so c128/src/strpool.c is shared
            unchanged and the panel titles come off the disk
-    NEXT   the game build -- main.c, ui.c and core, with no overlays to
-                      arrange: this is where it stops being seams
-           sound   -- LAST. Paula is four channels of SAMPLED audio, the
+           the game: main.c, ui.c and all of core/, linked and PLAYED --
+           title, briefing, setup, console, orders, dialogs
+    NEXT   sound -- LAST. Paula is four channels of SAMPLED audio, the
                       furthest from the SID of any target. Budget a tempo bug:
                       the C128 lost time to a driver three semitones from its
                       cause and the MEGA65 to a raster that wraps twice a frame
-
+           save/restore and the hall of fame, played through rather than
+                      unit-tested -- the storage seam is proven, the game's
+                      use of it is not
 The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
 the seven panel titles, because the string pool needs the file seam that is not
 built yet. It is replaced by `c128/src/strpool.c` when storage lands.

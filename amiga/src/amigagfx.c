@@ -310,6 +310,46 @@ void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char col
     }
 }
 
+/* THE MESSAGE LOG'S BACKING STORE, and on this machine it is just an array.
+ *
+ * ui.c keeps the scrollback -- 32 entries of a date, a department and a line
+ * of text -- outside its own variables, reached through vdc_set_address /
+ * vdc_data_write / vdc_data_read. That is not an abstraction for its own
+ * sake: on the C128 it lives in SPARE VDC VIDEO RAM, which the 8502 cannot
+ * address at all, because 2K of scrollback will not fit in a machine whose
+ * writable data has a hundred bytes left. The X16 puts it in VERA's VRAM for
+ * the same reason.
+ *
+ * Here there is no shortage, so the three calls address a plain array. The
+ * cursor is a file static exactly as it is on the X16, because the seam is a
+ * write-and-advance one: ui.c sets an address once and then streams a whole
+ * record through it.
+ *
+ * SIZED FROM ui.c's OWN CONSTANTS: LOG_BASE is 0x1000 and 32 slots of 64
+ * bytes follow it, so the highest address it can reach is 0x1000 + 32*64.
+ * Written out rather than rounded up, so that a bigger log is a bounds
+ * failure here rather than a quiet corruption of whatever follows. */
+#define LOG_ORIGIN  0x1000
+#define LOG_BYTES   (32 * 64)
+
+static unsigned char logstore[LOG_BYTES];
+static unsigned int  log_cursor;
+
+void vdc_set_address(unsigned int addr) {
+    log_cursor = (addr >= LOG_ORIGIN) ? (addr - LOG_ORIGIN) : 0;
+}
+
+void vdc_data_write(unsigned char value) {
+    if (log_cursor < LOG_BYTES) logstore[log_cursor] = value;
+    log_cursor++;
+}
+
+unsigned char vdc_data_read(void) {
+    unsigned char v = (log_cursor < LOG_BYTES) ? logstore[log_cursor] : 0;
+    log_cursor++;
+    return v;
+}
+
 void scr_clear(void) {
     unsigned char x, y;
     for (y = 0; y < VDC_ROWS; y++)
