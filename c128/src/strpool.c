@@ -46,7 +46,18 @@ uint8_t str_load(void) {
        the screen would fill with garbage read from somewhere else in the
        store. Refusing the pool turns that into the failure the pool already
        plans for -- no words, and a game that still plays. */
-    far_read(base, &count, sizeof count);
+    /* COMPOSED FROM BYTES, NOT READ INTO A uint16_t. STRINGS.DAT is written
+       little endian by tools/gen_strings.py, and far_read is a byte copy --
+       so reading two bytes straight into a uint16_t is only correct on a
+       little-endian machine. Three of these ports are; the AMIGA IS NOT, and
+       there the count came back byte-swapped, failed the guard below, and the
+       game would have run wordless with nothing to say why. Written this way
+       it is right on either, and costs nothing on the 6502s. */
+    {
+        unsigned char b[2];
+        far_read(base, b, 2);
+        count = (uint16_t)(b[0] | ((uint16_t)b[1] << 8));
+    }
     if (count != STR_COUNT) return (loaded = 0);
 
     idx_base = (uint16_t)(base + sizeof count);
@@ -82,7 +93,12 @@ const char *S(StrId id) {
        costs two FETCH calls; the second was always going to be STR_MAX of
        them. Against 600 bytes of resident image that is not a trade worth
        thinking about. */
-    far_read((uint16_t)(idx_base + id * 2), &off, sizeof off);
+    /* Little endian in the file, byte-wise here -- see str_load(). */
+    {
+        unsigned char b[2];
+        far_read((uint16_t)(idx_base + id * 2), b, 2);
+        off = (uint16_t)(b[0] | ((uint16_t)b[1] << 8));
+    }
 
     /* One far read of the whole slot, then find the terminator -- rather than
        a far read per character. Every byte across the bank boundary costs a

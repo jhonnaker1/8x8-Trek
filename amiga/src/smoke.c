@@ -13,25 +13,8 @@
 #include "../../c128/src/vdc.h"
 #include "../../c128/src/layout.h"
 #include "../../core/strpool.h"
+#include "../../c128/src/strdata.h"
 
-/* A STUB STRING POOL, and it exists so this can draw the REAL console frame.
-   layout.c fetches every panel title through S(), which on a finished port
-   reads STRINGS.DAT out of far memory -- machinery this milestone has not
-   built. These seven titles are the pool's own text for the ids layout.c
-   asks for; anything else answers with its number so a wrong id is visible
-   rather than blank. Replaced by c128/src/strpool.c once the file seam is in. */
-const char *S(StrId id) {
-    switch (id) {
-        case 127: return "LASERS";
-        case 145: return "SHORT RANGE SCAN";
-        case 146: return "STATUS";
-        case 147: return "CHART OF KNOWN GALAXY";
-        case 148: return "COMMAND";
-        case 149: return "MAIN VIEWER";
-        case 150: return "SYSTEMS STATUS";
-        default:  return "?";
-    }
-}
 
 static const char *names[16] = {
     "BLACK","BLUE","GREEN","CYAN","RED","MAGENTA","BROWN","LTGRAY",
@@ -39,8 +22,16 @@ static const char *names[16] = {
 
 int main(void) {
     int i;
+    uint8_t pool_ok;
 
     vdc_init();
+
+    /* THE REAL POOL, out of STRINGS.DAT. The stub that used to sit in this
+       file answered seven panel titles from literals; every word below now
+       comes off the disk through c128/src/strpool.c, shared unchanged with
+       the other three ports. If str_load() fails the game is meant to run
+       WORDLESS rather than crash, so this says which happened. */
+    pool_ok = str_load();
 
     /* Sixteen colours, each label written in its own colour. An unreadable
        name means that index is wrong, and index 0 is meant to be invisible. */
@@ -101,6 +92,9 @@ int main(void) {
         scr_puts(3, 23, "PLAY AGAIN?  [YES]  [NO]", 13);
     }
 
+    scr_puts(42, 20, pool_ok ? "STRINGS.DAT LOADED, TITLES ARE POOLED"
+                             : "NO POOL -- PANEL TITLES WILL BE BLANK",
+             pool_ok ? 10 : 12);
     scr_puts(42, 21, "640X200, FOUR PLANES, 80X25 CELLS", 10);
     scr_puts(42, 22, "SIXTEEN EGA COLOURS ON THEIR OWN INDEX", 10);
     scr_puts(42, 23, "PRESS RETURN TO LEAVE", 12);

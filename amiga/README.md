@@ -150,6 +150,29 @@ wrong"), that the streaming path returns the same bytes and 0 at EOF, and that
 `plat_open` twice in a row is fine — which is the rule the X16 broke in a way
 that made every load but the first fail.
 
+## The string pool, and the first big-endian machine on the project
+
+`core/farmem.h` has said "Amiga — no banking needed, a plain array" since the
+seam was designed, and that is the whole of `amigafarmem.c`: a far offset is an
+index, `far_read` is a `memcpy`. The C128 reaches bank 1 through a KERNAL call
+per byte, the MEGA65 through DMA, the X16 by paging 8K windows and splitting
+every read that straddles one. With that in place `c128/src/strpool.c` is
+**shared unchanged** — the panel titles on screen come out of `STRINGS.DAT`.
+
+**Except that it did not work, and the reason is this machine's byte order.**
+`STRINGS.DAT` is written little-endian by `tools/gen_strings.py`, and
+`strpool.c` read its 16-bit count and offsets straight into a `uint16_t`.
+That is correct on three 6502 ports and wrong on a 68000: the count came back
+byte-swapped, failed its own guard, and the game would have run wordless with
+nothing on screen to say why. Both reads are composed from bytes now, which is
+right on either byte order and costs nothing on the 8-bit ports.
+
+**Checked by breaking it**: with the byte-wise read reverted, the smoke test
+says `NO POOL — PANEL TITLES WILL BE BLANK`; with it restored, `STRINGS.DAT
+LOADED, TITLES ARE POOLED`. That guard in `str_load()` — refusing a pool whose
+count disagrees — is what turned a silent garbage-on-screen failure into a
+legible one, and it was written for a stale disk rather than for endianness.
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -174,7 +197,10 @@ Amiga keycodes with separate press and release, not characters.
            storage seam: all five plat_* functions, twelve checks passing
            on the machine -- and WRITING WORKS, which it does not on the
            MEGA65
-    NEXT   strings -- strpool.c against a plain array, no far memory
+           far memory: a plain array, so c128/src/strpool.c is shared
+           unchanged and the panel titles come off the disk
+    NEXT   the game build -- main.c, ui.c and core, with no overlays to
+                      arrange: this is where it stops being seams
            sound   -- LAST. Paula is four channels of SAMPLED audio, the
                       furthest from the SID of any target. Budget a tempo bug:
                       the C128 lost time to a driver three semitones from its

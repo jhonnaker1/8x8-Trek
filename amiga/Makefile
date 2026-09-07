@@ -23,15 +23,28 @@ CFLAGS = -O2 -Wall -Wextra -Werror -noixemul \
 # build and nothing to copy: point it at build/ and the binaries are there.
 AMIBERRY ?= $(HOME)/Amiberry/Amiberry
 
-SMOKE_SRC = src/smoke.c src/amigagfx.c src/amigainput.c ../c128/src/layout.c
+SMOKE_SRC = src/smoke.c src/amigagfx.c src/amigainput.c src/amigastorage.c \
+            src/amigafarmem.c ../c128/src/strpool.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke
 
 STORE_SRC = src/storetest.c src/amigagfx.c src/amigainput.c src/amigastorage.c
 STORE_OUT = build/storetest
 
-.PHONY: all smoke storetest clean
+# THE POOL'S DATA. gen_strings.py owns the numbering, so every port builds the
+# same strdata.h and the same STR_COUNT; only the two strings that name the
+# machine differ, and those live in src/strings.override.txt.
+data: build/STRINGS.DAT
 
-all: smoke storetest
+build/STRINGS.DAT: ../c128/src/strings.txt src/strings.override.txt
+	@mkdir -p build
+	cd .. && python3 tools/gen_strings.py >/dev/null
+	cd .. && python3 tools/gen_strings.py --override amiga/src/strings.override.txt \
+	    amiga/build/STRINGS.DAT
+	@ls -l $@
+
+.PHONY: all smoke storetest data clean
+
+all: smoke storetest data
 
 smoke: $(SMOKE_OUT)
 
