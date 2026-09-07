@@ -1,0 +1,12 @@
+# Amiberry config for EGA Trek development. Mirrors the FS-UAE setup the
+# commodore-uno Amiga build was verified on: a real Kickstart, a bootable
+# hard drive, and the BUILD DIRECTORY MOUNTED AS A VOLUME -- so there is no
+# ADF to make and no copy step. Build, then type WORK:smoke at the shell.
+config_description=EGA Trek (A1200, KS3.1, WORK: = amiga/build)
+cpu_type=68ec020
+chipmem_size=4
+fastmem_size=8
+kickstart_rom_file=/Users/jhonnaker/FS-UAE/Kickstarts/kicka1200.rom
+hardfile2=rw,:/Users/jhonnaker/FS-UAE/Hard Drives/AmigaOS31-MFPGA.hdf,0,0,0,512,0,,uae
+filesystem2=rw,WORK:WORK:/Users/jhonnaker/claude-code/egatrek/amiga/build,0
+use_gui=no

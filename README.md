@@ -151,7 +151,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.10.0](../../releases/latest) |
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.10.0](../../releases/latest) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Playable** — console, sound and overlays; no save yet |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | **In progress** — video seam and first light; see [`amiga/README.md`](amiga/README.md) |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | Designed |
 
 **How much colour the console actually needs: fifteen.** Counted from the
