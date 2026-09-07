@@ -34,7 +34,8 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
            src/amigagfx.c src/amigainput.c src/amigastorage.c \
-           src/amigafarmem.c src/amigasnd.c src/amigaovl.c
+           src/amigafarmem.c src/amigasnd.c src/amigaovl.c \
+           src/music_data.c
 GAME_OUT = build/egatrek
 
 STORE_SRC = src/storetest.c src/amigagfx.c src/amigainput.c src/amigastorage.c
@@ -43,7 +44,18 @@ STORE_OUT = build/storetest
 # THE POOL'S DATA. gen_strings.py owns the numbering, so every port builds the
 # same strdata.h and the same STR_COUNT; only the two strings that name the
 # machine differ, and those live in src/strings.override.txt.
-data: build/STRINGS.DAT build/BRIEF.TXT
+data: build/STRINGS.DAT build/BRIEF.TXT build/MUSIC.DAT
+
+# THE MUSIC IS THIS PORT'S OWN COMPOSITION, from tools/make_music.py -- never
+# the note data tools/gen_music.py extracts from EGATREK.EXE, which is
+# Anderson's creative work and can never ship. See that file's header.
+music src/music_data.c src/music_data.h:
+	cd .. && python3 tools/make_music.py && \
+	    cp c128/src/music_data.c c128/src/music_data.h amiga/src/
+
+build/MUSIC.DAT: src/music_data.c
+	@mkdir -p build
+	cp ../c128/build/music.dat $@
 
 # The briefing, STREAMED through plat_open/plat_read a page at a time. It is
 # copied rather than generated: it is the port's own prose, committed, and
@@ -60,9 +72,19 @@ build/STRINGS.DAT: ../c128/src/strings.txt src/strings.override.txt
 	    amiga/build/STRINGS.DAT
 	@ls -l $@
 
-.PHONY: all game smoke storetest data clean
+# The tempo arithmetic, run on the HOST -- see test/test_tempo.c for why the
+# thing worth checking about this driver is a counting problem and not a
+# listening one.
+test: build/test_tempo
+	./build/test_tempo
 
-all: game data
+build/test_tempo: test/test_tempo.c
+	@mkdir -p build
+	cc -O2 -Wall -Wextra -Werror -o $@ test/test_tempo.c
+
+.PHONY: all game smoke storetest data music test clean
+
+all: game data test
 
 game: $(GAME_OUT)
 

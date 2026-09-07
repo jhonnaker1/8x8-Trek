@@ -41,6 +41,13 @@ void snd_poll(void);
 uint8_t snd_enabled(void);
 void    snd_toggle(void);   /* what the original's SND command does */
 
+/* Which display standard the machine came up in. It decides the SID's
+   frequency multiplier on the C128 and Paula's period on the Amiga, and how
+   many frames a quarter-second beep is on both. Part of this seam rather than
+   of any one driver's frequency table. */
+#define REGION_NTSC 0
+#define REGION_PAL  1
+
 extern uint8_t snd_region;  /* REGION_PAL or REGION_NTSC, set by snd_init */
 
 #endif

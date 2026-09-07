@@ -27,6 +27,7 @@
 #include <proto/graphics.h>
 
 #include "../../c128/src/input.h"
+#include "../../c128/src/sid.h"
 
 /* Raw keycodes. Only two, and they are the ONLY hand-written keyboard
    constants in this port -- the arrows are the original's primary binding for
@@ -97,6 +98,13 @@ char kb_waitkey(void) {
            is sampled when the player answers the setup screen, so how long a
            human takes to reach a key is what picks the galaxy. Before the
            C128 had this, every game was the same one. */
+        /* snd_poll() LIVES INSIDE THE WAIT, for the same reason it does on the
+           other three ports: this loop is where the program spends its idle
+           time and it is the driver's only chance to run. It was missing here
+           until the music was written and did not play -- Paula's master DMA
+           on, every channel silent -- and this file's own comment about where
+           the driver would hook in had been sitting above an empty wait. */
+        snd_poll();
         kb_entropy++;
         WaitTOF();
     }

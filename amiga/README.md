@@ -194,6 +194,49 @@ Sound is stubbed, not broken: `snd_enabled()` answers "off" and stays off,
 which is honest. `main.c` already treats missing music as a luxury it can do
 without.
 
+## Sound: Paula, and why the tempo is a counting problem
+
+Paula has no tone generator. A channel plays back a buffer in CHIP RAM on a
+loop, so "play a note" means having a waveform and choosing a **period** — the
+clock ticks between samples — rather than writing a frequency. The waveform is
+a 16-step square wave, because that is what the original made: EGA Trek on a PC
+is one square wave out of the speaker, and `sid.c` says "50% pulse, the square
+wave the original actually made".
+
+Sixteen steps rather than two so the period stays in Paula's usable range. Its
+floor is 124, and with a 16-sample wave the highest note reachable is
+`clock/(124*16)`, about 1.8 kHz; the music's highest is 1480 Hz. The clamp in
+`voice_note()` is the guard, not the plan.
+
+Two channels, mirroring the SID port's split: 0 is music, 1 is effects, so a
+laser does not cut the music off. The region is **read** from
+`graphics.library` rather than assumed, because it decides both the period for
+a given note and how many frames a quarter-second beep is.
+
+**The tempo is measured, not listened to.** The tracks are written in ticks of
+the PC's 18.2065 Hz timer. It would be easy to tick once per `snd_poll()` —
+the key loop calls it about fifty times a second — but `snd_poll()` is also
+called from places that run at no fixed rate, so the tempo would wander with
+whatever the game was doing. That is the MEGA65's bug in a different costume.
+This one converts from `DateStamp()`, which counts fiftieths of a second.
+
+`make -C amiga test` runs that conversion on the host: 1092 ticks in 60
+seconds, 18.2000 Hz against 18.2065 wanted, and the same count when the
+fiftieths arrive 25 at a time (a disk load blocks, and the accumulator must not
+drop the remainder). Checked by breaking it — doubling the rate fails the
+build. **Both previous ports shipped a tempo bug and neither was caught by
+listening**, because "a bit fast" is not obvious in music nobody has heard
+before. Both were caught by counting.
+
+### The bug this seam is shaped to catch, and I made it anyway
+
+`snd_poll()` has to be called from inside the keyboard wait — that loop is
+where the program spends its idle time and it is the driver's only chance to
+run. The stub version of `amigasnd.c` said exactly that, in a comment, and
+`amigainput.c` was written without the call. Paula came up with master DMA on
+and every channel silent. Found by asking the emulator for its audio state
+rather than by listening, which is the same reason the tempo is counted.
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -222,13 +265,12 @@ Amiga keycodes with separate press and release, not characters.
            unchanged and the panel titles come off the disk
            the game: main.c, ui.c and all of core/, linked and PLAYED --
            title, briefing, setup, console, orders, dialogs
-    NEXT   sound -- LAST. Paula is four channels of SAMPLED audio, the
-                      furthest from the SID of any target. Budget a tempo bug:
-                      the C128 lost time to a driver three semitones from its
-                      cause and the MEGA65 to a raster that wraps twice a frame
-           save/restore and the hall of fame, played through rather than
+           sound: a Paula driver on two channels, title track confirmed
+           playing and stopping on the machine
+    NEXT   save/restore and the hall of fame, played through rather than
                       unit-tested -- the storage seam is proven, the game's
                       use of it is not
+           a release: the port has not been played end to end by a human
 The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
 the seven panel titles, because the string pool needs the file seam that is not
 built yet. It is replaced by `c128/src/strpool.c` when storage lands.

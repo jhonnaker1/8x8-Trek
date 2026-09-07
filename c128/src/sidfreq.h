@@ -1,6 +1,8 @@
 #ifndef SIDFREQ_H
 #define SIDFREQ_H
 
+#include "sid.h"
+
 /* SID frequency and tempo arithmetic, in a header so native `cc` can test it.
  *
  * Same precedent as egavdc.h: this is pure integer arithmetic with a silent
@@ -45,9 +47,12 @@
 #define SID_PAL_WHOLE   170
 #define SID_PAL_FRAC     73     /* 0.284 * 256 */
 
-#define REGION_NTSC 0
-#define REGION_PAL  1
-
+/* REGION_NTSC and REGION_PAL now live in sid.h, next to the snd_region they
+   describe -- they are part of the sound SEAM, not of the SID's frequency
+   table. Moved 2026-09-06 when the Amiga's Paula driver needed them and could
+   not include this header for them: it also carries two static helpers for
+   the SID, and pulling those into a file with no SID makes them
+   unused-function errors under -Werror. */
 static unsigned int sid_freq(unsigned char tenths, unsigned char region) {
     unsigned int whole = (unsigned int)(region == REGION_PAL
                                         ? SID_PAL_WHOLE : SID_NTSC_WHOLE);
