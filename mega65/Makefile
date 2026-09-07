@@ -252,6 +252,20 @@ build/probe_dos$(CFG).prg: src/probe_dos.c
 probe-dos: build/probe_dos$(CFG).prg
 	sh tools/run_dos_probe.sh $(CFG)
 
+build/probe_read.prg: src/probe_read.c
+	@mkdir -p build
+	$(PROBECC)
+
+# Needs OVERLAYS.BIN on a D81 as a SEQ file called OVL; `make` first.
+probe-read: build/probe_read.prg build/OVERLAYS.BIN
+	@rm -f build/read.d81
+	@c1541 -format "probe,01" d81 build/read.d81 >/dev/null 2>&1
+	@c1541 -attach build/read.d81 -write build/OVERLAYS.BIN "ovl,s" >/dev/null 2>&1
+	sh tools/run_read_probe.sh 40
+	@python3 -c "d=open('build/OVERLAYS.BIN','rb').read(); c=0;\
+	    [c := c ^ b for b in d]; \
+	    print('expect %d bytes, xor \$$%02X' % (len(d), c))"
+
 run-smoke: $(SMOKE_OUT)
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -prg $(CURDIR)/$(SMOKE_OUT)
 

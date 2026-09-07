@@ -196,12 +196,13 @@ evidence is the next section.
     `io_buf`, the hall of fame and the soft stack all stay visible, so the write
     itself is a straight port of `c128/src/storage.c` over byte-at-a-time CBDOS.
 
-    **The unmeasured half is READING BACK.** Writes land in a D81 on device 8;
-    reads go through the Hypervisor to the SD card's FAT32. A save written to
-    the D81 is invisible to hyppo, so the save and the hall of fame need a CBDOS
-    read path as well -- either routed per file, or by moving everything onto
-    the D81 and dropping hyppo. That is the decision this item is really
-    waiting on.
+    **The shape of the fix is now settled too.** Writes land in a D81 on
+    device 8 while reads go through the Hypervisor to the SD card's FAT32, so
+    a save written to the D81 would be invisible to hyppo -- which makes
+    "route each file to its own filesystem" the wrong answer. **Move everything
+    onto the D81 and drop hyppo**: probe 3 shows CBDOS reads all 45,056 bytes
+    of OVERLAYS.BIN byte-perfect in 0.9 seconds, so the one objection to it
+    does not hold.
 
 Everything else is fixed and verified. The port has still **not been played by
 a human** since 2026-09-03, and the fixes since then -- sound, briefing,
@@ -359,13 +360,43 @@ check is self-validating -- a fill that never landed would have shown
 mismatches everywhere, so reading zero proves both halves ran. The loaded
 overlay survives a save, and nothing has to be reloaded afterwards.
 
-### What is still NOT measured
+### Probe 3 -- and the SD card stops being worth keeping
 
-**Reading back.** Writes go to a D81 on device 8; reads today go through the
-Hypervisor to the SD card's FAT32. Those are different filesystems and a save
-written into the D81 is invisible to hyppo's `findfile` -- so the save and the
-hall of fame need a CBDOS **read** path too, not just a write. That is the half
-of this job that every note so far has left out, and it is unprobed.
+The two-filesystem problem is real: writes go to a D81 on device 8, reads go
+through the Hypervisor to the SD card's FAT32, and **a save written into the
+D81 is invisible to hyppo's `findfile`**. The obvious escape is to put
+*everything* on the D81 and drop the Hypervisor entirely -- one I/O stack, one
+medium, and the save reads back from where it was written.
+
+That turns on one number. `OVERLAYS.BIN` is 45,056 bytes and has to reach
+banked RAM at startup, and the C65 KERNAL's banked LOAD cannot be used (it
+exists, Xemu will not run it -- see below), so it would come in through
+`CHRIN`, a byte at a time. **Measured, `make probe-read`:**
+
+    45,056 bytes   xor checksum $57, matching the file exactly
+    0.9 seconds    timed on CIA1's TOD, ~50 KB/s
+
+So the objection does not survive. A byte at a time through the C65 DOS is
+fast enough to load the whole overlay set in under a second, and it is
+**byte-perfect** -- the checksum is in there because a read returning zeros
+quickly would look like a wonderful result.
+
+**THE FIRST RUN WAS ONE BYTE SHORT** and that is worth keeping, because it is
+the bug any real implementation will have. `if (instat) break;` before counting
+gave 45,055 bytes and a checksum of `$C3`. ST bit 6 (EOF) is set **together
+with the last good byte**; only bit 7 means the byte is junk. What identified
+it was arithmetic rather than a guess: `$C3 ^ $94` is exactly `$57`, and `$94`
+is the last byte of OVERLAYS.BIN -- the high half of the build stamp.
+
+What dropping hyppo would take with it: `m65hyppo.s` and its `__rc`-saving
+shim, `after_hyppo()`, the four-descriptor budget and the `closeall`-instead-of
+-`close` workaround, and **the 512-byte sector buffer**, which this file calls
+the single biggest thing the port keeps in bank 0. Reading a byte at a time
+needs no buffer at all -- each byte can go straight to `$50000+n` with `lpoke`.
+
+The cost is that the player mounts a D81 instead of copying five files onto the
+card, which is how MEGA65 software is normally distributed anyway, and it makes
+this port ship like the C128's `.d64`.
 
 ## Driving this port headlessly
 
