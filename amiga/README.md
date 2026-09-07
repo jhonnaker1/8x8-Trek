@@ -238,6 +238,31 @@ run. The stub version of `amigasnd.c` said exactly that, in a comment, and
 and every channel silent. Found by asking the emulator for its audio state
 rather than by listening, which is the same reason the tempo is counted.
 
+## The screen is as tall as the display, and the console is centred in it
+
+The console is 80×25 cells of 8×8 — 640×200, which is **exactly an NTSC
+screen**, and that is where the number came from. PAL gives 256 non-interlaced
+lines, so a 200-line screen left the bottom 56 empty: a fifth of the display
+doing nothing, with the game jammed against the top. Jamie spotted it.
+
+**The X16 had the same shape of fault** — VERA's text mode is 80×60 while the
+console is 80×25 — and it was fixed there by doubling the row height. That
+trick is not available here: these are 8×8 glyphs blitted into bitplanes, and
+stretching them would mean a second set at another height, or interlace, which
+flickers on a real display. So the screen opens at the display's own height and
+the console is placed in the middle, 28 lines above and below on PAL. On NTSC
+the offset is zero and nothing changes. 640×256 in four planes is 81,920 bytes
+of chip RAM against 64,000; both are comfortable.
+
+**It uncovered a second bug that had been invisible.** `ShowTitle(scr, FALSE)`
+hides a screen's drag bar *behind backdrop windows*, so it does nothing until
+there is one — and it was being called before `OpenWindow`. Nobody could see
+that while the console filled the screen from row 0, because `scr_put` writes
+the bitplanes directly and simply painted over the bar. Centring the console
+left a margin, and the bar appeared in it. `scr_clear` now blanks the whole
+bitmap by plane rather than the console's 25 rows, which is both correct for
+the margins and much quicker than two thousand `scr_put` calls.
+
 ## Played through, and what that proved
 
 Driven on the machine rather than reasoned about:

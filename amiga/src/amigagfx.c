@@ -27,6 +27,7 @@
  * this port's own artwork, thirteen glyphs, written out in `box[]` -- the same
  * rule that made tools/make_music.py compose the music rather than extract it.
  */
+#include <string.h>
 #include <exec/types.h>
 #include <intuition/intuition.h>
 #include <graphics/gfxbase.h>
@@ -37,13 +38,34 @@
 
 #include "../../c128/src/vdc.h"
 
-#define SCR_W  640
-#define SCR_H  200
-#define DEPTH    4
-#define BPR     (SCR_W / 8)          /* 80 bytes per plane row */
+#define SCR_W    640
+#define CON_H    200                 /* the console: 25 rows of 8 pixels */
+#define DEPTH      4
+#define BPR       (SCR_W / 8)        /* 80 bytes per plane row */
+
+/* THE SCREEN IS AS TALL AS THE DISPLAY, AND THE CONSOLE IS CENTRED IN IT.
+ *
+ * The console is 80x25 cells of 8x8, which is 640x200 -- exactly an NTSC
+ * screen, and that is where the number came from. On PAL there are 256
+ * non-interlaced lines, so a 200-line screen left the bottom 56 EMPTY: a
+ * fifth of the display doing nothing, with the game jammed against the top.
+ *
+ * THE X16 HAD THE SAME SHAPE OF FAULT and it was fixed there by doubling the
+ * row height, because VERA's text mode is 80x60 while the console is 80x25.
+ * That trick is not available here -- these are 8x8 glyphs blitted into
+ * bitplanes, and stretching them would mean a second set at another height,
+ * or interlace, which flickers on a real display. So the screen is opened at
+ * the display's own height and the console is placed in the MIDDLE of it,
+ * 28 lines above and below on PAL. On NTSC the offset is zero and nothing
+ * changes.
+ *
+ * 640x256 in four planes is 81,920 bytes of chip RAM, against 64,000 for 200
+ * lines. Both are comfortable on any machine this port targets. */
+static UWORD scr_h = CON_H;          /* 256 on PAL, 200 on NTSC */
+static UWORD y_org;                  /* first pixel row of the console */
 
 static struct NewScreen ns = {
-    0, 0, SCR_W, SCR_H, DEPTH,
+    0, 0, SCR_W, CON_H, DEPTH,
     0, 1,
     HIRES,
     CUSTOMSCREEN,
@@ -57,7 +79,7 @@ static struct NewScreen ns = {
    a frame, ACTIVATE so it has the focus from the first keystroke, RMBTRAP so
    the right button does not drop a menu over the game. */
 static struct NewWindow nw = {
-    0, 0, SCR_W, SCR_H,
+    0, 0, SCR_W, CON_H,
     0, 1,
     IDCMP_VANILLAKEY | IDCMP_RAWKEY,
     ACTIVATE | BORDERLESS | BACKDROP | RMBTRAP | NOCAREREFRESH,
@@ -65,6 +87,8 @@ static struct NewWindow nw = {
     0, 0, 0, 0,
     CUSTOMSCREEN
 };
+
+extern struct GfxBase *GfxBase;
 
 static struct Screen *scr;
 static struct Window *win;
@@ -234,17 +258,31 @@ done:
 void vdc_init(void) {
     int i;
 
+    /* Read the display the machine came up in before opening anything. The
+       sound driver reads the same flag for Paula's period; this one decides
+       how many lines there are to put a console in. */
+    scr_h = (GfxBase->DisplayFlags & PAL) ? 256 : CON_H;
+    y_org = (UWORD)((scr_h - CON_H) / 2);
+    ns.Height = scr_h;
+    nw.Height = scr_h;
+
     scr = OpenScreen(&ns);
     if (!scr) return;
 
     for (i = 0; i < 16; i++)
         SetRGB4(&scr->ViewPort, i, ega[i][0], ega[i][1], ega[i][2]);
 
-    /* The title bar would sit over the top row of the console. */
-    ShowTitle(scr, FALSE);
-
     nw.Screen = scr;
     win = OpenWindow(&nw);
+
+    /* AFTER OpenWindow, NOT BEFORE. ShowTitle(FALSE) hides the screen's drag
+       bar BEHIND backdrop windows, so it does nothing until there is one --
+       and this was called first, which meant the bar was still being drawn.
+       It went unnoticed while the console filled the screen from row 0,
+       because scr_put writes the bitplanes directly and simply painted over
+       it; centring the console on PAL left a 28-line margin and the bar
+       appeared in it. */
+    ShowTitle(scr, FALSE);
 
     {
         struct TextAttr topaz8;
@@ -284,7 +322,7 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
     if (!scr || x >= VDC_COLS || y >= VDC_ROWS) return;
 
     glyph_for(ch, g);
-    off = (unsigned long)y * 8 * BPR + x;
+    off = (unsigned long)(y_org + (unsigned int)y * 8) * BPR + x;
 
     for (b = 0; b < DEPTH; b++) {
         p = plane[b] + off;
@@ -350,10 +388,21 @@ unsigned char vdc_data_read(void) {
     return v;
 }
 
+/* THE WHOLE BITMAP, not just the console's 25 rows. On PAL the console sits
+   in the middle of a taller screen and the margins above and below are never
+   touched by scr_put -- so anything Intuition drew there before the backdrop
+   window went up would stay. Clearing by plane is also a great deal quicker
+   than two thousand scr_put calls. */
+static void blank_screen(void) {
+    int b;
+    unsigned long n = (unsigned long)BPR * scr_h;
+
+    if (!scr) return;
+    for (b = 0; b < DEPTH; b++) memset(plane[b], 0, n);
+}
+
 void scr_clear(void) {
-    unsigned char x, y;
-    for (y = 0; y < VDC_ROWS; y++)
-        for (x = 0; x < VDC_COLS; x++) scr_put(x, y, 32, 0);
+    blank_screen();
 }
 
 void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w, unsigned char h,
