@@ -38,6 +38,19 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            src/music_data.c
 GAME_OUT = build/egatrek
 
+# THE RELEASE BUNDLE: a drawer, since this machine has no disk image the way a
+# 1541 one does and PROGDIR: makes the drawer's location irrelevant.
+REL = build/release
+
+release: game data
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-amiga
+	@cp build/egatrek build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT \
+	    $(REL)/egatrek-amiga/
+	@cp README-release.txt $(REL)/egatrek-amiga/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-amiga.zip egatrek-amiga
+	@echo "release: build/egatrek-amiga.zip"
+	@unzip -l build/egatrek-amiga.zip | tail -n +4
+
 STORE_SRC = src/storetest.c src/amigagfx.c src/amigainput.c src/amigastorage.c
 STORE_OUT = build/storetest
 
@@ -82,7 +95,7 @@ build/test_tempo: test/test_tempo.c
 	@mkdir -p build
 	cc -O2 -Wall -Wextra -Werror -o $@ test/test_tempo.c
 
-.PHONY: all game smoke storetest data music test clean
+.PHONY: all game smoke storetest data music test release clean
 
 all: game data test
 

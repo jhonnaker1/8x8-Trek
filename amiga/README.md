@@ -1,12 +1,13 @@
 # EGA Trek — Amiga (OCS/ECS, KS2.0+)
 
-Fourth port. **Started 2026-09-06; first light works.** The nine-panel console
-frame draws in EGA colours through the shared `c128/src/layout.c`, on a
-640×200 four-bitplane screen, with box glyphs this port authored.
+Fourth port, **complete 2026-09-06 and played end to end on the machine**:
+title, briefing, setup, console, orders, dialogs, save, restore, the hall of
+fame, the endgame, play-again, and a clean exit back to the shell.
 
-    make smoke                    build build/smoke
+    make            build the game, the data and run the tempo test
+    make release    build/egatrek-amiga.zip
     # then, at the Amiga shell:
-    work:smoke
+    work:egatrek
 
 ## Why this target is the cheapest left
 
@@ -237,6 +238,27 @@ run. The stub version of `amigasnd.c` said exactly that, in a comment, and
 and every channel silent. Found by asking the emulator for its audio state
 rather than by listening, which is the same reason the tempo is counted.
 
+## Played through, and what that proved
+
+Driven on the machine rather than reasoned about:
+
+* **SAVE** writes `EGATREK.SAV`, 625 bytes, into the program's drawer.
+* **Restore** brings it back — warp 5.0, the same quadrant, the same chart and
+  the same scan, where a fresh game would be warp 1.0 and a different galaxy.
+* **The hall of fame** reads `TREK.SCR`, and with a table it can beat it writes
+  the file again with the commander inserted **into the right rank band** —
+  a level-3 captain lands in the captain slots, not at the top.
+* **The endgame** — self destruct, loss memo, evaluation, hall of fame — and
+  the play-again loop back to the title with setup asked again.
+* **Quitting returns to the AmigaDOS shell cleanly**: prompt back, no hang, no
+  crash. Worth stating, because the C128 BRKed into its machine-language
+  monitor here and shipped that way in v0.9.0.
+
+A −930 score does **not** qualify for an empty table, so the write path had to
+be exercised against a seeded one. That is correct behaviour, not a bug — worth
+writing down, because "the file was not written" looks identical to a broken
+seam until you read `hof_offer`.
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -267,10 +289,11 @@ Amiga keycodes with separate press and release, not characters.
            title, briefing, setup, console, orders, dialogs
            sound: a Paula driver on two channels, title track confirmed
            playing and stopping on the machine
-    NEXT   save/restore and the hall of fame, played through rather than
-                      unit-tested -- the storage seam is proven, the game's
-                      use of it is not
-           a release: the port has not been played end to end by a human
+           played through: SAVE writes EGATREK.SAV and the setup screen
+           restores it (warp 5 and the same chart come back); the hall of
+           fame reads TREK.SCR, inserts into the right rank band and writes
+           it again; the endgame, play-again and the quit all work
+    NEXT   a human playing it. Everything above was driven by a script.
 The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
 the seven panel titles, because the string pool needs the file seam that is not
 built yet. It is replaced by `c128/src/strpool.c` when storage lands.
