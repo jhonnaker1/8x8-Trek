@@ -29,6 +29,8 @@ mega65/src/music_data.h
 mega65/src/music_data.c
 x16/src/music_data.h
 x16/src/music_data.c
+amiga/src/music_data.h
+amiga/src/music_data.c
 
 # Build output
 build/
