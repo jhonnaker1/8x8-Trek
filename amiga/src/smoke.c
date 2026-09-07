@@ -93,6 +93,12 @@ int main(void) {
            has never fired is not a marker. */
         scr_puts(42, 19, "UNDRAWN CODE 97 -> HOLLOW BOX:", 8);
         scr_put(74, 19, 97, 12);
+
+        /* THE PLAY-AGAIN PROMPT, verbatim from ui.c. Its brackets are screen
+           codes 27 and 29, which this port had no glyph for until the marker
+           fired on them -- so it is drawn here every run rather than left to
+           be discovered at the end of somebody's game. */
+        scr_puts(3, 23, "PLAY AGAIN?  [YES]  [NO]", 13);
     }
 
     scr_puts(42, 21, "640X200, FOUR PLANES, 80X25 CELLS", 10);

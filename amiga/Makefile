@@ -26,11 +26,21 @@ AMIBERRY ?= $(HOME)/Amiberry/Amiberry
 SMOKE_SRC = src/smoke.c src/amigagfx.c src/amigainput.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke
 
-.PHONY: all smoke clean
+STORE_SRC = src/storetest.c src/amigagfx.c src/amigainput.c src/amigastorage.c
+STORE_OUT = build/storetest
 
-all: smoke
+.PHONY: all smoke storetest clean
+
+all: smoke storetest
 
 smoke: $(SMOKE_OUT)
+
+storetest: $(STORE_OUT)
+
+$(STORE_OUT): $(STORE_SRC)
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $(STORE_SRC)
+	@ls -l $@
 
 $(SMOKE_OUT): $(SMOKE_SRC) src/../../c128/src/vdc.h
 	@mkdir -p build
@@ -38,4 +48,4 @@ $(SMOKE_OUT): $(SMOKE_SRC) src/../../c128/src/vdc.h
 	@ls -l $@
 
 clean:
-	rm -f build/smoke build/*.o
+	rm -f build/smoke build/storetest build/*.o

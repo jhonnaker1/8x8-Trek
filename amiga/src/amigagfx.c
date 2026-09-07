@@ -135,6 +135,15 @@ static const struct box_glyph box[] = {
          on an 8px pitch" off the original. Geometry again. */
                          {100, {0,0,0,0,0,0,0,0xFF}},
 
+  /* 30, 31 the up and left arrows -- the only two of 27..31 with no ASCII to
+         borrow, so they are drawn. Not used by the game as it stands; they
+         are here because a screen code with a glyph is one that cannot come
+         out as a hollow box later. POUND at 28 is deliberately NOT here: it
+         is unused, and the marker is a better answer than an invented glyph
+         for a character nobody asks for. */
+                         { 30, {0x18,0x3C,0x7E,0x18,0x18,0x18,0x18,0}},
+                         { 31, {0,0x10,0x30,0x7E,0x30,0x10,0,0}},
+
   /* 81  the ship's saucer, drawn HERE and not copied: the badge and the info
          panel both put this next to four cells of G_HLINE and a solid block,
          so what it has to be is a round body that reads as a hull at 8x8.
@@ -150,6 +159,14 @@ static const struct box_glyph box[] = {
 static int code_to_ascii(unsigned char c) {
     if (c == 0) return '@';
     if (c <= 26) return 'A' + c - 1;
+    /* 27..31 ARE [ POUND ] UP-ARROW LEFT-ARROW, and two of them are real: the
+       play-again box is drawn as "[YES]" and "[NO]", which scr_puts turns into
+       screen codes 27 and 29. Without these that prompt reads as a hollow box
+       either side of the word -- caught by the missing-glyph marker firing on
+       this port's own test labels, which is the whole reason the marker is
+       there. topaz has both brackets, so they come from the ROM exactly. */
+    if (c == 27) return '[';
+    if (c == 29) return ']';
     if (c >= 32 && c <= 63) return c;
     return -1;
 }

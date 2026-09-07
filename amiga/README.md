@@ -43,10 +43,19 @@ by hand would be three more chances to disagree with the rule.
 **A code nobody drew renders as a hollow box, not as nothing.** Every other
 port hands these to a charset that has something at every position; here the
 set is finite and authored, so a missed code would be invisible — which is
-exactly the bug that leaves a panel looking merely empty. Two of the fifteen
-were missed on the first pass, so this is not hypothetical. `smoke.c` draws
-one deliberately undrawn code every run, because a marker that has never fired
-is not a marker.
+exactly the bug that leaves a panel looking merely empty. `smoke.c` draws one
+deliberately undrawn code every run, because a marker that has never fired is
+not a marker.
+
+**It has paid for itself twice.** Two of the fifteen were missed on the first
+pass. Then it fired on the storage test's own labels, which is how screen
+codes 27 and 29 turned up — `ui.c` draws the play-again prompt as `[YES]` and
+`[NO]`, and without those the box would have read `□YES□  □NO□` at the end of
+somebody's game. topaz has both brackets, so they come from the ROM exactly;
+the up and left arrows at 30 and 31 are drawn, since they have no ASCII to
+borrow. The pound sign at 28 is deliberately left to the marker: nothing asks
+for it, and an invented glyph for a character nobody uses is worse than a
+visible gap.
 
 ## The glyphs are this port's own artwork
 
@@ -117,6 +126,30 @@ once before the title, and implemented on all four ports now — the C128's is
 an empty function with a comment saying why (it scans CIA1's matrix; there is
 no queue to drain).
 
+## Storage, and the first port where writing works
+
+AmigaDOS `Open`/`Read`/`Write`/`Close` sit straight under the five `plat_*`
+functions. No KERNAL channel to open and close in the right order, no
+hypervisor trap, no device number, no secondary address, no 8K window and no
+512-byte sector to buffer. The MEGA65's `plat_write_all()` is still a stub
+returning `STOR_ERROR`; here it is one `Write()`.
+
+**`PROGDIR:` is the whole of the path design.** The game asks for bare names
+like `STRINGS.DAT`, because on the other three machines a bare name means "the
+disk in the drive". Here it would mean the shell's current directory —
+wherever the player happened to be standing — while the data files are in the
+program's own drawer. `PROGDIR:` is AmigaDOS's assign for exactly that, so
+`work:egatrek` finds its files whether it was started from `WORK:`, from
+`SYS:`, or from Workbench.
+
+`make storetest` builds a test that runs on the machine and prints twelve
+PASS/FAIL lines: the round trip, the byte count, that a file longer than `max`
+is an **error and not a truncation**, that a missing file is `NOTFOUND` and not
+`ERROR` (the setup screen has to tell "there is no save" from "the disk went
+wrong"), that the streaming path returns the same bytes and 0 at EOF, and that
+`plat_open` twice in a row is fine — which is the rule the X16 broke in a way
+that made every load but the first fail.
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -138,10 +171,10 @@ Amiga keycodes with separate press and release, not characters.
            glyphs: all fifteen, verified on the machine, with a marker for
            any sixteenth nobody has noticed yet
            input seam: kb_init, kb_waitkey, kb_entropy
-    NEXT   storage -- AmigaDOS Open/Read/Write/Close onto the five plat_*
-                      functions. plat_write_all() will actually work here; it
-                      still does not on the MEGA65
-           strings -- strpool.c against a plain array, no far memory
+           storage seam: all five plat_* functions, twelve checks passing
+           on the machine -- and WRITING WORKS, which it does not on the
+           MEGA65
+    NEXT   strings -- strpool.c against a plain array, no far memory
            sound   -- LAST. Paula is four channels of SAMPLED audio, the
                       furthest from the SID of any target. Budget a tempo bug:
                       the C128 lost time to a driver three semitones from its
