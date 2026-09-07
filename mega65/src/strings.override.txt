@@ -3,7 +3,16 @@
 #     python3 tools/gen_strings.py --override mega65/src/strings.override.txt OUT
 #
 # IDS THAT ALREADY EXIST, and nothing else -- the generator owns the numbering,
-# so both ports build the same strdata.h and the same STR_COUNT. Only the two
+# so both ports build the same strdata.h and the same STR_COUNT. Only the
 # strings that name the machine differ.
 0	 MEGA65 PORT 
 82	TO THE MEGA65.
+# The C128 quits onto its OTHER display and says so. This machine has one
+# screen, and plat_exit() resets it -- so what comes back is the ROM's own
+# READY prompt, not a 40-column anything. Seen on screen 2026-09-07.
+#
+# 34 characters, because main.c prints this at a hardcoded x=23 on an 80-column
+# screen and 23+17 is dead centre. The first try was 24 and sat visibly left.
+# It also names the keypress: main() waits for one here and the C128's wording
+# never says so, which leaves the player looking at a dead screen.
+10	HIT A KEY AND THE MEGA65 RESTARTS.

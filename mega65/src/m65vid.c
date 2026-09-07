@@ -53,20 +53,39 @@ void vdc_init(void) {
     clrscr();
 }
 
-/* NOT FIXED HERE, AND SAID SO RATHER THAN LEFT LOOKING DONE. This port's
-   `exit` is `jsr _fini` then a branch to itself, so quitting HANGS the machine
-   -- found while fixing the C128's exit on 2026-09-06, not reproduced on
-   hardware, and not addressed because this port does not ship yet. A reset
-   through $FFFC is the likely answer, as it was on the C128, but the MEGA65's
-   banking at that moment has not been measured and guessing at it is how the
-   C128 got its BRK in the first place. */
-void plat_exit(void) { }
+/* RESET, because this program is sitting in BASIC 65's own program area at
+   $2001 and there is nothing to return to. llvm-mos's `exit` is `jsr _fini`
+   then a branch to itself, so leaving this empty HUNG the machine on a blank
+   screen -- confirmed 2026-09-07 by driving to "Play Again? N".
 
-void vdc_shutdown(void) {
-    bordercolor(6);
-    bgcolor(6);
-    clrscr();
+   THE BANKING WAS THE OPEN QUESTION and it did not need guessing at: llvm-mos
+   links `unmap-basic.o` into every MEGA65 program, whose `.init` pages the C65
+   ROM out ($01=$3E, $D030=$44) and whose `.fini` pages it back ($01=$3F,
+   $D030=$64). Without that restore, $FFFC is RAM and the vector is garbage.
+   So this does exactly what `.fini` does and then takes the vector. Guessing
+   at banking instead of reading it is how the C128 got its BRK. */
+void plat_exit(void) {
+    __asm__ volatile("sei\n\t"
+                     "lda #$3f\n\t"
+                     "sta $01\n\t"
+                     "lda #$64\n\t"
+                     "sta $d030\n\t"
+                     "jmp ($fffc)"
+                     ::: "a", "memory");
 }
+
+/* DELIBERATELY LEAVES THE SCREEN ALONE, which is the C128 port's lesson
+   arriving here a day late. This used to be bordercolor(6)/bgcolor(6)/clrscr()
+   and it erased the goodbye main() had just drawn, one statement before
+   main() waits for the player to read it -- so quitting showed a blank screen
+   and nothing else. Worse here than on the C128, which at least hands BASIC a
+   different display; this machine has only the one.
+
+   Colour 6 was the other half of it: on a stock C65 that is blue, but this
+   port has reprogrammed the palette to EGA, where 6 is BROWN. The quit screen
+   was a full brown page. Nothing needs restoring anyway -- plat_exit() resets
+   the machine and the ROM sets its own palette and video mode. */
+void vdc_shutdown(void) { }
 
 /* Frame pace off the raster, as the C128 port does. $D012 is the VIC-II
    compatible low byte and the VIC-IV still maintains it in native mode. */

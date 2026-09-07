@@ -246,6 +246,43 @@ Likewise Jamie's DMA descriptor of `$454854` -- ASCII "THE", which is text the
 hall of fame itself puts on screen -- is *consistent* with a wild source
 pointer from the same execution, and was not re-witnessed.
 
+## Quitting works now, and the banking never needed guessing at
+
+Fixed 2026-09-07, and it was two faults stacked, both visible in one
+screenshot: **a blank brown page**.
+
+`plat_exit()` was an empty stub with an honest comment saying a `$FFFC` reset
+was the likely answer but "the MEGA65's banking at that moment has not been
+measured". It did not need measuring -- it needed **reading**. llvm-mos links
+`unmap-basic.o` into every MEGA65 program, and disassembling it gives both
+halves:
+
+    .init.010   sei / $00=$2F / $01=$3E / $D030=$44     pages the C65 ROM OUT
+    .fini.990   $01=$3F / $D030=$64 / cli               pages it back IN
+
+With the ROM out, `$FFFC` is RAM and the reset vector is whatever happens to be
+there. So `plat_exit()` now does exactly what `.fini` does and then takes the
+vector, and the machine comes back to a BASIC 65 `READY.` with the ROM's own
+palette. Reaching `exit` at all was the hang: llvm-mos's is `jsr _fini` then a
+branch to itself.
+
+`vdc_shutdown()` was the other half, and **the C128 port had already learned
+this lesson**: its own version carries a comment saying it deliberately does
+NOT clear the screen, because clearing left the display the player was watching
+black and that reads as a crash. This one cleared. It erased the goodbye
+`main()` had drawn one statement earlier -- immediately before `main()` waits
+for the player to read it. The brown was the same mistake twice over:
+`bgcolor(6)` restores a stock C65's blue, but this port has reprogrammed the
+palette to EGA, where 6 is brown. It does nothing at all now; the reset
+restores the machine.
+
+The quit line is a **string override**, not a code change. `main.c` prints
+S_10, which on the C128 is "BASIC IS ON THE 40-COLUMN SCREEN." -- true there
+and meaningless on a machine with one screen that is about to restart. The
+override is 34 characters because `main.c` prints it at a hardcoded `x=23` and
+23+17 is dead centre on 80 columns; the first attempt was 24 and sat visibly
+left. It also names the keypress, which the C128's wording never does.
+
 ## Driving this port headlessly
 
 `tools/drive.py out.png [--peek SYMBOL[:LEN]] KEY...` injects keys through the

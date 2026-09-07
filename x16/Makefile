@@ -193,7 +193,11 @@ nolto: $(GAME_SRC)
 	        || exit 1; \
 	done
 
-verify: $(GAME_OUT) nolto
+# `data` FIRST, because verify checks OVERLAYS.BIN against the ELF and on a
+# clean tree that file does not exist yet. Without this it reported "the image
+# file is stale" and then "OVERLAYS.BIN missing" -- two failures that read like
+# real faults and are a missing build step. Cost two rounds on 2026-09-07.
+verify: $(GAME_OUT) data nolto
 	python3 tools/verify_prg.py
 
 # WHAT DOES A KEY ACTUALLY RETURN? -- prints the raw byte GETIN hands back,
