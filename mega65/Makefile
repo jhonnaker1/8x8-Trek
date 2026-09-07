@@ -222,6 +222,36 @@ DRIVE_PEEK ?=
 drive: debug disk
 	python3 tools/drive.py build/screen.png $(DRIVE_PEEK) $(DRIVE_KEYS)
 
+# THE TWO BANKING PROBES, kept because they are the evidence behind the write
+# path and because the first run of probe 1 got the $01 bits backwards -- which
+# is exactly the sort of thing that is cheap to re-run and expensive to argue
+# about. See README, "What the C65 DOS actually needs".
+#
+#   make probe-bank              what stops being our RAM while the ROM is mapped
+#   make probe-dos CFG=3         can the DOS write under config C
+#
+# probe-dos needs a D81 on drive 8; the script formats a fresh one per run and
+# lists it afterwards, because a KERNAL call can report success and write
+# nothing. The DIRECTORY is the result, not the screen.
+PROBECC = $(M65CC) -Wall -Werror -Oz \
+          -I $(MEGA65_LIBC)/include -o $@ $< $(LIBC_A)
+CFG ?= 3
+
+build/probe_bank.prg: src/probe_bank.c
+	@mkdir -p build
+	$(PROBECC)
+
+probe-bank: build/probe_bank.prg
+	sh tools/run.sh "$(CURDIR)/$<" build/probe1.png 14
+	@echo "read build/probe1.png"
+
+build/probe_dos$(CFG).prg: src/probe_dos.c
+	@mkdir -p build
+	$(M65CC) -Wall -Werror -Oz -DCFG=$(CFG) -I $(MEGA65_LIBC)/include -o $@ $< $(LIBC_A)
+
+probe-dos: build/probe_dos$(CFG).prg
+	sh tools/run_dos_probe.sh $(CFG)
+
 run-smoke: $(SMOKE_OUT)
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -prg $(CURDIR)/$(SMOKE_OUT)
 

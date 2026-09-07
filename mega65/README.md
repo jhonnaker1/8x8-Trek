@@ -190,12 +190,18 @@ rule 4 -- and closing them is the retest commit `620ac09` asked for. The
 evidence is the next section.
 
   * **Saving does not work.** `plat_write_all()` returns `STOR_ERROR`, so SAVE
-    and the hall of fame report a failure rather than writing. This is a
-    *bounded* job, not a mystery -- see "Writing files IS possible" below --
-    but it needs a low-memory trampoline and has not been built. Scope it
-    around **byte-at-a-time CBDOS I/O**, which is proven working here: the
-    KERNAL's banked LOAD exists in the ROM but delivers nothing under Xemu, so
-    it cannot be tested. See "The C65 KERNAL HAS a banked LOAD" below.
+    and the hall of fame report a failure rather than writing. ~~It needs a
+    low-memory trampoline.~~ **It does not** -- measured 2026-09-07, see "What
+    the C65 DOS actually needs": with `$01=$3E, $D030=$64` the DOS writes while
+    `io_buf`, the hall of fame and the soft stack all stay visible, so the write
+    itself is a straight port of `c128/src/storage.c` over byte-at-a-time CBDOS.
+
+    **The unmeasured half is READING BACK.** Writes land in a D81 on device 8;
+    reads go through the Hypervisor to the SD card's FAT32. A save written to
+    the D81 is invisible to hyppo, so the save and the hall of fame need a CBDOS
+    read path as well -- either routed per file, or by moving everything onto
+    the D81 and dropping hyppo. That is the decision this item is really
+    waiting on.
 
 Everything else is fixed and verified. The port has still **not been played by
 a human** since 2026-09-03, and the fixes since then -- sound, briefing,
@@ -282,6 +288,84 @@ and meaningless on a machine with one screen that is about to restart. The
 override is 34 characters because `main.c` prints it at a hardcoded `x=23` and
 23+17 is dead centre on 80 columns; the first attempt was 24 and sat visibly
 left. It also names the keypress, which the C128's wording never does.
+
+## What the C65 DOS actually needs -- MEASURED 2026-09-07
+
+Two probes, `make probe-bank` and `make probe-dos CFG=n`, run because the
+scope of "make saving work" turned entirely on facts nobody had measured. The
+answer is **much better than the estimate**: the low-memory trampoline this
+port has been assuming for three days **is not needed at all**.
+
+### Probe 1 -- what stops being our RAM
+
+Markers at five addresses, written with the ROM out, read back under each
+banking config. Nothing here can hang: it maps, reads, unmaps.
+
+| cfg | `$01` | `$D030` | `$8000` | `$9000` | `$A000` | `$B000` | `$CF00` |
+|---|---|---|---|---|---|---|---|
+| none | 3E | 44 | RAM | RAM | RAM | RAM | RAM |
+| A | 3F | 64 | RAM | RAM | **rom** | **rom** | **rom** |
+| B | 3F | 44 | RAM | RAM | **rom** | **rom** | RAM |
+| C | 3E | 64 | RAM | RAM | RAM | RAM | **rom** |
+
+**The two shadows are INDEPENDENT and each has its own control:** `$01` bit 0
+(LORAM) puts BASIC over `$A000..$BFFF`, `$D030` bit 5 (ROMC) puts the C65 ROM
+over `$C000..$CFFF`. So there is a config for every combination.
+
+**`$8000..$9FFF` is RAM under every one of them.** The 2026-09-04 note saying
+"while the ROM is mapped, `$8000..$BFFF` is not our RAM" was wrong by 8K, and
+that 8K is where the storage code already lives -- `plat_read_all` is at
+`$913E`. Nothing has to move.
+
+**THE FIRST RUN OF THIS PROBE GOT THE `$01` BITS BACKWARDS** and is worth
+recording, because it produced a confident wrong answer rather than an error.
+It tested `$3B` as "KERNAL and I/O, BASIC out"; `$3B` actually SETS LORAM and
+CLEARS CHAREN -- BASIC in and I/O gone, the opposite question. Every config
+read "`$A000` shadowed" and it looked like BASIC could not be paged out at all.
+`$3E`, which `unmap-basic.o` already leaves, *is* KERNAL + I/O with BASIC out;
+`$3F` only adds BASIC.
+
+### Probe 2 -- which config the DOS will accept
+
+One config per run, because a config the DOS rejects **hangs**. Config A first,
+to check the rig reproduces the known-good result before any negative was
+believed. The result is the **D81 directory read back with `c1541`**, not the
+status byte: a KERNAL call can report success and write nothing.
+
+| cfg | | outcome |
+|---|---|---|
+| A | `$3F`,`$64` | file written -- reproduces 2026-09-04 |
+| B | `$3F`,`$44` | **HANGS** at OPEN, never returns |
+| C | `$3E`,`$64` | **file written**, carry clear, `READST=$00` |
+
+**ROMC is required and BASIC is not.** Config C is the one to use, and it
+differs from the state the game already runs in by **exactly one bit** --
+`$D030` bit 5.
+
+What that buys, against the trampoline the old note called for:
+
+  * `io_buf` (`$A784`, 626 bytes) stays visible. **Nothing to copy down.**
+  * `hof` (`$A9F6`) stays visible.
+  * The soft stack, `$C000` growing down into `$BFxx`, stays visible -- so the
+    write path can be ordinary C. That one mattered most: under BASIC ROM,
+    stores fall through to RAM while loads return ROM, so a push/pop pair
+    straddling the mapped window corrupts silently.
+  * Only `$C000..$CFFF` -- the overlay window -- is shadowed, and no code needs
+    to execute there during the call.
+
+**And the DOS does not scribble the window.** `$C000..$CBFF` was filled with a
+pattern before the write and re-checked after: **zero bytes changed**. That
+check is self-validating -- a fill that never landed would have shown
+mismatches everywhere, so reading zero proves both halves ran. The loaded
+overlay survives a save, and nothing has to be reloaded afterwards.
+
+### What is still NOT measured
+
+**Reading back.** Writes go to a D81 on device 8; reads today go through the
+Hypervisor to the SD card's FAT32. Those are different filesystems and a save
+written into the D81 is invisible to hyppo's `findfile` -- so the save and the
+hall of fame need a CBDOS **read** path too, not just a write. That is the half
+of this job that every note so far has left out, and it is unprobed.
 
 ## Driving this port headlessly
 
