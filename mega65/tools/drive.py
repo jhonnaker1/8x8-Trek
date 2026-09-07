@@ -4,6 +4,13 @@
     make debug
     python3 tools/drive.py out.png RETURN N N J A M I E RETURN 3 RETURN X RETURN
 
+A screenshot answers "what does the player see"; it cannot answer "what is in
+`ship`". --peek SYMBOL[:LEN] dumps a symbol out of the running machine just
+before the screenshot, looked up in the ELF the way kb_inject is, because these
+addresses move for exactly the same reason:
+
+    python3 tools/drive.py out.png --peek ship ... keys ...
+
 WHY A POKE AND NOT A KEYSTROKE. Xemu can run headless and it flushes
 -screenshot on SIGTERM, but it has no way to inject a key: $D610 is the ASCII
 key register and WRITING it pops the queue rather than filling it. So the
@@ -17,21 +24,23 @@ tools/putfiles.sh before testing a release build again.
 """
 import os, re, signal, socket, subprocess, sys, time
 
-def kb_inject_addr(elf):
-    """Look kb_inject up rather than hardcoding it.
+def sym(elf, want):
+    """Look a symbol up rather than hardcoding it, and return (addr, size).
 
-    IT MOVES. This was a literal 0x6B for one afternoon, and the moment the
-    build changed it pointed at some other variable: the driver poked a byte
-    nobody read, every key was 'never consumed', and the failure looked like
-    the game hanging."""
-    import subprocess
+    IT MOVES. kb_inject was a literal 0x6B for one afternoon, and the moment
+    the build changed it pointed at some other variable: the driver poked a
+    byte nobody read, every key was 'never consumed', and the failure looked
+    like the game hanging. --peek addresses move for the same reason."""
     nm = subprocess.check_output(
-        [os.path.expanduser("~/llvm-mos/bin/llvm-nm"), elf]).decode()
+        [os.path.expanduser("~/llvm-mos/bin/llvm-nm"), "--print-size", elf]).decode()
     for ln in nm.splitlines():
         f = ln.split()
-        if len(f) == 3 and f[2] == "kb_inject":
-            return int(f[0], 16)
-    raise SystemExit("drive: no kb_inject in %s -- is this the `make debug` build?" % elf)
+        if len(f) == 4 and f[3] == want:
+            return int(f[0], 16), int(f[1], 16)
+        if len(f) == 3 and f[2] == want:
+            return int(f[0], 16), 0
+    raise SystemExit("drive: no %s in %s -- is this the `make debug` build?"
+                     % (want, elf))
 NAMED = {"RETURN": 0x0D, "SPACE": 0x20, "ESC": 0x1B, "DEL": 0x14,
          "UP": 0x91, "DOWN": 0x11}
 
@@ -45,10 +54,17 @@ def key(tok):
     raise SystemExit("drive: don't know key %r" % tok)
 
 def main():
-    out, keys = sys.argv[1], [key(t) for t in sys.argv[2:]]
+    argv = sys.argv[1:]
+    peeks = []
+    while "--peek" in argv:
+        i = argv.index("--peek")
+        peeks.append(argv[i + 1])
+        del argv[i:i + 2]
+    out, keys = argv[0], [key(t) for t in argv[1:]]
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(here)
-    KB_INJECT = kb_inject_addr("build/egatrek-debug.elf")
+    ELF = "build/egatrek-debug.elf"
+    KB_INJECT, _ = sym(ELF, "kb_inject")
     subprocess.check_call(["sh", "tools/putfiles.sh", "build/OVERLAYS-DEBUG.BIN"],
                           stdout=subprocess.DEVNULL)
     # putfiles keeps the source name; the game opens OVERLAYS.BIN.
@@ -107,6 +123,25 @@ subprocess.check_call(['mcopy','-o','build/OVERLAYS-DEBUG.BIN','z:/OVERLAYS.BIN'
         else:
             raise SystemExit("drive: key %02x was never consumed" % k)
     time.sleep(1.5)
+
+    # BEFORE the screenshot: SIGTERM ends the process and the socket with it.
+    for spec in peeks:
+        name, _, n = spec.partition(":")
+        addr, size = sym(ELF, name)
+        n = int(n) if n else (size or 16)
+        got = b""
+        while len(got) < n:
+            r = talk("m%08x" % (addr + len(got)))
+            row = re.search(r":%08X:((?:[0-9A-F]{2})+)" % (addr + len(got)),
+                            r.upper())
+            if not row:
+                raise SystemExit("drive: peek %s at $%X read nothing" % (name, addr))
+            got += bytes.fromhex(row.group(1))
+        got = got[:n]
+        print("drive: %s $%04X %d bytes" % (name, addr, n))
+        for i in range(0, n, 16):
+            print("  +%02d  %s" % (i, " ".join("%02x" % b for b in got[i:i + 16])))
+
     p.send_signal(signal.SIGTERM)
     p.wait()
     print("drive: %d keys -> %s" % (len(keys), out))

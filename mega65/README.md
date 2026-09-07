@@ -1,12 +1,17 @@
 # EGA Trek — MEGA65 (native C65 mode)
 
 The second port, and the first of the four **text-mode siblings** the target
-order puts ahead of the bitmap machines. Status: **first light** — the console
-frame draws from the shared layout, in 80 columns, on an exact EGA palette.
+order puts ahead of the bitmap machines. Status: **the whole game runs** — in
+80 columns, on an exact EGA palette, with sound, a streamed briefing, and a
+game playable from the title screen through the hall of fame to a second game.
+One thing is missing: it cannot **write** files, so SAVE and the hall of fame
+report a failure. See "Still open".
 
 ```sh
-make          # build/smoke.prg
-make run      # in Xemu
+make          # build/egatrek.prg + build/OVERLAYS.BIN
+make verify   # load address, resident space, overlay layout and call rules
+make run      # in Xemu, on Xemu's own SD card
+make drive    # headless: inject keys, screenshot, --peek symbols
 ```
 
 ## Why native mode, not C64 mode
@@ -43,23 +48,29 @@ low nibble of a VIC-III-compatible four.
 
 ## What is shared, and what this port has to supply
 
-`core/` and the console layout compile unchanged — the smoke build already
-links `../c128/src/layout.c` and uses `layout.h`'s glyph constants as they
-stand, because the MEGA65 uses the same C64-family screen codes the C128's VDC
-does.
+`core/` and the console layout compile unchanged — this port links
+`../c128/src/layout.c` and uses `layout.h`'s glyph constants as they stand,
+because the MEGA65 uses the same C64-family screen codes the C128's VDC does.
 
 `ui.c` and `main.c` — 4,500 lines of console and command handling — touch the
 platform through a seam that is already abstracted at core level:
 
+**This table used to be a plan, and three of its rows outlived the work.** It
+said `ovl_load` was "a no-op: nothing needs overlaying" fifteen lines above the
+section explaining why that is false, `kb_*` stayed "to write" after it was
+written, and `far_*` claimed this machine needs no far seam while the port was
+already keeping the string pool, the music and the message log in banked RAM.
+What it records now is what is built.
+
 | seam | calls | MEGA65 |
 |---|---|---|
-| `scr_*` | 224 | **done** — `m65vid.c` |
-| `ovl_load` | 25 | a **no-op**: 40MHz and far more RAM, so nothing needs overlaying |
-| `kb_*` | 17 | to write |
-| `snd_*` | 15 | the MEGA65 has real SIDs, so `sid.c` should port nearly as-is |
-| `vdc_data_*` | 9 | the one genuinely C128-shaped thing: the message log lives in spare **VDC RAM**. Here it becomes plain RAM |
-| `plat_*` | 5 | SD-card file I/O via mega65-libc |
-| `far_*` | — | plain RAM; the bank-1 seam exists because the C128 has 42K, and this machine does not |
+| `scr_*` | 224 | `m65vid.c` — VIC-IV, H640, full 2000-cell colour RAM |
+| `ovl_load` | 25 | **needed after all** — one window at `$C000`, eleven images DMA'd in from banked RAM |
+| `kb_*` | 17 | `m65input.c` — plus `kb_inject` in the debug build, which is how this port is driven |
+| `snd_*` | 15 | `m65snd.c` — real SIDs, so the C128's driver ported nearly as-is |
+| `vdc_data_*` | 9 | the one genuinely C128-shaped thing: the message log lived in spare **VDC RAM**. Here it is banked RAM at `$44000` |
+| `plat_*` | 5 | Hypervisor file I/O — **reads only**, see "Still open" |
+| `far_*` | — | banked RAM via `lcopy`/`lpeek`/`lpoke`, not the C128's MMU dance |
 
 ## Overlays are still needed here, and the first version of this file was wrong
 
@@ -77,7 +88,7 @@ platform's Makefile says whether it wants windows.
 **What does change is the cost, and it changes completely.** The C128 reads
 each 4K image off a 1541 — hundreds of milliseconds, which is why that port
 works so hard to call `ovl_load` rarely and why `check_overlay_calls` exists.
-Here the ten images sit in banked RAM at `$50000` and come in by **DMAgic**:
+Here the images sit in banked RAM at `$50000` and come in by **DMAgic**:
 one `lcopy`, microseconds. Same mechanism, and the cost that shaped the C128
 port's structure is gone.
 
@@ -85,9 +96,12 @@ The other two really did evaporate. The string pool and music live at `$40000`
 and the message log at `$44000`, reached with `lcopy`/`lpeek`/`lpoke` instead
 of an MMU dance, and `far_read` is a DMA burst.
 
-    resident   33,566 bytes of 40,959    ($2001..$BFFF)
-    window      4,096 bytes              ($C000..$CFFF)
-    images     40,960 bytes              banked at $50000, from OVERLAYS.BIN
+`make verify` prints the live figures rather than this file quoting them --
+these three numbers had all gone stale once already. As of 2026-09-07:
+
+    resident   34,654 bytes of 40,447    ($2001, up to the window)
+    window      4,096 bytes              ($C000..$CFFF), largest image 3,772
+    images     11                        banked at $50000, from OVERLAYS.BIN
 
 ## Running it headlessly -- SOLVED, and the answer was in Xemu's source
 
@@ -169,27 +183,11 @@ with `-dumpmem` rather than by looking at the screen.
 Jamie played the release build on 2026-09-03 and found three faults; sound and
 the briefing are fixed below, and one crash remains unexplained.
 
-## Still open (2026-09-05)
+## Still open (2026-09-07)
 
-Three faults, none of them reproduced by a build check, so they are written
-here rather than left in commit messages where nobody re-reads them.
-
-  * **`ship` is corrupted after the hall of fame.** The console comes back with
-    `$6464` in energy, impulse, shields and enemies_left, and 100 in torps and
-    laser_eff -- the shape of `sys[]` written at the wrong offset. The ship is
-    intact *during* play (energy 5000 read from behind the self-destruct
-    dialog), so it happens somewhere in the end-of-game sequence.
-
-    **It is MEGA65-only**, established 2026-09-05 rather than assumed:
-    `core/trek.c` and `core/hof.c` pass their native guard tests, and the C128
-    driven through the identical sequence returns a coherent ship
-    (`energy=5000, impulse=500, shields=2500, torps=9, level=3, enemies=37`).
-    So it is in this port's platform layer, not in shared code.
-
-  * **A crash and a freeze around the hall of fame**, both reported from play
-    on 2026-09-03. One dump showed `$454854` -- ASCII "THE" -- sitting in a DMA
-    descriptor. Neither has been reproduced since, and the overlay-id fix
-    (`fe9d4f1`) plausibly addresses the crash without that being demonstrated.
+**One item, down from three.** The other two were a single fault -- overlay
+rule 4 -- and closing them is the retest commit `620ac09` asked for. The
+evidence is the next section.
 
   * **Saving does not work.** `plat_write_all()` returns `STOR_ERROR`, so SAVE
     and the hall of fame report a failure rather than writing. This is a
@@ -199,9 +197,73 @@ here rather than left in commit messages where nobody re-reads them.
     KERNAL's banked LOAD exists in the ROM but delivers nothing under Xemu, so
     it cannot be tested. See "The C65 KERNAL HAS a banked LOAD" below.
 
-Everything above the first two items is fixed and verified; the sound, briefing
-and end-of-game overlay fixes since 2026-09-03 have been checked headlessly and
-**not yet played by a human**.
+Everything else is fixed and verified. The port has still **not been played by
+a human** since 2026-09-03, and the fixes since then -- sound, briefing,
+end-of-game overlay, and rule 4 -- have only been checked headlessly.
+
+## The hall of fame was rule 4, and the discriminator that proves it
+
+Retested 2026-09-07, because a fix nobody re-runs the failing case against is a
+hypothesis. `620ac09` fixed a resident `trek_score()` calling into a window
+that `load_hof()` had already swapped, and said this port's two hall-of-fame
+faults "should be retested". They were, on the identical key sequence, against
+two builds that differ only by that commit:
+
+    RETURN N RETURN N RETURN J A M I E RETURN 3 RETURN X RETURN   setup
+    S X RETURN X RETURN                                          self destruct
+    RETURN RETURN RETURN                                         memo, evaluation
+    RETURN                                                       dismiss the hall of fame
+
+| | at `620ac09^` | at HEAD |
+|---|---|---|
+| the hall of fame screen | **name rows missing** | drawn complete |
+| the RETURN that dismisses it | **machine dies, 3/3** | survives, 3/3 |
+| `ship` afterwards | unreachable | coherent |
+| the second game's console | unreachable | energy 5000, shields 2500, 12 systems at 100 |
+
+The broken screen is the part worth keeping. Before the fix the hall of fame
+**arrives already wrong** -- the dotted name placeholders are simply absent --
+which is what running off into unwritten window bytes and coming back looks
+like when it does not happen to jam. The next keystroke then takes the machine
+down. Both are downstream of one wild execution.
+
+**Two claims in the old list were wrong, and both were negatives about this
+port.** "It is MEGA65-only ... so it is in this port's platform layer, not in
+shared code" was established by driving the C128 through the same sequence and
+getting a coherent ship -- a real experiment, and a real result, that supported
+a conclusion it could not reach. The fault was in shared code all along, in
+`main.c`, and all three ports carried it; the C128 simply survived it. And
+"none of them reproduced by a build check" is now false twice over: `make
+verify` fails the tree before `620ac09`, and the sequence above reproduces the
+death deterministically.
+
+**What is NOT claimed.** The `$6464` pattern was never witnessed here directly:
+this build dies at the hall of fame before a second console can be reached, so
+the corruption Jamie saw cannot be reproduced on this tree to watch it go away.
+What is shown is that the code path which produced it executed garbage before
+the fix and does not after, and that a second game now starts coherent.
+Likewise Jamie's DMA descriptor of `$454854` -- ASCII "THE", which is text the
+hall of fame itself puts on screen -- is *consistent* with a wild source
+pointer from the same execution, and was not re-witnessed.
+
+## Driving this port headlessly
+
+`tools/drive.py out.png [--peek SYMBOL[:LEN]] KEY...` injects keys through the
+uart monitor and screenshots the result. `--peek` was added for the retest
+above: a screenshot answers "what does the player see" and cannot answer "what
+is in `ship`", and the whole of the old `$6464` report is a claim about memory.
+Symbols are looked up in the ELF, never hardcoded -- these addresses move
+between builds, which has already cost this port one afternoon.
+
+    python3 tools/drive.py build/end.png --peek ship RETURN N RETURN ...
+
+    drive: ship $ACDE 61 bytes
+      +00  02 04 04 01 88 13 f4 01 c4 09 09 64 00 00 0a 00
+      +16  b8 88 00 e4 89 03 21 00 64 64 64 64 64 64 64 64
+
+`Ship` packs to one-byte alignment on llvm-mos, so the fields are sequential:
+energy at +4, impulse +6, shields +8, torps +10, laser_eff +11, level +21,
+enemies_left +22, and the twelve `sys[]` percentages at +24.
 
 ## What `make verify` checks
 
@@ -212,8 +274,8 @@ same one window, same `.ovl_*` section names, nothing looking at them.
     load address      the PRG must start at $2001 or Xemu will not auto-run it
     resident space    the image against mega65.ld's OWN `ram` region
     overlay layout    one run address, distinct load addresses, each fits
-    overlay calls     rules 2 and 3 of core/overlay.h -- shared with the C128
-    OVERLAYS.BIN      ten 4K slots, each byte-identical to its ELF section
+    overlay calls     rules 2, 3 and 4 of core/overlay.h -- shared with the C128
+    OVERLAYS.BIN      one 4K slot per overlay, each byte-identical to its ELF section
     build stamp       the last two bytes are this link's ovl_load
 
 The call-graph and layout checks live in `tools/overlay_check.py` and are

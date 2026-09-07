@@ -214,8 +214,13 @@ run: sd
 # Headless, scripted, and screenshotted -- how this port is actually checked.
 # `make debug` first: the release build has no kb_inject to poke.
 DRIVE_KEYS ?= RETURN N RETURN N RETURN J A M I E RETURN 3 RETURN X RETURN
+# DRIVE_PEEK dumps symbols out of the running machine before the screenshot.
+# A picture cannot answer "what is in `ship`", and the hall-of-fame report this
+# port chased for days was entirely a claim about memory.
+#   make drive DRIVE_PEEK="--peek ship" DRIVE_KEYS="... S X RETURN X RETURN"
+DRIVE_PEEK ?=
 drive: debug disk
-	python3 tools/drive.py build/screen.png $(DRIVE_KEYS)
+	python3 tools/drive.py build/screen.png $(DRIVE_PEEK) $(DRIVE_KEYS)
 
 run-smoke: $(SMOKE_OUT)
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -prg $(CURDIR)/$(SMOKE_OUT)
