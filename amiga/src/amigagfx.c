@@ -65,14 +65,32 @@ static const UBYTE ega[16][3] = {
     {15,  5,  5}, {15,  5, 15}, {15, 15,  5}, {15, 15, 15}
 };
 
-/* THIS PORT'S OWN BOX GLYPHS, one entry per C64 screen code that layout.h
-   names. A line sits on rows 3 and 4 and in columns 3 and 4 (0x18), which is
-   what makes a vertical meet a horizontal in the middle of the cell and what
-   makes two adjacent cells join. Written as bit patterns rather than lifted
-   from any character ROM. */
+/* THIS PORT'S OWN GLYPHS -- every code the shared UI can pass that topaz
+ * does not have. Re-derived from the sources rather than guessed at: a sweep
+ * of every scr_put/hline/vline/fill_rect argument in ui.c, layout.c and
+ * main.c found FIFTEEN, not the eleven box-drawing ones an eyeball count
+ * gives. The two that were missed both live in panels nothing had drawn yet
+ * -- the badge's disc and the systems-status bars.
+ *
+ * WHAT WAS COPIED AND WHAT WAS NOT. The C128 chargen ROM was read to find out
+ * what SHAPE each code is meant to be, which is the same thing
+ * c128/test/test_panels.c does to check our screen codes. Three of these are
+ * pure geometry and can only look one way -- a half block is a half block --
+ * so knowing the shape IS knowing the bytes. The rest are drawn here: a line
+ * sits on rows 3 and 4 and in columns 3 and 4, which is what makes a vertical
+ * meet a horizontal in the middle of a cell and two adjacent cells join, and
+ * the disc is this port's own circle rather than Commodore's.
+ *
+ * REVERSE VIDEO IS A RULE, NOT ENTRIES. Codes 128..255 are their base glyph
+ * inverted, so 160 (the block cursor and the badge's solid body) falls out of
+ * 32, 226 out of 98, and 228 -- the systems bar -- out of 100. Writing those
+ * three out by hand would be three more chances to disagree with the rule. */
 struct box_glyph { unsigned char code; unsigned char row[8]; };
 
 static const struct box_glyph box[] = {
+  /* 32  space, stated rather than left to the font, so that 160 -- the
+         cursor and the badge's body -- is solid even if topaz is missing */
+                         { 32, {0,0,0,0,0,0,0,0}},
   /* 64  G_HLINE  ---- */ { 64, {0,0,0,0xFF,0xFF,0,0,0}},
   /* 93  G_VLINE  |    */ { 93, {0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18}},
   /* 112 G_TL     ,-   */ {112, {0,0,0,0x1F,0x1F,0x18,0x18,0x18}},
@@ -84,10 +102,25 @@ static const struct box_glyph box[] = {
   /* 114 G_TEE_D  T    */ {114, {0,0,0,0xFF,0xFF,0x18,0x18,0x18}},
   /* 113 G_TEE_U  _|_  */ {113, {0x18,0x18,0x18,0xFF,0xFF,0,0,0}},
   /* 91  G_CROSS  +    */ { 91, {0x18,0x18,0x18,0xFF,0xFF,0x18,0x18,0x18}},
-  /* 81  the filled ball the badge panel draws the ship with */
-                         { 81, {0x3C,0x7E,0xFF,0xFF,0xFF,0xFF,0x7E,0x3C}},
-  /* 160 reverse space -- a solid cell in the attribute colour */
-                         {160, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}}
+
+  /* 98  BADGE_DISC_TOP -- the lower half filled, which rounds the top edge of
+         the badge's disc. Geometry: a half block has one shape. Its reverse,
+         226, is BADGE_DISC_BOTTOM and needs no entry. */
+                         { 98, {0,0,0,0,0xFF,0xFF,0xFF,0xFF}},
+
+  /* 100 the bottom row alone -- and the ONLY reason it is here is that its
+         REVERSE is 228, SYS_BAR_GLYPH: seven rows filled on an eight-pixel
+         pitch, which is what leaves a hairline between the systems-status
+         bars instead of one continuous block. ui.c measured that at "7px bars
+         on an 8px pitch" off the original. Geometry again. */
+                         {100, {0,0,0,0,0,0,0,0xFF}},
+
+  /* 81  the ship's saucer, drawn HERE and not copied: the badge and the info
+         panel both put this next to four cells of G_HLINE and a solid block,
+         so what it has to be is a round body that reads as a hull at 8x8.
+         Wider than it is tall, clear of the top and bottom rows so it does
+         not merge with the cell above or below. */
+                         { 81, {0,0x3C,0x7E,0xFF,0xFF,0x7E,0x3C,0}}
 };
 #define BOX_COUNT ((int)(sizeof box / sizeof box[0]))
 
@@ -128,9 +161,9 @@ static void glyph_for(unsigned char code, unsigned char *out) {
     int i, ch, rev = 0;
     unsigned char base = code;
 
-    /* Reverse video is the top bit, and the port uses it for the block cursor
-       and for solid bars. Fold it here so every glyph below is the plain one. */
-    if (base >= 128 && base != 160) { base -= 128; rev = 1; }
+    /* Reverse video is the top bit. Fold it here and every entry below is a
+       plain glyph -- 160, 226 and 228 are 32, 98 and 100 inverted. */
+    if (base >= 128) { base -= 128; rev = 1; }
 
     for (i = 0; i < 8; i++) out[i] = 0;
 
@@ -141,7 +174,21 @@ static void glyph_for(unsigned char code, unsigned char *out) {
         }
     }
     ch = code_to_ascii(base);
-    if (ch >= 0) rom_glyph(ch, out);
+    if (ch >= 0) {
+        rom_glyph(ch, out);
+        goto done;
+    }
+
+    /* A GRAPHICS CODE NOBODY DREW. Every other port hands these to a charset
+       that has something at every code; here the set is finite and authored,
+       so a code that was missed renders as NOTHING -- invisible, and exactly
+       the bug that leaves a panel looking merely empty. Two of the fifteen
+       were missed on the first pass, so this is not hypothetical. Draw a
+       hollow box instead: it is obvious on screen, it is impossible to
+       mistake for game content, and it names the failure the moment a panel
+       that has never been drawn before is drawn for the first time. */
+    out[0] = 0xFF; out[7] = 0xFF;
+    for (i = 1; i < 7; i++) out[i] = 0x81;
 
 done:
     if (rev) for (i = 0; i < 8; i++) out[i] = (unsigned char)~out[i];

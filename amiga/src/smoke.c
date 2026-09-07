@@ -55,6 +55,46 @@ int main(void) {
        character ROM, so whether they join is a real question. */
     draw_console();
 
+    /* EVERY GLYPH THIS PORT HAD TO DRAW, in the panels that use them, because
+       a code that renders as a letter is the failure mode here and it is
+       invisible until something asks for it. The set was re-derived from the
+       shared sources -- fifteen codes, not the eleven an eyeball count of the
+       box drawing gives. */
+    {
+        static const unsigned char codes[] = {
+            G_HLINE, G_VLINE, G_TL, G_TR, G_BL, G_BR,
+            G_TEE_L, G_TEE_R, G_TEE_D, G_TEE_U, G_CROSS,
+            98, 226, 160, 228, 81
+        };
+        unsigned char k;
+        for (k = 0; k < sizeof codes; k++)
+            scr_put((unsigned char)(3 + k * 2), 19, codes[k], 11);
+        scr_puts(3, 18, "EVERY DRAWN GLYPH", 14);
+
+        /* The ship, exactly as ui.c assembles it: saucer, neck, hull. */
+        scr_puts(3, 21, "SHIP", 14);
+        scr_put(9, 21, 81, 15);
+        scr_hline(10, 21, 4, G_HLINE, 15);
+        scr_put(14, 21, 160, 15);
+
+        /* The badge disc: top cap, body, bottom cap, stacked. */
+        scr_puts(18, 21, "DISC", 14);
+        scr_put(24, 20, 98, 9); scr_put(24, 21, 160, 9); scr_put(24, 22, 226, 9);
+
+        /* Systems bars -- seven pixels on an eight-pixel pitch, so there must
+           be a visible hairline between them rather than one solid block. */
+        scr_puts(28, 21, "BARS", 14);
+        scr_hline(34, 21, 6, 228, 10);
+
+        /* AND ONE CODE ON PURPOSE THAT NOBODY DREW. 97 is a C64 graphics code
+           this port has no glyph for, so it must come out as the hollow box
+           amigagfx.c substitutes -- proving that a glyph nobody noticed is
+           missing shows up as something rather than as nothing. A marker that
+           has never fired is not a marker. */
+        scr_puts(42, 19, "UNDRAWN CODE 97 -> HOLLOW BOX:", 8);
+        scr_put(74, 19, 97, 12);
+    }
+
     scr_puts(42, 21, "640X200, FOUR PLANES, 80X25 CELLS", 10);
     scr_puts(42, 22, "SIXTEEN EGA COLOURS ON THEIR OWN INDEX", 10);
     scr_puts(42, 23, "PRESS RETURN TO LEAVE", 12);
