@@ -98,6 +98,20 @@
 #define KB_W      87
 #define KB_Y      89
 
+/* Called ONCE before the title screen, to throw away anything the keyboard
+   was holding when the game started.
+ *
+ * IT WAS DEAD CODE ON TWO PORTS. m65input.c and x16input.c both defined a
+ * kb_init() and neither this header nor main() ever mentioned it, so neither
+ * was ever called -- found 2026-09-06 while writing the Amiga's. It matters
+ * most where the machine QUEUES keystrokes: on the Amiga the game is started
+ * by typing `work:egatrek` at a shell, and the RETURN that launches it was
+ * still sitting in Intuition's message port when the title screen asked for a
+ * key, so the title dismissed itself. The C128 cannot have that fault -- it
+ * scans CIA1's matrix and there is no queue to hold anything -- but it gets
+ * the same entry point rather than an #ifdef at the call site. */
+void kb_init(void);
+
 char kb_waitkey(void);   /* blocks until one key is pressed and released */
 
 /* Free-running counter, bumped once per pass of the key poll loop. Sampling it

@@ -50,9 +50,29 @@ static struct NewScreen ns = {
     NULL, (UBYTE *)"EGA TREK", NULL, NULL
 };
 
+/* A BACKDROP WINDOW OVER THE WHOLE SCREEN, and it exists for the KEYBOARD.
+   Nothing is drawn through it -- scr_put writes the bitplanes directly -- but
+   Intuition delivers keys to a WINDOW's message port and there is no other
+   way to be given them. BORDERLESS|BACKDROP so it covers the console without
+   a frame, ACTIVATE so it has the focus from the first keystroke, RMBTRAP so
+   the right button does not drop a menu over the game. */
+static struct NewWindow nw = {
+    0, 0, SCR_W, SCR_H,
+    0, 1,
+    IDCMP_VANILLAKEY | IDCMP_RAWKEY,
+    ACTIVATE | BORDERLESS | BACKDROP | RMBTRAP | NOCAREREFRESH,
+    NULL, NULL, NULL, NULL, NULL,
+    0, 0, 0, 0,
+    CUSTOMSCREEN
+};
+
 static struct Screen *scr;
+static struct Window *win;
 static struct TextFont *font;
 static UBYTE *plane[DEPTH];
+
+/* For amigainput.c, which needs the window's message port and nothing else. */
+struct Window *amiga_window(void) { return win; }
 
 /* EGA's own palette, in the two bits per channel the standard actually uses:
    0x00, 0x55, 0xAA, 0xFF become 0, 5, 10, 15 in the Amiga's four-bit guns
@@ -206,6 +226,9 @@ void vdc_init(void) {
     /* The title bar would sit over the top row of the console. */
     ShowTitle(scr, FALSE);
 
+    nw.Screen = scr;
+    win = OpenWindow(&nw);
+
     {
         struct TextAttr topaz8;
         topaz8.ta_Name  = (STRPTR)"topaz.font";
@@ -222,6 +245,7 @@ void vdc_init(void) {
 }
 
 void vdc_shutdown(void) {
+    if (win)  { CloseWindow(win); win = NULL; }
     if (font) { CloseFont(font); font = NULL; }
     if (scr)  { CloseScreen(scr); scr = NULL; }
 }

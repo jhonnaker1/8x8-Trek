@@ -1900,6 +1900,10 @@ int main(void) {
 #endif
 
     vdc_init();
+    /* Before anything asks for a key. See input.h -- on a machine that queues
+       keystrokes, the RETURN that launched the game would otherwise dismiss
+       the title screen before the player had seen it. */
+    kb_init();
     /* Bulk data lives on the disk, not in the binary -- see core/farmem.h.
        The prose goes first because everything draws with it; the music is a
        luxury by comparison. Neither is fatal if missing: a disk without

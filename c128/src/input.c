@@ -202,6 +202,14 @@ volatile unsigned char kb_inject = 0;
 
 uint16_t kb_entropy = 0;
 
+/* NOTHING TO DRAIN ON THIS MACHINE, and that is worth stating rather than
+   leaving as an empty function somebody later "fixes". This port scans CIA1's
+   matrix directly, so there is no buffer holding old keystrokes -- and
+   kb_waitkey() already waits out anything still physically held before it
+   accepts a press. The entry point exists so main() does not need to know
+   which machines queue keys and which do not. */
+void kb_init(void) { }
+
 char kb_waitkey(void) {
     unsigned char i;
 

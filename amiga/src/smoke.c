@@ -9,7 +9,7 @@
  * also proves that file compiles and runs for 68000 against a video layer
  * that is nothing like a VDC.
  */
-#include <stdio.h>
+#include "../../c128/src/input.h"
 #include "../../c128/src/vdc.h"
 #include "../../c128/src/layout.h"
 #include "../../core/strpool.h"
@@ -99,9 +99,38 @@ int main(void) {
     scr_puts(42, 22, "SIXTEEN EGA COLOURS ON THEIR OWN INDEX", 10);
     scr_puts(42, 23, "PRESS RETURN TO LEAVE", 12);
 
-    /* Nothing to poll yet -- the input seam is not built. AmigaDOS gives us a
-       blocking read for free, and the screen stays up until it returns. */
-    getchar();
+    /* THE INPUT SEAM, ECHOED. Every key comes back as its character and its
+       code, so this screenshot says what kb_waitkey() actually returns rather
+       than what this file assumes -- which is the check the X16 did not have
+       until every typed order had already been answering NO SUCH ORDER.
+       The arrows must read as 1 and 2, and letters must arrive UPPER CASE
+       whichever way they were typed. RETURN (13) ends it. */
+    kb_init();
+    scr_puts(42, 5, "TYPE: KEYS ECHO AS CHAR AND CODE", 14);
+    scr_puts(42, 6, "ARROWS MUST READ 1 AND 2, RETURN ENDS", 8);
+    {
+        unsigned char col = 42, row = 8;
+        for (;;) {
+            char k = kb_waitkey();
+            unsigned char u = (unsigned char)k;
+            char one[2];
+
+            if (k == KB_RETURN) break;
+
+            scr_fill_rect(col, row, 12, 1, 32, 15);
+            one[0] = (u >= 32 && u < 127) ? k : '?';
+            one[1] = '\0';
+            scr_puts(col, row, one, 15);
+            scr_put((unsigned char)(col + 2), row,
+                    (unsigned char)(48 + (u / 100) % 10), 10);
+            scr_put((unsigned char)(col + 3), row,
+                    (unsigned char)(48 + (u / 10) % 10), 10);
+            scr_put((unsigned char)(col + 4), row,
+                    (unsigned char)(48 + u % 10), 10);
+            if (++row > 19) { row = 8; col = (unsigned char)(col + 6); }
+            if (col > 70) col = 42;
+        }
+    }
 
     vdc_shutdown();
     plat_exit();

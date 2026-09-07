@@ -70,6 +70,18 @@ def type_text(text):
 if __name__ == "__main__":
     if sys.argv[1] == "shot":
         print(cmd("SCREENSHOT\t" + sys.argv[2]))
+    elif sys.argv[1] == "raw":
+        # NO TRAILING RETURN. Typing at a shell always wants one; typing INTO
+        # the game does not -- RETURN is a key the game acts on, and appending
+        # it silently is how the first run of the input test exited before it
+        # could be read.
+        type_text(" ".join(sys.argv[2:]))
+        print("typed raw")
+    elif sys.argv[1] == "key":
+        for c in sys.argv[2:]:
+            code = int(c, 0)
+            key(code, 1); time.sleep(0.05); key(code, 0); time.sleep(0.15)
+        print("sent raw keycodes")
     else:
         type_text(" ".join(sys.argv[1:]) + "\n")
         print("typed")

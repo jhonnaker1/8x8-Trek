@@ -23,7 +23,7 @@ CFLAGS = -O2 -Wall -Wextra -Werror -noixemul \
 # build and nothing to copy: point it at build/ and the binaries are there.
 AMIBERRY ?= $(HOME)/Amiberry/Amiberry
 
-SMOKE_SRC = src/smoke.c src/amigagfx.c ../c128/src/layout.c
+SMOKE_SRC = src/smoke.c src/amigagfx.c src/amigainput.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke
 
 .PHONY: all smoke clean

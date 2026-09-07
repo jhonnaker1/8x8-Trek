@@ -79,6 +79,44 @@ two thousand times. A cell is 32 bytes of plane data (eight rows, four planes)
 and writing it directly is both simpler and exact. The RastPort is still
 opened, because the ROM font is read through it.
 
+## The input seam, and the one thing it got wrong
+
+Intuition hands over a character, converted through the **user's own keymap**,
+so a non-US keyboard works without this port knowing anything about it. No scan
+table, no encoding to probe — the C128 needs a hand-transcribed table of fifty
+row/column pairs and two `make verify` checks to guard it, and the X16 needed a
+probe to discover `GETIN` returns lower-case ASCII rather than the PETSCII its
+own comment claimed.
+
+`IDCMP_VANILLAKEY` carries the characters; the cursor keys have no ASCII, so
+they arrive only as `IDCMP_RAWKEY` and exactly two raw codes are taken from
+that stream. **Measured, because enabling both classes could have delivered
+every letter twice** — it does not.
+
+    m w 5 q   ->  M 077, W 087, 5 053, Q 081     letters fold to upper case
+    up, down  ->  001, 002                        KB_UP, KB_DOWN
+    ESC       ->  027                             KB_ESC, no mapping needed
+    RETURN    ->  013
+    backspace ->  008  ... which is WRONG
+
+**Backspace is 8 here and the shared code deletes on 20.** `read_field()` and
+`ui_read_command()` both test `KB_DELETE`, which is PETSCII's 20, so backspace
+did nothing at all: the commander's name could be typed but not corrected.
+Caught by echoing every key's code on screen rather than by assuming ASCII
+lines up. Backspace and Del both map to `KB_DELETE` now, verified as 020.
+
+## kb_init was dead code on two ports
+
+`m65input.c` and `x16input.c` each defined a `kb_init()`, and neither
+`input.h` nor `main()` ever mentioned it — so neither was ever called. Found
+while writing this one. It matters most where the machine **queues**
+keystrokes: the game is started by typing `work:egatrek` at a shell, and the
+RETURN that launches it is still in Intuition's message port when the title
+screen asks for a key, so the title dismisses itself. It is declared, called
+once before the title, and implemented on all four ports now — the C128's is
+an empty function with a comment saying why (it scans CIA1's matrix; there is
+no queue to drain).
+
 ## Running it
 
 Amiberry mounts a **host directory** as an Amiga volume, so there is no ADF to
@@ -99,9 +137,8 @@ Amiga keycodes with separate press and release, not characters.
            wait_vsync, vdc_shutdown, plat_exit, the EGA palette
            glyphs: all fifteen, verified on the machine, with a marker for
            any sixteenth nobody has noticed yet
-    NEXT   input   -- IDCMP VANILLAKEY into kb_waitkey; there is no scan table
-                      to hand-transcribe and no encoding to measure
-           storage -- AmigaDOS Open/Read/Write/Close onto the five plat_*
+           input seam: kb_init, kb_waitkey, kb_entropy
+    NEXT   storage -- AmigaDOS Open/Read/Write/Close onto the five plat_*
                       functions. plat_write_all() will actually work here; it
                       still does not on the MEGA65
            strings -- strpool.c against a plain array, no far memory
