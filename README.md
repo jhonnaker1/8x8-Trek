@@ -7,12 +7,12 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: one port released, a second running.** The **Commodore 128** port
-> is feature complete and released as [v0.9.0](../../releases/latest). The
-> **MEGA65** port plays — console, sound, overlays and the briefing — with
-> saving still to come; see [`mega65/README.md`](mega65/README.md) for what
-> works and what is still open. Research and decisions are recorded in
-> [`NOTES.md`](NOTES.md).
+> **Status: two ports released, a third running.** The **Commodore 128** and
+> **Commander X16** ports are feature complete and released as
+> [v0.10.0](../../releases/latest). The **MEGA65** port plays — console, sound,
+> overlays and the briefing — with saving still to come; see
+> [`mega65/README.md`](mega65/README.md) for what works and what is still open.
+> Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
 
@@ -148,9 +148,9 @@ per-cell colour; anything that can hold that runs the game as designed.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
-| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.9.0](../../releases/latest) |
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.10.0](../../releases/latest) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.10.0](../../releases/latest) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Playable** — console, sound and overlays; no save yet |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | Designed |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×200 bitmap, 16 colours | 68000 | Designed |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | Designed |
 

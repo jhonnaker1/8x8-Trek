@@ -18,6 +18,7 @@ That build differs from the release binary by one byte of state and the poll
 that reads it; the exit path is identical.
 """
 import os
+import re
 import subprocess
 import sys
 import time
@@ -28,14 +29,32 @@ from vice_mon import Mon, CMD_KEYBOARD_FEED, screenshot, symbol
 ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, "c128", "build")
 SHOTS = os.path.join(BUILD, "bisect")
-PRG   = os.path.join(BUILD, "trek128-exit.prg")
-MAP   = os.path.join(BUILD, "trek128-exit.map")
+D64   = os.path.join(BUILD, "trek128-debug.d64")
+MAP   = os.path.join(BUILD, "trek128-debug.map")
 
-# Kept in step with c128/Makefile by hand. It drifted once already: adding the
-# SID driver broke this script and not the build, because the build has the
-# list and this has a copy.
-SRC = ["src/main.c", "src/vdc.c", "src/layout.c", "src/ui.c", "src/input.c",
-       "src/sid.c", "src/music_data.c", "../core/trek.c"]
+# READ FROM THE MAKEFILE, NOT COPIED. This was a hand-kept list with a comment
+# admitting it had already drifted once -- and by 2026-09-06 it had drifted to
+# about half the port: no overlay.c, no storage.c, no farmem.c, no strpool.c,
+# no planet.c, hof.c or serial.c. So this script built a DIFFERENT program and
+# then reported that the exit was fine, which is how "returning to BASIC wedges
+# the C128" came to be marked settled while every release BRKed on quit.
+#
+# A rig that builds its own subject cannot be a regression test. The list comes
+# from the same place the build gets it now, and a missing file is an error
+# here rather than a quietly smaller program.
+def _sources():
+    mk = open(os.path.join(ROOT, "c128", "Makefile")).read()
+    m = re.search(r"^SRC = (.*?)(?=^\w)", mk, re.M | re.S)
+    if not m:
+        sys.exit("exit_real: cannot find SRC in c128/Makefile")
+    files = m.group(1).replace("\\\n", " ").split()
+    for f in files:
+        if not os.path.exists(os.path.join(ROOT, "c128", f)):
+            sys.exit("exit_real: %s is in SRC but not on disk" % f)
+    return files
+
+
+SRC = _sources()
 
 # title, briefing=no, restore=no, name, level, password, then Q and the two
 # end-of-game screens. RETURN alone answers "no" to the Y/N prompts because
@@ -67,8 +86,18 @@ SCRIPT = (
 
 
 def build():
-    subprocess.run(["cl65", "-t", "c128", "-O", "-DTREK_DEBUG_INPUT",
-                    "-m", MAP, "-o", PRG] + SRC,
+    """The Makefile's own debug DISK, not a private cl65 line.
+
+    This used to shell out to `cl65 -t c128` -- and the port left cc65 on
+    2026-08-23, so by 2026-09-06 this rig had been building with a compiler
+    the project no longer uses, from a source list missing half the port.
+    Two independent ways to be measuring something that is not the program.
+
+    IT MUST BE A DISK. The overlays are separate files the game LOADs at run
+    time, so a bare PRG reaches the title screen, fails to page OVLTITLE in
+    and dies -- the same trap `make monitor` had until the same afternoon.
+    """
+    subprocess.run(["make", "build/trek128-debug.d64"],
                    check=True, cwd=os.path.join(ROOT, "c128"))
 
 
@@ -80,7 +109,7 @@ def main():
 
     proc = subprocess.Popen(
         ["x128", "-binarymonitor", "-binarymonitoraddress", "ip4://127.0.0.1:6502",
-         "-autostart", PRG],
+         "-autostart", D64],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(14)

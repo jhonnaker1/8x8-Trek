@@ -2137,9 +2137,30 @@ int main(void) {
     vdc_shutdown();
     snd_off();      /* a SID still gated would howl at BASIC forever */
 
-    /* NOTES.md open item 2 -- "returning to BASIC wedges the C128" -- was
-     * never true of this program, or stopped being true before anyone could
-     * measure it. Settled 2026-08-22 and the park loop is gone.
+    /* READ BEFORE RESET. plat_exit() resets this machine, so without a wait
+       the two lines above would flash past and the player would be looking at
+       a boot screen wondering what happened. */
+    kb_waitkey();
+
+    /* NOTES item 2 -- "returning to BASIC wedges the C128" -- WAS TRUE ALL
+     * ALONG, and the note below saying otherwise is kept because how it came
+     * to be wrong is the useful part. Answering NO at "Play Again?" BRKed into
+     * the C128's machine-language monitor, deterministically, PC=$005B; Jamie
+     * reported it on 2026-09-06 and it reproduces on the v0.9.0 release. The
+     * cause is llvm-mos's exit path banking ROM over this program's own code
+     * -- c128/src/vdc.c carries the disassembly -- and plat_exit() below is
+     * the answer: reset the machine, which is the only way to hand back a
+     * C128 whose entire BASIC text area this program is sitting in.
+     *
+     * WHY IT STOOD: tools/exit_real.py "settled" it by playing the port to a
+     * quit and asking BASIC for arithmetic -- but its source list is a hand-
+     * kept copy of the Makefile's, it has drifted to about half the port, and
+     * the program it builds has no overlays, no disk seam and no serialiser.
+     * It answered honestly about a program nobody ships. A rig that builds its
+     * own subject is not a regression test.
+     *
+     * What follows is the note as it stood. Every word of it about METHOD is
+     * still right, which is why it stays:
      *
      * The note it replaces named three suspects and a bisect: the 2MHz
      * switch, the direct VDC register writes, and scanning CIA1 behind the
@@ -2163,5 +2184,6 @@ int main(void) {
      * reported WEDGED. That is the same false positive the original note
      * almost certainly recorded. Deciding it needs a question only a live
      * BASIC can answer -- hence the arithmetic. */
-    return 0;
+    plat_exit();
+    return 0;               /* not reached on a machine that resets */
 }

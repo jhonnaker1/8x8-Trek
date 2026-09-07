@@ -60,7 +60,7 @@ MEMORY {
      * the linker: it gives each overlay a distinct place in the ELF so their
      * file ranges do not collide, while their RUN addresses all coincide at
      * the window. That overlap is why the link needs --no-check-sections. */
-    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x40 - 0x1000, LENGTH = 0x1000
+    window (rwx) : ORIGIN = 0x1C01 + 0xA3FF - 0x100 - 0x1000, LENGTH = 0x1000
 
     /* ONE STAGING REGION PER OVERLAY, and they must not be merged back into
      * one. A single `AT>ovlimg` shared by every overlay does NOT advance the
@@ -86,22 +86,37 @@ MEMORY {
     ovlimg9 (rw) : ORIGIN = 0x19000, LENGTH = 0x1000
     ovlimg10 (rw): ORIGIN = 0x1a000, LENGTH = 0x1000
 
-    /* SHORT OF $C000 ON PURPOSE.
+    /* SHORT OF $C000 ON PURPOSE, AND BY 256 BYTES RATHER THAN 64.
      *
      * 0xA3FF would run the region right up to $C000, which is where __stack
      * starts and grows DOWN -- so the stock script lets a build succeed and
-     * then corrupt itself, with the linker none the wiser. This reserves a
-     * guard so that overflowing it is a LINK ERROR instead.
+     * then corrupt itself, with the linker none the wiser.
      *
-     * Why only 64 bytes: llvm-mos gives a non-reentrant program a STATIC
-     * stack, and this one has 181 bytes of `.Lstatic_stack` in .noinit. The
-     * soft stack at $C000 is for recursion and alloca, neither of which this
-     * code uses, and nothing in the link map references it. So the guard is a
-     * tripwire rather than a real allocation.
+     * IT WAS 64 BYTES AND THAT WAS WRONG, on a stated assumption that is
+     * simply false: "the soft stack at $C000 is for recursion and alloca,
+     * neither of which this code uses ... the guard is a tripwire rather than
+     * a real allocation". The soft stack is in constant use. MEASURED
+     * 2026-09-06 by filling $BC00..SP with $A5 through VICE's binary monitor
+     * and playing a game to the hall of fame:
      *
-     * If that assumption ever breaks -- recursion, a function pointer table,
-     * alloca -- raise this and expect to have to free space for it. */
-    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x40 - 0x1000
+     *     title screen           SP = $BFC8      56 bytes down
+     *     console, all dialogs        $BFA4      92
+     *     evaluation, hall of fame    $BF71     143
+     *
+     * so the shipped 64-byte guard was overrun by 79 bytes -- straight into
+     * the overlay window, whose next ovl_load then wrote 4K of code over the
+     * live return addresses. THAT is why quitting BRKed into the C128's
+     * machine-language monitor: main returned through a smashed frame and
+     * landed in zero page. Reported by Jamie against v0.9.0, reproduced on
+     * v0.9.0, so it shipped in that release.
+     *
+     * A TRIPWIRE THAT CANNOT TRIP IS NOT A GUARD. The linker cannot see a
+     * runtime stack, so "overflowing it is a LINK ERROR" was never true of
+     * this region; only the sentinel fill above can see it. 256 leaves 113
+     * bytes over the deepest path measured. If a deeper one is ever found,
+     * re-run that measurement rather than reasoning about it -- and note the
+     * X16 port carries the same hazard in the same shape. */
+    ram    (rw) : ORIGIN = 0x1C01, LENGTH = 0xA3FF - 0x100 - 0x1000
 }
 
 __rc0 = __basic_zp_start;

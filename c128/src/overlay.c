@@ -39,7 +39,20 @@ extern char __ovl_start[];
 /* One name per id in core/overlay.h. Still literals in the binary rather than
    pooled strings: the loader must work whether or not the pool loaded, and
    one short name is cheaper than the id and the fetch it would take. */
-static const char *const ovl_name[OVL_COUNT] = {
+/* NO EXPLICIT SIZE, AND THE ASSERT BELOW IS WHY. Written as
+   ovl_name[OVL_COUNT] this array was left with TEN entries when OVL_XTRA made
+   eleven, and C quietly zero-filled the eleventh: ovl_load(OVL_XTRA) called
+   cbm_k_setnam(NULL), the load failed, and the window kept OVL_FRONT. main
+   then called trek_new_game at the address it has in the XTRA layout, landed
+   inside the FRONT image, and the game opened on an UNINITIALISED galaxy --
+   stardate 0.0, no energy, scanners inoperative -- having first shown the SAVE
+   GAME dialog, because that is what lives at that address in FRONT.
+
+   Nothing caught it. The compiler is entitled to zero-fill, `make verify` was
+   looking at sections rather than at this table, and every test passes because
+   none of them loads an overlay. Sizing the array from its contents turns the
+   next omission into a compile error. */
+static const char *const ovl_name[] = {
     "0:OVLEVAL",
     "0:OVLHOF",
     "0:OVLFRONT",
@@ -49,7 +62,15 @@ static const char *const ovl_name[OVL_COUNT] = {
     "0:OVLPLANET",
     "0:OVLCMDS",
     "0:OVLTITLE",
-    "0:OVLEVENTS"
+    "0:OVLEVENTS",
+    "0:OVLXTRA"
+};
+
+/* Same shape as the save-record assert in core/serial.c: a negative bitfield
+   width is a hard error on every compiler this port has met. */
+struct ovl_name_count_check {
+    int ovl_name_has_one_entry_per_overlay :
+        1 - 2 * !(sizeof ovl_name / sizeof ovl_name[0] == OVL_COUNT);
 };
 
 static uint8_t live = OVL_NONE;
@@ -78,8 +99,24 @@ void ovl_load(uint8_t which) {
         uint16_t stamp;
         const uint8_t *tail;
 
-        if (end <= (uint16_t)(uintptr_t)__ovl_start)
-            return;                 /* KERNAL error code, not an end address */
+        /* A FAILED LOAD IS FATAL, NOT SOMETHING TO RETURN FROM. This used to
+           `return` quietly, which is the second half of the OVLXTRA bug: the
+           caller's very next instruction jumps into the window, so a silent
+           failure means running whatever the LAST overlay left there. There is
+           no recovering from that and no way to describe it afterwards, so say
+           which file could not be read and stop -- the same treatment the
+           stamp mismatch below already got, and for the same reason. */
+        if (end <= (uint16_t)(uintptr_t)__ovl_start) {
+            scr_clear();
+            scr_puts(2, 2, "CANNOT LOAD AN OVERLAY FROM THE DISK",
+                     EGA_TO_VDC(EGA_LTRED));
+            scr_puts(2, 4, ovl_name[which] + 2, EGA_TO_VDC(EGA_WHITE));
+            scr_puts(2, 6, "IS MISSING FROM THE DISK IN DRIVE 8.",
+                     EGA_TO_VDC(EGA_WHITE));
+            scr_puts(2, 8, "THE GAME CANNOT RUN WITHOUT IT.",
+                     EGA_TO_VDC(EGA_LTCYAN));
+            for (;;) { }
+        }
 
         /* THE STAMP: the low sixteen bits of ovl_load's address in the link
            this image was cut from, appended by the Makefile as its last two

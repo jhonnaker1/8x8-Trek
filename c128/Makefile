@@ -222,9 +222,49 @@ $(DEBUG_OUT): $(SRC) $(HDR) trek128.ld Makefile
 # tools/vice_mon.py can screenshot the VDC and read or write memory. Not the
 # remote (text) monitor -- that one halts emulation the moment anything
 # connects, which is what made this look impossible for a while.
-monitor: $(DEBUG_OUT)
+# A DEBUG DISK, NOT A BARE PRG, AND THAT IS THE WHOLE FIX HERE.
+#
+# `monitor` autostarted build/trek128-debug.prg on its own until 2026-09-06,
+# which is how it was written before this port had overlays. Since then the
+# overlays are separate files ON THE DISK, so a bare PRG has nothing to page
+# in: the title screen calls ovl_load(OVL_TITLE), the load fails, the call
+# lands in an empty window and the machine BREAKs -- a black VDC and a BRK on
+# the 40-column screen, which looks exactly like a broken build. It cost a
+# release smoke test to work out that the disk was the difference. The same
+# trap was already documented for `run` versus `rund`; this target had it too
+# and nobody had run it since.
+#
+# The debug overlays overwrite build/ovl*.prg, so this disk is built from
+# $(DEBUG_OUT) and must never be mixed with the release images.
+DEBUG_D64 = build/trek128-debug.d64
+
+$(DEBUG_D64): $(DEBUG_OUT)
+	@mkdir -p build
+	@# See the note in $(D64): these must be the DEBUG images, and `make
+	@# d64` may have left the release ones in build/ovl*.prg.
+	$(call OVL_IMAGES,build/trek128-debug.elf)
+	rm -f $(DEBUG_D64)
+	c1541 -format "ega trek dbg,01" d64 $(DEBUG_D64) >/dev/null
+	c1541 -attach $(DEBUG_D64) -write $(DEBUG_OUT) trek128 >/dev/null
+	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
+	c1541 -attach $(DEBUG_D64) -write build/trek.scr trek.scr,s >/dev/null
+	c1541 -attach $(DEBUG_D64) -write src/briefing.txt brief.txt,s >/dev/null
+	@python3 -c "d = open('build/strings.dat','rb').read(); \
+	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	c1541 -attach $(DEBUG_D64) -write build/strings.pdat strings.dat >/dev/null
+	@if [ -f build/music.dat ]; then \
+	    python3 -c "d = open('build/music.dat','rb').read(); \
+	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
+	    c1541 -attach $(DEBUG_D64) -write build/music.pdat music.dat >/dev/null; \
+	fi
+	@for o in $(OVERLAYS); do \
+	    c1541 -attach $(DEBUG_D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \
+	done
+	@echo "debug disk: $(DEBUG_D64)"
+
+monitor: $(DEBUG_D64)
 	x128 -binarymonitor -binarymonitoraddress ip4://127.0.0.1:6502 \
-	     -autostart $(DEBUG_OUT)
+	     -autostart $(DEBUG_D64)
 
 run: verify
 	# -autostart, not a bare filename, so VICE loads AND runs the PRG.
@@ -248,6 +288,13 @@ d64: $(D64)
 
 $(D64): $(OUT)
 	@mkdir -p build
+	@# CUT THE IMAGES AGAIN, HERE. build/ovl*.prg is shared between the
+	@# release and debug builds -- whichever linked last wins -- so a disk
+	@# rule that merely depends on $(OUT) can pick up the OTHER build's
+	@# overlays when $(OUT) is already up to date. The stamp check in
+	@# src/overlay.c catches that on the machine, loudly, but a release
+	@# disk should never get that far.
+	$(call OVL_IMAGES,build/trek128.elf)
 	rm -f $(D64)
 	c1541 -format "ega trek,01" d64 $(D64) >/dev/null
 	c1541 -attach $(D64) -write $(OUT) trek128 >/dev/null
@@ -274,13 +321,18 @@ $(D64): $(OUT)
 	@python3 -c "import sys; d = open('build/strings.dat','rb').read(); \
 	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
 	c1541 -attach $(D64) -write build/strings.pdat strings.dat >/dev/null
+	@# STALE MESSAGE FIXED 2026-09-06: this used to say `make music` NEEDS
+	@# reference/, which stopped being true when tools/make_music.py replaced
+	@# tools/gen_music.py. make_music.py composes the port's OWN tracks and
+	@# needs nothing but python -- which is the whole point of it, since
+	@# Anderson's extracted note data can never ship on a release disk.
 	@if [ -f build/music.dat ]; then \
 	    python3 -c "import sys; d = open('build/music.dat','rb').read(); \
 	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
 	    c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null; \
 	else \
 	    echo "d64: NO MUSIC.DAT -- the game will play SILENTLY."; \
-	    echo "     run \`make music\` (needs reference/) to generate it."; \
+	    echo "     run \`make music\` to compose it (no reference/ needed)."; \
 	fi
 	@# The overlays, one PRG each. ovl_load() LOADs them into the window.
 	@for o in $(OVERLAYS); do \

@@ -137,6 +137,12 @@ void vdc_init(void) {
     scr_clear();
 }
 
+/* NOTHING TO DO. The X16 loads at $0801 in plain, unbanked RAM and its
+   _fini is a bare RTS, so returning from main hands the machine back to BASIC
+   the ordinary way. The C128 needs a reset because its code sits under the
+   ROMs; this one does not. See the long note in c128/src/vdc.c. */
+void plat_exit(void) { }
+
 void vdc_shutdown(void) {
     scr_clear();
 }

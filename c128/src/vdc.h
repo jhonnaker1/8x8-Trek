@@ -38,6 +38,16 @@ void vdc_init(void);
 /* Puts back what vdc_init() changed on the machine's behalf, so returning to
    BASIC leaves a usable C128 rather than one still running at 2MHz. */
 void vdc_shutdown(void);
+
+/* THE LAST THING THE PROGRAM DOES, and it is a per-machine question.
+ *
+ * main() used to `return 0` and llvm-mos's exit took over from there. On this
+ * machine that BRKed into the C128's machine-language monitor, every single
+ * time, and it shipped that way in v0.9.0 -- see c128/src/vdc.c for the two
+ * reasons and the disassembly. A port that has taken the whole machine has to
+ * say how it gives it back rather than leave it to a runtime that assumes a
+ * small program in low memory. */
+void plat_exit(void);
 void wait_vsync(void);
 void scr_clear(void);
 

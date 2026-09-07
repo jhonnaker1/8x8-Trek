@@ -53,6 +53,15 @@ void vdc_init(void) {
     clrscr();
 }
 
+/* NOT FIXED HERE, AND SAID SO RATHER THAN LEFT LOOKING DONE. This port's
+   `exit` is `jsr _fini` then a branch to itself, so quitting HANGS the machine
+   -- found while fixing the C128's exit on 2026-09-06, not reproduced on
+   hardware, and not addressed because this port does not ship yet. A reset
+   through $FFFC is the likely answer, as it was on the C128, but the MEGA65's
+   banking at that moment has not been measured and guessing at it is how the
+   C128 got its BRK in the first place. */
+void plat_exit(void) { }
+
 void vdc_shutdown(void) {
     bordercolor(6);
     bgcolor(6);

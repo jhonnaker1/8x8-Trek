@@ -2039,10 +2039,34 @@ Not missing features -- implemented things that do not match the original.
    so `cc` can reach it is worth doing too, but it is the smaller half — a
    native test of that function still would not have caught the key table.
 
-2. ~~**Returning to BASIC wedges the C128.**~~ RESOLVED 2026-08-22 -- it does
-   not, and there is no evidence it ever did. `main()` returns 0, the park loop
-   is gone, and Q now ends the program properly. See "The exit bug that was
-   never there" below. Original text follows.
+2. ~~**Returning to BASIC wedges the C128.**~~ RESOLVED 2026-09-06 -- and the
+   2026-08-22 resolution below was WRONG. It read "it does not, and there is no
+   evidence it ever did"; it did, it always did, and it shipped that way in
+   v0.9.0. Answering NO at "Play Again?" BRKed into the C128's machine-language
+   monitor at PC=$005B, deterministically, on every run. Jamie reported it, and
+   it reproduces on a v0.9.0 build.
+
+   THE CAUSE is llvm-mos's exit path, not this port's hardware handling -- so
+   all three suspects the original note named (2MHz, direct VDC writes, scanning
+   CIA1) were innocent, which is why the bisect that cleared them proved
+   nothing about the real fault. `_start` saves the MMU config into `__mmusave`,
+   the linker puts that in `.bss`, and `__do_zero_bss` erases it before `main`;
+   `_fini` then writes the resulting zero to $FF00, banking BASIC-hi ROM in over
+   $8000..$BFFF where this program's code is running. And even with the save
+   fixed, `exit` is an infinite loop, so returning was never going to reach
+   BASIC. `plat_exit()` resets the machine instead -- the only honest way to
+   hand back a C128 whose entire BASIC text area the program occupies.
+
+   WHY IT STOOD FOR TWO WEEKS is the part worth keeping. `tools/exit_real.py`
+   "settled" it by playing the port to a quit and asking BASIC for arithmetic --
+   an excellent method, applied to the wrong program. Its source list was a
+   hand-kept copy of the Makefile's and had drifted to eight of fifteen files
+   (no overlays, no disk seam, no serialiser), and it invoked `cl65` three weeks
+   after this port left cc65. Both are now fixed: it reads SRC from the Makefile
+   and builds the Makefile's own debug disk. A rig that builds its own subject
+   is not a regression test.
+
+   Original text follows.
 
    **Returning to BASIC wedges the C128.** Quit currently parks with the console
    readable and RUN/STOP+RESTORE as the way out, which works but is a

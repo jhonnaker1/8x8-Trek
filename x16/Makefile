@@ -158,6 +158,27 @@ data: $(GAME_OUT)
 run: data
 	cd $(DATA) && $(X16EMU)/x16emu -prg trekx16.prg -run
 
+# THE RELEASE BUNDLE. The X16 has no disk image the way a 1541 machine does:
+# the emulator's HostFS and a real SD card both want a DIRECTORY of files, so
+# what ships is a zip of exactly what `make data` assembles, unpacked wherever
+# the player keeps their programs.
+#
+# MUSIC.DAT IS THIS PORT'S OWN COMPOSITION, from tools/make_music.py. The
+# extracted note data that tools/gen_music.py pulls out of EGATREK.EXE is
+# Anderson's creative work and must never reach a release; make_music.py exists
+# so that a release can have sound at all. See its header.
+REL = build/release
+VERSION ?= dev
+
+release: data
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-x16
+	@cp $(DATA)/trekx16.prg $(DATA)/OVERLAYS.BIN $(DATA)/STRINGS.DAT \
+	    $(DATA)/MUSIC.DAT $(DATA)/BRIEF.TXT $(REL)/egatrek-x16/
+	@cp README-release.txt $(REL)/egatrek-x16/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-x16.zip egatrek-x16
+	@echo "release: build/egatrek-x16.zip"
+	@unzip -l build/egatrek-x16.zip | tail -n +4
+
 # OBJECTS WITHOUT LTO, built only so verify can read the call graph AS
 # WRITTEN. LTO inlines a resident function into main(), at which point a call
 # that only works with one particular overlay loaded is indistinguishable from

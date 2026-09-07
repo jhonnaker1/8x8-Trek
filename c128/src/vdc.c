@@ -119,6 +119,41 @@ void vdc_shutdown(void) {
        Leaving the final console up is both more useful and more honest. */
 }
 
+/* RESET, because there is nothing to return to.
+ *
+ * MEASURED 2026-09-06, after Jamie reported a BREAK on the 40-column screen
+ * when answering NO to "Play Again?". It reproduces on the v0.9.0 release, so
+ * it is not new -- it had simply never been looked at, and the note in main()
+ * claiming the exit was settled rested on a rig that builds a DIFFERENT
+ * program (tools/exit_real.py keeps a hand-copied source list, and that list
+ * has drifted to about half the port).
+ *
+ * TWO FAULTS, BOTH IN THE RUNTIME'S EXIT PATH, both visible in the link:
+ *
+ *   _start   saves the MMU config from $FF00 into __mmusave, which the linker
+ *            places at $1306 -- the FIRST BYTE OF .bss. __do_zero_bss then
+ *            zeroes it before main runs, so the saved config is gone.
+ *   _fini    writes that zero back to $FF00. Config $00 banks the BASIC-hi
+ *            ROM in over $8000..$BFFF, which is where this program's code
+ *            lives -- so the very next instruction is fetched from ROM.
+ *            `exit` is `jsr _fini` then a jump to itself at $9B0A; after the
+ *            switch that address is ROM, the CPU runs whatever is there, and
+ *            it lands in zero page and BRKs. PC=$005B, every run.
+ *
+ * FIXING __mmusave WOULD NOT HELP. With the right config restored, `exit` is
+ * still an infinite loop -- so "BASIC IS ON THE 40-COLUMN SCREEN" was never
+ * going to be true by returning. And there is nothing to return TO: this
+ * program occupies $1C01..$BEFF, which is BASIC's entire text area.
+ *
+ * So: jump through the reset vector and let the KERNAL bring the machine up
+ * clean. The MMU is deliberately NOT touched first -- the current config
+ * ($0E, set by _start) already maps the KERNAL at $C000..$FFFF, so $FFFC is
+ * readable, while writing $FF00 here would bank ROM over this very function
+ * before the jump could execute. That is the same trap _fini fell into. */
+void plat_exit(void) {
+    __asm__ volatile("jmp ($fffc)");
+}
+
 void scr_clear(void) {
     unsigned int i;
     vdc_set_address(VDC_SCREEN_BASE);
