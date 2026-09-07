@@ -196,13 +196,15 @@ evidence is the next section.
     `io_buf`, the hall of fame and the soft stack all stay visible, so the write
     itself is a straight port of `c128/src/storage.c` over byte-at-a-time CBDOS.
 
-    **The shape of the fix is now settled too.** Writes land in a D81 on
-    device 8 while reads go through the Hypervisor to the SD card's FAT32, so
-    a save written to the D81 would be invisible to hyppo -- which makes
-    "route each file to its own filesystem" the wrong answer. **Move everything
-    onto the D81 and drop hyppo**: probe 3 shows CBDOS reads all 45,056 bytes
-    of OVERLAYS.BIN byte-perfect in 0.9 seconds, so the one objection to it
-    does not hold.
+    **Nothing about it is unmeasured any more** -- four probes, below. Writes
+    land in a D81 on device 8 while reads go through the Hypervisor to the SD
+    card's FAT32, so a save written to the D81 would be invisible to hyppo:
+    "route each file to its own filesystem" is the wrong answer. **Move
+    everything onto the D81 and drop hyppo.** CBDOS reads all 45,056 bytes of
+    OVERLAYS.BIN byte-perfect in 0.9s, the command channel and its error codes
+    behave exactly as `c128/src/storage.c` expects, overwriting works through a
+    scratch, and the overlay window survives both a read and a write. What is
+    left is writing it, and one pass on real hardware.
 
 Everything else is fixed and verified. The port has still **not been played by
 a human** since 2026-09-03, and the fixes since then -- sound, briefing,
@@ -397,6 +399,42 @@ needs no buffer at all -- each byte can go straight to `$50000+n` with `lpoke`.
 The cost is that the player mounts a D81 instead of copying five files onto the
 card, which is how MEGA65 software is normally distributed anyway, and it makes
 this port ship like the C128's `.d64`.
+
+### Probe 4 -- the command channel, and proving the scratch is load-bearing
+
+The last three unknowns, all of them things that work on a 1541 and might not
+here. `make probe-cmd`, against a fresh D81:
+
+| step | | got | wanted |
+|---|---|---|---|
+| 1 | command channel on a fresh disk | `00,OK` | 00 |
+| 2 | write, file absent | `00,OK` | 00 |
+| 3 | write again, **no scratch** | `63,FI` | **63 FILE EXISTS** |
+| 4 | scratch `S0:TREKSAVE` | `01,FI` | 01 FILES SCRATCHED |
+| 5 | write again, after scratch | `00,OK` | 00 |
+| 6 | open a name that is not there | `62,FI` | 62 FILE NOT FOUND |
+| 7 | read the file back | `00,OK` | 00 |
+
+Eight bytes back, `$41..$48` -- exactly what was written. The D81 afterwards
+holds **one** `TREKSAVE`, not two.
+
+**STEP 3 IS THE POINT OF THE PROBE.** Writing the same name twice with no
+scratch in between is *supposed* to fail, and it did. Without that row, step 5
+proves nothing: a run where every step succeeds cannot tell you which step
+mattered, and "the scratch is necessary" would have been an assumption wearing
+a passing test.
+
+So the command channel behaves exactly as `c128/src/storage.c` expects, error
+codes included -- which means `classify()` (62 is NOT FOUND, everything else
+non-zero is a real fault) ports across unchanged, and `plat_read_all` really
+can tell "no save yet" from "broken disk".
+
+**And the window survives a read**: `$C000..$CBFF` again zero bytes changed.
+That was the one with teeth, because the briefing streams from disk *while an
+overlay is loaded*. It does not need reloading afterwards.
+
+Nothing about the write path is unmeasured now. What is left is writing it, and
+one pass on real hardware.
 
 ## Driving this port headlessly
 

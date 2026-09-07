@@ -266,6 +266,13 @@ probe-read: build/probe_read.prg build/OVERLAYS.BIN
 	    [c := c ^ b for b in d]; \
 	    print('expect %d bytes, xor \$$%02X' % (len(d), c))"
 
+build/probe_cmd.prg: src/probe_cmd.c
+	@mkdir -p build
+	$(PROBECC)
+
+probe-cmd: build/probe_cmd.prg
+	sh tools/run_cmd_probe.sh
+
 run-smoke: $(SMOKE_OUT)
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -prg $(CURDIR)/$(SMOKE_OUT)
 
