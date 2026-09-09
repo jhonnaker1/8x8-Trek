@@ -151,7 +151,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.0](../../releases/latest) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Blocked on one question** — a few KB short (`make early` measures it); viable if `run_turn` splits, see [`atari/README.md`](atari/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Viable, not started** — the `run_turn` split was measured on 2026-09-08 and frees 3,520 bytes against a ~3,850 gap; see [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except

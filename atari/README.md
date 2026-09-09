@@ -74,10 +74,67 @@ about 2,330 of it.
    `trek_events_due()`, the same predicate `run_turn` loads `OVL_EVENTS` on.
    That pairing is the only reason it is safe, and it is documented in
    `tools/overlay_check.py`'s `PAIRED` table because rule 4's check could not
-   see it. **Any further split has to follow that pattern: a guard that
-   provably matches its load.** That is more delicate than the load-and-call
-   pairs in `main`, so the remaining bytes will not come from a mechanical
-   pass.
+   see it.
+
+### ANSWERED 2026-09-08: it splits, and it was BUILT to find out
+
+Not reasoned about — performed on the C128 in a throwaway worktree, because
+this project has been wrong before about which split pays (the fourth overlay
+pass named candidates that cost 863 bytes instead of saving any).
+
+**The candidate is `trek_enemy_turn` and its damage chain, and the call graph
+is unusually clean:**
+
+```
+trek_enemy_turn     1939   <- run_turn, and nothing else
+trek_wreck_system   1132   <- trek_combat_damage
+trek_take_hit        814   <- trek_enemy_turn
+trek_combat_damage   393   <- trek_enemy_turn
+                    ----
+                    4278   private to the enemy turn
+
+trek_laser_damage    341   <- trek_enemy_turn AND trek_fire_laser -- SHARED,
+                             so it stays resident
+```
+
+Everything except `trek_laser_damage` is reachable from exactly one place. One
+entry point, one caller: rule 3 satisfied by construction, and rule 4 by the
+same `PAIRED` pattern the events overlay already uses.
+
+**MEASURED, as a twelfth overlay on the C128:**
+
+```
+resident text   33,571 -> 30,051      3,520 BYTES FREED
+.ovl_enemy       3,832 of 4,094       fits, 262 spare
+make verify      all rules pass, including rule 4 with the pairing declared
+```
+
+And it **plays**: driven through setup into the console, `SHUP` ran a full turn
+through the newly paged code — "ENGINEERING: SHIELDS UP", energy 5000 to 4950 —
+with no crash. The rule-4 check caught the missing pairing first, which is
+exactly what it is for.
+
+**3,520 against a shortfall of about 3,850**, plus the +512 from item 1, closes
+it with room to spare.
+
+### What it costs, and why the Atari can afford what the C128 cannot
+
+`run_turn` calls the enemy turn on essentially every command, so this is a
+window swap on the hot path — the thing this port's notes warn about. Two
+things soften it:
+
+* **`ovl_load` is idempotent.** On a turn where nothing else touched the
+  window, `OVL_ENEMY` is already there and the load costs nothing. The real
+  cost is on commands that swap the window first — the seven `load_cmds()`
+  sites and the panels — where it doubles one load into two.
+* **On this target the images need not come off disk.** VBXE has 512K of VRAM
+  and MEMAC window A to reach it, so overlay images can live there and arrive
+  as a memory copy, exactly as the MEGA65's arrive from banked RAM by DMAgic
+  in microseconds. That is what makes a per-turn swap affordable here and
+  ruinous on a 1541.
+
+**So this is not committed to the C128**, where it would buy nothing and cost a
+disk read on the hot path. It is recorded as measured and available.
 3. Writable data into VBXE VRAM beyond the message log — but only for things
    already reached through a seam. `io_buf` is wanted as one contiguous blob
    and cannot move; that is settled and recorded for the C128.
