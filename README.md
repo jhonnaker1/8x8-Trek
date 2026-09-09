@@ -7,12 +7,10 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: three ports released, a fourth feature complete.** The **Commodore
-> 128**, **Commander X16** and **Amiga** ports are released as
-> [v0.11.0](../../releases/latest). The **MEGA65** port is now feature complete
-> too — console, sound, overlays, briefing, and saving to a D81 — but has **not
-> been played by a human** since 2026-09-03; see
-> [`mega65/README.md`](mega65/README.md).
+> **Status: four ports, all released.** The **Commodore 128**, **Commander
+> X16**, **Amiga** and **MEGA65** ports are feature complete and released as
+> [v0.12.0](../../releases/latest) — the MEGA65 joined on 2026-09-08 with
+> saving, and everything it reads or writes lives on one D81.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
@@ -152,7 +150,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.11.0](../../releases/latest) |
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.11.0](../../releases/latest) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.11.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
-| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Feature complete** — console, sound, overlays, save/restore to a D81; unplayed by hand |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — console, sound, overlays, save/restore to a D81 |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Blocked on one question** — 3,754 bytes short; viable if `run_turn` splits, see [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the

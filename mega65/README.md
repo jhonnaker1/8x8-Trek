@@ -5,8 +5,8 @@ order puts ahead of the bitmap machines. Status: **feature complete** — the
 whole game in 80 columns on an exact EGA palette, with sound, a streamed
 briefing, saving and restoring, and a game playable from the title screen
 through the hall of fame to a second game. It reads and writes **one D81** on
-device 8 and does not touch the SD card. **Not yet played by a human** since
-2026-09-03.
+device 8 and does not touch the SD card. **Played by hand and released in
+v0.12.0** on 2026-09-08.
 
 ```sh
 make          # build/egatrek.prg + build/OVERLAYS.BIN
@@ -195,9 +195,11 @@ the briefing are fixed below, and one crash remains unexplained.
 
 **Nothing.** Saving was the last item and it works: a game SAVEs to the D81,
 a RESTORE brings back a pixel-identical console, and the port no longer touches
-the SD card at all. What remains is not a defect list -- it is that **no human
-has played this port since 2026-09-03**, and the two deferred features (the
-viewer's other pages, colour per message) were never started.
+the SD card at all. Played by hand on 2026-09-08 and released in v0.12.0.
+
+The two deferred features -- the MAIN VIEWER's other nine pages and colour per
+message -- were never started, and are deliberate scope rather than defects.
+There is about 5K of resident space for them.
 
 ## Saving works, and the SD card is gone
 

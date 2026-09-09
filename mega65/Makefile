@@ -234,6 +234,19 @@ d81: disk
 	done
 	@c1541 -attach $(D81) -list 2>&1 | grep -v "OPENCBM\|recognised\|attached\|detached"
 
+# THE RELEASE ARTEFACT IS THE D81 ITSELF, plus the README beside it. Unlike the
+# X16 -- which has no disk image and ships a folder of files for HostFS -- this
+# machine mounts one image, so a zip would only be a wrapper around a wrapper.
+#
+# MUSIC.DAT IS THIS PORT'S OWN COMPOSITION, from tools/make_music.py. The
+# extracted note data that tools/gen_music.py pulls out of EGATREK.EXE is
+# Anderson's creative work and must never reach a release; make_music.py exists
+# so that a release can have sound at all.
+release: d81
+	@cp $(D81) build/egatrek-mega65.d81
+	@cp README-release.txt build/egatrek-mega65.txt
+	@ls -l build/egatrek-mega65.d81 build/egatrek-mega65.txt
+
 # Kept as an alias for a while: `sd` is in three docs and a release script.
 sd: d81
 
