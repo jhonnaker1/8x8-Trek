@@ -105,9 +105,21 @@ uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
     return sink ? STOR_ERROR : STOR_OK;
 }
 uint8_t plat_open(const char *name) { sink = (unsigned char)*name; return sink ? STOR_NOTFOUND : STOR_OK; }
-uint16_t plat_read(void *buf, uint16_t len) { sink = (unsigned char)len; memset(buf, 0, 1); return 0; }
+/* `return 0` HERE DELETED THE GAME on 2026-09-09, the moment far_load became
+   real: a literal zero let LTO prove the read loop never ran, so far_load
+   always returned FAR_NONE, so ovl_init always reached its noreturn die(),
+   so everything main() does after its first ovl_load was unreachable. The
+   early link reported 1,507 bytes -- the X16's 1,564-byte reading again,
+   arriving through a different door. A stub is unfoldable only while nothing
+   downstream of it is real; check it again each time a consumer lands. */
+uint16_t plat_read(void *buf, uint16_t len) {
+    sink = (unsigned char)len;
+    memset(buf, 0, 1);
+    return sink ? len : 0;
+}
 void plat_close(void) { sink = 13; }
 
+#ifndef ATARI_HAVE_FARMEM
 /* ---- far memory ----------------------------------------------------- */
 uint16_t far_load(const char *name) { sink = (unsigned char)*name; return FAR_NONE; }
 uint16_t far_size(void) { return sink; }
@@ -115,6 +127,9 @@ void far_read(uint16_t off, void *dst, uint8_t len) {
     sink = (unsigned char)(off ^ len);
     memset(dst, 0, len);
 }
+#endif /* ATARI_HAVE_FARMEM */
 
+#ifndef ATARI_HAVE_OVERLAY
 /* ---- overlays ------------------------------------------------------- */
 void ovl_load(uint8_t which) { sink = which; }
+#endif /* ATARI_HAVE_OVERLAY */

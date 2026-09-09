@@ -16,6 +16,12 @@ CFLAGS  = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS \
           -I src -I ../c128/src -I ../core
 LDFLAGS = -T atari.ld -Wl,--no-check-sections
 
+# THE WINDOW SIZE, READ OUT OF atari.ld RATHER THAN COPIED. The X16 keeps the
+# same number in its Makefile and its linker script and relies on nobody
+# changing one without the other; there is no reason to repeat that here when
+# the linker script is the only file that can actually enforce it.
+OVL_WINDOW = $(shell python3 -c "import re;print(int(re.search(r'__ovl_size\s*=\s*(0x[0-9a-f]+)',open('atari.ld').read()).group(1),16))")
+
 # THE MEASUREMENT THE SCOPE ASKS FOR: link the whole game against stubbed
 # seams and see what the GAME costs, before any driver is written. See
 # src/stubs.c for why every stub writes through a volatile.
@@ -23,13 +29,13 @@ LDFLAGS = -T atari.ld -Wl,--no-check-sections
 # src/stubs.c. Every driver that lands moves one line from the stub column to
 # the source column, so the budget converges on the truth rather than being
 # corrected by hand at the end.
-EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT
+EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_HAVE_OVERLAY
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/vbxevid.c src/atariinput.c src/stubs.c
+            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest clean
 
 all: early
 
@@ -41,7 +47,7 @@ early:
 
 build/early.elf: $(EARLY_SRC) atari.ld
 	@mkdir -p build
-	$(ATARICC) $(CFLAGS) $(EARLY_DEFS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
+	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(EARLY_DEFS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
 
 clean:
 	rm -f build/*.elf build/*.map
@@ -87,3 +93,14 @@ keyecho: src/keyecho.c src/vbxevid.c src/atariinput.c src/vbxevid.h atari.ld
 run-keyecho: keyecho
 	python3 tools/run_atari.py build/keyecho.xex build/keyecho.png 120 \
 	    --keys T,R,E,K,1,9,COMMA,PERIOD,MINUS,SPACE,RETURN,ESCAPE,BACKSPACE
+
+# FAR MEMORY AND THE OVERLAY-SIZED COPY, checked across bank boundaries -- the
+# case the C128's flat 64K bank cannot have and this port's 4K window meets on
+# every overlay swap.
+memtest: src/memtest.c src/vbxevid.c src/atarimem.c src/vbxevid.h src/atarimem.h atari.ld
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(LDFLAGS) -o build/memtest.xex \
+	    src/memtest.c src/vbxevid.c src/atarimem.c
+
+run-memtest: memtest
+	python3 tools/run_atari.py build/memtest.xex build/memtest.png 240

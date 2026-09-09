@@ -10,7 +10,7 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**Video and input are built and running.**
+**Video, input, far memory and the overlay loader are built.**
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -22,7 +22,13 @@ one screenshot.
 what the input seam returned. All thirteen came back as the values
 `c128/src/input.h` names — letters uppercased, RETURN 13, ESC 27, DELETE 20.
 
-Still `src/stubs.c`: sound, storage, far memory and the overlay loader.
+`make run-memtest` plants a 9,000-byte pattern in VBXE VRAM and reads it back
+across both 4K bank boundaries, including a 4,608-byte overlay-sized `far_bulk`
+starting where it crosses two of them. Four for four, zero bad bytes, and the
+screen bank survives — which is the check that two drivers share the MEMAC
+bank bookkeeping correctly.
+
+Still `src/stubs.c`: **sound and storage.**
 
 ## The budget, and it moved
 
@@ -240,6 +246,47 @@ returning, so the OS's auto-repeat cannot turn one press into a burst. The
 bridge's `KEY` queues a press-and-release and cannot hold a key down, so the
 rig cannot reach that case. First real play settles it.
 
+## Far memory and overlays are one mechanism here
+
+`core/farmem.h` lists the banking model of every target it was designed around
+and this one is not in the list, because when it was written this machine was
+going to be a 130XE with 16K banks at `$4000`. It is not. **VBXE brings 512K of
+its own VRAM through the same MEMAC window the video driver already opens**, so
+far memory, the message log and the screen are the same mechanism seen through
+the same 4K hole. Banks 0–3 are the video driver's (screen and XDL, font, the
+log's two); the far store starts at VRAM `$04000`, and the seam's 16-bit
+offsets reach 64K of it — four times what any port has ever put in one.
+
+`src/atariovl.c` is then the X16's loader with the far store underneath it: all
+the images live in VRAM and a swap is a copy through the window. **On this
+target that is not merely tidier, it is what makes the twelfth overlay
+possible** — `run_turn` calls the enemy turn on essentially every command, so
+paging it is a window swap on the hot path. A disk read there would be ruinous;
+a VRAM copy is not. `ovl_load` stays idempotent, which is what makes a turn
+that touched nothing else cost nothing at all.
+
+The build-stamp check comes across from the other ports unchanged. It cost the
+MEGA65 an afternoon and two wrong diagnoses before the disk was even suspected,
+and it caught a real mismatch on the C128 the day it went in.
+
+**One number that was duplicated is not any more.** The X16 keeps its window
+size in both its Makefile and its linker script and relies on nobody changing
+one without the other; here the Makefile reads `__ovl_size` out of `atari.ld`,
+which is the only file that can actually enforce it.
+
+### The stub that deleted the game, from the other side
+
+The moment `far_load` became real, the early link reported **1,507 bytes** —
+the X16's 1,564-byte reading arriving through a different door, and the same
+disaster the top of `src/stubs.c` warns about.
+
+The fault was one literal. `plat_read` returned `0`, so LTO could prove the
+read loop never ran, so `far_load` always returned `FAR_NONE`, so `ovl_init`
+always reached its `noreturn` `die()` — and everything `main()` does after its
+first `ovl_load` was unreachable. **A stub is unfoldable only while nothing
+downstream of it is real.** Check every stub again each time a consumer lands,
+not once when it is written.
+
 ## The stubs measure the game, not themselves
 
 `src/stubs.c` is every remaining seam with nothing behind it, and **every stub
@@ -275,7 +322,7 @@ Two things it cost to learn:
 
 ## What is still open
 
-* The five remaining seams, and what each costs beyond its driver.
+* **Sound and storage**, and what each costs beyond its driver.
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.
