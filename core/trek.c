@@ -2068,7 +2068,7 @@ static void erode_chart(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
-void trek_wreck_system(uint8_t which, uint16_t hits,
+OVL_CODE_ENEMY void trek_wreck_system(uint8_t which, uint16_t hits,
                        TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t factor, divisor, off, q, r;
     int16_t  left;
@@ -2120,7 +2120,7 @@ void trek_wreck_system(uint8_t which, uint16_t hits,
    main loop at 0x005993 inside a `for r = 1 to Round(hits/350) + 1`. The
    level and penetration gates in that routine are unreachable in play (see
    trek.h), so what is left is the count and a two-in-three roll. */
-void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max) {
+OVL_CODE_ENEMY void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t rounds, i;
 
     /* The shield SYSTEM wears from what the POOL stopped, once, on the
@@ -2149,7 +2149,7 @@ void trek_combat_damage(TrekEvent *ev, uint8_t *n, uint8_t max) {
     turn_hits = turn_absorbed = 0;
 }
 
-void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
+OVL_CODE_ENEMY void trek_take_hit(uint16_t amount, TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t absorbed = 0, through, drain = 0;
 
     /* SHIELDS ARE A PROPORTIONAL ABSORBER -- see the law and its evidence in
@@ -2438,7 +2438,7 @@ uint8_t trek_plasma_bolt(uint8_t ty, uint8_t tx,
     return PBOLT_FIRED;
 }
 
-uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
+OVL_CODE_ENEMY uint8_t trek_enemy_turn(TrekEvent *ev, uint8_t max, uint8_t player_fired) {
     uint8_t cell, n = 0;
     uint16_t d, energy, dmg;
 

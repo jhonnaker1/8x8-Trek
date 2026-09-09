@@ -184,6 +184,14 @@ PAIRED = {
     ("trek_run_events", ".ovl.events"):
         "guarded by trek_events_due(), which is the SAME predicate run_turn "
         "loads OVL_EVENTS on -- see the comment at that call in core/trek.c",
+    # ADDED 2026-09-09 WITH THE ATARI'S TWO OPT-IN WINDOWS. Only that port
+    # enables TREK_OVL_ENEMY, so on every other build .ovl.enemy is empty and
+    # this entry is inert -- but the pairing is a property of the SOURCE, not
+    # of the port, so it belongs here rather than in one Makefile.
+    ("run_turn", ".ovl.enemy"):
+        "load_enemy() on the line above it, inside the same `if (enemy_acts "
+        "&& n < 12)` that makes the call -- see core/overlay.h on why these "
+        "two windows are opt-in",
 }
 
 

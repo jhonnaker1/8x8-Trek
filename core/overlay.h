@@ -133,7 +133,50 @@
    and it is cheapest here because the X16 keeps its images in banked RAM
    rather than as separate disk files. */
 #define OVL_XTRA   10   /* trek_new_game */
-#define OVL_COUNT  11
+
+/* THE ELEVEN ABOVE ARE EVERY PORT'S. THE TWO BELOW ARE OPT-IN, and the reason
+ * is the cost of a swap rather than anything about the code.
+ *
+ * Every rule of thumb in this file -- "the test is FREQUENCY, not size",
+ * "fire_one_torpedo must NOT move because firing is the most frequent action"
+ * -- rests on one assumption: that loading an overlay means reading a disk.
+ * On the C128 it does, and on the X16 it is a copy out of banked RAM.
+ *
+ * ON THE ATARI + VBXE IT IS A COPY OUT OF VIDEO RAM, and that changes which
+ * splits are affordable rather than which are correct. These two page code on
+ * the HOT PATH -- the enemy turn runs on essentially every command and the
+ * move command is the most common one a player types -- which is ruinous on a
+ * 1541 and merely costs milliseconds through a MEMAC window. So they are
+ * enabled per port, by the Makefile, and no released port pays for them.
+ *
+ * MEASURED ON THE ATARI 2026-09-09: 3,910 and 1,578 bytes, which is what took
+ * that target from 5,161 over to linking with about 330 spare. The enemy split
+ * was measured at 3,520 on the C128, so the figure is per-target and must be
+ * re-measured, not carried across.
+ *
+ * IDS STAY CONTIGUOUS whichever combination is on, because they are indices
+ * into the image file. */
+#define OVL_BASE_COUNT 11
+
+#ifdef TREK_OVL_ENEMY
+#define OVL_ENEMY       (OVL_BASE_COUNT)
+#define OVL_CODE_ENEMY  OVL_CODE("enemy")
+#define OVL_N_ENEMY     1
+#else
+#define OVL_CODE_ENEMY
+#define OVL_N_ENEMY     0
+#endif
+
+#ifdef TREK_OVL_MOVE
+#define OVL_MOVE        (OVL_BASE_COUNT + OVL_N_ENEMY)
+#define OVL_CODE_MOVE   OVL_CODE("move")
+#define OVL_N_MOVE      1
+#else
+#define OVL_CODE_MOVE
+#define OVL_N_MOVE      0
+#endif
+
+#define OVL_COUNT  (OVL_BASE_COUNT + OVL_N_ENEMY + OVL_N_MOVE)
 
 #define OVL_NONE   0xFF
 

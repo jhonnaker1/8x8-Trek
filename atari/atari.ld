@@ -54,6 +54,11 @@ MEMORY {
     ovlimg8 (rw) : ORIGIN = 0x110000, LENGTH = __ovl_size
     ovlimg9 (rw) : ORIGIN = 0x112000, LENGTH = __ovl_size
     ovlimg10 (rw): ORIGIN = 0x114000, LENGTH = __ovl_size
+    /* THE TWO OPT-IN WINDOWS -- see core/overlay.h. The Makefile
+       defines TREK_OVL_ENEMY and TREK_OVL_MOVE; on a port that does
+       not, these sections are empty and cost nothing. */
+    ovlimg11 (rw): ORIGIN = 0x116000, LENGTH = __ovl_size
+    ovlimg12 (rw): ORIGIN = 0x118000, LENGTH = __ovl_size
 }
 
 REGION_ALIAS("c_readonly", ram)
@@ -71,6 +76,8 @@ SECTIONS {
     .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
     .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
     .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
+    .ovl_enemy  ORIGIN(window) : { *(.ovl.enemy)  } >window AT>ovlimg11
+    .ovl_move   ORIGIN(window) : { *(.ovl.move)   } >window AT>ovlimg12
 
     INCLUDE c.ld
 }

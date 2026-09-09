@@ -29,6 +29,20 @@ OVL_LOADER load_title(void)  { ovl_load(OVL_TITLE); }
 OVL_LOADER load_events(void) { ovl_load(OVL_EVENTS); }
 OVL_LOADER load_xtra(void)   { ovl_load(OVL_XTRA);   }
 
+/* THE TWO OPT-IN WINDOWS -- see core/overlay.h. A port that does not want
+   them compiles the loader away entirely rather than calling an empty
+   function, so no released port pays a byte for either. */
+#ifdef TREK_OVL_ENEMY
+OVL_LOADER load_enemy(void)  { ovl_load(OVL_ENEMY);  }
+#else
+#define load_enemy() ((void)0)
+#endif
+#ifdef TREK_OVL_MOVE
+OVL_LOADER load_move(void)   { ovl_load(OVL_MOVE);   }
+#else
+#define load_move() ((void)0)
+#endif
+
 /* 8x8 Trek -- C128 VDC port, milestone 2.
  *
  * Galaxy generation, movement and laser fire, driven from the shared core.
@@ -781,7 +795,7 @@ static void do_lasers(void) {
     ui_dialog_close();
 }
 
-static void report_move(uint8_t r) {
+OVL_CODE_MOVE static void report_move(uint8_t r) {
     /* Caught in flight. The core sets this on a warp move that ended
        somewhere the captain did not ask for. */
     if (tractored) {
@@ -883,7 +897,7 @@ static void report_move(uint8_t r) {
  *
  * Returns 1 if the field parsed, 0 on ESC or nonsense. The parsed value is a
  * signed count of SECTORS, since a quadrant is eight of them. */
-static uint8_t read_delta(const char *prompt, int16_t *out) {
+OVL_CODE_MOVE static uint8_t read_delta(const char *prompt, int16_t *out) {
     char buf[10];
     const char *p;
     uint8_t neg = 0, q = 0, sec = 0;
@@ -914,7 +928,7 @@ static uint8_t read_delta(const char *prompt, int16_t *out) {
    impulse hop inside the quadrant, four is a warp jump; anything else is not
    a location. Shared by the command line and the NAVIGATION dialog so the
    two cannot drift. */
-static void move_absolute(const uint8_t *d, uint8_t n) {
+OVL_CODE_MOVE static void move_absolute(const uint8_t *d, uint8_t n) {
     uint8_t i;
 
     for (i = 0; i < n; i++)
@@ -929,7 +943,7 @@ static void move_absolute(const uint8_t *d, uint8_t n) {
         ui_message(S(S_52), S(S_57));
 }
 
-static void do_move_manual(void) {
+OVL_CODE_MOVE static void do_move_manual(void) {
     int16_t dy, dx;
 
     if (!read_delta("DELTAX:", &dy)) { ui_dialog_close(); return; }
@@ -941,7 +955,7 @@ static void do_move_manual(void) {
 /* The NAVIGATION dialog, which the original opens when M arrives with no
    coordinates on it. Automatic entry takes "6,2,3,5" or a bare "3,5" for an
    impulse hop; typing just M switches to manual entry, as the manual says. */
-static void do_move_prompt(void) {
+OVL_CODE_MOVE static void do_move_prompt(void) {
     char buf[16];
     uint8_t d[8], n;
 
@@ -968,7 +982,7 @@ static void do_move_prompt(void) {
     move_absolute(d, n);
 }
 
-static void do_move(const char *line) {
+OVL_CODE_MOVE static void do_move(const char *line) {
     uint8_t d[8];
     uint8_t n = grab_digits(line, d, 8);
 
@@ -1581,9 +1595,16 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
        a turn where nothing is due, which is almost every turn. */
     if (trek_events_due()) load_events();
     n = trek_run_events(ev, 12);
-    if (enemy_acts && n < 12)
+    /* PAIRED, and declared as such in tools/overlay_check.py: run_turn is
+       resident and trek_enemy_turn is in OVL_ENEMY on the ports that enable
+       it, so the load has to sit on the call. Rule 4 exists for exactly this
+       and the check caught the missing pairing when the split was first
+       built. On a port without TREK_OVL_ENEMY the load compiles away. */
+    if (enemy_acts && n < 12) {
+        load_enemy();
         n = (uint8_t)(n + trek_enemy_turn(ev + n, (uint8_t)(12 - n),
                                           player_fired));
+    }
 
     for (i = 0; i < n; i++) {
         k = 0;
@@ -2021,7 +2042,7 @@ int main(void) {
             else if (word_is(cmd, "SHDN")) { do_shields_down(); enemy_turn(0); }
             else if (word_is(cmd, "MAX"))  { load_cmds(); do_max_energy();
                                              enemy_turn(0); }
-            else if (c == KB_M)      { do_move(cmd);    enemy_turn(0); }
+            else if (c == KB_M)      { load_move(); do_move(cmd); enemy_turn(0); }
             else if (c == KB_L) { do_lasers();     enemy_turn(1); }
             else if (c == KB_T) { do_torpedo(cmd); enemy_turn(1); }
             else if (c == KB_D) { load_cmds(); do_dock();

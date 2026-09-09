@@ -12,7 +12,15 @@
 LLVM_MOS ?= $(HOME)/llvm-mos
 ATARICC   = $(LLVM_MOS)/bin/mos-atari8-dos-clang
 
-CFLAGS  = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS \
+# THE TWO OPT-IN OVERLAYS, and this is the only port that turns them on.
+# Both page code on the HOT PATH -- the enemy turn runs on essentially every
+# command and MOVE is the commonest thing a player types -- which is ruinous
+# where a swap is a disk read and costs milliseconds where it is a copy out of
+# VBXE's VRAM. Measured 2026-09-09: 3,910 and 1,578 bytes, which is what takes
+# this target from 5,161 over to linking. See core/overlay.h.
+OVL_OPT = -DTREK_OVL_ENEMY -DTREK_OVL_MOVE
+
+CFLAGS  = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS $(OVL_OPT) \
           -I src -I ../c128/src -I ../core
 LDFLAGS = -T atari.ld -Wl,--no-check-sections
 
@@ -35,7 +43,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest nolto verify clean
 
 all: early
 
@@ -145,3 +153,20 @@ storetest: src/storetest.c src/vbxevid.c src/ataristorage.c
 
 run-storetest: storetest
 	python3 tools/storetest.py "$(DOS_ATR)"
+
+# OBJECTS WITHOUT LTO, built only so verify can read the call graph AS
+# WRITTEN. LTO inlines a resident function into main(), at which point a call
+# that only works with one particular overlay loaded is indistinguishable from
+# the correct ones -- which is exactly how the hall-of-fame crash got out on
+# three ports at once. See tools/overlay_check.py, rule 4.
+NOLTO = build/nolto
+
+nolto: $(EARLY_SRC) src/music_data.h
+	@mkdir -p $(NOLTO)
+	@for f in $(EARLY_SRC); do \
+	    $(ATARICC) -c -fno-lto $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(EARLY_DEFS) \
+	        -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
+	done
+
+verify: build/early.elf nolto
+	python3 tools/verify_xex.py
