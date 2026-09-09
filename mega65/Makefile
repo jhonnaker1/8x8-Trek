@@ -189,20 +189,18 @@ disk: $(OUT) verify
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > $(DISK)/TREK.SCR
 	@ls -l $(DISK)
 
-# THE CARD IS XEMU'S OWN, and that is the whole trick. Three hand-built images
-# failed before this: a bare FAT32, an MBR+FAT32 the Hypervisor would not CHDIR
-# into, and a blank card offered to the format utility that lives ON the card.
-# `-sdimg @mega65.img` names the image in Xemu's own preferences directory,
-# which Xemu partitions, formats and populates itself the first time it creates
-# one -- so it needs no ONBOARDing and nothing waits for a human. The game's
-# files go onto it with mtools; tools/putfiles.sh has the one wrinkle (Xemu's
-# formatter leaves the legacy CHS geometry zeroed and mtools refuses the card
-# until it is patched).
+# `-sdimg @mega65.img` STAYS, but only because the MACHINE boots off the card.
+# The game no longer reads or writes it. That flag names Xemu's own image in its
+# preferences directory, which Xemu partitions and formats itself, so it needs
+# no ONBOARDing and nothing waits for a human -- which is what makes `-headless`
+# work at all. Three hand-built cards failed before that was understood.
 #
-# There used to be an `sd` target here that built build/sd.img with
-# tools/mksd.py. THE SCRIPT DOES NOT EXIST -- the approach was abandoned for
-# the one above and the rules outlived it, so `make run` had been broken for a
-# day. Both are gone rather than repaired.
+# THE FILES USED TO GO ON WITH mtools, through tools/putfiles.sh. That is gone
+# with hyppo: c1541 writes the D81 instead, and the CHS-geometry wrinkle
+# putfiles.sh existed for went with it. THIS IS THE SECOND TIME A SCRIPT HAS
+# OUTLIVED ITS RULE HERE -- an `sd` target once called a tools/mksd.py that did
+# not exist, and `make run` was broken for a day before anyone noticed. Deleted
+# rather than left lying about.
 # ONE D81, AND THE SD CARD IS NO LONGER THE GAME'S BUSINESS.
 #
 # The port used to read its files off Xemu's own SD card through the

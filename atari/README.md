@@ -8,18 +8,21 @@ before committing: link the whole game early."*
 
 ## Is it viable? Yes — but only if `run_turn` can be split
 
-Measured 2026-09-06, and this is the whole argument:
+**`make early` re-measures this on every build and is the authority; the block
+below is the reading on 2026-09-08.** It has already drifted once -- it said
+SHORT BY 3754 when first written on 2026-09-06 and shared code has moved since,
+so treat the figure as a position, not a constant.
 
 ```
 address space   $3000..$BFFF        36864   4K MEMAC window, not 8K
 overlay window                       4608
-writable data (.data/.bss/.noinit)   2322
-leaves for code+rodata              29934
+writable data (.data/.bss/.noinit)   2329
+leaves for code+rodata              29927
 
-the game's code+rodata, seams stubbed 29149
+the game's code+rodata, seams stubbed 29245
 the driver layer it still needs       4539   measured on the X16
                                     -------
-                                      33688   SHORT BY 3754
+                                      33784   SHORT BY 3857
 ```
 
 **The 8K→4K window is the first lever and it is already spent.** With VBXE's
@@ -44,7 +47,7 @@ So this is not a target that generates worse code. **The C128 wins on
 structure**: its writable data lives in a separate `lowram` region at
 `$1300..$1C00` that does not compete with code at all, while the Atari's
 `.data`/`.bss`/`.noinit` come out of the same space. That difference alone is
-2,322 of the 3,754.
+2,329 of the 3,857.
 
 ### What could close it, in order of what they cost
 
@@ -56,6 +59,20 @@ structure**: its writable data lives in a separate `lowram` region at
    candidate large enough to matter** — after `main` and `run_turn` the biggest
    resident function is 1,143 bytes, and everything at that size is drawn or
    run every turn, so paging it means a disk load per turn.
+
+   **What "split `run_turn`" actually means, established 2026-09-07:** the
+   function is only **68 source lines**. Its size is LTO inlining
+   `trek_run_events` (2,299 bytes) and `trek_enemy_turn` (1,939) into it, so
+   the work is paging one of *those*, not carving up `run_turn`.
+
+   **And `trek_run_events` is already paged, conditionally** — it is guarded by
+   `trek_events_due()`, the same predicate `run_turn` loads `OVL_EVENTS` on.
+   That pairing is the only reason it is safe, and it is documented in
+   `tools/overlay_check.py`'s `PAIRED` table because rule 4's check could not
+   see it. **Any further split has to follow that pattern: a guard that
+   provably matches its load.** That is more delicate than the load-and-call
+   pairs in `main`, so the remaining bytes will not come from a mechanical
+   pass.
 3. Writable data into VBXE VRAM beyond the message log — but only for things
    already reached through a seam. `io_buf` is wanted as one contiguous blob
    and cannot move; that is settled and recorded for the C128.

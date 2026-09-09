@@ -104,31 +104,31 @@ The other two really did evaporate. The string pool and music live at `$40000`
 and the message log at `$44000`, reached with `lcopy`/`lpeek`/`lpoke` instead
 of an MMU dance, and `far_read` is a DMA burst.
 
-`make verify` prints the live figures rather than this file quoting them --
-these three numbers had all gone stale once already. As of 2026-09-07:
-
-    resident   34,654 bytes of 40,447    ($2001, up to the window)
-    window      4,096 bytes              ($C000..$CFFF), largest image 3,772
-    images     11                        banked at $50000, from OVERLAYS.BIN
+**`make verify` prints the live figures and this file no longer quotes them.**
+They had gone stale twice: once as a set, and again the day after being
+re-quoted with a date attached, because a date makes a number look maintained
+without making it so. The shape is one 4K window at `$C000`, eleven images
+banked at `$50000`, and the resident half filling `$2001` upwards to meet it.
 
 ## Running it headlessly -- SOLVED, and the answer was in Xemu's source
 
-    make                                  # build/egatrek.prg + build/OVERLAYS.BIN
-    tools/putfiles.sh build/OVERLAYS.BIN ../c128/build/strings.dat ...
-    tools/run.sh build/egatrek.prg shot.png 20
+    make d81                              # the program and its files, one image
+    make drive DRIVE_KEYS="RETURN N ..."  # keys in, screenshot out
 
-**Use Xemu's OWN default card**, `-sdimg @mega65.img`, which lives in its prefs
-directory. Xemu fdisk/formats that card itself the first time it creates one,
-and a card it made needs no ONBOARDing -- so nothing waits for a human and
-`-headless -screenshot` works.
+**`-sdimg @mega65.img` is still passed, but only because the MACHINE boots off
+the card** -- the game itself has read and written a D81 on drive 8 since
+2026-09-08. That flag names Xemu's own image in its prefs directory, which Xemu
+partitions and formats itself, so it needs no ONBOARDing and nothing waits for
+a human. That is what makes `-headless -screenshot` work at all.
 
-Three hand-built images failed before that: a bare FAT32; an MBR plus FAT32 the
-Hypervisor would not `CHDIR /` into; and a blank card offered to the machine's
-own FDISK+FORMAT utility, which cannot work because that utility is a file ON
-the card. `targets/mega65/sdcontent.c` in Xemu's source is the authority and
-says why: the card needs **two** partitions -- type `0x0C` FAT32 at LBA 2048
-and a type `0x41` MEGA65 system partition -- plus a fixed disk signature
-`837dcba6`. Guessing at that three times cost more than reading it once.
+Three hand-built cards failed before that was understood: a bare FAT32; an MBR
+plus FAT32 the Hypervisor would not `CHDIR /` into; and a blank card offered to
+the machine's own FDISK+FORMAT utility, which cannot work because that utility
+is a file ON the card. `targets/mega65/sdcontent.c` in Xemu's source is the
+authority: **two** partitions -- type `0x0C` FAT32 at LBA 2048 and a type
+`0x41` MEGA65 system partition -- plus disk signature `837dcba6`. Guessing at
+that three times cost more than reading it once. **None of it matters to the
+game any more**, and it is kept because it is what makes the emulator boot.
 
 Two smaller traps, both of which look exactly like a hang:
 
@@ -137,25 +137,33 @@ Two smaller traps, both of which look exactly like a hang:
     build that links straight to a `.prg` emits an ELF, which loads at `$457F`
     and is never started. `mega65.ld` deliberately has no `OUTPUT_FORMAT`, so
     every target must go through objcopy.
-  * **mtools** will not touch the card until the FAT32 BPB has non-zero CHS
-    geometry, which Xemu's formatter leaves at zero. Those fields are legacy
-    and unused by FAT32-LBA; `putfiles.sh` patches them once.
+  * ~~**mtools** will not touch the card until the FAT32 BPB has non-zero CHS
+    geometry.~~ **Gone with hyppo**, along with `tools/putfiles.sh`: files go
+    on the D81 with `c1541` now and mtools is not involved.
 
-## What actually runs, as of now
+## The staged harness, and what it could not tell us (HISTORICAL)
 
 `smoke2.c` is a staged harness -- each stage draws a marker, so one screenshot
-says how far it got. All of these pass:
+says how far it got. **This is a record of bring-up, not a current test.** It
+still compiles, but it has NOT been re-run since the port moved from the
+Hypervisor to the C65 DOS, and its overlay images are its own, so it needs a
+disk built for it rather than the game's. The stages as they passed then:
 
     STAGE 1  video up, EGA palette
-    STAGE 2  STRINGS.DAT loaded through the Hypervisor
-    STAGE 3  drawing still works after Hypervisor file calls
+    STAGE 2  STRINGS.DAT loaded (through the Hypervisor, as it then was)
+    STAGE 3  drawing still works after a file call
     U.S.S. LEXINGTON        -- a real pooled string, from the real file
     STAGE 4  window contains code after ovl_load: A6 16 DA A2 0C 86 04 A2
     STAGE 5  MUSIC.DAT loaded
     STAGE 6  music started
     STAGE 7  2000 frames of snd_poll(), which DMAs into a stack local each one
 
-And the real binary reaches `MAIN REACHED`, `LOOP TOP`, `MUSIC OK`, `OVL OK`.
+And the real binary reached `MAIN REACHED`, `LOOP TOP`, `MUSIC OK`, `OVL OK`.
+
+**What replaced it is `make drive`** -- keys into the real game, a screenshot
+out, and `--peek` to read any symbol out of the running machine. A harness that
+links the code is worth less than one that drives the program, which is exactly
+the lesson the paragraph below paid for.
 
 **AND EVERY ONE OF THOSE STAGES PASSED WHILE THE GAME WAS BROKEN**, which is
 the lesson worth keeping. The harness links the same `m65storage.c` and
@@ -184,12 +192,27 @@ headlessly from there through setup into the nine-panel console; and a `MSGS`
 command pages an overlay in over a live console, so runtime overlay swapping
 works too. `make drive` reproduces all of it.
 
-The string pool is byte-exact against the file, and so are MUSIC.DAT, all ten
-overlay images in banked RAM, and the window after an `ovl_load` -- checked
-with `-dumpmem` rather than by looking at the screen.
+The string pool is byte-exact against the file, and so are MUSIC.DAT, all
+ELEVEN overlay images in banked RAM, and the window after an `ovl_load` --
+checked with `-dumpmem` rather than by looking at the screen. (It said "ten"
+here for two days after an eleventh was added. A count only ever goes stale
+downward; re-derive it from the list, never from a header.)
 
-Jamie played the release build on 2026-09-03 and found three faults; sound and
-the briefing are fixed below, and one crash remains unexplained.
+**Verified 2026-09-08: saving.** SAVE writes `EGATREK.SAV` onto the D81 --
+confirmed by reading the image back with `c1541`, not by trusting a return code
+-- and a restore run returns a console whose pixels hash identically to the one
+that was saved, skipping the setup screen as a successful `save_read` does.
+
+**NOT verified: the hall-of-fame WRITE.** It draws correctly, but a driven
+self-destruct scores -930, which qualifies for no slot, so nothing is written
+and there is no file to check. It goes through the same `plat_write_all` the
+save proves. That is an argument, not a measurement.
+
+Jamie played the release build on 2026-09-03 and found three faults -- sound,
+the briefing, and a crash that turned out to be overlay rule 4 -- all fixed
+below. **He played it again on 2026-09-08, after the D81 rewrite: "it works
+great."** That is the whole port confirmed by a human, which is the one thing
+no rig here can stand in for.
 
 ## Still open (2026-09-08)
 

@@ -6754,8 +6754,11 @@ cannot block the rest.
 
 AmigaDOS `Open`/`Read`/`Write`/`Close` map straight onto the five `plat_*`
 functions, and unlike every 8-bit target there is no KERNAL, no hypervisor, no
-device number and no 8K window to negotiate. **`plat_write_all()` would
-actually work** -- it still does not on the MEGA65.
+device number and no 8K window to negotiate. ~~`plat_write_all()` would
+actually work -- it still does not on the MEGA65.~~ **The MEGA65 writes too as
+of 2026-09-08**, through the C65 DOS on device 8; the Hypervisor, which has no
+write call at all, is gone from that port. The Amiga's seam is still the
+simplest of the four -- that part stands.
 
 ### The rig is the best on the project
 
