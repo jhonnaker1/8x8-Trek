@@ -10,7 +10,7 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**Video, input, far memory and the overlay loader are built.**
+**Video, input, far memory, the overlay loader and sound are built.**
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -28,7 +28,12 @@ starting where it crosses two of them. Four for four, zero bad bytes, and the
 screen bank survives — which is the check that two drivers share the MEMAC
 bank bookkeeping correctly.
 
-Still `src/stubs.c`: **sound and storage.**
+`make run-sndtest` runs the shipping sound driver in **both video standards**
+and asks Altirra what frequency each POKEY voice is actually producing. Region,
+both voices, the pitch at each end of the music's range, the tempo and the
+loop — twelve checks, all pass, worst pitch error 0.05%.
+
+Still `src/stubs.c`: **storage**, and only storage.
 
 ## The budget, and it moved
 
@@ -287,6 +292,65 @@ first `ovl_load` was unreachable. **A stub is unfoldable only while nothing
 downstream of it is real.** Check every stub again each time a consumer lands,
 not once when it is written.
 
+## Sound: POKEY in 16-bit, and every number measured
+
+`src/atarisnd.c`, 1,050 bytes, +89 net once its stubs left. Pacing and pitch
+are the two things this project has got wrong by reasoning — the MEGA65 ran its
+music at double speed off a raster that wraps twice a frame, and the X16 paced
+off a jiffy clock that returns zero for ever once a program has taken the
+machine over — so `src/sndprobe.c` and `tools/pokey.py` asked the machine
+instead. The probe is driven from outside: the harness pokes a register block
+into page 6 and the 6502 writes it to POKEY, so the write is a hardware write
+and any configuration can be tried without rebuilding.
+
+**16-bit mode, which costs a divide, because the 8-bit modes cannot carry this
+tune.** Measured against the actual note set in `MUSIC.DAT` — 90 Hz to 930 Hz,
+25 distinct values:
+
+```
+8-bit, 64kHz base    bottoms out at 124.8 Hz.  Cannot reach 90 Hz.
+8-bit, 15kHz base    reaches everything, but is 5.51% sharp at 930 Hz and
+                     over 1.5% out on six of the 25. A semitone is 5.95%.
+16-bit, 1.79MHz      worst error 0.032% across the whole set.
+```
+
+Joining channels 1+2 and 3+4 uses all of POKEY and gives exactly the two voices
+this seam exists for. The divisor is `AUDF = C/n - 7`, and `C` was measured in
+each region rather than derived from a CPU clock: **88,672 on PAL, 89,489 on
+NTSC**, `n` being the note in tens of Hz.
+
+**`$D014` is `$01` on PAL and `$0F` on NTSC — settled by making the machine
+both.** The first reading of `$0F` sat next to a base clock that was plainly
+NTSC's, so one of the two was being misread and no amount of staring at either
+was going to say which.
+
+**And the Atari has the frame clock the X16 did not.** `RTCLOK` (`$0014`), the
+OS vertical-blank counter, keeps running for a program that has taken the
+machine over — measured, 180 changes in 200 frames, the shortfall being the
+frames spent booting. This port only clears `SDMCTL`; it never takes the
+interrupt vectors.
+
+### The bug the test caught, and it was one fault wearing three faces
+
+`snd_poll` returned early when there was nothing to play, *before* sampling the
+frame counter — so `last_frame` went stale for as long as the game was silent,
+and the first poll after the music started saw hundreds of frames and burned
+the whole track in one call. Three of the first run's six failures were that
+one line: the track was already on its second note four frames in, and
+`snd_beep`'s `done += frames_since()` was satisfied immediately, so the refusal
+beep ended before it was audible **while its bounded loop correctly reported
+that it had terminated**.
+
+The catch-up is capped at four frames now. Honouring a two-second gap exactly
+would keep wall-clock tempo at the price of a burst of far-memory note reads
+and a flurry of notes nobody hears.
+
+The sixth failure was the test's own arithmetic: nine ticks at 18.2 Hz is 29.6
+NTSC frames against 24.8 PAL ones, so "45 frames later" lands in a different
+note in each region. It checks the *sequence* of distinct pitches now — 930,
+90, 930 can only happen if the track advanced and the zero pair looped it back,
+and it needs no arithmetic at all.
+
 ## The stubs measure the game, not themselves
 
 `src/stubs.c` is every remaining seam with nothing behind it, and **every stub
@@ -322,7 +386,7 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **Sound and storage**, and what each costs beyond its driver.
+* **Storage**, and what it costs beyond its driver.
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.

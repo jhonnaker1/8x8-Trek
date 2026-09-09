@@ -29,13 +29,13 @@ OVL_WINDOW = $(shell python3 -c "import re;print(int(re.search(r'__ovl_size\s*=\
 # src/stubs.c. Every driver that lands moves one line from the stub column to
 # the source column, so the budget converges on the truth rather than being
 # corrected by hand at the end.
-EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_HAVE_OVERLAY
+EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_HAVE_OVERLAY -DATARI_HAVE_SOUND
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/stubs.c
+            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest clean
 
 all: early
 
@@ -45,7 +45,13 @@ all: early
 early:
 	@python3 tools/budget.py
 
-build/early.elf: $(EARLY_SRC) atari.ld
+# GENERATED, not committed -- tools/make_music.py composes this port's own
+# music. tools/gen_music.py extracts Anderson's note data instead and its
+# output must never be committed or released; see the root .gitignore.
+music src/music_data.c src/music_data.h:
+	cd .. && python3 tools/make_music.py && cp c128/src/music_data.c c128/src/music_data.h atari/src/
+
+build/early.elf: $(EARLY_SRC) src/music_data.h atari.ld
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(EARLY_DEFS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
 
@@ -104,3 +110,24 @@ memtest: src/memtest.c src/vbxevid.c src/atarimem.c src/vbxevid.h src/atarimem.h
 
 run-memtest: memtest
 	python3 tools/run_atari.py build/memtest.xex build/memtest.png 240
+
+# WHAT DOES POKEY ACTUALLY DO? -- the divisor formula differs per mode and the
+# frame clock is the thing every port here has got wrong once. Driven live from
+# the harness: no rebuild per configuration.
+sndprobe: src/sndprobe.c
+	@mkdir -p build
+	$(ATARICC) -Wall -Werror -Oz $(LDFLAGS) -o build/sndprobe.xex src/sndprobe.c
+
+pokey: sndprobe
+	python3 tools/pokey.py
+
+# THE SOUND SEAM, checked in BOTH video standards -- the region decides the
+# divide constant and the tempo numerator, and a test that only ever sees one
+# region cannot catch the fault that made the MEGA65's music 19% fast.
+sndtest: src/sndtest.c src/vbxevid.c src/atarisnd.c src/atarimem.c src/music_data.c
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/sndtest.xex \
+	    src/sndtest.c src/vbxevid.c src/atarisnd.c src/atarimem.c src/music_data.c
+
+run-sndtest: sndtest
+	python3 tools/sndtest.py

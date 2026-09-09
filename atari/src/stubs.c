@@ -80,6 +80,7 @@ void kb_init(void)    { sink = 6; }
 char kb_waitkey(void) { sink = 7; return (char)sink; }
 #endif /* ATARI_HAVE_INPUT */
 
+#ifndef ATARI_HAVE_SOUND
 /* ---- sound ---------------------------------------------------------- */
 uint8_t snd_region = REGION_PAL;
 void snd_init(void)   { sink = 8; }
@@ -91,6 +92,8 @@ void snd_beep(void)   { sink = 10; }
 void snd_poll(void)   { sink = 11; }
 uint8_t snd_enabled(void) { return sink; }
 void snd_toggle(void) { sink = 12; }
+
+#endif /* ATARI_HAVE_SOUND */
 
 /* ---- storage -------------------------------------------------------- */
 uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) {
