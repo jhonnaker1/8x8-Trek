@@ -10,7 +10,7 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**Video, input, far memory, the overlay loader and sound are built.**
+**All six seams are built. The game does not fit yet.**
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -33,7 +33,12 @@ and asks Altirra what frequency each POKEY voice is actually producing. Region,
 both voices, the pitch at each end of the music's range, the tempo and the
 loop — twelve checks, all pass, worst pitch error 0.05%.
 
-Still `src/stubs.c`: **storage**, and only storage.
+`make run-storetest` builds a DOS 2.5 disk, plants files on it, boots it with
+the test as `AUTORUN.SYS`, and checks the seam in both directions — six checks
+on the machine plus one on the host, all passing.
+
+**`src/stubs.c` is now empty of live code.** Which means `make early` is
+finally measuring the whole thing.
 
 ## The budget, and it moved
 
@@ -43,15 +48,14 @@ measures a fully stubbed game** — as each driver lands its stubs drop out of
 truth instead of being corrected by hand at the end. The header line says
 which seams are real.
 
-Reading on 2026-09-09, with **five of six seams real** and only storage
-stubbed:
+Reading on 2026-09-09, with **every seam real** for the first time:
 
 ```
 address space   $3000..$BFFF        36864     4K MEMAC window, not 8K
 overlay window                       4608
 for resident                        32256
 
-RESIDENT IS OVER BY ABOUT 3,770 BYTES
+RESIDENT IS OVER BY ABOUT 5,180 BYTES
 ```
 
 **Quote the magnitude, run `make early` for the number.** That last digit is
@@ -61,9 +65,11 @@ paragraph and committing it.
 
 It has been 3,923 (video only), 4,213 (video and input), 3,678 (far memory and
 overlays added — *less*, because `ovl_load` stopped being a volatile-sink stub
-inlined into each of `main()`'s loader stubs) and about 3,770 with sound. The
-direction is not monotonic and the seam that has not landed is the one that
-matters.
+inlined into each of `main()`'s loader stubs), about 3,770 with sound and about
+5,180 with storage. The direction is not monotonic.
+
+**Storage cost 1,394 bytes**, which is the second-largest seam after video and
+about double what its 500-byte driver measures.
 
 ### A SEAM COSTS MORE THAN ITS DRIVER, and that is new information
 
@@ -133,7 +139,7 @@ command, so this is a window swap on the hot path — which is affordable here
 and ruinous on a 1541, because `ovl_load` is idempotent and because on this
 target the images live in VBXE's 512K of VRAM and arrive as a memory copy.
 
-### +2,282 — writable data below the window. MEASURED, AND IT IS NOT FREE
+### +772 with DOS, +2,282 without. MEASURED, AND IT IS THE FORK
 
 The Atari's `.data`/`.bss`/`.noinit` come out of the same region as its code,
 where the C128's live in a separate `lowram` at `$1300..$1C00` that does not
@@ -141,18 +147,50 @@ compete at all. That difference is about 2,330 bytes and it is the single
 largest structural disadvantage this target has.
 
 Pointing `c_writeable` at a `lowram` region of `$0700..$1FFF` takes the
-overflow from 3,923 to **1,641** — worth 2,282, close to the whole of the
-writable data (`.data`'s initialiser image still loads from the code region,
-which is the difference).
+overflow down by **2,282** — close to the whole of the writable data (`.data`'s
+initialiser image still loads from the code region, which is the difference).
 
-**But `$0700..$1FFF` is where Atari DOS lives.** DOS 2.5 puts MEMLO at about
-`$1F00`, so with DOS resident there is nothing down there — and the storage
-seam wants DOS, because `D:NAME.EXT` through CIO is how a file gets read on
-this machine. Taking this lever means not having DOS, which means either
-sector-level SIO of our own or **appending the data files to the XEX as extra
-segments that load through the MEMAC window straight into VRAM.** That second
-one is attractive and unproven; it also does not answer SAVE, which has to
-write. **This is a real fork and it is not decided.**
+**But `$0700..$1FFF` is where Atari DOS lives, and now there is a number for
+it.** A booted DOS 2.5 reports `MEMLO = $1CFC`, read straight off the machine —
+so with DOS resident the region is `$1CFC..$1FFF` and the lever is worth
+**772 bytes, not 2,282.**
+
+And the disk seam wants DOS. Not for the data files, which could come off raw
+sectors through the OS's own SIO vector with no DOS at all — but because
+**saves are named by the player**. `ui.c` lets them type a filename, and sector
+ranges have no names, so the no-DOS route needs a filesystem of its own.
+
+So the fork is now priced:
+
+```
+                        with DOS 2.5        without DOS
+over by                        5,181              5,181
+enemy overlay                 -3,520             -3,520
+window split                    -512               -512
+writable data low               -772             -2,282
+                        ------------       ------------
+                          377 SHORT           1,133 SPARE
+```
+
+**Neither column is a decision yet**, because there is a fourth lever this
+target has and no other port does — see below.
+
+### The lever only this target has
+
+Every other port's overlay budget is governed by "an overlay swap is a disk
+load, so never page anything on the hot path." **Here a swap is a copy out of
+VRAM.** That is what makes the twelfth overlay affordable, and it applies just
+as much to a thirteenth and a fourteenth: after `main` and `run_turn` the
+biggest resident functions are `report_move` (1,143), `ui_draw_viewer` (818)
+and `ui_draw_chart` (683), and on the C128 every one of those is untouchable
+because it is drawn every turn.
+
+The cost is real but it is time, not space: 4,608 bytes copied through a 4K
+window is on the order of 20–50 ms depending on how tight the loop is. That is
+a budget question this port can actually spend, and none of the others could.
+**Measuring one of those splits is the next thing worth doing**, and it should
+be measured rather than argued — the fourth overlay pass on the C128 named
+candidates that cost 863 bytes instead of saving any.
 
 ### +512 — the window
 
@@ -363,6 +401,45 @@ note in each region. It checks the *sequence* of distinct pitches now — 930,
 90, 930 can only happen if the track advanced and the zero pair looped it back,
 and it needs no arithmetic at all.
 
+## The disk seam: CIO, and two statuses that are not errors
+
+`src/ataristorage.c`, about 500 bytes of driver and 1,394 of seam. `D:` through
+IOCB 1, which is what `core/storage.h` names as this port's answer in its own
+header. The one `jsr` in the file declares the `"p"` clobber; that omission
+cost this project a day on the MEGA65 and was latent in the released C128 and
+X16 builds.
+
+`tools/atr.py` reads and writes files inside a DOS 2 disk image, because the
+bridge can mount an ATR but **not** a host directory — so there was no way to
+put a file where the `D:` handler could see it without writing the filesystem.
+`tools/storetest.py` then builds a disk, plants the files the test reads, adds
+the test itself as `AUTORUN.SYS`, boots it, and afterwards extracts the file
+the program *wrote* and checks it on the host.
+
+**That last step is the point.** `atr.py` writing sector chains and then
+reading back its own is self-consistency, not evidence. DOS reading what
+`atr.py` wrote, and `atr.py` reading what DOS wrote, are two independent checks
+that only pass together if the format is right. The chain encoding was checked
+against `DOS.SYS`'s own sectors on the same disk rather than against a manual.
+
+Two faults, and both are the kind that ship:
+
+**A failed OPEN still holds the channel.** The missing-file check passed, and
+then every later operation failed with CIO `$81` — "IOCB already open" —
+because IOCB 1 was still allocated to an open that had never succeeded.
+Nothing says so until the *next* open fails.
+
+**CIO status `$03` is a success, not an error.** There are three successful
+statuses for a read, not two: `$01` (more file follows), `$03` (the last byte
+of the file was read, returned when a read ends *exactly* at the end of the
+file) and `$88` (the read asked for more than was left). This driver accepted
+`$01` and `$88` and called `$03` an error — which is invisible until a file's
+length happens to equal the buffer it is read into. Reading 19 bytes into 128
+gives `$88` and passes; reading 700 into 700 gives `$03` and fails. **The save
+record is a fixed size read into a fixed-size buffer, so that is not an
+unlikely case, it is the normal one.** The test writes a file and reads it back
+at exactly its own length for precisely this reason.
+
 ## The stubs measure the game, not themselves
 
 `src/stubs.c` is every remaining seam with nothing behind it, and **every stub
@@ -398,7 +475,11 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **Storage**, and what it costs beyond its driver.
+* **The fork above**, now priced in both columns.
+* **A thirteenth overlay**, which only this target can afford — and measuring
+  one is what would settle whether the DOS column closes.
+* Building the release disk. `tools/atr.py` can already write one; what it
+  should contain is a question for when the game links.
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.

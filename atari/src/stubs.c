@@ -95,6 +95,7 @@ void snd_toggle(void) { sink = 12; }
 
 #endif /* ATARI_HAVE_SOUND */
 
+#ifndef ATARI_HAVE_STORAGE
 /* ---- storage -------------------------------------------------------- */
 uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) {
     sink = (unsigned char)((unsigned char)*name ^ (unsigned char)max);
@@ -121,6 +122,7 @@ uint16_t plat_read(void *buf, uint16_t len) {
     return sink ? len : 0;
 }
 void plat_close(void) { sink = 13; }
+#endif /* ATARI_HAVE_STORAGE */
 
 #ifndef ATARI_HAVE_FARMEM
 /* ---- far memory ----------------------------------------------------- */

@@ -29,13 +29,13 @@ OVL_WINDOW = $(shell python3 -c "import re;print(int(re.search(r'__ovl_size\s*=\
 # src/stubs.c. Every driver that lands moves one line from the stub column to
 # the source column, so the budget converges on the truth rather than being
 # corrected by hand at the end.
-EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_HAVE_OVERLAY -DATARI_HAVE_SOUND
+EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_HAVE_OVERLAY -DATARI_HAVE_SOUND -DATARI_HAVE_STORAGE
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/music_data.c src/stubs.c
+            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest clean
 
 all: early
 
@@ -131,3 +131,17 @@ sndtest: src/sndtest.c src/vbxevid.c src/atarisnd.c src/atarimem.c src/music_dat
 
 run-sndtest: sndtest
 	python3 tools/sndtest.py
+
+# THE DISK SEAM. Needs a booted DOS for D: to exist at all, so the test runs as
+# AUTORUN.SYS off a DOS 2.5 disk -- which is what a release would do anyway.
+# tools/atr.py plants the files it reads and extracts the file it writes, so
+# each half checks the other's work.
+DOS_ATR ?= $(HOME)/Atari400mini/os/Dos 2.5.atr
+
+storetest: src/storetest.c src/vbxevid.c src/ataristorage.c
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/storetest.xex \
+	    src/storetest.c src/vbxevid.c src/ataristorage.c
+
+run-storetest: storetest
+	python3 tools/storetest.py "$(DOS_ATR)"

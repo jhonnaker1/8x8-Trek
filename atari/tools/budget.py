@@ -118,9 +118,11 @@ def main():
         print("  eleven 4,096-byte overlays. THE THREE LEVERS, all measured:")
         print("    +3,520  a twelfth overlay for trek_enemy_turn and its")
         print("            private damage chain (built on the C128 2026-09-08)")
-        print("    +2,282  writable data below the window, as the C128's lowram")
-        print("            does it -- BUT $0700..$1FFF is where Atari DOS lives,")
-        print("            so this one is not free; see README.md")
+        print("      +772  writable data below the window WITH DOS RESIDENT.")
+        print("            DOS 2.5 puts MEMLO at $1CFC, read off a booted")
+        print("            machine, so $1CFC..$1FFF is all there is. It is")
+        print("            2,282 with no DOS -- and the disk seam needs DOS,")
+        print("            because saves are named by the player. README.md.")
         print("      +512  splitting msgs and planet so the window is 4,096")
 
 
