@@ -6,11 +6,19 @@ mount an ATR but not a host directory, so there is no way to put a file where
 the D: handler can see it without writing the filesystem -- and later to build
 whatever the release ships.
 
-DOS 2 single/enhanced density, 128-byte sectors, allocating only out of the
-primary VTOC's range (sectors 1..719). DOS 2.5's second VTOC at sector 1024
-covers 720..1023 and is deliberately not touched: this tool would have to keep
-two bitmaps in step to use it, and 707 sectors is 88,375 bytes, which is more
-than anything it is asked to carry.
+DOS 2 enhanced density, 128-byte sectors, BOTH VTOCs.
+
+THE SECOND VTOC WAS NOT WORTH SKIPPING AFTER ALL. This tool used to allocate
+only out of the primary VTOC's 707 sectors, on the grounds that 88,375 bytes
+was more than it would be asked to carry. The game disk wants 866 sectors --
+the overlay images alone are 59,904 bytes -- so it is not.
+
+DOS 2.5's second VTOC lives at sector 1024 and its layout was READ off a stock
+disk rather than recalled: the bitmap for sectors 720..1023 starts at offset
+84, and the free count is the word at offset 122. Two independent readings of
+the same disk agree -- counting the bitmap's set bits gives 303, and the word
+at 122 says 303 -- which is what makes it a measurement rather than a guess.
+Sector 720 is the one DOS reserves there.
 
     atr.py list      DISK
     atr.py add       DISK NAME.EXT FILE
@@ -24,7 +32,12 @@ HDR = 16
 SEC = 128
 VTOC = 360
 DIR0, DIRN = 361, 368
-FIRST_DATA, LAST_DATA = 4, 719      # 1-3 are the boot sectors
+FIRST_DATA, LAST_DATA = 4, 1023     # 1-3 are the boot sectors
+VTOC2 = 1024
+V2_BITMAP = 84                      # sector 720's bit, read off a stock disk
+V2_FREE = 122                       # free-count word for 720..1023
+HIGH = 720                          # first sector the second VTOC covers
+RESERVED = {360, VTOC2, HIGH}       # VTOCs, and the sector DOS keeps at 720
 DATA_PER_SEC = SEC - 3
 
 
@@ -46,29 +59,49 @@ class Atr:
 
     # ---- the free-sector bitmap ----------------------------------------
     def _bit(self, n):
-        return 10 + (n >> 3), 7 - (n & 7)
+        """Which VTOC, which byte, which bit. Sectors below 720 live in the
+           primary bitmap at offset 10; the rest in VTOC2's at offset 84."""
+        if n < HIGH:
+            return VTOC, 10 + (n >> 3), 7 - (n & 7)
+        k = n - HIGH
+        return VTOC2, V2_BITMAP + (k >> 3), 7 - (k & 7)
 
     def is_free(self, n):
-        b, s = self._bit(n)
-        return bool(self.sec(VTOC)[b] & (1 << s))
+        v, b, s = self._bit(n)
+        return bool(self.sec(v)[b] & (1 << s))
 
     def set_free(self, n, free):
-        v = bytearray(self.sec(VTOC))
-        b, s = self._bit(n)
+        which, b, s = self._bit(n)
+        v = bytearray(self.sec(which))
         if free:
             v[b] |= (1 << s)
         else:
             v[b] &= ~(1 << s) & 0xFF
-        self.put(VTOC, v)
+        self.put(which, v)
 
-    def free_count(self):
-        v = self.sec(VTOC)
-        return v[3] | (v[4] << 8)
+    def _count_at(self, which, off):
+        v = self.sec(which)
+        return v[off] | (v[off + 1] << 8)
 
-    def set_free_count(self, n):
-        v = bytearray(self.sec(VTOC))
-        v[3], v[4] = n & 0xFF, n >> 8
-        self.put(VTOC, v)
+    def _set_count_at(self, which, off, n):
+        v = bytearray(self.sec(which))
+        v[off], v[off + 1] = n & 0xFF, n >> 8
+        self.put(which, v)
+
+    def free_count(self, n=None):
+        """Total free, or the count for the VTOC that owns sector `n`. DOS
+           keeps the two ranges' counts separately and both must stay true."""
+        if n is None:
+            return self._count_at(VTOC, 3) + self._count_at(VTOC2, V2_FREE)
+        return (self._count_at(VTOC, 3) if n < HIGH
+                else self._count_at(VTOC2, V2_FREE))
+
+    def bump_free(self, n, delta):
+        if n < HIGH:
+            self._set_count_at(VTOC, 3, self._count_at(VTOC, 3) + delta)
+        else:
+            self._set_count_at(VTOC2, V2_FREE,
+                               self._count_at(VTOC2, V2_FREE) + delta)
 
     # ---- the directory --------------------------------------------------
     def entries(self):
@@ -110,8 +143,10 @@ class Atr:
                 print("%-14s %6d %6d   $%02X"
                       % (self.name_of(ent), ent[1] | (ent[2] << 8),
                          ent[3] | (ent[4] << 8), ent[0]))
-        print("\n%d sectors free in the primary VTOC (%d bytes)"
-              % (self.free_count(), self.free_count() * DATA_PER_SEC))
+        lo = self._count_at(VTOC, 3)
+        hi = self._count_at(VTOC2, V2_FREE)
+        print("\n%d sectors free (%d below 720, %d above) = %d bytes"
+              % (lo + hi, lo, hi, (lo + hi) * DATA_PER_SEC))
 
     def delete(self, name):
         i, ent = self.find(name)
@@ -123,9 +158,9 @@ class Atr:
             s = self.sec(n)
             nxt = ((s[125] & 0x03) << 8) | s[126]
             self.set_free(n, True)
+            self.bump_free(n, +1)
             count += 1
             n = nxt
-        self.set_free_count(self.free_count() + count)
         self.write_entry(i, bytes([0x80]) + ent[1:])     # flag as deleted
         self.save()
         print("atr: deleted %s (%d sectors)" % (name, count))
@@ -143,7 +178,8 @@ class Atr:
 
         need = max(1, (len(data) + DATA_PER_SEC - 1) // DATA_PER_SEC)
         free = [n for n in range(FIRST_DATA, LAST_DATA + 1)
-                if n != VTOC and not (DIR0 <= n <= DIRN) and self.is_free(n)]
+                if n not in RESERVED and not (DIR0 <= n <= DIRN)
+                and self.is_free(n)]
         if len(free) < need:
             sys.exit("atr: %s needs %d sectors and %d are free"
                      % (name, need, len(free)))
@@ -160,8 +196,8 @@ class Atr:
             s[127] = len(chunk)          # bit7 clear: a full-length data sector
             self.put(n, s)
             self.set_free(n, False)
+            self.bump_free(n, -1)
 
-        self.set_free_count(self.free_count() - need)
         ent = bytearray(16)
         ent[0] = 0x42                    # in use, DOS 2 file, unlocked
         ent[1], ent[2] = need & 0xFF, need >> 8

@@ -43,7 +43,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest nolto verify clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest nolto verify game data atr run clean
 
 all: early
 
@@ -161,12 +161,78 @@ run-storetest: storetest
 # three ports at once. See tools/overlay_check.py, rule 4.
 NOLTO = build/nolto
 
-nolto: $(EARLY_SRC) src/music_data.h
+nolto: $(GAME_SRC) src/music_data.h
 	@mkdir -p $(NOLTO)
-	@for f in $(EARLY_SRC); do \
-	    $(ATARICC) -c -fno-lto $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(EARLY_DEFS) \
+	@for f in $(GAME_SRC); do \
+	    $(ATARICC) -c -fno-lto $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) \
 	        -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
 	done
 
-verify: build/early.elf nolto
+verify: $(GAME_OUT) nolto
 	python3 tools/verify_xex.py
+
+# ---------------------------------------------------------------------------
+# THE GAME. One link produces the resident XEX and every overlay image, which
+# is not tidiness: an overlay is linked WITH the resident half, so the two are
+# only valid together. See src/atariovl.c on the build stamp that enforces it.
+#
+# ORDER MATTERS AND IS NOT ALPHABETICAL -- the loader indexes OVERLAYS.BIN by
+# the OVL_* id, so this list must read in the same order as core/overlay.h.
+# `enemy` and `move` are last because they are the two opt-in windows.
+OVERLAYS = eval hof front info repair msgs planet cmds title events xtra \
+           enemy move
+
+GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
+           ../c128/src/strpool.c \
+           ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
+           src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c \
+           src/atarisnd.c src/ataristorage.c src/music_data.c
+GAME_OUT = build/trekatari.xex
+
+game: $(GAME_OUT)
+
+$(GAME_OUT): $(GAME_SRC) src/vbxevid.h src/atarimem.h src/music_data.h atari.ld
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(LDFLAGS) \
+	    -Wl,-Map=build/trekatari.map -o $(GAME_OUT) $(GAME_SRC)
+	@python3 tools/cut_overlays.py $(GAME_OUT).elf build/OVERLAYS.BIN \
+	    $(OVL_WINDOW) $(OVERLAYS)
+	@python3 -c "import os; print('atari: XEX %d bytes' % os.path.getsize('$(GAME_OUT)'))"
+
+OBJCOPY = $(LLVM_MOS)/bin/llvm-objcopy
+NM      = $(LLVM_MOS)/bin/llvm-nm
+
+# THE DATA FILES. Same set as every other port assembles.
+DATA = build/data
+
+data: $(GAME_OUT)
+	@mkdir -p $(DATA)
+	@cd .. && python3 tools/gen_strings.py >/dev/null && python3 tools/make_music.py >/dev/null
+	@# THE POOL IS SHARED; THE THREE STRINGS THAT NAME THE MACHINE ARE NOT.
+	@# Same ids, same count, same strdata.h -- see src/strings.override.txt.
+	@cd .. && python3 tools/gen_strings.py --override atari/src/strings.override.txt \
+	    atari/build/strings.dat
+	@cp build/strings.dat        $(DATA)/STRINGS.DAT
+	@cp ../c128/build/music.dat  $(DATA)/MUSIC.DAT
+	@cp ../c128/src/briefing.txt $(DATA)/BRIEF.TXT
+	@cp build/OVERLAYS.BIN       $(DATA)/OVERLAYS.BIN
+	@ls -l $(DATA) | grep -v total
+
+# THE DISK. A DOS 2.5 image with the game as AUTORUN.SYS, so booting it runs
+# the game -- which is what a player does and what the test harness does.
+# DOS.SYS stays; the utilities go, because the game wants the room.
+GAME_ATR = build/egatrek.atr
+
+atr: data
+	@cp "$(DOS_ATR)" $(GAME_ATR)
+	@for f in DUP.SYS RAMDISK.COM SETUP.COM COPY32.COM DISKFIX.COM; do \
+	    python3 tools/atr.py delete $(GAME_ATR) $$f >/dev/null 2>&1 || true; \
+	done
+	@python3 tools/atr.py add $(GAME_ATR) AUTORUN.SYS $(GAME_OUT)
+	@for f in OVERLAYS.BIN STRINGS.DAT MUSIC.DAT BRIEF.TXT; do \
+	    python3 tools/atr.py add $(GAME_ATR) $$f $(DATA)/$$f || exit 1; \
+	done
+	@python3 tools/atr.py list $(GAME_ATR) | tail -8
+
+run: atr
+	python3 tools/run_atari.py --disk $(GAME_ATR) build/run.png 900

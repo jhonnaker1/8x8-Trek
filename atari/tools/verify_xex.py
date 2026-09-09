@@ -24,8 +24,10 @@ sys.path.insert(0, str(ROOT / "tools"))
 import overlay_check  # noqa: E402  -- needs the path above
 
 LD = ATARI / "atari.ld"
-ELF = ATARI / "build" / "early.elf"
-MAP = ATARI / "build" / "early.map"
+# THE LINK THAT SHIPS, not the one budget.py measures. build/early.elf carries
+# src/stubs.c and exists to report a number; this checks the game.
+ELF = ATARI / "build" / "trekatari.xex.elf"
+MAP = ATARI / "build" / "trekatari.map"
 NOLTO = ATARI / "build" / "nolto"
 
 LLVM_MOS = pathlib.Path.home() / "llvm-mos"
@@ -114,7 +116,7 @@ def check_headroom(window):
 
 def main():
     if not ELF.exists() or not MAP.exists():
-        die("build/early.elf and build/early.map must exist -- run `make early`")
+        die("the game must be linked first -- run `make game`")
     window = ld_number(r"__ovl_size\s*=\s*(0x[0-9a-f]+)")
     print("verify: window %d bytes, from atari.ld" % window)
 

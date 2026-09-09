@@ -84,6 +84,34 @@ uint16_t far_load(const char *name) {
     for (;;) {
         got = plat_read(buf, (uint16_t)sizeof buf);
         if (!got) break;
+
+        /* THE STORE IS 64K BECAUSE THE SEAM'S OFFSETS ARE, and this port is
+           the first to get near it -- the C128 keeps its images on disk and
+           the X16's eleven windows are 3,968 bytes against this target's
+           thirteen at 4,608.
+         *
+         * IT OVERFLOWED SILENTLY ONCE, 2026-09-09, and the way it presented
+         * is why this check exists rather than a comment. far_used wrapped
+         * past 65,535 while OVERLAYS.BIN was streaming, so the last 2,064
+         * bytes of the images were written over the START of the far store --
+         * which is the string pool. The game booted, drew its title, drew
+         * every panel border, and every piece of TEXT was missing. Nothing
+         * reported anything: not the loader, not the pool's own count guard,
+         * which had been read correctly an instant before it was overwritten.
+         *
+         * Refusing is the whole of the fix here. What made it FIT is that
+         * OVERLAYS.BIN is packed by actual image size now -- see
+         * src/atariovl.c and the OVERLAYS rule in the Makefile. */
+        /* SIXTEEN-BIT, DELIBERATELY. The obvious `(uint32_t)far_used + got >
+           0xFFFF` costs 61 bytes on this target -- measured, and 61 bytes it
+           did not have. Asking how much ROOM is left says the same thing
+           without ever leaving 16 bits. */
+        if ((uint16_t)(0xFFFFU - far_used) < got) {
+            plat_close();
+            far_used = base;                    /* leave the store as found */
+            return FAR_NONE;
+        }
+
         far_write(far_used, buf, got);
         far_used = (uint16_t)(far_used + got);
         if (got < sizeof buf) break;

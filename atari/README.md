@@ -10,7 +10,8 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**All six seams are built, and the game FITS — measured, not projected.**
+**It plays.** Fifth port, booting from a DOS 2.5 disk on an Atari 800XL with
+VBXE, driven through setup into the nine-panel console and through a turn.
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -37,11 +38,20 @@ loop — twelve checks, all pass, worst pitch error 0.05%.
 the test as `AUTORUN.SYS`, and checks the seam in both directions — six checks
 on the machine plus one on the host, all passing.
 
+`make atr` builds the game disk and `tools/play.py` drives it: title screen,
+briefing declined, a captain named JAMIE typed a letter at a time (J and I
+included — those are the two the C128 could not type once), command level,
+self-destruct password, and then the console. `SHUP` ran a full turn —
+"ENGINEERING: SHIELDS UP", energy 5000 to 4980 — **through the paged enemy
+code**. `M6,2,3,5` warped the ship from quadrant 8,8 to 6,2 sector 3,5,
+stardate 3500.0 to 3523.6, chart filled in, console redrawn — **through the
+paged move code**. Both new windows work on the machine, not just in the link.
+
 **`src/stubs.c` is now empty of live code**, so `make early` measures the whole
-thing — and with two more overlays it links with about 330 bytes to spare, with
-DOS resident and the writable-data lever untouched. See "The two levers that
-close it" below. That split is **measured and available, not committed**: it
-changes shared sources four released ports also compile.
+thing. The two extra overlays are committed and gated per port — see "The two
+levers that close it" — and the shipping link has **62 bytes free**, which is
+the thinnest margin anywhere in this project and is not a comfortable place to
+stop.
 
 ## The budget, and it moved
 
@@ -214,19 +224,36 @@ smaller.
 4,202 bytes, so the window has to stay at 4,608 to hold it. The lever is not
 merely unnecessary, it is unavailable — and it was worth 537, not 512.
 
-### What it would take to land
+### How it landed
 
-The split is not committed. It touches `core/trek.c` and `c128/src/main.c`,
-which four released ports also compile, so the annotations need gating behind a
-per-port define the way `TREK_OVERLAYS` already is — the C128 must not page its
-move command onto a 1541. `tools/overlay_check.py`'s `PAIRED` table also needs
-the `run_turn` → `.ovl.enemy` pairing declared, exactly as the events overlay
-already declares one.
+`TREK_OVL_ENEMY` and `TREK_OVL_MOVE` are opt-in and only `atari/Makefile` sets
+them, so the four released ports compile byte-identically — checked, not
+assumed: `c128/build/trek128.prg` hashes the same before and after.
+`tools/overlay_check.py` carries the `run_turn` → `.ovl.enemy` pairing, and
+`make verify` here reads rules 2, 3 and 4 off `-fno-lto` objects.
 
-And it is a **link**, not a run. The C128's enemy split was driven through a
-real turn before it was believed; this one has not been, because there is no
-game disk yet. 327 bytes is thin, and `.ovl_front` is the overlay that grows
-with the save record.
+## OVERLAYS.BIN is PACKED, and the bug that made it necessary
+
+Every other port pads each overlay image to the window and indexes the file as
+`which * OVL_SIZE`. Thirteen windows of 4,608 is 59,904 bytes, and with the
+string pool and the music ahead of it in the far store that is **67,600 —
+past the 65,535 the seam's 16-bit offsets can address.**
+
+**It overflowed silently, and the way it presented is the point.** `far_used`
+wrapped while `OVERLAYS.BIN` was streaming, so the last 2,064 bytes of the
+images were written over the *start* of the far store, which is the string
+pool. The game booted. It drew its title. It drew every panel border on the
+console. **Every piece of text was missing and nothing reported anything** —
+not the loader, not the string pool's own count guard, which had been read
+correctly an instant before it was overwritten. What found it was watching
+`far_used` climb to 58,960 and then read 2,064.
+
+Two changes came out of it. `far_load` now refuses rather than wrapping — in
+sixteen-bit arithmetic, because the obvious `(uint32_t)far_used + got` cost 61
+bytes this port did not have. And `OVERLAYS.BIN` starts with its own index of
+`OVL_COUNT+1` offsets and packs the images at their real sizes: **36,474 bytes
+instead of 59,904**, which is 23,460 bytes of VRAM and 188 disk sectors back,
+and a swap that copies only the bytes an image actually has.
 
 ### +512 — the window
 
@@ -511,11 +538,18 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **Landing the two overlays properly**, gated per-port, with the `PAIRED`
-  table updated and `make verify` passing.
-* **Playing it.** Everything here is measured; nothing has run a turn.
-* Building the release disk. `tools/atr.py` can already write one; what it
-  should contain is a question for when the game runs.
+* **62 bytes.** That is the whole margin, and `.ovl_front` grows with the save
+  record. The writable-data lever is still in reserve — 772 bytes with DOS,
+  2,282 without — and the window could give back 512 if `.ovl_enemy` were
+  split, but the honest answer is that this needs headroom before it needs
+  features.
+* **Playing it properly.** A turn is not a game: nothing has fought, docked,
+  landed on a planet, saved or reached the hall of fame.
+* **The load time.** `OVERLAYS.BIN` streams through CIO at boot and the packing
+  cut it by 40%, but it has not been timed against a real 1050.
+* A release bundle. What ships is the XEX and the data files for the player's
+  own DOS disk — `tools/atr.py` builds the test disk but a DOS is not ours to
+  redistribute.
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.

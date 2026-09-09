@@ -16,6 +16,12 @@ out loud instead.
 
     python3 tools/run_atari.py build/smoke.xex build/smoke.png [frames] \
         [--keys A,B,RETURN,...]
+    python3 tools/run_atari.py --disk build/egatrek.atr build/run.png [frames] \
+        [--keys ...]
+
+BOOTING A DISK IS NOT THE SAME AS BOOTING AN XEX. A bare XEX runs with no DOS
+at all, so the D: handler does not exist and every file read fails; the game
+needs a booted DOS, which is why the disk carries it as AUTORUN.SYS.
 """
 import os
 import pathlib
@@ -68,9 +74,16 @@ def start_server(log):
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
-    xex = str((ATARI / sys.argv[1]).resolve() if not os.path.isabs(sys.argv[1])
-              else sys.argv[1])
-    out = ATARI / sys.argv[2]
+    argv = sys.argv[1:]
+    disk = None
+    if argv and argv[0] == "--disk":
+        disk = str((ATARI / argv[1]).resolve() if not os.path.isabs(argv[1])
+                   else argv[1])
+        argv = argv[1:]
+    xex = str((ATARI / argv[0]).resolve() if not os.path.isabs(argv[0])
+              else argv[0])
+    out = ATARI / argv[1]
+    sys.argv = ["run_atari"] + argv
     rest = sys.argv[3:]
     keys = []
     if "--keys" in rest:
@@ -85,7 +98,11 @@ def main():
     proc, token = start_server(log)
     try:
         with AltirraBridge.from_token_file(token) as a:
-            a.boot(xex)
+            if disk:
+                a.mount(0, disk)
+                a.cold_reset()
+            else:
+                a.boot(xex)
             a.frame(frames)
             for k in keys:
                 a.key(k)

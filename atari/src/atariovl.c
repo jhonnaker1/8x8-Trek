@@ -26,10 +26,27 @@
 
 #define OVL_SIZE OVL_WINDOW   /* -D from the Makefile, which reads atari.ld */
 
-/* UNSIGNED, AND NOT WRITTEN AS OVL_COUNT * OVL_SIZE. `int` is 16 bits here and
-   the product is over 32,767, so the signed form is undefined -- -Werror
-   caught exactly this on the X16. */
-#define OVL_TOTAL ((uint16_t)OVL_COUNT * (uint16_t)OVL_SIZE)
+/* THE IMAGES ARE PACKED BY ACTUAL SIZE, NOT PADDED TO THE WINDOW, and that is
+ * not a space optimisation for its own sake -- it is what makes this port fit
+ * at all.
+ *
+ * Every other port pads each image to the window and indexes the file as
+ * `which * OVL_SIZE`. Thirteen windows of 4,608 is 59,904 bytes, and with the
+ * string pool and the music ahead of it in the far store that is 67,600 --
+ * past the 65,535 the seam's 16-bit offsets can address. It overflowed
+ * SILENTLY: the tail of the images landed on the string pool and the game drew
+ * every panel with no text in it. See the guard in src/atarimem.c.
+ *
+ * Packed, the same thirteen are 36,444 bytes. That is 23,460 bytes of VRAM and
+ * 188 disk sectors back, and one fewer thing that can quietly wrap.
+ *
+ * THE FILE STARTS WITH ITS OWN INDEX: OVL_COUNT+1 little-endian offsets from
+ * the base, so image `i` runs from off[i] to off[i+1] and the last entry is
+ * where the images end. The extra entry is what makes a LENGTH available
+ * without storing one, and copying only the bytes an image actually has makes
+ * a swap cheaper on the hot path as well. The index's own size is the
+ * cutter's business -- nothing here needs to know it, because every offset it
+ * reads is already relative to the base. */
 
 extern char __ovl_start[];
 
@@ -62,8 +79,18 @@ static void die(const char *a, const char *b, const char *c) {
 
    STATIC AND CALLED LAZILY, because a public ovl_init() that main() does not
    know the name of is a function LTO deletes -- taking the anchor with it. */
+/* Two consecutive index entries: where image `which` starts and where it
+   ends. Four bytes out of far memory, once per swap that actually swaps. */
+static void ovl_extent(uint8_t which, uint16_t *start, uint16_t *len) {
+    uint8_t e[4];
+
+    far_read((uint16_t)(ovl_base + (uint16_t)which * 2U), e, 4);
+    *start = (uint16_t)(e[0] | ((uint16_t)e[1] << 8));
+    *len   = (uint16_t)((uint16_t)(e[2] | ((uint16_t)e[3] << 8)) - *start);
+}
+
 static void ovl_init(void) {
-    uint16_t stamp;
+    uint16_t stamp, end;
     uint8_t  tail[2];
 
     /* A REAL ACCESS, or the symbol does not survive: `volatile` constrains how
@@ -77,12 +104,19 @@ static void ovl_init(void) {
             "THE GAME CANNOT RUN WITHOUT IT.",
             "PUT IT BESIDE THE PROGRAM AND START AGAIN.");
 
-    if (far_size() < (uint16_t)(ovl_base + OVL_TOTAL))
+    /* THE INDEX MUST DESCRIBE A FILE THIS LONG. A short OVERLAYS.BIN would
+       otherwise be found out by jumping into whatever followed it.
+       The LAST index entry is where the images end, read straight rather than
+       through ovl_extent -- which would fetch four bytes and subtract to say
+       the same thing, and this port has four bytes to spare and not eight. */
+    far_read((uint16_t)(ovl_base + (uint16_t)OVL_COUNT * 2U), tail, 2);
+    end = (uint16_t)(tail[0] | ((uint16_t)tail[1] << 8));
+    if (far_size() < (uint16_t)(ovl_base + end + 2U))
         die("OVERLAYS.BIN IS TOO SHORT",
             "IT MUST HOLD ONE IMAGE PER OVERLAY.",
             "REBUILD AND START AGAIN.");
 
-    far_read((uint16_t)(ovl_base + OVL_TOTAL - 2U), tail, 2);
+    far_read((uint16_t)(ovl_base + end), tail, 2);
     stamp = (uint16_t)(tail[0] | ((uint16_t)tail[1] << 8));
     if (stamp != (uint16_t)(uintptr_t)&ovl_anchor)
         die("OVERLAYS.BIN IS FROM A DIFFERENT BUILD",
@@ -101,7 +135,13 @@ void ovl_load(uint8_t which) {
        way the window holds a mixture, and claiming it holds `which` would be a
        lie that survives into the next call. */
     live = OVL_NONE;
-    far_bulk((uint16_t)(ovl_base + (uint16_t)which * (uint16_t)OVL_SIZE),
-             __ovl_start, OVL_SIZE);
+    {
+        uint16_t start, len;
+        ovl_extent(which, &start, &len);
+        /* Only the bytes this image HAS. Whatever the last overlay left
+           beyond them is never reached -- no image is longer than its own
+           extent -- and not copying it is the cheaper half of the hot path. */
+        far_bulk((uint16_t)(ovl_base + start), __ovl_start, len);
+    }
     live = which;
 }
