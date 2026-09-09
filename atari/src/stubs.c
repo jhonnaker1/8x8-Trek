@@ -34,6 +34,11 @@
    callee does nothing -- which is exactly what happened on the X16. */
 volatile unsigned char sink;
 
+/* AS EACH DRIVER LANDS, ITS STUBS DROP OUT and `make early` starts reporting
+   the REAL position rather than the game's half of it. The Makefile defines
+   these for whichever seams are built for real in that link; the budget is
+   only honest if the two halves cannot both be present. */
+#ifndef ATARI_HAVE_VIDEO
 /* ---- video ---------------------------------------------------------- */
 void vdc_init(void)      { sink = 1; }
 void vdc_shutdown(void)  { sink = 2; }
@@ -65,6 +70,8 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
 void vdc_set_address(unsigned int addr) { sink = (unsigned char)addr; }
 void vdc_data_write(unsigned char v)    { sink = v; }
 unsigned char vdc_data_read(void)       { return sink; }
+
+#endif /* ATARI_HAVE_VIDEO */
 
 /* ---- input ---------------------------------------------------------- */
 uint16_t kb_entropy;

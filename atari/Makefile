@@ -19,12 +19,17 @@ LDFLAGS = -T atari.ld -Wl,--no-check-sections
 # THE MEASUREMENT THE SCOPE ASKS FOR: link the whole game against stubbed
 # seams and see what the GAME costs, before any driver is written. See
 # src/stubs.c for why every stub writes through a volatile.
+# THE VIDEO SEAM IS REAL NOW, and its stubs drop out with it -- see
+# src/stubs.c. Every driver that lands moves one line from the stub column to
+# the source column, so the budget converges on the truth rather than being
+# corrected by hand at the end.
+EARLY_DEFS = -DATARI_HAVE_VIDEO
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/stubs.c
+            src/vbxevid.c src/stubs.c
 
-.PHONY: all early clean
+.PHONY: all early smoke run-smoke clean
 
 all: early
 
@@ -36,7 +41,27 @@ early:
 
 build/early.elf: $(EARLY_SRC) atari.ld
 	@mkdir -p build
-	$(ATARICC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
+	$(ATARICC) $(CFLAGS) $(EARLY_DEFS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
 
 clean:
 	rm -f build/*.elf build/*.map
+
+# FIRST LIGHT. The video seam and nothing else: sixteen colours, the authored
+# box-drawing set, and row 24 -- because uno's VBXE driver is 24 rows and this
+# console needs 25. Linked with atari.ld like the game, so the load address and
+# the window are the same ones the real build uses.
+SMOKE_SRC = src/smoke.c src/vbxevid.c
+SMOKE_OUT = build/smoke.xex
+
+smoke: $(SMOKE_OUT)
+
+$(SMOKE_OUT): $(SMOKE_SRC) src/vbxevid.h atari.ld
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) -I ../c128/src $(LDFLAGS) -o $@ $(SMOKE_SRC)
+	@python3 -c "import os; print('atari: smoke %d bytes' % os.path.getsize('$(SMOKE_OUT)'))"
+
+# Drive AltirraSDL's headless bridge: boot the XEX, run frames, screenshot.
+# The VBXE device itself comes from the user's Altirra settings (--settings=user)
+# because the standalone server has no switch to add hardware devices.
+run-smoke: $(SMOKE_OUT)
+	python3 tools/run_atari.py $(SMOKE_OUT) build/smoke.png

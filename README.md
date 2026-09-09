@@ -151,7 +151,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.0](../../releases/latest) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Viable, not started** — the `run_turn` split was measured on 2026-09-08 and frees 3,520 bytes against a ~3,850 gap; see [`atari/README.md`](atari/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Started 2026-09-09** — video seam built and running; five seams still stubbed and the budget is not yet closed. See [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
@@ -220,11 +220,20 @@ is ordered by **what each actually costs**, cheapest first:
 3. **Atari 800XL + VBXE** — last, and **not** because of the display. Its text
    mode is real: 80×25 with per-cell foreground and background from 1024
    colours, confirmed on hardware emulation including that all twenty-five rows
-   fit. It is last because it has **the tightest code budget of any target so
-   far**: VBXE's VRAM window occupies `$2000–$3FFF` of the 6502 address space,
-   leaving 32,768 bytes against the 37,612 the C128 build needs. More code
-   would have to move into overlays than on any port yet built. It also needs
-   hardware the base machine does not have.
+   fit — and now confirmed again by this port's own first light. It is last
+   because it has **the tightest code budget of any target**: VBXE's VRAM
+   window occupies part of the 6502 address space, and even narrowed to 4K at
+   `$2000–$2FFF` that leaves 36,864 bytes against the 37,612 the C128 build
+   needs. More code has to move into overlays than on any port yet built, and
+   unlike the C128 this machine has no separate home for its variables. It also
+   needs hardware the base machine does not have.
+
+   **And starting it found something the other four ports never had to face: a
+   seam costs more than its driver.** Swapping the video stubs for the real
+   driver cost 4,636 bytes where the driver itself is 1,559 — the rest is
+   `main()` and the `ui_draw_*` routines growing, because a stub that folds to
+   one `volatile` write lets the optimiser collapse the argument setup at every
+   call site. Budget a seam, not a file.
 
 **The screen layer really was mechanical; nothing else was.** Doing the MEGA65
 for real cost far more than a `vdc.c` rewrite, and none of it was display work:
