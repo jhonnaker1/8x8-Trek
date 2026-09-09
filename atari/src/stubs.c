@@ -73,10 +73,12 @@ unsigned char vdc_data_read(void)       { return sink; }
 
 #endif /* ATARI_HAVE_VIDEO */
 
+#ifndef ATARI_HAVE_INPUT
 /* ---- input ---------------------------------------------------------- */
 uint16_t kb_entropy;
 void kb_init(void)    { sink = 6; }
 char kb_waitkey(void) { sink = 7; return (char)sink; }
+#endif /* ATARI_HAVE_INPUT */
 
 /* ---- sound ---------------------------------------------------------- */
 uint8_t snd_region = REGION_PAL;

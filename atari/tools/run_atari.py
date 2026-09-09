@@ -14,7 +14,8 @@ $D640, nothing answers, and the screen stays as the OS left it -- which
 reads as a driver bug rather than a missing device. The check below says so
 out loud instead.
 
-    python3 tools/run_atari.py build/smoke.xex build/smoke.png [frames]
+    python3 tools/run_atari.py build/smoke.xex build/smoke.png [frames] \
+        [--keys A,B,RETURN,...]
 """
 import os
 import pathlib
@@ -70,7 +71,13 @@ def main():
     xex = str((ATARI / sys.argv[1]).resolve() if not os.path.isabs(sys.argv[1])
               else sys.argv[1])
     out = ATARI / sys.argv[2]
-    frames = int(sys.argv[3]) if len(sys.argv) > 3 else 180
+    rest = sys.argv[3:]
+    keys = []
+    if "--keys" in rest:
+        i = rest.index("--keys")
+        keys = [k for k in rest[i + 1].split(",") if k]
+        rest = rest[:i]
+    frames = int(rest[0]) if rest else 180
 
     check_vbxe_configured()
     log = str(ATARI / "build" / "bridge.log")
@@ -80,6 +87,10 @@ def main():
         with AltirraBridge.from_token_file(token) as a:
             a.boot(xex)
             a.frame(frames)
+            for k in keys:
+                a.key(k)
+                a.frame(6)          # let the OS IRQ land it in CH and the
+                                    # program's poll loop consume it
             regs = a.regs()
             out.parent.mkdir(parents=True, exist_ok=True)
             # PATH MODE, NOT INLINE. The inline base64 screenshot never

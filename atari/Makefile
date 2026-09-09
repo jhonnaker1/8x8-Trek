@@ -23,13 +23,13 @@ LDFLAGS = -T atari.ld -Wl,--no-check-sections
 # src/stubs.c. Every driver that lands moves one line from the stub column to
 # the source column, so the budget converges on the truth rather than being
 # corrected by hand at the end.
-EARLY_DEFS = -DATARI_HAVE_VIDEO
+EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/vbxevid.c src/stubs.c
+            src/vbxevid.c src/atariinput.c src/stubs.c
 
-.PHONY: all early smoke run-smoke clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho clean
 
 all: early
 
@@ -65,3 +65,25 @@ $(SMOKE_OUT): $(SMOKE_SRC) src/vbxevid.h atari.ld
 # because the standalone server has no switch to add hardware devices.
 run-smoke: $(SMOKE_OUT)
 	python3 tools/run_atari.py $(SMOKE_OUT) build/smoke.png
+
+# THE KEY TABLE, MEASURED. CH holds a matrix position, not a character, and
+# the mapping is the kind of thing a header comment gets wrong -- see the X16.
+# `make keytable` injects every key the game needs and prints what came back.
+keyprobe: src/keyprobe.c
+	@mkdir -p build
+	$(ATARICC) -Wall -Werror -Oz $(LDFLAGS) -o build/keyprobe.xex src/keyprobe.c
+
+keytable: keyprobe
+	python3 tools/keytable.py
+
+# THE INPUT SEAM, CHECKED THROUGH THE VIDEO ONE. Injects keys over the bridge
+# and screenshots what came back -- the fold from ATASCII to input.h's ASCII
+# is the part that can be wrong, so each key prints its decimal value.
+keyecho: src/keyecho.c src/vbxevid.c src/atariinput.c src/vbxevid.h atari.ld
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/keyecho.xex \
+	    src/keyecho.c src/vbxevid.c src/atariinput.c
+
+run-keyecho: keyecho
+	python3 tools/run_atari.py build/keyecho.xex build/keyecho.png 120 \
+	    --keys T,R,E,K,1,9,COMMA,PERIOD,MINUS,SPACE,RETURN,ESCAPE,BACKSPACE

@@ -10,14 +10,19 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**The video seam is built and running.** `make run-smoke` boots an XEX on
-AltirraSDL's headless bridge and comes back with a picture: eighty columns,
-twenty-five rows, all sixteen EGA colours on their own indices, and the
-console's box-drawing set rendering as a frame with its tees and cross
-joining. That is questions 1–4 of first light answered in one screenshot.
+**Video and input are built and running.**
 
-Everything below the video seam is still `src/stubs.c`: input, sound,
-storage, far memory and the overlay loader.
+`make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
+with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
+their own indices, and the console's box-drawing set rendering as a frame with
+its tees and cross joining. That is questions 1–4 of first light answered in
+one screenshot.
+
+`make run-keyecho` injects thirteen keys over the same bridge and screenshots
+what the input seam returned. All thirteen came back as the values
+`c128/src/input.h` names — letters uppercased, RETURN 13, ESC 27, DELETE 20.
+
+Still `src/stubs.c`: sound, storage, far memory and the overlay loader.
 
 ## The budget, and it moved
 
@@ -200,6 +205,40 @@ What is new here:
   226 and 228 fall out of 32, 98 and 100. A code nobody drew renders as a
   hollow box, not as nothing: the Amiga missed two of fifteen on its first
   pass, and an invisible glyph leaves a panel looking merely empty.
+
+## The input driver, and why it carries no table
+
+`src/atariinput.c`. The OS keyboard IRQ writes a raw key code into `CH`
+(`$02FC`) — `$FF` when nothing is waiting, bit 6 for shift, bit 7 for ctrl.
+That code is a **keyboard matrix position, not a character**, so every other
+port here decodes such a thing with a table of its own.
+
+**The Atari already has the table.** `KEYDEF` (`$0079/$007A`) points at a
+192-byte ROM table — 64 unshifted, 64 shifted, 64 control — indexed by exactly
+the byte `CH` holds. So the driver is one indexed load and a small fold from
+ATASCII to the ASCII values `input.h` names: uppercase the letters, and bend
+four codes by hand (EOL is `$9B` not 13, delete is `$7E`, and the cursor keys
+produce `$1C`/`$1D` where `input.h` uses 1 and 2). The whole seam is 290 bytes.
+
+**Reading that table beat injecting keys, and the difference is instructive.**
+`make keytable` injects every key the game needs and prints what `CH` held —
+46 of them, and it is how the fold was checked. But the bridge has no key
+identifier for `+`, `*`, `:`, `@` or the cursor keys, so six came back
+"unknown key name". The table answers all six directly:
+
+```
++  $06     *  $07     :  $42 (shift ;)    @  $75 (shift 8)
+up $8E (ctrl -)       down $8F (ctrl =)
+```
+
+**The Atari's cursor keys ARE ctrl-minus and ctrl-equals.** No amount of
+asking the emulator for a key called `UP` was going to say so.
+
+One thing here is reasoned rather than measured, and is marked as such at its
+site: `kb_waitkey` waits for POKEY's `SKSTAT` bit 2 to come back before
+returning, so the OS's auto-repeat cannot turn one press into a burst. The
+bridge's `KEY` queues a press-and-release and cannot hold a key down, so the
+rig cannot reach that case. First real play settles it.
 
 ## The stubs measure the game, not themselves
 
