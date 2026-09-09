@@ -49,9 +49,8 @@ paged move code**. Both new windows work on the machine, not just in the link.
 
 **`src/stubs.c` is now empty of live code**, so `make early` measures the whole
 thing. The two extra overlays are committed and gated per port — see "The two
-levers that close it" — and the shipping link has **62 bytes free**, which is
-the thinnest margin anywhere in this project and is not a comfortable place to
-stop.
+levers that close it" — and the shipping link has **708 bytes free** — see
+"The margin, and where it came from".
 
 ## The budget, and it moved
 
@@ -503,6 +502,66 @@ record is a fixed size read into a fixed-size buffer, so that is not an
 unlikely case, it is the normal one.** The test writes a file and reads it back
 at exactly its own length for precisely this reason.
 
+## The margin, and where it came from
+
+The shipping link had **62 bytes** free, which is not a margin. It has 708 now,
+and the whole of the difference is one buffer.
+
+`io_buf` is 626 bytes, the port's biggest single writable object, and it now
+lives at **`$0480` in the OS spare area** — the only memory on this machine
+that does not compete with code. `core/lowmem.h` carries the annotation and
+expands to nothing unless a port asks, exactly as `OVL_CODE` does; the four
+released ports compile byte-identically.
+
+```
+verify: resident $3000..$AB3C, 708 bytes free below the window at $AE00
+verify: lowram $0480..$06FF, 626 of 640 used, 14 free
+```
+
+**Measured, not read off a memory map.** Every Atari memory map calls
+`$0480..$06FF` free, and a map is not evidence about a running machine.
+`src/lowprobe.c` fills the region and then does what this program actually does
+— a whole-file read, two hundred streamed reads, and a write that makes DOS
+allocate sectors and rewrite its own VTOC — and counts what came back changed.
+Zero, with DOS 2.5 resident and MEMLO at `$1CFC`.
+
+**And the buffer's own two uses are checked separately**, because "disk I/O
+does not *clobber* the region" is a different claim from "CIO can *fill* it".
+`storetest` writes a file from `$0480` and reads one back into it: 625 bytes,
+zero wrong. What goes in `.lowbss` is **not zeroed at startup**, so `io_buf`'s
+write-before-read property was checked at each of its three use sites.
+
+There is more where that came from if it is ever needed: `hof` is 280 bytes and
+`slot` 256, and `$1CFC..$1FFF` is another 772 with DOS 2.5 — though that one
+depends on which DOS the player boots, where `$0480..$06FF` does not.
+
+## OPEN: SAVE writes a file the game cannot read back
+
+Found while testing the margin, and **not caused by it.**
+
+The game's SAVE creates `EGATREK.SAV`, five sectors, correct length — and
+leaves its directory entry marked **`$03`**, open-for-output, where every write
+`storetest` does leaves `$42`. Restoring it does not come back. CIO reports
+success on both the transfer and the close, and `open_live` returns to 0, so
+the driver believes it finished.
+
+Three hypotheses are already eliminated, each by a discriminator rather than by
+reasoning:
+
+* **The buffer address.** A `plat_write_all` from `$0480` closes correctly.
+* **The record ending exactly on a sector boundary.** The save is 625 bytes and
+  a DOS 2 sector holds 125, so it fills five with nothing over — the same shape
+  that caught the read path out with CIO status `$03`. A 625-byte write closes
+  correctly.
+* **Reading into low RAM.** 625 bytes back into `$0480`, zero wrong.
+
+What is left is something about the game's context that `storetest` does not
+reproduce: `ui_save_game` runs from `OVL_FRONT`, and by the time it runs the
+program has opened and closed four files through the same IOCB. **One thing the
+driver does wrong regardless** is that `plat_write_all` reports on the
+*transfer's* status and discards the *close's* — and on a write the close is
+where the data lands.
+
 ## The stubs measure the game, not themselves
 
 `src/stubs.c` is every remaining seam with nothing behind it, and **every stub
@@ -538,13 +597,9 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **62 bytes.** That is the whole margin, and `.ovl_front` grows with the save
-  record. The writable-data lever is still in reserve — 772 bytes with DOS,
-  2,282 without — and the window could give back 512 if `.ovl_enemy` were
-  split, but the honest answer is that this needs headroom before it needs
-  features.
+* **SAVE, above.** The one known bug, and the port cannot be released with it.
 * **Playing it properly.** A turn is not a game: nothing has fought, docked,
-  landed on a planet, saved or reached the hall of fame.
+  landed on a planet or reached the hall of fame.
 * **The load time.** `OVERLAYS.BIN` streams through CIO at boot and the packing
   cut it by 40%, but it has not been timed against a real 1050.
 * A release bundle. What ships is the XEX and the data files for the player's
