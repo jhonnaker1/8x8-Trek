@@ -18,6 +18,9 @@
 #define VDC_ROWS 25
 
 void vdc_init(void);
+/* Re-apply the video mode after a C65 DOS call, which programs the VIC for
+   its own screen. See the note in m65vid.c. Does NOT clear. */
+void vdc_reclaim(void);
 void vdc_shutdown(void);
 void wait_vsync(void);
 

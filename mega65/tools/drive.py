@@ -18,9 +18,9 @@ debug build carries `kb_inject` (see src/m65input.c) and this pokes it through
 the uart monitor, exactly as the C128 port is driven through VICE's monitor.
 
 The debug build's overlay images are its own -- the release build's would be
-linked against different resident addresses -- so this puts OVERLAYS-DEBUG.BIN
-on the card as OVERLAYS.BIN and does not put it back. Run `make disk` and
-tools/putfiles.sh before testing a release build again.
+linked against different resident addresses -- so this builds its OWN D81 at
+build/drive.d81 with OVERLAYS-DEBUG.BIN in it. It no longer disturbs anything
+the release build uses, which the old SD-card route did.
 """
 import os, re, signal, socket, subprocess, sys, time
 
@@ -55,6 +55,12 @@ def key(tok):
 
 def main():
     argv = sys.argv[1:]
+    # --keep-disk leaves build/drive.d81 alone instead of formatting a fresh
+    # one. Needed to test a RESTORE: the save the previous run wrote lives on
+    # that disk, and rebuilding it is exactly what throws the save away.
+    keep = "--keep-disk" in argv
+    if keep:
+        argv.remove("--keep-disk")
     peeks = []
     while "--peek" in argv:
         i = argv.index("--peek")
@@ -65,17 +71,32 @@ def main():
     os.chdir(here)
     ELF = "build/egatrek-debug.elf"
     KB_INJECT, _ = sym(ELF, "kb_inject")
-    subprocess.check_call(["sh", "tools/putfiles.sh", "build/OVERLAYS-DEBUG.BIN"],
-                          stdout=subprocess.DEVNULL)
-    # putfiles keeps the source name; the game opens OVERLAYS.BIN.
-    subprocess.check_call(["python3", "-c", """
-import os,subprocess,tempfile,sys
-img=os.path.expanduser('~/Library/Application Support/xemu-lgb/mega65/mega65.img')
-rc=tempfile.NamedTemporaryFile('w',suffix='.mtoolsrc',delete=False)
-rc.write('drive z: file="%s" offset=1048576\\n' % img); rc.close()
-os.environ['MTOOLSRC']=rc.name
-subprocess.check_call(['mcopy','-o','build/OVERLAYS-DEBUG.BIN','z:/OVERLAYS.BIN'])
-"""])
+    # THE DEBUG D81, built here rather than on the SD card. The release build's
+    # overlay images are linked against different resident addresses, so a
+    # debug run needs its own OVERLAYS.BIN -- and since this port dropped the
+    # Hypervisor for the C65 DOS, "putting a file where the game can find it"
+    # is c1541 on a D81 instead of mtools on a FAT32 card. That deleted the one
+    # wrinkle putfiles.sh existed for (Xemu's formatter leaves the FAT32 CHS
+    # geometry zeroed and mtools refuses the card until it is patched).
+    d81 = "build/drive.d81"
+    if keep and os.path.exists(d81):
+        files = []
+    else:
+        if os.path.exists(d81):
+            os.unlink(d81)
+        subprocess.check_call(["c1541", "-format", "ega trek,01", "d81", d81],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        files = [("build/OVERLAYS-DEBUG.BIN", "overlays.bin"),
+             ("build/disk/STRINGS.DAT",   "strings.dat"),
+             ("build/disk/MUSIC.DAT",     "music.dat"),
+             ("build/disk/BRIEF.TXT",     "brief.txt")]
+    for src, name in files:
+        if not os.path.exists(src):
+            raise SystemExit("drive: no %s -- run `make debug disk` first" % src)
+        subprocess.check_call(["c1541", "-attach", d81, "-write", src,
+                               name + ",s"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     rom = os.path.expanduser("~/Library/Application Support/xemu-lgb/mega65/MEGA65.ROM")
     sock = "/tmp/m65drive.sock"
     if os.path.exists(sock):
@@ -86,6 +107,7 @@ subprocess.check_call(['mcopy','-o','build/OVERLAYS-DEBUG.BIN','z:/OVERLAYS.BIN'
             os.unlink(f)
     p = subprocess.Popen([os.path.expanduser("~/xemu/bin/xmega65"), "-rom", rom,
                           "-sdimg", "@mega65.img", "-prgmode", "65",
+                          "-8", os.path.join(here, d81),
                           "-prg", os.path.join(here, "build/egatrek-debug.prg"),
                           "-besure", "-headless", "-screenshot", out,
                           "-uartmon", sock], stdout=log, stderr=log)

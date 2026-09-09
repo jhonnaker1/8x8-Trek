@@ -1,16 +1,18 @@
 # EGA Trek — MEGA65 (native C65 mode)
 
 The second port, and the first of the four **text-mode siblings** the target
-order puts ahead of the bitmap machines. Status: **the whole game runs** — in
-80 columns, on an exact EGA palette, with sound, a streamed briefing, and a
-game playable from the title screen through the hall of fame to a second game.
-One thing is missing: it cannot **write** files, so SAVE and the hall of fame
-report a failure. See "Still open".
+order puts ahead of the bitmap machines. Status: **feature complete** — the
+whole game in 80 columns on an exact EGA palette, with sound, a streamed
+briefing, saving and restoring, and a game playable from the title screen
+through the hall of fame to a second game. It reads and writes **one D81** on
+device 8 and does not touch the SD card. **Not yet played by a human** since
+2026-09-03.
 
 ```sh
 make          # build/egatrek.prg + build/OVERLAYS.BIN
 make verify   # load address, resident space, overlay layout and call rules
-make run      # in Xemu, on Xemu's own SD card
+make d81      # build/egatrek.d81 -- the whole game, one image
+make run      # in Xemu, with the D81 on drive 8
 make drive    # headless: inject keys, screenshot, --peek symbols
 ```
 
@@ -69,8 +71,14 @@ What it records now is what is built.
 | `kb_*` | 17 | `m65input.c` — plus `kb_inject` in the debug build, which is how this port is driven |
 | `snd_*` | 15 | `m65snd.c` — real SIDs, so the C128's driver ported nearly as-is |
 | `vdc_data_*` | 9 | the one genuinely C128-shaped thing: the message log lived in spare **VDC RAM**. Here it is banked RAM at `$44000` |
-| `plat_*` | 5 | Hypervisor file I/O — **reads only**, see "Still open" |
+| `plat_*` | 5 | the C65 DOS on device 8 — reads AND writes, one D81 |
 | `far_*` | — | banked RAM via `lcopy`/`lpeek`/`lpoke`, not the C128's MMU dance |
+
+**Row four went stale the day it stopped being true, twice.** `plat_*` said
+"Hypervisor file I/O — reads only" for as long as that was the port's one open
+item, and the header above still said "it cannot write files" in the same
+commit that made it write them. This file's own record of stale front doors is
+three paragraphs long; it takes a deliberate pass to stay honest.
 
 ## Overlays are still needed here, and the first version of this file was wrong
 
@@ -183,32 +191,95 @@ with `-dumpmem` rather than by looking at the screen.
 Jamie played the release build on 2026-09-03 and found three faults; sound and
 the briefing are fixed below, and one crash remains unexplained.
 
-## Still open (2026-09-07)
+## Still open (2026-09-08)
 
-**One item, down from three.** The other two were a single fault -- overlay
-rule 4 -- and closing them is the retest commit `620ac09` asked for. The
-evidence is the next section.
+**Nothing.** Saving was the last item and it works: a game SAVEs to the D81,
+a RESTORE brings back a pixel-identical console, and the port no longer touches
+the SD card at all. What remains is not a defect list -- it is that **no human
+has played this port since 2026-09-03**, and the two deferred features (the
+viewer's other pages, colour per message) were never started.
 
-  * **Saving does not work.** `plat_write_all()` returns `STOR_ERROR`, so SAVE
-    and the hall of fame report a failure rather than writing. ~~It needs a
-    low-memory trampoline.~~ **It does not** -- measured 2026-09-07, see "What
-    the C65 DOS actually needs": with `$01=$3E, $D030=$64` the DOS writes while
-    `io_buf`, the hall of fame and the soft stack all stay visible, so the write
-    itself is a straight port of `c128/src/storage.c` over byte-at-a-time CBDOS.
+## Saving works, and the SD card is gone
 
-    **Nothing about it is unmeasured any more** -- four probes, below. Writes
-    land in a D81 on device 8 while reads go through the Hypervisor to the SD
-    card's FAT32, so a save written to the D81 would be invisible to hyppo:
-    "route each file to its own filesystem" is the wrong answer. **Move
-    everything onto the D81 and drop hyppo.** CBDOS reads all 45,056 bytes of
-    OVERLAYS.BIN byte-perfect in 0.9s, the command channel and its error codes
-    behave exactly as `c128/src/storage.c` expects, overwriting works through a
-    scratch, and the overlay window survives both a read and a write. What is
-    left is writing it, and one pass on real hardware.
+Done 2026-09-08. `m65storage.c` is now the C65 DOS on device 8 -- essentially
+`c128/src/storage.c` with a banking wrapper -- and everything the game reads or
+writes lives on one D81. `make d81` builds it; `make run` and `make drive`
+attach it with `-8`.
 
-Everything else is fixed and verified. The port has still **not been played by
-a human** since 2026-09-03, and the fixes since then -- sound, briefing,
-end-of-game overlay, and rule 4 -- have only been checked headlessly.
+    make d81      # build/egatrek.d81 -- the whole game, one image
+    make drive    # headless; --keep-disk preserves a save between runs
+
+What went with the Hypervisor: `m65hyppo.s`, `after_hyppo()`, the
+four-descriptor budget, the `closeall`-instead-of-`close` workaround, and the
+512-byte sector buffer this file used to call the biggest thing the port kept
+in bank 0. Reading a byte at a time needs no buffer.
+
+**Verified as a round trip, not as a return code.** SAVE writes `egatrek.sav`
+(3 blocks, confirmed with `c1541`); a restore run on the same disk comes back
+to a console whose pixels hash identically to the one that was saved -- same
+quadrant, same sector, same Mongol count, same chart -- and it skips the setup
+screen, which is what a successful `save_read` does.
+
+**NOT separately proven: the hall-of-fame WRITE.** It draws correctly, but a
+driven self-destruct scores -930, which qualifies for no slot, so nothing is
+written and there is no file to check. It goes through the same
+`plat_write_all` the save proves, and that is an argument rather than a
+measurement. Say so rather than claiming it.
+
+## The bug was ONE undeclared clobber, and it cost a day
+
+Worth the space, because two confident diagnoses were wrong before the right
+one, and both were wrong in the same way: **reasoning about a symptom instead
+of reading the generated code.**
+
+The symptom was a contradiction. `cmd_status()` read the drive's status text,
+stored the first two characters into diagnostics as `'0'` and `'0'`, and then
+its own `if (a < '0' || a > '9')` rejected them as non-digits. Both readings
+were true.
+
+  * **First diagnosis: the KERNAL clobbers `__rc`.** llvm-mos's imaginary
+    registers live at `$02..$21`, and this port has a September note about
+    mega65-libc's `read512` destroying `__rc4`/`__rc5`. Plausible, precedented,
+    and wrong. A save/restore shim around every KERNAL call changed nothing.
+  * **Second diagnosis: the soft stack.** Also wrong.
+  * **What it actually was:** `llvm-objdump` on `cmd_status`:
+
+        cpx #$30          ; compare a with '0' -- SETS THE CARRY
+        jsr m65k_save
+        jsr $ffcc         ; CLRCHN runs here
+        jsr m65k_rest
+        bcc reject        ; branches on the carry from three calls ago
+
+    The compare was evaluated before the call and branched on after it. **`a`
+    was never corrupted -- the carry was.** llvm-mos names the status register
+    `"p"`, and none of the inline asm declared it, so the compiler believed the
+    flags survived a `jsr` into ROM. `mos-platform/neo6502/include/kernel.h`
+    declares `"p"` on exactly this shape of call.
+
+Turning the locals into `static volatile` globals had appeared to fix it, which
+is what made the first diagnosis so convincing: it forced a reload after the
+call and moved the compare with it. **A symptom disappearing is not a cause
+being found.**
+
+**AND THE SHIM WAS THEN DELETED, on a measurement.** Filling `$02..$21` with a
+pattern, making one `CHRIN` and reading it back changes **zero bytes** -- the
+hyppo hazard was llvm-mos's own assembly using those addresses as scratch, not
+a property of calling into ROM. `plat_open` holds C locals live across OPEN,
+CHKIN and the status read, so the working round trip covers the calls the probe
+did not. That returned 441 bytes.
+
+Three smaller faults were real and are fixed:
+
+  * **`$00` is the port DDR that gates `$01`.** `mega65_io_enable()` pokes it
+    with 65 to force full speed, leaving the DDR wrong for the next bank
+    switch, so `lda $01` read something never written. `rom_in()` writes `$2F`
+    to `$00` first, as `unmap-basic.o`'s own `.init` does. This one took the
+    machine from dead to drawing.
+  * **No `0:` drive prefix.** The C128 emits one and its 1541 wants it; this
+    DOS errors on every open until it comes off.
+  * **Reading past EOF never terminates.** `CHRIN` keeps returning a byte with
+    the status bit set, so a `while (plat_read(...))` loop never ends. "EOF
+    already seen" is now a distinct state.
 
 ## The hall of fame was rule 4, and the discriminator that proves it
 

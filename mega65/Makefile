@@ -32,7 +32,7 @@ M65ROM  ?= $(HOME)/Library/Application Support/xemu-lgb/mega65/MEGA65.ROM
 SHARED = ../c128/src/ui.c ../c128/src/main.c ../c128/src/layout.c \
          ../c128/src/strpool.c \
          ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
-PLATFORM = src/m65vid.c src/m65input.c src/m65snd.c src/m65storage.c src/m65hyppo.s \
+PLATFORM = src/m65vid.c src/m65input.c src/m65snd.c src/m65storage.c \
            src/m65mem.c src/music_data.c
 SRC = $(SHARED) $(PLATFORM)
 OUT = build/egatrek.prg
@@ -203,13 +203,43 @@ disk: $(OUT) verify
 # tools/mksd.py. THE SCRIPT DOES NOT EXIST -- the approach was abandoned for
 # the one above and the rules outlived it, so `make run` had been broken for a
 # day. Both are gone rather than repaired.
-sd: disk
-	sh tools/putfiles.sh $(DISK)/STRINGS.DAT $(DISK)/MUSIC.DAT \
-	    $(DISK)/OVERLAYS.BIN $(DISK)/BRIEF.TXT $(DISK)/TREK.SCR
+# ONE D81, AND THE SD CARD IS NO LONGER THE GAME'S BUSINESS.
+#
+# The port used to read its files off Xemu's own SD card through the
+# Hypervisor. It cannot write there -- hyppo has no write call at all -- so the
+# save had to go to a D81 on device 8 instead, and hyppo cannot SEE inside a
+# D81. Splitting reads and writes across two filesystems means saving
+# successfully and never reading it back, so everything moved to the D81 and
+# hyppo is gone. See src/m65storage.c.
+#
+# `-sdimg` stays because the MACHINE still boots off the card; the game no
+# longer touches it. On real hardware the player mounts this image and RUNs
+# EGATREK, which is how MEGA65 software normally ships -- and it makes this
+# port distribute like the C128's .d64.
+#
+# Names go on in lower case: c1541 writes them as shifted PETSCII, which is
+# what the drive matches against the upper-case names the game asks for. That
+# is measured, not styled -- probe 3 opened "OVL,S,R" against an entry c1541
+# lists as "ovl".
+D81 = build/egatrek.d81
 
-run: sd
+d81: disk
+	@rm -f $(D81)
+	@c1541 -format "ega trek,01" d81 $(D81) >/dev/null 2>&1
+	@c1541 -attach $(D81) -write $(OUT) egatrek >/dev/null 2>&1
+	@for f in STRINGS.DAT MUSIC.DAT OVERLAYS.BIN BRIEF.TXT; do \
+	    n=`echo $$f | tr 'A-Z' 'a-z'`; \
+	    c1541 -attach $(D81) -write $(DISK)/$$f "$$n,s" >/dev/null 2>&1 \
+	        || { echo "d81: could not write $$f"; exit 1; }; \
+	done
+	@c1541 -attach $(D81) -list 2>&1 | grep -v "OPENCBM\|recognised\|attached\|detached"
+
+# Kept as an alias for a while: `sd` is in three docs and a release script.
+sd: d81
+
+run: d81
 	$(XMEGA65) -rom "$(M65ROM)" -prgmode 65 -sdimg @mega65.img \
-	    -prg $(CURDIR)/$(OUT)
+	    -8 $(CURDIR)/$(D81) -prg $(CURDIR)/$(OUT)
 
 # Headless, scripted, and screenshotted -- how this port is actually checked.
 # `make debug` first: the release build has no kb_inject to poke.

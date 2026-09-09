@@ -53,6 +53,30 @@ void vdc_init(void) {
     clrscr();
 }
 
+/* PUT THE VIDEO BACK AFTER A DOS CALL, and it is more than the I/O key.
+ *
+ * The C65 DOS is KERNAL code and it programs the VIC for its own screen. The
+ * Hypervisor only ever cost this port the extended-I/O key -- one
+ * mega65_io_enable() put it right, and that is all after_hyppo() ever did.
+ * The DOS costs the whole video mode: H640, the EGA palette, the attribute
+ * setting and the case. The first all-D81 build came up with a BLACK SCREEN
+ * from the first file load onward while the game itself ran perfectly -- PC
+ * sampling caught it looping through ui_message and log_put_str, writing
+ * messages nobody could see.
+ *
+ * DELIBERATELY NO clrscr(): this is called between a file operation and
+ * whatever the caller was drawing, and wiping the console mid-turn would be a
+ * worse bug than the one it fixes. */
+void vdc_reclaim(void) {
+    mega65_io_enable();
+    setscreensize(VDC_COLS, VDC_ROWS);
+    setextendedattrib(0);
+    setuppercase();
+    load_ega_palette();
+    bordercolor(0);
+    bgcolor(0);
+}
+
 /* RESET, because this program is sitting in BASIC 65's own program area at
    $2001 and there is nothing to return to. llvm-mos's `exit` is `jsr _fini`
    then a branch to itself, so leaving this empty HUNG the machine on a blank
