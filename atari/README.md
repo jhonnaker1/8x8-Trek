@@ -10,7 +10,7 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**All six seams are built. The game does not fit yet.**
+**All six seams are built, and the game FITS — measured, not projected.**
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -37,8 +37,11 @@ loop — twelve checks, all pass, worst pitch error 0.05%.
 the test as `AUTORUN.SYS`, and checks the seam in both directions — six checks
 on the machine plus one on the host, all passing.
 
-**`src/stubs.c` is now empty of live code.** Which means `make early` is
-finally measuring the whole thing.
+**`src/stubs.c` is now empty of live code**, so `make early` measures the whole
+thing — and with two more overlays it links with about 330 bytes to spare, with
+DOS resident and the writable-data lever untouched. See "The two levers that
+close it" below. That split is **measured and available, not committed**: it
+changes shared sources four released ports also compile.
 
 ## The budget, and it moved
 
@@ -139,7 +142,7 @@ command, so this is a window swap on the hot path — which is affordable here
 and ruinous on a 1541, because `ovl_load` is idempotent and because on this
 target the images live in VBXE's 512K of VRAM and arrive as a memory copy.
 
-### +772 with DOS, +2,282 without. MEASURED, AND IT IS THE FORK
+### +772 with DOS, +2,282 without — MEASURED, AND NO LONGER NEEDED
 
 The Atari's `.data`/`.bss`/`.noinit` come out of the same region as its code,
 where the C128's live in a separate `lowram` at `$1300..$1C00` that does not
@@ -160,37 +163,70 @@ sectors through the OS's own SIO vector with no DOS at all — but because
 **saves are named by the player**. `ui.c` lets them type a filename, and sector
 ranges have no names, so the no-DOS route needs a filesystem of its own.
 
-So the fork is now priced:
+**This lever is now held in reserve rather than spent.** The two overlays below
+close the budget without it, so the port can keep DOS, keep player-named saves,
+and ship as an ordinary XEX on the player's own DOS disk. The fork stays
+recorded because it is 2,282 bytes of headroom if this ever gets tight again.
 
-```
-                        with DOS 2.5        without DOS
-over by                        5,181              5,181
-enemy overlay                 -3,520             -3,520
-window split                    -512               -512
-writable data low               -772             -2,282
-                        ------------       ------------
-                          377 SHORT           1,133 SPARE
-```
-
-**Neither column is a decision yet**, because there is a fourth lever this
-target has and no other port does — see below.
-
-### The lever only this target has
+## The two levers that close it
 
 Every other port's overlay budget is governed by "an overlay swap is a disk
 load, so never page anything on the hot path." **Here a swap is a copy out of
-VRAM.** That is what makes the twelfth overlay affordable, and it applies just
-as much to a thirteenth and a fourteenth: after `main` and `run_turn` the
-biggest resident functions are `report_move` (1,143), `ui_draw_viewer` (818)
-and `ui_draw_chart` (683), and on the C128 every one of those is untouchable
-because it is drawn every turn.
+VRAM**, which is what makes both of these affordable and neither of them
+affordable anywhere else.
 
-The cost is real but it is time, not space: 4,608 bytes copied through a 4K
-window is on the order of 20–50 ms depending on how tight the loop is. That is
-a budget question this port can actually spend, and none of the others could.
-**Measuring one of those splits is the next thing worth doing**, and it should
-be measured rather than argued — the fourth overlay pass on the C128 named
-candidates that cost 863 bytes instead of saving any.
+Both were **built and measured on this target** in a throwaway worktree on
+2026-09-09, not projected:
+
+```
+over by, every seam real       5,161
+OVL_ENEMY                     -3,910
+OVL_MOVE                      -1,578
+                          ----------
+                            327 SPARE     link exit status 0
+```
+
+**OVL_MOVE is the whole `M` command**, not `report_move` alone. `report_move`
+is 717 bytes as written and cannot go in an overlay by itself: its callers
+`move_absolute` and `do_move_manual` are resident, and rule 4 says only `main()`
+or a declared pair may call into a window. Taking the command whole —
+`do_move`, `do_move_prompt`, `do_move_manual`, `read_delta`, `move_absolute`,
+`report_move` — gives one entry point reached from `main()` and nothing else.
+`grab_digits` is shared with `do_warp` and `put_quad`/`put_sector` are used by
+the rare-event reports, so all three stay resident.
+
+The image is **1,563 bytes of a 4,608 window**, less than half full, so there
+is room for more of the command layer later.
+
+**And OVL_ENEMY is 3,910 here against 3,520 on the C128** — which is why it was
+worth re-measuring rather than carrying the C128's figure across. Its image is
+**4,202 bytes**, and that has a consequence below.
+
+### Two things the old lever list had wrong
+
+**"Split `msgs` and `planet` so the window returns to 4,096, +512."** Both of
+those had already fallen under 4,096 — `msgs` is 3,887 and `planet` 3,273, and
+the largest image of the eleven was `front` at 3,889. **No split was needed for
+that, and had not been for some time.** The window could simply have been made
+smaller.
+
+**Except it cannot be, and that is the other correction.** `.ovl_enemy` is
+4,202 bytes, so the window has to stay at 4,608 to hold it. The lever is not
+merely unnecessary, it is unavailable — and it was worth 537, not 512.
+
+### What it would take to land
+
+The split is not committed. It touches `core/trek.c` and `c128/src/main.c`,
+which four released ports also compile, so the annotations need gating behind a
+per-port define the way `TREK_OVERLAYS` already is — the C128 must not page its
+move command onto a 1541. `tools/overlay_check.py`'s `PAIRED` table also needs
+the `run_turn` → `.ovl.enemy` pairing declared, exactly as the events overlay
+already declares one.
+
+And it is a **link**, not a run. The C128's enemy split was driven through a
+real turn before it was believed; this one has not been, because there is no
+game disk yet. 327 bytes is thin, and `.ovl_front` is the overlay that grows
+with the save record.
 
 ### +512 — the window
 
@@ -475,11 +511,11 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **The fork above**, now priced in both columns.
-* **A thirteenth overlay**, which only this target can afford — and measuring
-  one is what would settle whether the DOS column closes.
+* **Landing the two overlays properly**, gated per-port, with the `PAIRED`
+  table updated and `make verify` passing.
+* **Playing it.** Everything here is measured; nothing has run a turn.
 * Building the release disk. `tools/atr.py` can already write one; what it
-  should contain is a question for when the game links.
+  should contain is a question for when the game runs.
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.

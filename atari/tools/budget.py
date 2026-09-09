@@ -45,6 +45,13 @@ def real_seams():
     return sorted(re.findall(r"-DATARI_HAVE_(\w+)", m.group(1)))
 
 
+ALL_SEAMS = ("VIDEO", "INPUT", "FARMEM", "OVERLAY", "SOUND", "STORAGE")
+
+
+def real_seams_missing():
+    return [s for s in ALL_SEAMS if s not in real_seams()]
+
+
 def window_size():
     """From atari.ld, so this file never carries a second copy of it."""
     m = re.search(r"__ovl_size\s*=\s*(0x[0-9a-f]+)", (ATARI / "atari.ld").read_text())
@@ -60,8 +67,9 @@ def main():
     build = subprocess.run(["make", "-C", str(ATARI), "build/early.elf"],
                            capture_output=True, text=True)
     over = {}
+    text = build.stderr + build.stdout
     for m in re.finditer(r"section '(\S+)' will not fit in region '(\w+)': "
-                         r"overflowed by (\d+) bytes", build.stderr + build.stdout):
+                         r"overflowed by (\d+) bytes", text):
         sec, region, n = m.group(1), m.group(2), int(m.group(3))
         if region == "ram":
             over[sec] = n
@@ -82,6 +90,21 @@ def main():
         for k, v in sorted(wins.items()):
             print("    %-16s over by %d" % (k[7:], v))
         print()
+
+    # CHECK THE EXIT STATUS, THEN THE OUTPUT -- and this file did not, twice
+    # on 2026-09-09. A build that fails for a reason this parser does not
+    # recognise (an overlay overflowing its STAGING region, say, rather than
+    # the window) leaves `over` empty, and the map-reading branch below then
+    # reports "IT LINKS" and a spare-bytes figure off a STALE map from an
+    # earlier successful build. It said "IT LINKS, 327 bytes spare" over a
+    # link that had just failed. A number that looks like good news is the
+    # worst possible failure mode for a measuring instrument.
+    if build.returncode != 0 and not over:
+        print("  THE BUILD FAILED and this file cannot say why. Raw output:")
+        for line in text.splitlines():
+            if "error" in line.lower() and "-Werror" not in line:
+                print("    " + line.strip())
+        sys.exit(1)
 
     if not over:
         """READ FROM THE MAP, NOT FROM nm. The link emits an XEX through
@@ -104,26 +127,33 @@ def main():
         print("    writable data    $%04X..$%04X   %6d bytes" % (code_end, end, end - code_end))
         print("    spare below the window          %6d bytes" % (window - end))
         print()
-        print("  Seams still stubbed cost NOTHING here and something real")
-        print("  later -- and more than their drivers measure, because the")
-        print("  callers grow too. Video alone cost 4,636 for a 1,559-byte")
-        print("  driver.")
+        if real_seams_missing():
+            print("  AND SEAMS ARE STILL STUBBED. They cost nothing here and")
+            print("  something real later -- more than their drivers measure,")
+            print("  because the callers grow too. Video alone cost 4,636 for")
+            print("  a 1,559-byte driver.")
         return
 
     worst = max(v for k, v in over.items() if not k.startswith("WINDOW:")) if \
         any(not k.startswith("WINDOW:") for k in over) else 0
     if worst:
         print("  RESIDENT IS OVER BY %d BYTES." % worst)
-        print("  For scale, the C128 fits the same game in 37,823 bytes using")
-        print("  eleven 4,096-byte overlays. THE THREE LEVERS, all measured:")
-        print("    +3,520  a twelfth overlay for trek_enemy_turn and its")
-        print("            private damage chain (built on the C128 2026-09-08)")
-        print("      +772  writable data below the window WITH DOS RESIDENT.")
-        print("            DOS 2.5 puts MEMLO at $1CFC, read off a booted")
-        print("            machine, so $1CFC..$1FFF is all there is. It is")
-        print("            2,282 with no DOS -- and the disk seam needs DOS,")
-        print("            because saves are named by the player. README.md.")
-        print("      +512  splitting msgs and planet so the window is 4,096")
+        print("  THE TWO LEVERS THAT CLOSE IT, both measured ON THIS TARGET")
+        print("  in a throwaway worktree on 2026-09-09:")
+        print("    +3,910  OVL_ENEMY: trek_enemy_turn and its private damage")
+        print("            chain. (3,520 on the C128 -- measure per target.)")
+        print("    +1,578  OVL_MOVE: the whole M command, do_move down to")
+        print("            report_move. Six functions, one entry from main().")
+        print("            ----")
+        print("            5,488 against %d. IT LINKS, ~330 bytes spare." % worst)
+        print()
+        print("  Held in reserve, not needed: +772 of writable data below the")
+        print("  window with DOS resident (MEMLO = $1CFC, read off a booted")
+        print("  machine), or +2,282 with no DOS at all.")
+        print("  NOT AVAILABLE: shrinking the window to 4,096. Every image was")
+        print("  under it -- .ovl_front, the largest, is 3,889 -- so no split")
+        print("  of msgs and planet was ever needed for that. But .ovl_enemy")
+        print("  is 4,202, so the window has to stay at 4,608 to hold it.")
 
 
 main()

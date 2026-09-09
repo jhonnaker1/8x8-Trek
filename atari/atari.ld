@@ -35,25 +35,25 @@ MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
 
     /* $4000 up to the window. */
-    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - 0x1200
+    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - __ovl_size
 
     /* The window sits at the TOP of the region, below the OS ROM at $C000. */
-    window (rwx) : ORIGIN = 0x3000 + 0x9000 - 0x1200, LENGTH = 0x1200
+    window (rwx) : ORIGIN = 0x3000 + 0x9000 - __ovl_size, LENGTH = __ovl_size
 
     /* Staging: each overlay is linked to RUN at the window and to LOAD at its
        own address, so one link produces every image. Addresses above any real
        memory, exactly as the other three ports do it. */
-    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = 0x1200
-    ovlimg1 (rw) : ORIGIN = 0x101000, LENGTH = 0x1200
-    ovlimg2 (rw) : ORIGIN = 0x102000, LENGTH = 0x1200
-    ovlimg3 (rw) : ORIGIN = 0x103000, LENGTH = 0x1200
-    ovlimg4 (rw) : ORIGIN = 0x104000, LENGTH = 0x1200
-    ovlimg5 (rw) : ORIGIN = 0x105000, LENGTH = 0x1200
-    ovlimg6 (rw) : ORIGIN = 0x106000, LENGTH = 0x1200
-    ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x1200
-    ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x1200
-    ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x1200
-    ovlimg10 (rw): ORIGIN = 0x10a000, LENGTH = 0x1200
+    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = __ovl_size
+    ovlimg1 (rw) : ORIGIN = 0x102000, LENGTH = __ovl_size
+    ovlimg2 (rw) : ORIGIN = 0x104000, LENGTH = __ovl_size
+    ovlimg3 (rw) : ORIGIN = 0x106000, LENGTH = __ovl_size
+    ovlimg4 (rw) : ORIGIN = 0x108000, LENGTH = __ovl_size
+    ovlimg5 (rw) : ORIGIN = 0x10a000, LENGTH = __ovl_size
+    ovlimg6 (rw) : ORIGIN = 0x10c000, LENGTH = __ovl_size
+    ovlimg7 (rw) : ORIGIN = 0x10e000, LENGTH = __ovl_size
+    ovlimg8 (rw) : ORIGIN = 0x110000, LENGTH = __ovl_size
+    ovlimg9 (rw) : ORIGIN = 0x112000, LENGTH = __ovl_size
+    ovlimg10 (rw): ORIGIN = 0x114000, LENGTH = __ovl_size
 }
 
 REGION_ALIAS("c_readonly", ram)
