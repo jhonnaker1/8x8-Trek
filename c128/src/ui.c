@@ -13,6 +13,7 @@
 #include "../../core/hof.h"
 #include "../../core/serial.h"
 #include "../../core/storage.h"
+#include "../../core/lowmem.h"
 #include "../../core/ega.h"
 
 /* Raw screen codes. Letters are 1..26 in the C64/C128 set, digits 48..57 --
@@ -1688,7 +1689,14 @@ void ui_messages_view(void) {
  * with NO SAVED GAME FOUND while the file sat on the disk, correctly written
  * and correctly closed. */
 #define IO_BUF_SIZE (((SAVE_BYTES + 1) > HOF_BUF) ? (SAVE_BYTES + 1) : HOF_BUF)
-static uint8_t io_buf[IO_BUF_SIZE];
+/* THE PORT'S BIGGEST SINGLE BUFFER, 626 bytes, and on a target where writable
+   data competes with code that is worth moving out of the way -- see
+   core/lowmem.h. It is WRITE-BEFORE-READ everywhere it is used, which is what
+   makes it safe in a section the startup code does not zero: the save path
+   serialises into it before writing, the restore path fills it from disk
+   before deserialising, and the briefing writes a line and terminates it
+   before drawing. Checked at each of those sites, not assumed. */
+static uint8_t TREK_LOW io_buf[IO_BUF_SIZE];
 #define save_buf io_buf
 
 /* Copies a NUL-terminated string into a fixed field, padding with NUL. Same

@@ -80,6 +80,33 @@ def check_staging_distinct(window):
              window))
 
 
+def check_lowram():
+    """THE OS SPARE AREA, reported by name -- a resource nobody reports is a
+       resource nobody manages, which is the lesson the C128's lowram check
+       was written for and this port has two such pools rather than one.
+
+       The linker would refuse an overflow, but it would not say how close it
+       came, and 640 bytes with 626 of them spent is worth seeing every build.
+    """
+    text = LD.read_text()
+    m = re.search(r"lowram\s*\(rw\)\s*:\s*ORIGIN = (0x[0-9a-f]+),\s*LENGTH = (0x[0-9a-f]+)",
+                  text)
+    if not m:
+        print("verify: no lowram region -- writable data all competes with code")
+        return
+    origin, length = int(m.group(1), 0), int(m.group(2), 0)
+    used = 0
+    for ln in subprocess.run([OBJDUMP, "-h", str(ELF)],
+                             capture_output=True, text=True).stdout.splitlines():
+        f = ln.split()
+        if len(f) >= 4 and f[0].isdigit() and f[1] == ".lowbss":
+            used = int(f[2], 16)
+    print("verify: lowram $%04X..$%04X, %d of %d used, %d free"
+          % (origin, origin + length - 1, used, length, length - used))
+    if used > length:
+        die("lowbss has overrun the OS spare area by %d bytes" % (used - length))
+
+
 def check_headroom(window):
     """THE RESIDENT POOL, reported by name every build.
 
@@ -129,6 +156,7 @@ def main():
         die("build/nolto is missing -- rule 4 can only be read WITHOUT LTO, "
             "which folds the offending caller into main()")
     check_headroom(window)
+    check_lowram()
     print("verify: ok")
 
 

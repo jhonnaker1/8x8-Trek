@@ -18,7 +18,7 @@ ATARICC   = $(LLVM_MOS)/bin/mos-atari8-dos-clang
 # where a swap is a disk read and costs milliseconds where it is a copy out of
 # VBXE's VRAM. Measured 2026-09-09: 3,910 and 1,578 bytes, which is what takes
 # this target from 5,161 over to linking. See core/overlay.h.
-OVL_OPT = -DTREK_OVL_ENEMY -DTREK_OVL_MOVE
+OVL_OPT = -DTREK_OVL_ENEMY -DTREK_OVL_MOVE -DTREK_LOWMEM
 
 CFLAGS  = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS $(OVL_OPT) \
           -I src -I ../c128/src -I ../core
@@ -236,3 +236,17 @@ atr: data
 
 run: atr
 	python3 tools/run_atari.py --disk $(GAME_ATR) build/run.png 900
+
+# IS LOW RAM FREE WHILE DOS IS RESIDENT? A memory map is not evidence about a
+# running machine, and the buffer this port wants to put down there is 626
+# bytes of the tightest budget in the project.
+lowprobe: src/lowprobe.c src/vbxevid.c src/ataristorage.c
+	@mkdir -p build
+	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/lowprobe.xex \
+	    src/lowprobe.c src/vbxevid.c src/ataristorage.c
+
+run-lowprobe: lowprobe atr
+	@cp build/egatrek.atr build/lowprobe.atr
+	@python3 tools/atr.py delete build/lowprobe.atr AUTORUN.SYS >/dev/null
+	@python3 tools/atr.py add build/lowprobe.atr AUTORUN.SYS build/lowprobe.xex
+	python3 tools/run_atari.py --disk build/lowprobe.atr build/lowprobe.png 1200

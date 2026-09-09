@@ -104,8 +104,50 @@ int main(void) {
         result("read back: bad bytes", bad == 0 && got == OUT_BYTES, bad, got);
     }
 
+    /* 6. THE SAME WRITE, FROM A BUFFER IN THE OS SPARE AREA. The game's save
+          record lives at $0480 now (core/lowmem.h), and its directory entry
+          came back marked open-for-output where this test's came back closed.
+          Same plat_write_all, different source address, so the address is the
+          variable to isolate. */
+    {
+        volatile unsigned char *low = (volatile unsigned char *)0x0480;
+        for (i = 0; i < 600; i++) low[i] = want(i);
+        st = plat_write_all("LOWWRITE.DAT", (const void *)0x0480, 600);
+        result("write_all from $0480", st == STOR_OK, st, 600);
+    }
+
+    /* 7. A WRITE THAT ENDS EXACTLY ON A SECTOR BOUNDARY. The save record is
+          625 bytes -- SAVE_HDR 24 plus TREK_SAVE_SIZE 601 -- and a DOS 2 data
+          sector holds 125, so a save fills five sectors with nothing left
+          over. That is the shape that already caught this driver out once on
+          the READ side, where CIO reports $03 rather than $01 for a transfer
+          ending exactly at the end of a file. 700 and 600 do not have it and
+          both came back closed; if 625 comes back open-for-output then the
+          boundary is the variable and not the address. */
+    {
+        volatile unsigned char *low = (volatile unsigned char *)0x0480;
+        for (i = 0; i < 625; i++) low[i] = want(i);
+        st = plat_write_all("EXACT625.DAT", (const void *)0x0480, 625);
+        result("write_all 625 = 5 sectors", st == STOR_OK, st, 625);
+    }
+
+    /* 8. A READ *INTO* $0480, which is the restore path and the one case the
+          low-RAM probe did NOT cover: lowprobe.c proved that disk I/O does not
+          CLOBBER the region, which is a different claim from CIO being able to
+          fill it. The save record is read straight back into io_buf, so if
+          this fails the whole lowram move is unsafe. */
+    {
+        volatile unsigned char *low = (volatile unsigned char *)0x0480;
+        uint16_t badlow = 0;
+        for (i = 0; i < 625; i++) low[i] = 0;
+        st = plat_read_all("EXACT625.DAT", (void *)0x0480, 625, &got);
+        for (i = 0; i < got; i++) if (low[i] != want(i)) badlow++;
+        result("read_all INTO $0480", st == STOR_OK && got == 625 && !badlow,
+               got, badlow);
+    }
+
     scr_puts(2, (unsigned char)(row + 1),
-             "HOST CHECKS WROTE.DAT OUT OF THE IMAGE NEXT.", 14);
+             "HOST CHECKS THE FILES OUT OF THE IMAGE NEXT.", 14);
     for (;;) { }
     return 0;
 }

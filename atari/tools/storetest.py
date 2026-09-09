@@ -99,6 +99,11 @@ def main():
 
     # THE HOST HALF. The program wrote WROTE.DAT from a rule, not from a blob,
     # so nothing had to be shipped to compare against.
+    # BOTH FILES, and the directory FLAGS, because the fault being chased is
+    # a file that was written and never closed -- which reads as a perfectly
+    # good file until DOS is asked for it again.
+    subprocess.run([sys.executable, str(HERE.parent / "atr.py"), "list", str(DISK)])
+
     out = ATARI / "build" / "_wrote.bin"
     try:
         atr("extract", DISK, "WROTE.DAT", out)

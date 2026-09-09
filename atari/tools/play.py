@@ -10,6 +10,7 @@ runs unless a human or this script presses the keys.
 """
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -47,7 +48,14 @@ def main():
     proc, token = start_server(str(ATARI / "build" / "bridge.log"))
     try:
         with AltirraBridge.from_token_file(token) as a:
-            a.mount(0, str(ATARI / "build" / "egatrek.atr"))
+            # A COPY, NEVER THE MASTER. The emulator mounts an ATR
+            # read-write, so a run that saves a game writes back into the
+            # image -- and a later "fresh disk" then is not one. That cost
+            # a round of diagnosing a save-file flag that had been left by
+            # the PREVIOUS run.
+            scratch = ATARI / "build" / "play.atr"
+            shutil.copy(ATARI / "build" / "egatrek.atr", scratch)
+            a.mount(0, str(scratch))
             a.cold_reset()
             a.frame(boot)
             a.screenshot(path=str(outdir / "00-title.png"))

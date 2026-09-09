@@ -34,6 +34,14 @@ __ovl_size = 0x1200;
 MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
 
+    /* THE OS SPARE AREA, and the only memory on this machine that does not
+       compete with code. $0480..$06FF is 640 bytes below where DOS loads at
+       $0700 -- MEASURED intact through a whole-file read, two hundred
+       streamed reads and a write that makes DOS rewrite its own VTOC; see
+       src/lowprobe.c. Nothing here is zeroed at startup, so what goes in it
+       must be write-before-read. See core/lowmem.h. */
+    lowram (rw) : ORIGIN = 0x0480, LENGTH = 0x0280
+
     /* $4000 up to the window. */
     ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - __ovl_size
 
@@ -65,6 +73,8 @@ REGION_ALIAS("c_readonly", ram)
 REGION_ALIAS("c_writeable", ram)
 
 SECTIONS {
+    .lowbss (NOLOAD) : { *(.lowbss) } >lowram
+
     .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
     .ovl_hof    ORIGIN(window) : { *(.ovl.hof)    } >window AT>ovlimg1
     .ovl_front  ORIGIN(window) : { *(.ovl.front)  } >window AT>ovlimg2
