@@ -81,7 +81,7 @@ static unsigned char ap_at = 0;
 
 static unsigned char getin(void) {
     unsigned char c;
-    __asm__ volatile("jsr $FFE4\n sta %0\n" : "=r"(c) :: "a", "x", "y");
+    __asm__ volatile("jsr $FFE4\n sta %0\n" : "=r"(c) :: "a", "x", "y", "p");
     return c;
 }
 

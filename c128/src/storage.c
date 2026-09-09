@@ -52,7 +52,7 @@ static char fname[24];
    vector and links clean. */
 
 static void set_banks(void) {
-    __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x");
+    __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x", "p");
 }
 
 /* 2MHz WAS SUSPECTED AND IS INNOCENT.

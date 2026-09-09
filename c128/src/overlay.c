@@ -80,7 +80,7 @@ static uint8_t live = OVL_NONE;
    KERNAL set to bank 1 only for the duration of its own load, but setting it
    here costs three bytes and removes the ordering assumption entirely. */
 static void bank_for_data(void) {
-    __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x", "memory");
+    __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x", "memory", "p");
 }
 
 void ovl_load(uint8_t which) {

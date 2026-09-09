@@ -61,7 +61,7 @@ static const unsigned char ega_b[16] = {
  * values point. The console is upper-case throughout, as on the C128, so
  * losing lower case costs nothing. */
 static void set_screencode_charset(void) {
-    __asm__ volatile("lda #2\n jsr $FF62\n" ::: "a", "x", "y", "memory");
+    __asm__ volatile("lda #2\n jsr $FF62\n" ::: "a", "x", "y", "memory", "p");
 }
 
 static void vera_seek(unsigned long addr, unsigned char inc) {

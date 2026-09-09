@@ -11,12 +11,12 @@
  * Sets the charset exactly as x16vera.c does first, in case that matters. */
 
 static void chrout(unsigned char c) {
-    __asm__ volatile("lda %0\n jsr $FFD2\n" :: "r"(c) : "a", "x", "y");
+    __asm__ volatile("lda %0\n jsr $FFD2\n" :: "r"(c) : "a", "x", "y", "p");
 }
 
 static unsigned char getin(void) {
     unsigned char c;
-    __asm__ volatile("jsr $FFE4\n sta %0\n" : "=r"(c) :: "a", "x", "y");
+    __asm__ volatile("jsr $FFE4\n sta %0\n" : "=r"(c) :: "a", "x", "y", "p");
     return c;
 }
 
@@ -29,7 +29,7 @@ static void hex(unsigned char v) {
 
 int main(void) {
     unsigned char c;
-    __asm__ volatile("lda #2\n jsr $FF62\n" ::: "a", "x", "y");
+    __asm__ volatile("lda #2\n jsr $FF62\n" ::: "a", "x", "y", "p");
     for (;;) {
         c = getin();
         if (c) hex(c);

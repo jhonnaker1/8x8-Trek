@@ -104,7 +104,7 @@ static void far_move(uint16_t addr, unsigned char *ram, uint8_t len) {
         "        iny\n"
         "        cpy far_n\n"
         "        bne 1b\n"
-        ::: "a", "x", "y", "memory");
+        ::: "a", "x", "y", "memory", "p");
 }
 
 /* ONE KERNAL LOAD, STRAIGHT INTO BANK 1, and it is worth the explanation.
@@ -145,7 +145,7 @@ static void bank_for_data(unsigned char b) {
         "        lda far_n\n"
         "        ldx #0\n"
         "        jsr $ff68\n"
-        ::: "a", "x", "memory");
+        ::: "a", "x", "memory", "p");
 }
 
 uint16_t far_load(const char *name) {
