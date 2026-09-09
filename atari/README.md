@@ -43,15 +43,27 @@ measures a fully stubbed game** — as each driver lands its stubs drop out of
 truth instead of being corrected by hand at the end. The header line says
 which seams are real.
 
-Reading on 2026-09-09, with video real and five seams stubbed:
+Reading on 2026-09-09, with **five of six seams real** and only storage
+stubbed:
 
 ```
 address space   $3000..$BFFF        36864     4K MEMAC window, not 8K
 overlay window                       4608
 for resident                        32256
 
-RESIDENT IS OVER BY 3923 BYTES
+RESIDENT IS OVER BY ABOUT 3,770 BYTES
 ```
+
+**Quote the magnitude, run `make early` for the number.** That last digit is
+not stable and never will be: regenerating the music alone moves it, because
+`music_data.c` is compiled in, and it moved by one byte between writing this
+paragraph and committing it.
+
+It has been 3,923 (video only), 4,213 (video and input), 3,678 (far memory and
+overlays added — *less*, because `ovl_load` stopped being a volatile-sink stub
+inlined into each of `main()`'s loader stubs) and about 3,770 with sound. The
+direction is not monotonic and the seam that has not landed is the one that
+matters.
 
 ### A SEAM COSTS MORE THAN ITS DRIVER, and that is new information
 
