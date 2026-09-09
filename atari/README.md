@@ -19,11 +19,16 @@ overlay window                       4608
 writable data (.data/.bss/.noinit)   2329
 leaves for code+rodata              29927
 
-the game's code+rodata, seams stubbed 29245
+the game's code+rodata, seams stubbed ~29240
 the driver layer it still needs       4539   measured on the X16
                                     -------
-                                      33784   SHORT BY 3857
+                                             SHORT BY ABOUT 3850
 ```
+
+**That last digit is not stable and never will be.** It read 3754 on
+2026-09-06, 3857 on the morning of 2026-09-08 and 3851 that afternoon --
+regenerating the music alone moves it, because `music_data.c` is compiled in.
+Quote the magnitude, run `make early` for the number.
 
 **The 8K→4K window is the first lever and it is already spent.** With VBXE's
 default 8K window the program starts at `$4000` and is 3,358 bytes short before
@@ -47,7 +52,7 @@ So this is not a target that generates worse code. **The C128 wins on
 structure**: its writable data lives in a separate `lowram` region at
 `$1300..$1C00` that does not compete with code at all, while the Atari's
 `.data`/`.bss`/`.noinit` come out of the same space. That difference alone is
-2,329 of the 3,857.
+about 2,330 of it.
 
 ### What could close it, in order of what they cost
 
@@ -155,9 +160,11 @@ work proves harder than the arithmetic suggests.
   **does not exist** on the FX core: Altirra's register switch has no case for
   it, so writes are silently dropped and the window never opens.
 
-**Not known yet:** how much of the 3,358 (plus the drivers) a twelfth and
-thirteenth overlay can absorb, and whether `front` — which grows with the save
-record and cannot be split — becomes the ceiling.
+**Not known yet:** how much of the shortfall a twelfth and thirteenth overlay
+can absorb, and whether `front` — which grows with the save record and cannot
+be split — becomes the ceiling. (This paragraph quoted "3,358" until
+2026-09-08, which was the *8K-window* figure from before that lever was spent.
+`make early` is the authority; do not copy its output into prose.)
 
 ## The stubs measure the game, not themselves
 
