@@ -6407,7 +6407,14 @@ and the MEGA65 is the reason to believe it.** Its screen layer really was a
 never freed a descriptor, a raster counter that wrapped twice per frame. Budget
 the X16 for its own three of those, not for the seven files above.
 
-## SCOPE: Atari 800XL + VBXE (written 2026-09-05, NOT STARTED)
+## SCOPE: Atari 800XL + VBXE (written 2026-09-05, BUILT 2026-09-09)
+
+> **THE PORT EXISTS NOW AND `atari/README.md` IS THE AUTHORITY.** What follows
+> is the scope as it was written before a line of it was built, kept because
+> the reasoning is worth reading against what actually happened -- and because
+> two of its figures are superseded, marked in place below. The section "Atari
+> VBXE: what it cost, and four things that transfer" at the end of this file
+> records the outcome.
 
 **AND IT IS NOT A BITMAP TARGET.** That is the headline, because this file and
 the README have said the opposite since 2026-08-23: "the two bitmap targets go
@@ -6440,6 +6447,10 @@ exactly this reason.
 `vbxe_init()` then mapped the window over its own code, and execution fell into
 VRAM: `PC=$25ED illegal=1`. The emulator's own Program Error dialog is what
 reported it.
+
+> **[SUPERSEDED 2026-09-09: the window is 4K at $2000, not 8K, so the program
+> starts at $3000 and gets 36,864 bytes. That lever was spent on day one. The
+> game links there with about 700 bytes spare -- see atari/README.md.]**
 
 So the real figure is **$4000..$BFFF = 32,768 bytes** with an 8K window --
 about 4.8K LESS than the C128's 37,823, which currently holds the game with 211
@@ -6812,6 +6823,9 @@ what remains, and neither for a display reason: **the Amiga goes early because
 it DELETES the overlay machinery** -- `farmem.h`'s "no banking needed, a plain
 array" is worth more than any display advantage on this list -- **and VBXE goes
 last because it has 32,768 bytes against the 37,612 the C128 build needs.**
+**[SUPERSEDED 2026-09-09: 36,864 with a 4K window, and it FITS -- two extra
+overlays no other port can afford, because a swap there is a copy out of video
+RAM rather than a disk read.]**
 
 The one thing the August note got right and this does not change: the screen
 layer is mechanical and nothing else is. Budget each remaining port for its own
@@ -6976,3 +6990,85 @@ Two options, and the first helps every port:
     broken out; sizing this needs `-fno-lto` or a per-object link first.
 
 **Not started. The game target does not link yet, by 813 bytes.**
+
+
+## Atari VBXE: what it cost, and four things that transfer (2026-09-09)
+
+Built in a day, from `make early` to a screenshot of the console with a turn
+run through it. `atari/README.md` carries the port's own detail; this is what
+the rest of the project should take from it.
+
+### A SEAM COSTS MORE THAN ITS DRIVER
+
+Replacing the video stubs with the real driver cost **4,636 bytes** against the
+driver's own **1,559**. The other 3,077 was `main()` and the eight `ui_draw_*`
+routines growing, because a stub that folds to one `volatile` write lets the
+optimiser collapse the argument setup at every call site and a real driver does
+not.
+
+**That invalidated a number three documents quoted**: "the X16's video, input,
+storage, far-memory, overlay and sound layers measure 4,539 bytes" was a
+measurement of DRIVER SOURCES, and it had been standing in for the size of the
+gap. Never size a remaining seam by another port's driver for it. The effect
+tracks CALL SITES, so it is concentrated in video and is not even always
+positive -- landing far memory and the overlay loader together made the total
+go DOWN 535, because `ovl_load` stopped being a stub inlined into each of
+`main()`'s loader stubs.
+
+### A STUB IS UNFOLDABLE ONLY WHILE NOTHING DOWNSTREAM OF IT IS REAL
+
+`src/stubs.c` opens with the X16's lesson -- every stub writes through a
+`volatile` so the optimiser cannot delete the game instead of the stub. It was
+still not enough. The moment `far_load` became real the early link reported
+1,507 bytes, and one literal did it: `plat_read` returned `0`, so LTO proved
+the read loop never ran, so `far_load` always returned `FAR_NONE`, so
+`ovl_init` always reached its `noreturn` `die()` -- and everything `main()`
+does after its first `ovl_load` was unreachable. The stub had been correct for
+three months. **Re-check every stub when a CONSUMER lands**, and watch for a
+`noreturn` error path, which is what turns "this always fails" into "the rest
+of the program does not exist".
+
+### WHERE A SWAP IS A MEMORY COPY, THE OVERLAY RULES CHANGE
+
+Every rule of thumb in `core/overlay.h` -- "the test is FREQUENCY, not size",
+"`fire_one_torpedo` must NOT move because firing is the most frequent action"
+-- rests on loading an overlay meaning reading a disk. On this target it is a
+copy out of VBXE's VRAM, so **two windows that page code on the hot path are
+affordable**: the enemy turn, which runs on essentially every command, and the
+MOVE command, which is the commonest thing a player types. Measured at 3,910
+and 1,578 bytes here, and that is what took the target from 5,161 over to
+linking.
+
+They are opt-in defines set by one Makefile, so no released port pays for them,
+and the four released ports compile byte-identically with them in the tree.
+**And the enemy split measured 3,520 on the C128 against 3,910 here** -- the
+figure is per-target and must be re-measured, not carried across.
+
+### THE RIG CAN INVENT A BUG, NOT ONLY HIDE ONE
+
+The last hours of the day went on a save that appeared to write a file the game
+could not read back: a directory entry left marked open-for-output, and a
+restore that never returned. Three hypotheses were eliminated by discriminator
+-- the buffer address, the record ending exactly on a sector boundary, and
+reading into low RAM -- and CIO reported success on both the transfer and the
+close throughout.
+
+**Altirra's default disk write mode is *virtual*.** The emulated drive accepts
+every write and the host `.ATR` never receives them. Killing the emulator
+leaves a half-flushed directory sector; ejecting makes the file vanish
+entirely; and a restore run in a separate process reads a disk the save never
+reached, so the game sits at a filename prompt and looks hung.
+
+**When every discriminator comes back negative, suspect the instrument.** That
+question was asked far too late. Whether SAVE works is still unknown, and the
+test that settles it wants the bridge's save-states -- boot once, snapshot the
+console -- rather than another cold boot, because the game streams 44,170 bytes
+into VRAM before it draws anything and every experiment was paying that twice.
+
+### And one divergence found in passing, not yet fixed
+
+`x16/src/x16snd.c`'s `snd_beep` plays **200Hz for 6 frames**, about 100ms.
+"The refusal beep, and two bugs behind one wrong number" above records the
+original's as **440Hz for 250ms, measured**, and `c128/src/sid.c` implements
+that. The X16 is released with the divergence; it is one line, and it is
+recorded here rather than fixed inside a task about a different machine.

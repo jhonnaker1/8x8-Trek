@@ -14,7 +14,14 @@
  *
  *     C128        bank 1's 64K through the KERNAL's FETCH/STASH
  *     X16         8K pages at $A000 out of 512K, or VERA's 128K
- *     Atari 130XE 16K banks at $4000
+ *     Atari + VBXE   512K of VIDEO RAM through the MEMAC window
+ *                    [CORRECTED 2026-09-09. This line said "Atari 130XE, 16K
+ *                    banks at $4000" and described a machine the port does not
+ *                    target. VBXE brings its own VRAM and the video driver
+ *                    already has a window into it, so far memory, the message
+ *                    log and the SCREEN are one mechanism seen three ways --
+ *                    and the overlay images ride in it too, which is what
+ *                    makes paging on the hot path affordable there.]
  *     CoCo 3      8K pages through the MMU   (target dropped 2026-09-05)
  *     F256        8K pages through the MMU   (target dropped 2026-09-05)
  *     MEGA65      no banking needed -- a plain array

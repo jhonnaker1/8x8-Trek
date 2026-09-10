@@ -195,6 +195,10 @@ OVL_MOVE                      -1,578
                             327 SPARE     link exit status 0
 ```
 
+That 327 is the **experiment's** figure and not the shipping one -- it was the
+early link, in a worktree, before the drivers grew and before `io_buf` moved
+out of the way. `make verify` is the authority for what the game has today.
+
 **OVL_MOVE is the whole `M` command**, not `report_move` alone. `report_move`
 is 717 bytes as written and cannot go in an overlay by itself: its callers
 `move_absolute` and `do_move_manual` are resident, and rule 4 says only `main()`
@@ -504,8 +508,10 @@ at exactly its own length for precisely this reason.
 
 ## The margin, and where it came from
 
-The shipping link had **62 bytes** free, which is not a margin. It has 708 now,
-and the whole of the difference is one buffer.
+The shipping link had **62 bytes** free, which is not a margin. It has about
+700 now, and the whole of the difference is one buffer. Run `make verify` for
+the number -- it moved by 15 the same day, when checking the close's status on
+a write turned out to cost that much.
 
 `io_buf` is 626 bytes, the port's biggest single writable object, and it now
 lives at **`$0480` in the OS spare area** — the only memory on this machine
@@ -514,7 +520,7 @@ expands to nothing unless a port asks, exactly as `OVL_CODE` does; the four
 released ports compile byte-identically.
 
 ```
-verify: resident $3000..$AB3C, 708 bytes free below the window at $AE00
+verify: resident $3000..$AB4B, 693 bytes free below the window at $AE00
 verify: lowram $0480..$06FF, 626 of 640 used, 14 free
 ```
 
