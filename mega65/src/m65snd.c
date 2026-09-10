@@ -44,6 +44,15 @@
 #define AD_FLAT 0x00
 #define SR_FLAT 0xF0
 #define BEEP_TENTHS 44      /* 440Hz, the same A the C128 port beeps */
+/* HOW LONG THE BEEP HOLDS, in ticks of the original's 18.2065Hz clock -- the
+   unit this driver already counts in, rather than frames.
+
+   The measured original is 250.6ms. Five ticks is 5/18.2065 = 274.6ms and four
+   is 219.7ms, so five is the nearer whole tick, the same way the C128 picks 13
+   PAL frames over 12. Not a frame count here on purpose: this machine's raster
+   counter wraps TWICE per frame and counting it is what ran the music at
+   double speed. */
+#define BEEP_TICKS 5
 
 #ifdef TREK_DEBUG_INPUT
 /* THE BEEP PROBE, added 2026-09-10 to settle a SOURCE READ against two
@@ -74,7 +83,10 @@ volatile uint8_t snd_dbg[6];
 #define DBG_V2OFF 1     /* voice_off(V2) calls -- the missing statement */
 #define DBG_WROTE 2     /* last value THIS code wrote to SID[V2+4] */
 #define DBG_ECHO  3     /* SID[V2+4] read straight back after that write */
-#define DBG_LATE  4     /* SID[V2+4] at the last snd_poll, seconds later */
+#define DBG_LATE  4     /* CIA1 tenths from snd_beep to the gate-off: the
+                           BEEP'S REAL DURATION, which the tick count cannot
+                           give -- this driver's tick calibration is exactly
+                           what once ran the music at double speed */
 #define DBG_POLLS 5     /* snd_polls since the last beep, saturating */
 #define DBG_HIT(i) (snd_dbg[i] = (uint8_t)(snd_dbg[i] < 255 ? snd_dbg[i] + 1 : 255))
 #define DBG_V2(val) do { snd_dbg[DBG_WROTE] = (val); \
@@ -84,6 +96,11 @@ volatile uint8_t snd_dbg[6];
 static uint16_t mus, sfx, mus_base;
 static uint8_t  mus_on, sfx_on, mus_track, mus_ok;
 static uint8_t  note_left, sfx_left;
+/* Ticks of refusal beep left to play, 0 = not beeping. See snd_beep(). */
+static uint8_t  beep_left;
+#ifdef TREK_DEBUG_INPUT
+static uint8_t  beep_tod;      /* CIA1 tenths when the beep started */
+#endif
 static uint8_t  enabled = 1;
 static uint16_t acc;
 uint8_t snd_region = REGION_NTSC;   /* pitch only; sid.h declares it */
@@ -186,7 +203,7 @@ void snd_init(void) {
     SID[V1 + 5] = AD_FLAT; SID[V1 + 6] = SR_FLAT;
     SID[V2 + 2] = PW_LO; SID[V2 + 3] = PW_HI;
     SID[V2 + 5] = AD_FLAT; SID[V2 + 6] = SR_FLAT;
-    mus_on = sfx_on = 0; acc = 0;
+    mus_on = sfx_on = 0; beep_left = 0; acc = 0;
     last_raster = 0;
     /* The C128's hand-computed PAL step until the first window closes: one
        frame per wrap, which is what every other machine does. */
@@ -196,7 +213,7 @@ void snd_init(void) {
     cal_tod = CIA1_TOD10;
 }
 
-void snd_off(void) { voice_off(V1); voice_off(V2); mus_on = sfx_on = 0; }
+void snd_off(void) { voice_off(V1); voice_off(V2); mus_on = sfx_on = 0; beep_left = 0; }
 void snd_toggle(void) { enabled = !enabled; if (!enabled) snd_off(); }
 uint8_t snd_enabled(void) { return enabled; }
 
@@ -228,16 +245,53 @@ void snd_effect(uint8_t which) {
     if (!enabled || !mus_ok || which >= MUS_COUNT) return;
     sfx = (uint16_t)(mus_base + mus_offset[which]);
     sfx_on = 1; sfx_left = 0;
+    beep_left = 0;                 /* an effect takes V2 over; see snd_beep */
 }
+/* THE REFUSAL BEEP, and it used to never stop.
+ *
+ * This was `voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0;` -- it
+ * gated voice 2 on and nothing ever gated it off. `sfx_on = 0` guaranteed it,
+ * because tick()'s effects branch is the only other code that touches V2, and
+ * `SR_FLAT` holds sustain at 15 with release 0 so there is no envelope to
+ * decay through. MEASURED on the machine 2026-09-10, not merely read: an
+ * ordinary keypress reached here, the last write to $D40B was $41 GATE_ON, and
+ * voice_off(V2) was called zero times afterwards -- against one, and $40, in a
+ * run that typed SND. See README, "What is verified, and what is not".
+ *
+ * The other three ports wait their frames and call voice_off. This one counts
+ * the driver's own ticks instead and lets tick() do it, so the beep does not
+ * block the caller -- and `enabled` is now tested, which matters more than
+ * tidiness: with sound off, snd_poll returns before tick(), so a beep started
+ * here would have had nothing left to turn it off. */
 void snd_beep(void) {
 #ifdef TREK_DEBUG_INPUT
     DBG_HIT(DBG_BEEPS); snd_dbg[DBG_POLLS] = 0;
 #endif
-    voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0;
+    if (!enabled) return;
+    sfx_on = 0; sfx_left = 0;      /* a refusal cancels whatever was playing */
+    voice_note(V2, BEEP_TENTHS);
+    beep_left = BEEP_TICKS;
+#ifdef TREK_DEBUG_INPUT
+    beep_tod = CIA1_TOD10;
+#endif
 }
 
 /* One original tick. Called from the frame loop through snd_poll(). */
 static void tick(void) {
+    /* FIRST, and before the effects branch: a beep and an effect never both
+       own V2, because snd_beep clears sfx_on and snd_effect clears this. */
+    if (beep_left && --beep_left == 0) {
+        voice_off(V2);
+#ifdef TREK_DEBUG_INPUT
+        /* Tenths actually elapsed, 0..9. The tick count is 5 by construction;
+           this is the only number here that could come out wrong. */
+        /* ACCUMULATES over every beep in the run, because ONE sample of a
+           tenth-resolution clock cannot separate 220ms from 275ms -- the
+           phase decides whether either reads as 2 or 3. Divide by DBG_BEEPS. */
+        snd_dbg[DBG_LATE] = (uint8_t)(snd_dbg[DBG_LATE]
+                                      + (CIA1_TOD10 + 10 - beep_tod) % 10);
+#endif
+    }
     if (mus_on) {
         if (note_left) note_left--;
         if (!note_left) {
@@ -276,9 +330,6 @@ void snd_poll(void) {
     unsigned int r;
 
 #ifdef TREK_DEBUG_INPUT
-    /* ABOVE the `enabled` gate deliberately: SND turns sound off, and a sample
-       that stops when the thing under test stops is no sample at all. */
-    snd_dbg[DBG_LATE] = SID[V2 + 4];
     DBG_HIT(DBG_POLLS);
 #endif
 

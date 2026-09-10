@@ -267,6 +267,40 @@ indefinitely here.
 **The release binary is byte-identical with the probe in the tree** (`make`
 without `TREK_DEBUG_INPUT` never sees it), which is what makes it safe to keep.
 
+### FIXED 2026-09-10, and the same probe measures the fix
+
+`snd_beep()` now sets `beep_left = BEEP_TICKS` and `tick()` calls `voice_off`
+when it reaches zero. **Ticks, not frames, on purpose**: this machine's raster
+counter wraps twice per frame and counting it is what ran the music at double
+speed. It does not block the caller, which the other three ports do.
+
+**And `enabled` is now tested, which matters more than tidiness.** With sound
+off, `snd_poll` returns before `tick()` -- so a beep started under the old code
+would have had nothing left to turn it off at all.
+
+The identical run, before and after:
+
+    run: ...Z RETURN      beeps  voice_off(V2)  last write   beep duration
+    before                1      0              $41 GATE_ON  never ends
+    after                 1      1              $40 GATE_OFF  ~275ms
+
+**The duration is measured, not asserted.** A tick count is 5 by construction
+and proves nothing; CIA1's time-of-day tenths are the honest clock here. One
+sample cannot separate 220ms from 275ms -- at tenth resolution the start phase
+decides whether either reads 2 or 3 -- so the probe ACCUMULATES over a run and
+eight beeps were taken in one:
+
+    8 beeps, 8 gate-offs, 22 tenth-boundaries crossed
+    mean 2.750 per beep -> 275ms, against 274.6ms predicted for 5 ticks
+
+which lands on the prediction to a part in seven hundred, and incidentally
+confirms the driver's tick calibration -- the thing that once ran the music at
+double speed -- from a direction that has nothing to do with music.
+
+Against the measured original's 250.6ms this is 9.6% long, which is one tick of
+granularity and the nearest whole tick available. **The fix costs nothing: the
+port has 5,282 bytes free with it in, up 99.**
+
 The two deferred features -- the MAIN VIEWER's other nine pages and colour per
 message -- were never started, and are deliberate scope rather than defects.
 There is about 5K of resident space for them (5,183, `make verify`).

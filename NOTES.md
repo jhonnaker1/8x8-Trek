@@ -477,17 +477,12 @@ that is released.**
 
 ### Sound -- both found by the 2026-09-09 sweep, both one line, neither fixed
 
-1. **The MEGA65's `snd_beep` never gates the voice off** -- **CONFIRMED ON THE
-   MACHINE 2026-09-10, and it is a defect in a released port.** It gates V2 on
-   at 440Hz and sets `sfx_on = 0`, which stops `tick()`'s effects branch -- the
-   only other code that touches V2 -- from ever clearing it, and `SR_FLAT`
-   leaves no envelope to decay through. Measured with a six-byte probe in the
-   debug build: an ordinary keypress reaches `snd_beep`, the last write to
-   `$D40B` is `$41` GATE_ON, and `voice_off(V2)` is called ZERO times after it
-   -- while the same probe in a run that types `SND` afterwards counts one and
-   reads `$40`. **Still open: the one-line fix, which is a released port's
-   audio and so is Jamie's call.** Write-up under "The refusal beep diverges"
-   below.
+1. ~~**The MEGA65's `snd_beep` never gates the voice off.**~~ **CONFIRMED on
+   the machine and FIXED, both 2026-09-10.** `beep_left` counts down in
+   `tick()` and calls `voice_off`; measured at 275ms against 274.6 predicted,
+   over eight beeps. It shipped in v0.12.0 and **the fix is not in any
+   release**, so a re-release is the only thing left on it. Write-up under "The
+   refusal beep diverges" below.
 2. **The X16's `snd_beep` is 200Hz for ~100ms** where the measured original is
    440Hz for 250ms and three other ports implement that. Not a conflict, just
    a divergence, shipped since v0.10.0.
@@ -7332,7 +7327,34 @@ C128's beep is that identical gated state with a `voice_off` 250ms later. A
 voice audible for 250ms there is audible indefinitely here. Say it as an
 argument, because that is what it is.
 
-Both are one line. **The MEGA65's is now confirmed rather than suspected, and
-still not fixed** -- not because the evidence is short, but because it is a
-released port's audio and that is Jamie's call to make, not a side effect of
-the sweep that found it. The X16's is unchanged and unmeasured.
+### FIXED the same day, and the probe measured the fix rather than assuming it
+
+`beep_left = BEEP_TICKS` in `snd_beep`, counted down in `tick()`, `voice_off`
+at zero. **Ticks and not frames**, because this machine's raster counter wraps
+twice per frame and counting it is what ran the music at double speed. Plus an
+`enabled` test that was missing: with sound off, `snd_poll` returns before
+`tick()`, so a beep started under the old code had nothing left to stop it.
+
+    run: ...Z RETURN      beeps  voice_off(V2)  last write   duration
+    before                1      0              $41 GATE_ON  never ends
+    after                 1      1              $40 GATE_OFF  ~275ms
+
+**A TICK COUNT IS 5 BY CONSTRUCTION AND PROVES NOTHING.** The only number that
+could come out wrong is the wall-clock duration, so the probe reads CIA1's
+time-of-day tenths at the beep and at the gate-off. One sample cannot separate
+220ms from 275ms -- at tenth resolution the start phase decides whether either
+reads 2 or 3 -- so it ACCUMULATES, and eight beeps went into one run:
+
+    8 beeps, 8 gate-offs, 22 tenth-boundaries -> mean 2.750 -> 275ms
+    predicted for 5 ticks at 18.2065Hz                        274.6ms
+
+A part in seven hundred, and it confirms the driver's tick calibration from a
+direction that has nothing to do with music -- which is worth more than the
+beep. **+99 bytes free, not fewer.**
+
+**IT SHIPPED IN v0.12.0 AND THE FIX IS IN NO RELEASE.** That is the only thing
+left on this item.
+
+Both were one line. **The MEGA65's is measured and fixed.** The X16's is
+unchanged and unmeasured -- and now that the MEGA65's turned out real, it is
+worth saying plainly that nobody has pointed an instrument at the X16's either.
