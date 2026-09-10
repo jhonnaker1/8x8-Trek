@@ -228,9 +228,21 @@ scored high enough to write a row. It goes through the `plat_write_all` the
 save proves — an argument, not a measurement. "Still open" and "still
 unverified" are different lists and this file was keeping only one of them.
 
+**And one defect found by source read on 2026-09-09, not yet heard.**
+`snd_beep()` gates SID voice 2 on at 440Hz and never gates it off; `sfx_on = 0`
+then stops `tick()`'s effects branch -- the only other code that touches V2 --
+from clearing it, and `SR_FLAT` leaves no envelope to decay through. Every
+other port waits its frames and calls `voice_off`. **This port has been played
+by hand twice with no report of a stuck tone, so it is a conflict rather than a
+finding.** The experiment that settles it is `make drive`: press an invalid
+key, then ask Xemu for the voice-2 gate bit a second later.
+
 The two deferred features -- the MAIN VIEWER's other nine pages and colour per
 message -- were never started, and are deliberate scope rather than defects.
-There is about 5K of resident space for them.
+There is about 5K of resident space for them (5,183, `make verify`).
+
+Both open items here are carried on THE OPEN LIST in `NOTES.md`, which is the
+list for the whole project and was re-derived on 2026-09-09.
 
 ## Saving works, and the SD card is gone
 

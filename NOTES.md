@@ -467,10 +467,94 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST (rewritten 2026-08-24)
+## THE OPEN LIST, re-derived 2026-09-09
 
-Read this first; the numbered items below are the historical record of how each
-one got here.
+**Re-derived from the five ports, not recited from the version below** -- that
+rule exists because "what is left?" is the only moment a list gets read, and
+asking it has caught built-but-listed items before. Every entry here was
+checked against the code or the port it names. **Nothing on it blocks anything
+that is released.**
+
+### Sound -- both found by the 2026-09-09 sweep, both one line, neither fixed
+
+1. **The MEGA65's `snd_beep` never gates the voice off.** It gates V2 on at
+   440Hz and sets `sfx_on = 0`, which stops `tick()`'s effects branch -- the
+   only other code that touches V2 -- from ever clearing it, and `SR_FLAT`
+   leaves no envelope to decay through. **READ, NOT HEARD.** The port has been
+   played by hand twice with no report of a stuck tone, so this is a CONFLICT,
+   not a finding. **The experiment: `make drive`, press an invalid key, then
+   ask Xemu for the SID voice-2 gate bit a second later.** One register read
+   separates a defect from a wrong reading of the source.
+2. **The X16's `snd_beep` is 200Hz for ~100ms** where the measured original is
+   440Hz for 250ms and three other ports implement that. Not a conflict, just
+   a divergence, shipped since v0.10.0.
+
+### The Atari, the only unreleased port
+
+3. **SAVE is unverified, not broken** -- the "broken" reading was Altirra's
+   virtual write mode and is retracted. The deciding test is save-then-restore
+   in ONE session, which wants the bridge's `state_save`/`state_load` rather
+   than another pair of five-minute cold boots. **Build the harness first.**
+4. **It has never fought, docked, landed on a planet or reached the hall of
+   fame.** A turn is not a game.
+5. **The boot load is untimed against a real 1050.** Packing `OVERLAYS.BIN`
+   cut it by 40% and nobody has held a stopwatch to what is left.
+6. **No release bundle** -- a licence fact rather than a task. What ships is
+   the XEX and the data files for the player's own DOS disk.
+7. **The DOS fork is held in reserve**, not spent: the lever that decides
+   whether `$0700..$1FFF` is worth 2,282 bytes.
+8. **Whether `.ovl_front` becomes the ceiling.** It grows with the save record
+   and cannot be split. 693 bytes resident today.
+
+### Verification gaps on released ports
+
+9. **The MEGA65's hall-of-fame WRITE has never been witnessed.** No driven game
+   scores high enough to write a row, so there is no file to check. It goes
+   through the `plat_write_all` the save proves -- an argument, not a
+   measurement, and the port's README now says so under "Still open" as well.
+10. **No human has played the Amiga.** End to end, yes -- by
+    `tools/amiga_type.py`. Every fault worth having on this project was found
+    by a person at a keyboard, so this is a real gap.
+11. **The C128 wants play.** The oldest item here and the only one that has
+    paid four times over: whether the game it adds up to is survivable,
+    readable and fair is not a question any build check reaches.
+
+### Deliberate scope, listed so they are not mistaken for defects
+
+12. **The MAIN VIEWER's other nine instrument pages** -- deferred to roomier
+    targets, Jamie 2026-08-29. What cycles them is read; the RESIDENT cost is
+    the blocker, not the data.
+13. **A colour per message** -- deferred, Jamie 2026-09-02. EGA Trek has no
+    department palette; every site picks its own colour. Same shape: the bytes
+    are nearly free, the resident code is not.
+
+### Repository
+
+14. **The X16 has no README.** The only released port without one -- and the
+    sweep that finally documented its build found the reason it needs one:
+    `cd x16 && make` builds the smoke test, not the game.
+15. **The C128's `make verify` does not report resident free.** Every other
+    port prints it -- the X16 its soft-stack headroom, the MEGA65 "5,183 free",
+    the Atari "693 bytes free below the window". The C128 prints its overlay
+    sizes and its lowram, and not the one number the whole overlay programme
+    exists to manage. **The cost of that showed up in this sweep:** the figure
+    was 211 on 2026-09-05, is 1,589 today, and three documents were still
+    quoting 211 four days later, one of them as a live comparison against
+    another port. *A resource nobody REPORTS is a resource nobody manages* --
+    written in this file about lowram, and true again about the resident
+    region. It is the top of the `ram` region minus the highest LMA end below
+    it, both already in the map: `$af00 - $a8cb`.
+
+**Not on this list, and checked:** the read list, the rig list and the build
+list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports
+FITTED 0, DERIVED 0, PROVISIONAL 0 against 203 BINARY.
+
+
+## THE MEASUREMENT-ERA OPEN LIST (rewritten 2026-08-24, ALL ITEMS CLOSED)
+
+**[Historical. This was the live list through the C128's measurement phase and
+every item on it is closed; the list above is the current one.]** The numbered
+items below are the historical record of how each one got here.
 
 **The plan for clearing the measurement items is at the end of this file** --
 "THE MEASUREMENT SESSION PLAN", five runs. **ALL FIVE RAN 2026-08-24.** What
@@ -2247,8 +2331,8 @@ Not missing features -- implemented things that do not match the original.
    **Feasible is not open.** This says the charset *could* be done here; it is
    NOT DOING IT on the C128 -- Jamie's call 2026-08-24, "PETSCII text and
    lettered ships are an acceptable position for this platform", which covers
-   the game symbols as much as the letterforms. See THE OPEN LIST,
-   Infrastructure. Kept because another target will want the costing.
+   the game symbols as much as the letterforms. See THE MEASUREMENT-ERA OPEN
+   LIST, Infrastructure. Kept because another target will want the costing.
 
    `commodore-uno/c128/src/vdc.c` has the upload path including the slot
    padding, and `tools/gen_charset.py` there is the generator precedent.
@@ -4811,14 +4895,20 @@ started with RUN (which clears variables) and BASIC is not running while it
 plays. What it rules out is a port that returns to BASIC and expects its far
 data to survive.
 
-## THE MEASUREMENT SESSION PLAN (written 2026-08-24, OVERTAKEN -- see below)
+## THE MEASUREMENT SESSION PLAN (written 2026-08-24, ALL FIVE RUNS DONE 2026-08-24)
 
-**[This said NOT YET RUN for sixteen days. It was never run as written: the
-disassembler closed the read list instead, item by item, and by 2026-09-02
-every list this plan was meant to empty was empty. Two sessions here did run
-against the original -- runs 1 and 2, whose readings are marked in place below.
-Kept because the SEQUENCING argument in the next paragraph is the part that
-was right, and because several sessions record what an emulator run costs.]**
+**[This heading said NOT YET RUN for sixteen days, and the correction it got on
+2026-09-09 was ALSO wrong -- it claimed the plan "was never run as written" and
+that only runs 1 and 2 happened. Both halves are false. THE OPEN LIST near the
+top of this file has said "ALL FIVE RAN 2026-08-24" since the day they ran, and
+runs 2 and 5 are cited by name in constants that shipped (LASER_HEAT, the
+deleted SELFDESTRUCT_FACTOR). The disassembler closed what the runs could not,
+which is a different claim.
+
+Worth keeping as written rather than tidied away: **the wrong correction was
+made during a sweep FOR wrong claims, from memory, without opening the list two
+thousand lines above that answers it.** The same failure the sweep wrote up an
+hour earlier, committed while writing it up.]**
 
 Jamie's sequencing, and it is the right one: **take every remaining
 measurement off the original first, then implement them all, then size the

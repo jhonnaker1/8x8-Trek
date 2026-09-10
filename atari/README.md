@@ -623,3 +623,6 @@ Two things it cost to learn:
 * **The DOS fork above**, which decides whether 2,282 bytes are available.
 * Whether `front` — which grows with the save record and cannot be split —
   becomes the ceiling once the arithmetic is closed.
+
+All six are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
+whole project and was re-derived on 2026-09-09.
