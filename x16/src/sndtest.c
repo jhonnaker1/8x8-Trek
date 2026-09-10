@@ -55,7 +55,16 @@ int main(void) {
     gap();
     snd_test_off();
     gap();
-    snd_test_note(88);          /* the driver believes this is 880Hz */
+    snd_test_note(30);          /* 300Hz -- a SECOND point inside the
+                                   analyser's trustworthy range, so the fix
+                                   is not confirmed by one reading */
+    gap();
+    snd_test_off();
+    gap();
+    snd_test_note(88);          /* 880Hz, deliberately ABOVE that range: it
+                                   reads half, and a run that demonstrates
+                                   its own instrument's limit every time is
+                                   worth the confusing line */
     gap();
     snd_test_off();
 

@@ -483,16 +483,15 @@ that is released.**
    over eight beeps. It shipped in v0.12.0 and **the fix is not in any
    release**, so a re-release is the only thing left on it. Write-up under "The
    refusal beep diverges" below.
-2. **The X16 plays every note AN OCTAVE FLAT, and the beep is a fifth below
-   even that.** Measured 2026-09-10 from x16emu's own audio recording: two
-   reference tones both come back at exactly x0.500, so the tens-of-Hz to VERA
-   conversion is wrong by a factor of two and the MUSIC has been flat since
-   v0.10.0. The beep measures 99.9Hz for 80ms against 440Hz for 250ms. A third
-   defect came free: `WAVE 0x00` selects VERA's narrowest pulse, measured at
-   0.9% duty, where its comment claims a 50% square. **Three fixes, all
-   verified except the last, all held for Jamie's call** -- one of them shifts
-   a released port's entire soundtrack. See "The X16 plays EVERY NOTE AN OCTAVE
-   FLAT" below.
+2. ~~**The X16 plays every note AN OCTAVE FLAT**~~ -- **FIXED 2026-09-10**,
+   confirmed at 440Hz and 300Hz. v0.10.0 through v0.12.0 all shipped an octave
+   low, music included, so **the fix is in no release**. Two things found in
+   the same run are still open and are separate defects, not consequences:
+   **the beep is 200.1Hz for 80ms** where the original measures 440Hz for
+   250.6ms (`voice_note(V_SFX, 20)` and six frame ticks, both wrong), and
+   **`WAVE 0x00` selects VERA's NARROWEST pulse -- measured 0.9% duty --**
+   where its comment claims a 50% square. See "The X16 plays EVERY NOTE AN
+   OCTAVE FLAT" below.
 
 ### The Atari, the only unreleased port
 
@@ -7408,19 +7407,33 @@ the law is **Hz * 2^26 / 25e6 = tens-of-Hz * 26.84355**. Doubling
     reference: driver says  440 Hz, VERA gives 439.9 Hz  (x1.000)
 
 The widest intermediate stays inside 16 bits (255 * 216 = 55,080) and the
-widest word is 6,845, so the staging that comment describes still holds. **The
-change was measured and then REVERTED, because an octave shift across a
-released port's whole soundtrack is not a side effect of a beep investigation.**
+widest word is 6,845, so the staging that comment describes still holds. The
+music's own top note is 93 tenths, giving 2,496.
+
+**FIXED 2026-09-10** (Jamie's call, asked for separately -- it was measured and
+reverted first, because an octave shift across a released port's whole
+soundtrack is not a side effect of a beep investigation). Confirmed at TWO
+points inside the analyser's trustworthy range, not one:
+
+    driver says 440 Hz -> 439.9 Hz  (x1.000)
+    driver says 300 Hz -> 299.6 Hz  (x0.999)
+    driver says 880 Hz -> 439.9 Hz  (x0.500)  [above the limit, reads half]
+
+The 880 line stays in the run deliberately. **An instrument that demonstrates
+its own limit on every run is worth a confusing line**, and this one's limit --
+periods going unsampled because the driver's pulse is under a sample wide --
+is exactly the kind of thing that would otherwise be rediscovered as a bug.
 
 ### Then the beep, which was a symptom and not the disease
 
     beep: 99.9 Hz, 80.4 ms      against 440 Hz, 250.6 ms measured off the original
 
 So the 2026-09-09 note -- "200Hz for ~100ms" -- was right about the driver's
-INTENT and wrong about the machine: the octave error puts it at 100Hz. Fixing
-the constant alone makes it 200Hz, still a fifth below spec and a third of the
-length, because `voice_note(V_SFX, 20)` and six frame ticks are separately
-wrong. **Two independent defects, and the beep is the smaller one.**
+INTENT and wrong about the machine: the octave error puts it at 100Hz. **With
+the octave fixed it now measures 200.1Hz for 80ms** -- still a fifth below spec
+and a third of the length, because `voice_note(V_SFX, 20)` and six frame ticks
+are separately wrong and remain so. **Two independent defects, and the beep is
+the smaller one; only the octave has been fixed.**
 
 ### And a third thing the recording gave away for free
 

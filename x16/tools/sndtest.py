@@ -26,6 +26,12 @@ WAV  = "/tmp/x16beep.wav"
 # What the original was MEASURED at, and what three other ports implement.
 WANT_HZ, WANT_MS = 440.0, 250.6
 
+# The tones sndtest.c plays before the beeps, and what the driver believes each
+# one is. Two inside the analyser's trustworthy range so the reading is not one
+# sample, and one deliberately above it -- see pitch() -- so every run shows
+# what this instrument cannot do.
+REFS = ((0, 440.0), (1, 300.0), (2, 880.0))
+
 
 def record():
     if os.path.exists(WAV):
@@ -116,15 +122,15 @@ def main():
     # BURSTS 1 AND 2 ARE REFERENCES the driver believes are 440 and 880.
     # Two of them, not one: a single wrong reading cannot say whether the error
     # is a SCALE or an OFFSET, and that is the whole question here.
-    for n, want in ((0, 440.0), (1, 880.0)):
+    for n, want in REFS:
         ra, rb = found[n]
         got = pitch(s, ra, rb, rate)
-        flag = "" if want <= 600 else "   [above the instrument's limit]"
+        flag = "" if want <= 600 else "   [ABOVE THE INSTRUMENT'S LIMIT, reads half]"
         print("  reference: driver says %5.0f Hz, VERA gives %6.1f Hz  (x%.3f)%s"
               % (want, got, got / want if want else 0, flag))
 
     hz, ms = [], []
-    for n, (a, b) in enumerate(found[2:], 1):
+    for n, (a, b) in enumerate(found[len(REFS):], 1):
         f = pitch(s, a, b, rate)
         d = (b - a) * 1000.0 / rate
         hz.append(f); ms.append(d)

@@ -31,10 +31,26 @@
  * VERA'S PSG lives in VRAM at $1F9C0, four bytes per voice: frequency low,
  * frequency high, volume with pan in the top two bits, then waveform with
  * pulse width. A note byte in MUSIC.DAT is a frequency in TENS OF HZ -- the
- * same encoding all five ports read -- and VERA wants Hz * 2^25 / 25e6, i.e.
- * tens-of-Hz * 13.42177. Staged as whole and fractional parts so no
- * intermediate leaves 16 bits, exactly as sidfreq.h does for the SID: the
- * widest case is 255 * 108 = 27,540.
+ * same encoding all five ports read.
+ *
+ * ~~VERA wants Hz * 2^25 / 25e6, i.e. tens-of-Hz * 13.42177.~~ **IT WANTS
+ * 2^26, AND THIS PORT WAS AN OCTAVE FLAT FROM v0.10.0 TO 2026-09-10.** VERA's
+ * PSG accumulator is SEVENTEEN bits, clocked at 25MHz/512 = 48828.125Hz, so
+ * the law is Hz * 2^26 / 25e6 = tens-of-Hz * 26.84355. The old constant put
+ * every note -- music, effects and the refusal beep -- an octave below every
+ * other port, playing the same MUSIC.DAT.
+ *
+ * MEASURED, not re-derived from the same documentation that produced the
+ * error: x16emu records a WAV, and two reference tones the driver believed
+ * were 440Hz and 880Hz came back at 219.9 and 439.9, both exactly x0.500. TWO
+ * references and not one, because one cannot separate a SCALE from an OFFSET.
+ * With the constant below they read 439.9 at x1.000. See `make run-sndtest`,
+ * `tools/sndtest.py`, and NOTES.md.
+ *
+ * Staged as whole and fractional parts so no intermediate leaves 16 bits,
+ * exactly as sidfreq.h does for the SID: the widest case is 255 * 216 =
+ * 55,080, and the widest word 6,845. The music's own top note is 93 tenths,
+ * giving 2,496.
  */
 #include <stdint.h>
 #include "../../c128/src/sid.h"
@@ -61,10 +77,10 @@
 #define V_MUSIC  0              /* voice 0 carries the tune   */
 #define V_SFX    1              /* voice 1 carries the effect */
 
-/* tens-of-Hz -> VERA frequency word. 13 + 108/256 = 13.4219, against the
-   exact 13.42177. */
-#define VERA_WHOLE 13
-#define VERA_FRAC 108
+/* tens-of-Hz -> VERA frequency word. 26 + 216/256 = 26.8438, against the
+   exact 26.84355. Was 13 + 108/256, which is half of it -- see the header. */
+#define VERA_WHOLE 26
+#define VERA_FRAC 216
 
 #define VOL_ON  0xC0            /* pan = both speakers, volume in bits 0-5 */
 #define WAVE    0x00            /* pulse, 50% -- the PC speaker the original
