@@ -36,6 +36,14 @@ SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/strpool.c \
       ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
 OUT = build/trek128.prg
+# DEFINED HERE, ABOVE THE RULES THAT USE THEM, and that is not a style choice:
+# make expands a rule's prerequisites AS IT PARSES THE LINE, so a variable
+# defined further down the file expands to NOTHING. Both of these were first
+# written next to their own rules, two hundred lines below `verify`, and the
+# result was a verify that silently stopped depending on either file -- the
+# checks did not run and nothing said so. See their rules for what they are.
+RES = build/trek128.res
+MAP = build/trek128.map
 DEBUG_OUT = build/trek128-debug.prg
 
 # THE LINK EMITS AN ELF AND objcopy MAKES EVERYTHING ELSE OUT OF IT.
@@ -159,7 +167,7 @@ nolto: $(SRC) $(HDR)
 	        -DTREK_OVERLAYS -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
 	done
 
-verify: $(OUT) nolto
+verify: $(OUT) $(RES) $(MAP) nolto
 	@# LOWRAM HEADROOM. Added 2026-08-27 after the save record was packed and
 	@# the 192 bytes it freed turned out to land in a pool NOBODY WAS
 	@# WATCHING: writable data lives in lowram, 0x1300..0x1C00, and it had 77
@@ -191,9 +199,29 @@ build/trek128.elf: $(SRC) $(HDR) trek128.ld Makefile
 	$(MOSCC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=build/trek128.map \
 	    -o $@ $(SRC) $(LDLIBS)
 
+# THE MAP IS AN OUTPUT OF THAT LINK AND MAKE 3.81 CANNOT SAY SO -- no grouped
+# targets here. Without this rule, deleting the map while the ELF is up to date
+# leaves `verify` with no map and nothing able to rebuild one: it dies with a
+# clear message, but the four checks that read the map simply do not run, and
+# the resident figure is the one nobody would notice missing. A rule with NO
+# prerequisites fires only when its target is absent, so this costs nothing on
+# every other build.
+$(MAP):
+	@rm -f build/trek128.elf
+	@$(MAKE) --no-print-directory build/trek128.elf
+
 # The resident image: everything except the overlay sections, with the load
 # address in front of it. `-O binary` over this ELF was checked byte for byte
 # against what the old OUTPUT_FORMAT produced.
+# THE FLAT IMAGE, with its own rule rather than only as a byproduct of $(OUT).
+# `verify` reads it as one of the two methods it cross-checks the resident
+# figure with, and a byproduct is not a dependency: with the PRG up to date and
+# this file deleted, make had nothing to rebuild and verify died on a missing
+# input. It derives from the ELF, so deriving it from the ELF is also the
+# honest way to say so.
+$(RES): build/trek128.elf
+	$(OBJCOPY) -O binary --remove-section=.ovl_* $< $@
+
 $(OUT): build/trek128.elf
 	$(OBJCOPY) -O binary --remove-section=.ovl_* $< build/trek128.res
 	@python3 -c "d = open('build/trek128.res','rb').read(); \

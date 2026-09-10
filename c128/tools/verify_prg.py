@@ -63,6 +63,7 @@ C128 = HERE.parents[1]
 sys.path.insert(0, str(C128.parent / "tools"))
 import overlay_check  # noqa: E402  -- needs the path above
 PRG = C128 / "build" / "trek128.prg"
+RES = C128 / "build" / "trek128.res"   # the flat image, overlays removed
 HDR = C128 / "src" / "input.h"
 SRC = C128 / "src" / "input.c"
 
@@ -127,6 +128,82 @@ def check_data_init(mapfile):
         )
     print(f"verify: .data is {size} bytes at ${vma:04x}, copied from "
           f"${lma:04x} -- ok")
+
+
+def check_resident_free(mapfile, res):
+    """How much room is left below the overlay window -- THE FIGURE THIS PORT
+    MANAGES AND WAS THE ONLY ONE NOT PRINTING.
+
+    Every other port reports it. The X16 prints its soft-stack headroom, the
+    MEGA65 "5,183 free", the Atari "693 bytes free below the window". The C128
+    printed its eleven overlay sizes and its lowram and not the one number the
+    whole overlay programme exists to move -- and on 2026-09-09 that cost
+    something concrete: the figure was 211 on 2026-09-05 and 1,589 four days
+    later, with three documents still quoting 211, one of them as a live
+    comparison against another port. A RESOURCE NOBODY REPORTS IS A RESOURCE
+    NOBODY MANAGES, which this project learned about lowram and then repeated
+    about the resident region.
+
+    TWO METHODS, AND THEY MUST AGREE. The map is scanned for the highest load
+    address in the `ram` region, and trek128.res -- objcopy's flat image of the
+    same link, minus the overlays -- gives the same end as its own length plus
+    the load address. They come from the same link but by different routes, so
+    a mistake in the map scan cannot quietly produce a plausible number. That
+    is the shape of check that caught the per-site message colour.
+
+    The window's run address is taken from the overlays themselves rather than
+    from a constant here, so this cannot disagree with the linker script the
+    way tools/budget.py and atari.ld once did -- two copies of a window size,
+    one of them read by the report and the other by the linker.
+    """
+    text = mapfile.read_text()
+
+    load = win = None
+    top = 0
+    for line in text.splitlines():
+        p = line.split()
+        if len(p) != 5 or not p[4].startswith("."):
+            continue
+        vma, lma, size = (int(p[i], 16) for i in range(3))
+        if p[4] == ".basic_header":
+            load = lma
+        if p[4].startswith(".ovl_"):
+            win = vma if win is None else min(win, vma)
+
+    if load is None:
+        die("no .basic_header in the map -- cannot find the load address")
+    if win is None:
+        die("no .ovl_* sections in the map -- cannot find the window")
+
+    for line in text.splitlines():
+        p = line.split()
+        if len(p) != 5 or not p[4].startswith("."):
+            continue
+        lma, size = int(p[1], 16), int(p[2], 16)
+        if size and load <= lma < win:
+            top = max(top, lma + size)
+
+    if not top:
+        die("no loadable section between the load address and the window -- "
+            "has trek128.ld changed?")
+
+    if not res.exists():
+        die(f"{res.name} not built -- it is one of the two methods here")
+    by_size = load + res.stat().st_size
+    if by_size != top:
+        die("the two methods disagree about where resident code ends:\n"
+            f"         the map says ${top:04x}, "
+            f"{res.name} says ${by_size:04x} "
+            f"(${load:04x} + {res.stat().st_size})\n"
+            "         One of them is being read wrongly. Do not trust either "
+            "number until they agree.")
+
+    free = win - top
+    if free < 0:
+        die(f"resident code runs INTO the overlay window: ends ${top:04x}, "
+            f"window at ${win:04x}")
+    print(f"verify: resident ${load:04x}..${top:04x}, {free} bytes free below "
+          f"the window at ${win:04x}")
 
 
 def check_overlays(mapfile):
@@ -820,6 +897,7 @@ def main():
         die(f"{prg} not built yet -- run make first")
 
     check_data_init(MAP)
+    check_resident_free(MAP, RES)
     check_overlays(MAP)
     check_message_widths()
     check_linebuf()

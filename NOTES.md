@@ -534,17 +534,20 @@ that is released.**
 14. **The X16 has no README.** The only released port without one -- and the
     sweep that finally documented its build found the reason it needs one:
     `cd x16 && make` builds the smoke test, not the game.
-15. **The C128's `make verify` does not report resident free.** Every other
-    port prints it -- the X16 its soft-stack headroom, the MEGA65 "5,183 free",
-    the Atari "693 bytes free below the window". The C128 prints its overlay
-    sizes and its lowram, and not the one number the whole overlay programme
-    exists to manage. **The cost of that showed up in this sweep:** the figure
-    was 211 on 2026-09-05, is 1,589 today, and three documents were still
-    quoting 211 four days later, one of them as a live comparison against
-    another port. *A resource nobody REPORTS is a resource nobody manages* --
-    written in this file about lowram, and true again about the resident
-    region. It is the top of the `ram` region minus the highest LMA end below
-    it, both already in the map: `$af00 - $a8cb`.
+15. ~~**The C128's `make verify` does not report resident free.**~~ **FIXED
+    2026-09-10.** It prints `resident $1c01..$a8cb, 1589 bytes free below the
+    window at $af00`, cross-checked between the map and `trek128.res` so a
+    misread map cannot produce a plausible number, and exercised against four
+    deliberate breakages. Two dependency bugs came out with it -- see "The
+    C128's resident figure" below.
+
+16. **`make d64` fails on the first run after a clean build**, on a missing
+    `build/strings.dat`; a second run succeeds. Found 2026-09-10 while testing
+    item 15 and **confirmed to predate it** -- it fails identically with those
+    changes stashed. It is the same class as the two bugs item 15 turned up: a
+    file that a recipe happens to produce is not a file that make knows how to
+    rebuild. Not fixed, because it is the release path and not the check that
+    was being repaired.
 
 **Not on this list, and checked:** the read list, the rig list and the build
 list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports
@@ -7252,6 +7255,62 @@ writing the fix.
 **Every port still builds and `trek128.prg` is byte-identical**
 (`6a1b289d4ba5c96ce60d1cc47e163f42`), which is what says these were comments.
 
+
+
+## The C128's resident figure, and two dependency bugs under it (2026-09-10)
+
+Item 15 of the open list: every port but this one printed how much room was
+left below the overlay window. Fixing it was five minutes; the two bugs
+underneath it were not, and both are the same shape.
+
+### The check itself
+
+    verify: resident $1c01..$a8cb, 1589 bytes free below the window at $af00
+
+**Two methods, and they must agree.** The map is scanned for the highest load
+address inside the `ram` region; `trek128.res` -- objcopy's flat image of the
+same link with the overlays removed -- gives the same end as its own length
+plus the load address. Same link, different routes, so a mistake in the map
+scan cannot quietly produce a plausible number. The window's address comes from
+the overlays themselves rather than a constant, which is the thing that bit
+`atari.ld` and `budget.py`: two copies of a window size, one read by the report
+and the other by the linker.
+
+**Exercised by breaking it, four ways**, because a check that has only been
+seen to pass is not evidence: a one-byte-longer `.res` (methods disagree, exit
+1), 2,000 bytes of extra resident code (runs INTO the window, exit 1), the
+`.ovl_` lines stripped from the map (cannot find the window, exit 1), and the
+`.res` deleted (exit 1). Then the clean case, exit 0.
+
+### The first bug: a byproduct is not a dependency
+
+`trek128.res` and `trek128.map` are written by the recipes for `$(OUT)` and the
+ELF, but nothing declared them as outputs. Delete either while the PRG is up to
+date and make has nothing to rebuild -- verify dies on a missing input, and the
+four checks that read the map simply do not run. The `.res` now has its own
+rule from the ELF. The map cannot: **make 3.81 has no grouped targets**, so
+there is a rule with NO prerequisites, which fires only when the target is
+absent and forces a relink.
+
+### The second bug, and it made the first fix silently do nothing
+
+`verify: $(OUT) $(RES) $(MAP) nolto` -- with `RES` and `MAP` defined two
+hundred lines below, next to their own rules. **Make expands a rule's
+prerequisites as it PARSES the line**, so both expanded to nothing and verify
+went straight back to not depending on either file. It presented as the map
+being missing on a run where nothing had been deleted.
+
+That is the second time in two days that a thing was fixed in one place and
+read from another: the retraction that reached `trek.h` and not `trek.c`, and
+now a variable defined below its use. **Both were invisible because the code
+still ran and still printed something.**
+
+### And a third, which is not mine and is not fixed
+
+`make d64` fails on the first run after a clean build -- `build/strings.dat`
+missing -- and succeeds on the second. **Confirmed to predate this work**: it
+fails identically with these changes stashed. Same class again, on the release
+path. Open list item 16.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
