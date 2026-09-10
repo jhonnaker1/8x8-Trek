@@ -483,9 +483,16 @@ that is released.**
    over eight beeps. It shipped in v0.12.0 and **the fix is not in any
    release**, so a re-release is the only thing left on it. Write-up under "The
    refusal beep diverges" below.
-2. **The X16's `snd_beep` is 200Hz for ~100ms** where the measured original is
-   440Hz for 250ms and three other ports implement that. Not a conflict, just
-   a divergence, shipped since v0.10.0.
+2. **The X16 plays every note AN OCTAVE FLAT, and the beep is a fifth below
+   even that.** Measured 2026-09-10 from x16emu's own audio recording: two
+   reference tones both come back at exactly x0.500, so the tens-of-Hz to VERA
+   conversion is wrong by a factor of two and the MUSIC has been flat since
+   v0.10.0. The beep measures 99.9Hz for 80ms against 440Hz for 250ms. A third
+   defect came free: `WAVE 0x00` selects VERA's narrowest pulse, measured at
+   0.9% duty, where its comment claims a 50% square. **Three fixes, all
+   verified except the last, all held for Jamie's call** -- one of them shifts
+   a released port's entire soundtrack. See "The X16 plays EVERY NOTE AN OCTAVE
+   FLAT" below.
 
 ### The Atari, the only unreleased port
 
@@ -7355,6 +7362,83 @@ beep. **+99 bytes free, not fewer.**
 **IT SHIPPED IN v0.12.0 AND THE FIX IS IN NO RELEASE.** That is the only thing
 left on this item.
 
-Both were one line. **The MEGA65's is measured and fixed.** The X16's is
-unchanged and unmeasured -- and now that the MEGA65's turned out real, it is
-worth saying plainly that nobody has pointed an instrument at the X16's either.
+Both were one line. **The MEGA65's is measured and fixed.** The X16's was
+measured next, and it was not one line and not really about the beep -- see
+below.
+
+
+## The X16 plays EVERY NOTE AN OCTAVE FLAT (measured 2026-09-10)
+
+Sent to measure the X16's refusal beep. The beep is as bad as claimed and
+worse, but it is a symptom: **the port's tens-of-Hz to VERA conversion is
+wrong by a factor of two, so the music, the effects and the beep have all been
+an octave low since v0.10.0.**
+
+### The instrument, and why this one could be acoustic
+
+x16emu records a WAV of its audio output (`-wav file,auto`), which no other
+emulator on this project offers -- the MEGA65's beep had to be settled by
+counting driver calls because SID registers are write-only. Here the sound
+itself can be measured. `src/sndtest.c` calls the SHIPPING driver and
+`tools/sndtest.py` reads pitch and duration out of the recording:
+
+    make run-sndtest
+
+### The reference tone is the whole design
+
+`snd_test_note()` is a guarded hook that plays any note through the same
+`voice_note()` the beep uses, so the run opens with **two tones whose answers
+are known in advance** -- 44 tenths, which the driver believes is 440Hz, and 88
+tenths, which it believes is 880.
+
+    reference: driver says  440 Hz, VERA gives 219.9 Hz  (x0.500)
+    reference: driver says  880 Hz, VERA gives 439.9 Hz  (x0.500)
+
+**TWO references and not one, because one cannot tell a SCALE from an OFFSET**
+-- and that is exactly the question a single wrong reading raises. Both come
+back at 0.500, so it is a scale.
+
+### The arithmetic, and the fix, measured rather than proposed
+
+`x16snd.c` says "VERA wants Hz * 2^25 / 25e6, i.e. tens-of-Hz * 13.42177".
+VERA's PSG accumulator is clocked at 25MHz/512 = 48828.125Hz and is 17 bits, so
+the law is **Hz * 2^26 / 25e6 = tens-of-Hz * 26.84355**. Doubling
+`VERA_WHOLE`/`VERA_FRAC` to 26 and 216 and re-running:
+
+    reference: driver says  440 Hz, VERA gives 439.9 Hz  (x1.000)
+
+The widest intermediate stays inside 16 bits (255 * 216 = 55,080) and the
+widest word is 6,845, so the staging that comment describes still holds. **The
+change was measured and then REVERTED, because an octave shift across a
+released port's whole soundtrack is not a side effect of a beep investigation.**
+
+### Then the beep, which was a symptom and not the disease
+
+    beep: 99.9 Hz, 80.4 ms      against 440 Hz, 250.6 ms measured off the original
+
+So the 2026-09-09 note -- "200Hz for ~100ms" -- was right about the driver's
+INTENT and wrong about the machine: the octave error puts it at 100Hz. Fixing
+the constant alone makes it 200Hz, still a fifth below spec and a third of the
+length, because `voice_note(V_SFX, 20)` and six frame ticks are separately
+wrong. **Two independent defects, and the beep is the smaller one.**
+
+### And a third thing the recording gave away for free
+
+    duty cycle measured: 0.9%
+
+`WAVE 0x00` is commented "pulse, 50% -- the PC speaker the original used had no
+envelope either". VERA's waveform field is the top two bits and the pulse WIDTH
+is the bottom six, so `0x00` selects the NARROWEST pulse available, not a
+square. A 1% pulse is thin and quiet and nothing like a PC speaker. **The
+comment states the intent and the code does not implement it**, which is this
+project's own definition of a bug.
+
+### The instrument's limit, which the run states rather than hides
+
+That narrow pulse is also why the 880Hz reference reads 439.9. At 48828Hz a
+1/64 pulse at 880Hz is on for **0.87 samples** -- under one -- so periods go
+unsampled and the median interval lands on two of them: a reading exactly an
+octave low. Trust the analysis below ~600Hz; the script prints the warning
+itself rather than leaving it in a comment. **The pre-fix references at 440 and
+880 both sat in the trustworthy range, which is what makes the x0.500 a
+finding and not an artifact of the same kind.**

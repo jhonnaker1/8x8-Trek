@@ -127,6 +127,19 @@ static unsigned char frame_tick(void) {
     return 0;
 }
 
+#ifdef TREK_SND_TEST
+/* A REFERENCE TONE WITH A KNOWN ANSWER, for src/sndtest.c only.
+ *
+ * Measuring the beep is worthless if the instrument is not known good: a
+ * number out of a WAV is only evidence once the same path has produced a
+ * frequency somebody can predict. This plays any note through the SAME
+ * voice_note() the beep uses, so `44` must come out at 440Hz -- and if it does
+ * not, the analysis is wrong and the beep reading means nothing. Never
+ * compiled into the game; see the sndtest target. */
+void snd_test_note(unsigned char tenths) { voice_note(V_SFX, tenths); }
+void snd_test_off(void) { voice_off(V_SFX); }
+#endif
+
 void snd_init(void) {
     unsigned char v;
     for (v = 0; v < 16; v++) { psg(v, 2, 0); }   /* silence every voice */

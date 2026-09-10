@@ -28,7 +28,7 @@ OVL_WINDOW = 3968
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
 
-.PHONY: all smoke charset game music data run autoplay clean run-charset run-smoke run-game clean
+.PHONY: sndtest run-sndtest all smoke charset game music data run autoplay clean run-charset run-smoke run-game clean
 
 all: smoke
 
@@ -83,6 +83,22 @@ storetest: $(STORE_OUT)
 $(STORE_OUT): $(STORE_SRC)
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(STORE_SRC)
+
+# THE BEEP, MEASURED. x16emu can record a WAV -- the only emulator on this
+# project that can -- so this runs the SHIPPING sound driver and reads the
+# pitch and duration out of the recording rather than out of the source.
+#   make run-sndtest
+SND_SRC = src/sndtest.c src/x16snd.c src/music_data.c
+SND_OUT = build/sndtest.prg
+
+sndtest: $(SND_OUT)
+
+$(SND_OUT): $(SND_SRC) src/x16snd.c
+	@mkdir -p build
+	$(X16CC) $(CFLAGS) -DTREK_SND_TEST -o $@ $(SND_SRC)
+
+run-sndtest: $(SND_OUT)
+	python3 tools/sndtest.py
 
 MEM_SRC = src/memtest.c src/x16mem.c src/x16storage.c
 MEM_OUT = build/memtest.prg
