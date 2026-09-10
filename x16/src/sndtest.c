@@ -38,6 +38,7 @@ static void gap(void) {
 
 void snd_test_note(unsigned char tenths);
 void snd_test_off(void);
+void snd_test_frames(unsigned char tenths, unsigned char n);
 
 int main(void) {
     uint8_t i;
@@ -71,6 +72,13 @@ int main(void) {
     /* Lead-in. x16emu's -wav ,auto starts recording on the first non-zero
        sample, so what it captures begins at the first beep either way. */
     gap();
+
+    /* WHAT IS A FRAME TICK WORTH. Three holds, so the answer is a SLOPE and
+       not one reading -- a fixed overhead at the start of each hold shows up
+       as an intercept, and one measurement cannot see it. */
+    snd_test_frames(44, 6);  gap();
+    snd_test_frames(44, 15); gap();
+    snd_test_frames(44, 30); gap();
 
     for (i = 0; i < 3; i++) {
         snd_beep();

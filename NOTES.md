@@ -483,15 +483,12 @@ that is released.**
    over eight beeps. It shipped in v0.12.0 and **the fix is not in any
    release**, so a re-release is the only thing left on it. Write-up under "The
    refusal beep diverges" below.
-2. ~~**The X16 plays every note AN OCTAVE FLAT**~~ -- **FIXED 2026-09-10**,
-   confirmed at 440Hz and 300Hz. v0.10.0 through v0.12.0 all shipped an octave
-   low, music included, so **the fix is in no release**. Two things found in
-   the same run are still open and are separate defects, not consequences:
-   **the beep is 200.1Hz for 80ms** where the original measures 440Hz for
-   250.6ms (`voice_note(V_SFX, 20)` and six frame ticks, both wrong), and
-   **`WAVE 0x00` selects VERA's NARROWEST pulse -- measured 0.9% duty --**
-   where its comment claims a 50% square. See "The X16 plays EVERY NOTE AN
-   OCTAVE FLAT" below.
+2. ~~**The X16's sound: an octave flat, a wrong beep and a 1% pulse.**~~
+   **ALL THREE FIXED 2026-09-10** and measured: references at x1.000/x0.999/
+   x1.009, beep 439.9Hz for 253.0ms at 49.7% duty against a spec of 440Hz and
+   250.6ms. **v0.10.0, v0.11.0 and v0.12.0 all ship all three**, so as with the
+   MEGA65's beep the fixes are in no release. That is now the only thing left
+   on X16 sound. See "The X16 plays EVERY NOTE AN OCTAVE FLAT" below.
 
 ### The Atari, the only unreleased port
 
@@ -7429,11 +7426,59 @@ is exactly the kind of thing that would otherwise be rediscovered as a bug.
     beep: 99.9 Hz, 80.4 ms      against 440 Hz, 250.6 ms measured off the original
 
 So the 2026-09-09 note -- "200Hz for ~100ms" -- was right about the driver's
-INTENT and wrong about the machine: the octave error puts it at 100Hz. **With
-the octave fixed it now measures 200.1Hz for 80ms** -- still a fifth below spec
-and a third of the length, because `voice_note(V_SFX, 20)` and six frame ticks
-are separately wrong and remain so. **Two independent defects, and the beep is
-the smaller one; only the octave has been fixed.**
+INTENT and wrong about the machine: the octave error puts it at 100Hz. **Two
+independent defects, and the beep was the smaller one.**
+
+### The beep, and it was THREE things once anyone looked
+
+**FIXED 2026-09-10.** Not by changing 20 to 44 and 6 to 15, which is what it
+looked like from the source and would have produced a beep cut off by its own
+guard.
+
+  * **The pitch.** `voice_note(V_SFX, 20)` -> `BEEP_TENTHS 44`.
+
+  * **SIX TICKS WERE FIVE FRAMES.** `snd_init` clears VERA's ISR LINE flag, but
+    by the time a refusal happens it is set again, so the first `frame_tick()`
+    returned at once. **Found as an INTERCEPT, which is the whole reason the
+    calibration holds three points and not one:** 6, 15 and 30 ticks measured
+    85.2, 235.9 and 487.6ms -- slope 16.77ms (59.6Hz, so the frame rate was
+    never the problem), intercept **-15.4ms**, one free tick. One hold would
+    have given a ms-per-tick figure with the error folded invisibly into it.
+    Clearing the flag in `snd_beep` is what makes fifteen ticks fifteen frames.
+
+  * **AND THE GUARD WOULD HAVE TRUNCATED THE FIX.** It bounded the WHOLE beep
+    at 65,536 spins. From the silences between bursts in the same recording --
+    739ms for four spins of 65,536 -- that is about **185ms**, which is fine
+    for an 84ms beep and short of a 251ms one. So `6` -> `15` alone would have
+    ended the beep early, and the symptom would have been a duration that
+    ignored the constant. It now bounds ONE FRAME and resets on each tick:
+    ~6,000 iterations needed against 65,536 allowed.
+
+### And the waveform, where the documentation was wrong twice
+
+`WAVE 0x00` -> `0x3F`. The first attempt was `0x1F` on the reasoning that
+duty is (width+1)/64, and it measured **24.9%**. So the sweep replaced the
+reasoning:
+
+    width 31 -> 24.9%      width 47 -> 37.2%      width 63 -> 49.7%
+
+which is **(width+1)/128** to a third of a percent at all three points. `0x3F`
+is the 50% square this line always claimed to be.
+
+**And fixing it deleted the instrument's limit.** The 880Hz reference had been
+reading exactly half, because a 0.9% pulse at 880Hz is on for 0.87 samples and
+periods went unsampled. With a square it reads 887.8. The script's hardcoded
+"above 600Hz" warning was true only while the bug was there, and **a hardcoded
+limit outlived its cause by one commit** -- it flags on the READING now.
+
+### Where it landed
+
+    reference: 440 -> 439.9 (x1.000)   300 -> 299.6 (x0.999)   880 -> 887.8 (x1.009)
+    beep:      439.9 Hz   253.0 ms   duty 49.7%
+    spec:      440.0 Hz   250.6 ms
+
+1.00x pitch, 1.01x length. Peak amplitude 3.3% of full scale, so the square
+does not clip.
 
 ### And a third thing the recording gave away for free
 

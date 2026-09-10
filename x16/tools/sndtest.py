@@ -32,6 +32,12 @@ WANT_HZ, WANT_MS = 440.0, 250.6
 # what this instrument cannot do.
 REFS = ((0, 440.0), (1, 300.0), (2, 880.0))
 
+# Frame-tick holds, in ticks. THREE, so the result is a slope: any fixed
+# overhead per hold lands in the intercept where it can be seen, instead of
+# being averaged into the rate where it cannot. That intercept is what found
+# the free first tick: -15.4ms against a 16.77ms slope.
+HOLDS = (6, 15, 30)
+
 
 def record():
     if os.path.exists(WAV):
@@ -77,6 +83,19 @@ def bursts(rate, s, win=64, floor=200):
     return out
 
 
+def duty(s, a, b):
+    """Fraction of samples above the burst's own midpoint.
+
+    This is how WAVE 0x00 was caught: the comment said "pulse, 50%" and the
+    recording said 0.9%. A waveform's shape is as measurable as its pitch and
+    nothing here was looking at it."""
+    seg = s[a + (b - a) // 3:a + (b - a) // 3 + min(20000, (b - a) // 3)]
+    if not seg:
+        return 0.0
+    mid = (min(seg) + max(seg)) / 2.0
+    return 100.0 * sum(1 for v in seg if v > mid) / len(seg)
+
+
 def pitch(s, a, b, rate):
     """Hz from the MIDDLE of the burst, by the median interval between rising
     crossings of the segment's own mean.
@@ -88,13 +107,14 @@ def pitch(s, a, b, rate):
     RISING crossings only, one per period rather than two. And it takes the
     MEDIAN interval, so a stray crossing from the emulator's resampling moves
     nothing, where a count over the whole segment would be inflated by it."""
-    # THE INSTRUMENT'S OWN LIMIT, measured not guessed. This driver selects
-    # VERA's NARROWEST pulse (see WAVE in x16snd.c) -- the recording's duty
-    # cycle is 0.9%, not the 50% that file's comment claims. Above about 600Hz
-    # the spike is under one sample wide at 48828Hz, so some periods are missed
-    # entirely and the median interval lands on TWO periods: a reading exactly
-    # an octave low. Trust this below ~600Hz; above it, halve your confidence
-    # rather than the number.
+    # WHERE THIS ANALYSIS BREAKS, and it is a property of the SIGNAL rather
+    # than of the code below. While the driver selected VERA's narrowest pulse
+    # (0.9% duty, measured) a note above ~600Hz was on for under one sample at
+    # 48828Hz, so periods went unsampled and the median interval landed on two
+    # of them -- a reading exactly an octave low. That was diagnosed here and
+    # then FIXED IN THE DRIVER: with a 50% square the 880Hz reference reads
+    # 887.8. Kept as a comment because the failure will return the moment
+    # anything plays a narrow pulse again.
     lo = a + (b - a) // 5
     hi = b - (b - a) // 5
     seg = s[lo:hi]
@@ -125,16 +145,37 @@ def main():
     for n, want in REFS:
         ra, rb = found[n]
         got = pitch(s, ra, rb, rate)
-        flag = "" if want <= 600 else "   [ABOVE THE INSTRUMENT'S LIMIT, reads half]"
+        # FLAG ON THE READING, NOT ON THE FREQUENCY. This used to say "above
+        # the instrument's limit" for anything over 600Hz, which was true only
+        # while the driver played a sub-sample-wide pulse: with a 50% square
+        # the 880 reference reads 887.8. A hardcoded limit outlived its cause
+        # by one commit.
+        off = abs(got - want) / want if want else 1.0
+        flag = "" if off < 0.05 else "   [OFF -- see pitch() on narrow pulses]"
         print("  reference: driver says %5.0f Hz, VERA gives %6.1f Hz  (x%.3f)%s"
               % (want, got, got / want if want else 0, flag))
 
+    # THE FRAME-TICK CALIBRATION: three holds of a known tick count.
+    holds = found[len(REFS):len(REFS) + len(HOLDS)]
+    if len(holds) == len(HOLDS):
+        pts = []
+        for (a, b), n in zip(holds, HOLDS):
+            d = (b - a) * 1000.0 / rate
+            pts.append((n, d))
+            print("  hold %2d ticks: %7.1f ms   (%5.2f ms/tick)" % (n, d, d / n))
+        (n0, d0), (n1, d1) = pts[0], pts[-1]
+        slope = (d1 - d0) / float(n1 - n0)
+        icept = d0 - slope * n0
+        print("  -> %.2f ms per tick (%.1f Hz), intercept %+.1f ms"
+              % (slope, 1000.0 / slope if slope else 0, icept))
+
     hz, ms = [], []
-    for n, (a, b) in enumerate(found[len(REFS):], 1):
+    for n, (a, b) in enumerate(found[len(REFS) + len(HOLDS):], 1):
         f = pitch(s, a, b, rate)
         d = (b - a) * 1000.0 / rate
         hz.append(f); ms.append(d)
-        print("  beep %d: %6.1f Hz  %6.1f ms" % (n, f, d))
+        print("  beep %d: %6.1f Hz  %6.1f ms  duty %4.1f%%"
+              % (n, f, d, duty(s, a, b)))
     if not hz:
         sys.exit("sndtest: reference only -- no beeps in the recording")
 

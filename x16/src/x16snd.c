@@ -83,7 +83,17 @@
 #define VERA_FRAC 216
 
 #define VOL_ON  0xC0            /* pan = both speakers, volume in bits 0-5 */
-#define WAVE    0x00            /* pulse, 50% -- the PC speaker the original
+/* PSG register 3 is [waveform:2][pulse width:6], and duty is (width+1)/64.
+   ~~0x00: pulse, 50%~~ -- **0x00 SELECTS THE NARROWEST PULSE THERE IS, and
+   this port played a 1/64 spike from v0.10.0 to 2026-09-10.** Measured off
+   x16emu's recording at 0.9% duty, against the 50% this line claimed.
+
+   AND THE DUTY LAW IS (width+1)/128, NOT /64, which is why 0x1F went in first
+   and measured 24.9%. Swept it instead of arguing with the documentation:
+   width 31 -> 24.9%, 47 -> 37.2%, 63 -> 49.7%, all three matching (w+1)/128 to
+   a third of a percent. So 0x3F is the square a PC speaker actually makes --
+   which is what the rest of this comment was always about. */
+#define WAVE    0x3F            /* pulse, 50% -- the PC speaker the original
                                    used had no envelope either */
 #define VOLUME  40
 
@@ -154,6 +164,21 @@ static unsigned char frame_tick(void) {
  * compiled into the game; see the sndtest target. */
 void snd_test_note(unsigned char tenths) { voice_note(V_SFX, tenths); }
 void snd_test_off(void) { voice_off(V_SFX); }
+
+/* HOLD A NOTE FOR N FRAME TICKS, to calibrate what a frame tick is worth.
+ *
+ * snd_beep() says six ticks and the recording says 80ms, which is neither
+ * 6/60 nor 6/50. Two candidates: the ISR LINE flag is already set when the
+ * loop starts, so N ticks span N-1 intervals; or the shipping guard runs out
+ * first. This separates them -- the guard here is four million, far past
+ * either, so what comes back is the TICK. */
+void snd_test_frames(unsigned char tenths, unsigned char n) {
+    unsigned long guard = 0;
+    unsigned char f = 0;
+    voice_note(V_SFX, tenths);
+    while (f < n && ++guard < 4000000UL) { if (frame_tick()) f++; }
+    voice_off(V_SFX);
+}
 #endif
 
 void snd_init(void) {
@@ -195,13 +220,43 @@ void snd_effect(uint8_t track) {
    sounding. A beep that ends early is a blemish; one that never ends is the
    bug Jamie hit. The spin cap is generous -- far longer than six frames -- and
    only reached if the frame source dies again. */
+/* THE REFUSAL BEEP. Three things were wrong with this and only one was the
+ * pitch; all three were measured on 2026-09-10 rather than reasoned about.
+ *
+ * IT PLAYED `voice_note(V_SFX, 20)` -- 200Hz, where the original is MEASURED
+ * at 440Hz and the other four ports play that. With the octave error still in
+ * place it came out of VERA at 99.9Hz.
+ *
+ * IT COUNTED SIX TICKS AND GOT FIVE FRAMES. `snd_init` clears the ISR LINE
+ * flag, but by the time a refusal happens it is set again, so the first
+ * `frame_tick()` returned immediately and N ticks spanned N-1 intervals.
+ * Measured as an INTERCEPT: holds of 6, 15 and 30 ticks came back at 85.2,
+ * 235.9 and 487.6ms, a slope of 16.77ms (59.6Hz, so the frame rate was never
+ * in doubt) and an intercept of -15.4ms -- one free tick. Clearing the flag
+ * here is what makes fifteen ticks mean fifteen frames.
+ *
+ * AND THE GUARD WOULD HAVE TRUNCATED THE FIX. It bounded the WHOLE beep at
+ * 65,536 spins, and 65,536 spins is about 185ms on this machine -- measured
+ * from the silences between bursts in the same recording, 739ms for four of
+ * them. That is fine for a 84ms beep and short of a 251ms one, so changing 6
+ * to 15 alone would have produced a beep cut off by its own guard. It bounds
+ * ONE FRAME now and resets on every tick: ~6,000 iterations needed against
+ * 65,536 allowed, and a beep of any length is safe. */
+#define BEEP_TENTHS 44          /* 440Hz, the A the other four ports beep */
+#define BEEP_FRAMES 15          /* 251.6ms at the measured 16.77ms/frame,
+                                   against the original's measured 250.6 */
+
 void snd_beep(void) {
     unsigned char frames = 0;
     unsigned int guard = 0;
     if (!enabled) return;
     sfx_on = 0;                    /* a refusal cancels whatever was playing */
-    voice_note(V_SFX, 20);
-    while (frames < 6 && ++guard) { if (frame_tick()) frames++; }
+    VERA_ISR = ISR_LINE;           /* or the first tick is free -- see above */
+    voice_note(V_SFX, BEEP_TENTHS);
+    while (frames < BEEP_FRAMES) {
+        if (frame_tick())      { frames++; guard = 0; }
+        else if (++guard == 0) { break; }   /* no frame in 65,536 spins */
+    }
     voice_off(V_SFX);
 }
 
