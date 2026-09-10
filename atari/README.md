@@ -535,32 +535,38 @@ There is more where that came from if it is ever needed: `hof` is 280 bytes and
 `slot` 256, and `$1CFC..$1FFF` is another 772 with DOS 2.5 — though that one
 depends on which DOS the player boots, where `$0480..$06FF` does not.
 
-## OPEN: SAVE writes a file the game cannot read back
+## OPEN: is SAVE broken? Probably not — and the first answer here was wrong
 
-Found while testing the margin, and **not caused by it.**
+This section said "SAVE writes a file the game cannot read back". **That claim
+is retracted, before anyone acts on it.**
 
-The game's SAVE creates `EGATREK.SAV`, five sectors, correct length — and
-leaves its directory entry marked **`$03`**, open-for-output, where every write
-`storetest` does leaves `$42`. Restoring it does not come back. CIO reports
-success on both the transfer and the close, and `open_live` returns to 0, so
-the driver believes it finished.
+What was seen: the game writes `EGATREK.SAV` at the right length, the host image
+shows its directory entry marked `$03` (open-for-output) where every write
+`storetest` does leaves `$42`, and restoring it never came back. Three
+hypotheses were eliminated by discriminator — the buffer address, the record
+ending exactly on a sector boundary, and reading into low RAM — and CIO reported
+`$01` on **both** the transfer and the close, with `open_live` back to 0.
 
-Three hypotheses are already eliminated, each by a discriminator rather than by
-reasoning:
+**When every discriminator comes back negative, suspect the instrument.**
+Altirra's default disk write mode is *virtual* read-write: the emulated drive
+accepts every write and the host `.ATR` never receives them. That explains all
+of it. Killing the emulator leaves a half-flushed directory sector, which is
+what `$03` was. Ejecting first makes the file **vanish entirely** — which is
+what it did. And the restore ran in a *separate process* against a disk the save
+had never reached, so the game sat at a filename prompt for a file that was not
+there, which from outside looks exactly like a hang.
 
-* **The buffer address.** A `plat_write_all` from `$0480` closes correctly.
-* **The record ending exactly on a sector boundary.** The save is 625 bytes and
-  a DOS 2 sector holds 125, so it fills five with nothing over — the same shape
-  that caught the read path out with CIO status `$03`. A 625-byte write closes
-  correctly.
-* **Reading into low RAM.** 625 bytes back into `$0480`, zero wrong.
+**Still unconfirmed either way.** The deciding test is save-then-restore in ONE
+session, and it has not completed — because every attempt pays two cold boots
+and the game streams 44,170 bytes into VRAM before it draws anything. The fix
+for that is `state_save`/`state_load`: boot once, snapshot the console, and
+reload in a second.
 
-What is left is something about the game's context that `storetest` does not
-reproduce: `ui_save_game` runs from `OVL_FRONT`, and by the time it runs the
-program has opened and closed four files through the same IOCB. **One thing the
-driver does wrong regardless** is that `plat_write_all` reports on the
-*transfer's* status and discards the *close's* — and on a write the close is
-where the data lands.
+**One real defect did come out of it and is fixed.** `plat_write_all` reported
+the *transfer's* status and discarded the *close's* — and on a write the close
+is where DOS flushes the last sector and rewrites the directory entry, so a
+write that failed to finish could report success. The close's status is checked
+now, and kept in `plat_dbg_close` for when it is not.
 
 ## The stubs measure the game, not themselves
 
@@ -597,7 +603,8 @@ Two things it cost to learn:
 
 ## What is still open
 
-* **SAVE, above.** The one known bug, and the port cannot be released with it.
+* **SAVE, above** — unverified rather than broken, and the test that settles it
+  needs the harness to stop paying for a cold boot every time.
 * **Playing it properly.** A turn is not a game: nothing has fought, docked,
   landed on a planet or reached the hall of fame.
 * **The load time.** `OVERLAYS.BIN` streams through CIO at boot and the packing

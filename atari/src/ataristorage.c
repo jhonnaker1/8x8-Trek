@@ -81,6 +81,14 @@ static unsigned char open_live;
    without it. `used` so LTO cannot drop it when only a test reads it. */
 __attribute__((used)) unsigned char plat_dbg_status;
 
+/* AND THE CLOSE'S OWN STATUS, SEPARATELY. plat_write_all used to report on the
+   TRANSFER and throw this away -- and on a write the close is where the data
+   actually lands: DOS flushes the last partial sector and rewrites the
+   directory entry there, not during the PUT. A write that reports success on
+   the transfer alone is a write that cannot tell you the file was never
+   finished, which is exactly the state the game's save file was found in. */
+__attribute__((used)) unsigned char plat_dbg_close;
+
 /* ONE CALL SITE FOR THE ONLY `jsr` IN THIS FILE. Status comes back through
    ICSTA rather than out of Y, which keeps the asm block to two instructions
    with no output constraint to get wrong -- CIO writes the same value to both.
@@ -157,7 +165,7 @@ static uint16_t transfer(unsigned char cmd, void *buf, uint16_t len) {
 void plat_close(void) {
     if (!open_live) return;
     IOCB[ICCOM] = CMD_CLOSE;
-    (void)cio();
+    plat_dbg_close = cio();
     open_live = 0;
 }
 
@@ -196,5 +204,7 @@ uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
     st = plat_dbg_status;
     plat_close();
     plat_dbg_status = st;
-    return (st == CIO_OK && put == len) ? STOR_OK : STOR_ERROR;
+    /* THE CLOSE IS PART OF THE WRITE, so its status is part of the verdict. */
+    return (st == CIO_OK && put == len && plat_dbg_close == CIO_OK)
+               ? STOR_OK : STOR_ERROR;
 }
