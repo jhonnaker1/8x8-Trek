@@ -45,6 +45,42 @@
 #define SR_FLAT 0xF0
 #define BEEP_TENTHS 44      /* 440Hz, the same A the C128 port beeps */
 
+#ifdef TREK_DEBUG_INPUT
+/* THE BEEP PROBE, added 2026-09-10 to settle a SOURCE READ against two
+ * evenings of play. `snd_beep()` gates V2 on and never gates it off, which
+ * reads as a tone that never stops -- but this port has been played by hand
+ * twice with no report of one, so the reading is in conflict with the only
+ * instrument that has ever been pointed at it.
+ *
+ * Three things are worth measuring and one is not. NOT worth measuring:
+ * whether the code clears the gate, which is settled by reading it. Worth
+ * measuring: whether `snd_beep` is REACHED in play, whether anything ELSE on
+ * the machine clears V2, and whether the emulated SID reads back at all --
+ * the first version of this experiment said "ask Xemu for the gate bit" and
+ * that is not obviously available: SID $D400..$D418 are WRITE-ONLY on real
+ * hardware, so a readback measures the emulator, not the chip.
+ *
+ * DEBUG BUILD ONLY. Six bytes of bss the release build never sees. Read with
+ *     make drive DRIVE_PEEK="--peek snd_dbg:6" DRIVE_KEYS="..."
+ *
+ * VOLATILE, AND THE FIRST VERSION WAS NOT. Nothing in the PROGRAM reads these
+ * bytes -- only a debugger does -- so LTO split the array into six independent
+ * symbols, dropped the three nobody read, and parked two of the survivors in
+ * ZERO PAGE. `--peek snd_dbg` then found no such symbol at all. A probe the
+ * program never reads is dead code to the optimiser; `volatile` is what tells
+ * it the reader is outside. */
+volatile uint8_t snd_dbg[6];
+#define DBG_BEEPS 0     /* snd_beep() calls */
+#define DBG_V2OFF 1     /* voice_off(V2) calls -- the missing statement */
+#define DBG_WROTE 2     /* last value THIS code wrote to SID[V2+4] */
+#define DBG_ECHO  3     /* SID[V2+4] read straight back after that write */
+#define DBG_LATE  4     /* SID[V2+4] at the last snd_poll, seconds later */
+#define DBG_POLLS 5     /* snd_polls since the last beep, saturating */
+#define DBG_HIT(i) (snd_dbg[i] = (uint8_t)(snd_dbg[i] < 255 ? snd_dbg[i] + 1 : 255))
+#define DBG_V2(val) do { snd_dbg[DBG_WROTE] = (val); \
+                         snd_dbg[DBG_ECHO]  = SID[V2 + 4]; } while (0)
+#endif
+
 static uint16_t mus, sfx, mus_base;
 static uint8_t  mus_on, sfx_on, mus_track, mus_ok;
 static uint8_t  note_left, sfx_left;
@@ -117,15 +153,29 @@ static void recalibrate(uint16_t wraps, uint16_t tenths) {
         tick_num = (uint16_t)(18206UL / wps);
 }
 
-static void voice_off(uint8_t v) { SID[v + 4] = GATE_OFF; }
+static void voice_off(uint8_t v) {
+    SID[v + 4] = GATE_OFF;
+#ifdef TREK_DEBUG_INPUT
+    if (v == V2) { DBG_HIT(DBG_V2OFF); DBG_V2(GATE_OFF); }
+#endif
+}
 
 static void voice_note(uint8_t v, uint8_t tenths) {
     unsigned int f;
-    if (tenths == 0) { SID[v + 4] = GATE_OFF; return; }
+    if (tenths == 0) {
+        SID[v + 4] = GATE_OFF;
+#ifdef TREK_DEBUG_INPUT
+        if (v == V2) DBG_V2(GATE_OFF);
+#endif
+        return;
+    }
     f = sid_freq(tenths, REGION_NTSC);
     SID[v + 0] = (unsigned char)(f & 0xFF);
     SID[v + 1] = (unsigned char)(f >> 8);
     SID[v + 4] = GATE_ON;
+#ifdef TREK_DEBUG_INPUT
+    if (v == V2) DBG_V2(GATE_ON);
+#endif
 }
 
 void snd_init(void) {
@@ -179,7 +229,12 @@ void snd_effect(uint8_t which) {
     sfx = (uint16_t)(mus_base + mus_offset[which]);
     sfx_on = 1; sfx_left = 0;
 }
-void snd_beep(void) { voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0; }
+void snd_beep(void) {
+#ifdef TREK_DEBUG_INPUT
+    DBG_HIT(DBG_BEEPS); snd_dbg[DBG_POLLS] = 0;
+#endif
+    voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0;
+}
 
 /* One original tick. Called from the frame loop through snd_poll(). */
 static void tick(void) {
@@ -219,6 +274,13 @@ static void tick(void) {
    goes backwards, which works at any rate above two samples a frame. */
 void snd_poll(void) {
     unsigned int r;
+
+#ifdef TREK_DEBUG_INPUT
+    /* ABOVE the `enabled` gate deliberately: SND turns sound off, and a sample
+       that stops when the thing under test stops is no sample at all. */
+    snd_dbg[DBG_LATE] = SID[V2 + 4];
+    DBG_HIT(DBG_POLLS);
+#endif
 
     if (!enabled) return;
 

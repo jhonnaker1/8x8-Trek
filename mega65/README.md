@@ -228,14 +228,44 @@ scored high enough to write a row. It goes through the `plat_write_all` the
 save proves — an argument, not a measurement. "Still open" and "still
 unverified" are different lists and this file was keeping only one of them.
 
-**And one defect found by source read on 2026-09-09, not yet heard.**
-`snd_beep()` gates SID voice 2 on at 440Hz and never gates it off; `sfx_on = 0`
-then stops `tick()`'s effects branch -- the only other code that touches V2 --
-from clearing it, and `SR_FLAT` leaves no envelope to decay through. Every
-other port waits its frames and calls `voice_off`. **This port has been played
-by hand twice with no report of a stuck tone, so it is a conflict rather than a
-finding.** The experiment that settles it is `make drive`: press an invalid
-key, then ask Xemu for the voice-2 gate bit a second later.
+**And one defect, found by source read on 2026-09-09 and CONFIRMED ON THE
+MACHINE on 2026-09-10.** `snd_beep()` gates SID voice 2 on at 440Hz and never
+gates it off; `sfx_on = 0` then stops `tick()`'s effects branch -- the only
+other code that touches V2 -- from clearing it, and `SR_FLAT` leaves no
+envelope to decay through. Every other port waits its frames and calls
+`voice_off`.
+
+**The experiment, and it is not the one first written down.** That said "ask
+Xemu for the voice-2 gate bit", which cannot work: SID `$D400..$D418` are
+WRITE-ONLY and read back `$FF` -- measured here, not assumed. What works is a
+six-byte probe in the debug build (`snd_dbg` in `m65snd.c`, `volatile` for the
+reason given there) counting beeps and `voice_off(V2)` calls, read out with
+`--peek`:
+
+    make drive DRIVE_PEEK="--peek snd_dbg:6" \
+      DRIVE_KEYS="RETURN N RETURN N RETURN J A M I E RETURN 3 RETURN X RETURN Z RETURN"
+
+`Z` is an unhandled command letter, so it reaches `main.c`'s `else if (c)` and
+beeps. Two runs, the second differing only by typing `SND` afterwards:
+
+    run          beeps  voice_off(V2)  last write to $D40B  readback
+    Z            1      0              $41  GATE_ON         $ff
+    Z then SND   1      1              $40  GATE_OFF        $ff
+
+**The second run is the point.** It is the discriminator: the same probe, the
+same build, a gate-off that DID happen and was seen. So the first run's zero is
+a measurement rather than a dead counter -- the beep leaves voice 2 gated on
+and nothing clears it, across a saturated count of `snd_poll` calls.
+
+**What is still an argument rather than a measurement: audibility.** Xemu has
+no audio-to-file, so the tone was not heard. But `snd_init` sets V2 exactly as
+the C128 sets it -- pulse width, `AD_FLAT`, `SR_FLAT` sustain 15 with release
+0 -- at full volume, and the C128's beep is that same gated state with a
+`voice_off` after it. A voice that is audible for 250ms there is audible
+indefinitely here.
+
+**The release binary is byte-identical with the probe in the tree** (`make`
+without `TREK_DEBUG_INPUT` never sees it), which is what makes it safe to keep.
 
 The two deferred features -- the MAIN VIEWER's other nine pages and colour per
 message -- were never started, and are deliberate scope rather than defects.

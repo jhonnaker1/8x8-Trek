@@ -477,14 +477,17 @@ that is released.**
 
 ### Sound -- both found by the 2026-09-09 sweep, both one line, neither fixed
 
-1. **The MEGA65's `snd_beep` never gates the voice off.** It gates V2 on at
-   440Hz and sets `sfx_on = 0`, which stops `tick()`'s effects branch -- the
+1. **The MEGA65's `snd_beep` never gates the voice off** -- **CONFIRMED ON THE
+   MACHINE 2026-09-10, and it is a defect in a released port.** It gates V2 on
+   at 440Hz and sets `sfx_on = 0`, which stops `tick()`'s effects branch -- the
    only other code that touches V2 -- from ever clearing it, and `SR_FLAT`
-   leaves no envelope to decay through. **READ, NOT HEARD.** The port has been
-   played by hand twice with no report of a stuck tone, so this is a CONFLICT,
-   not a finding. **The experiment: `make drive`, press an invalid key, then
-   ask Xemu for the SID voice-2 gate bit a second later.** One register read
-   separates a defect from a wrong reading of the source.
+   leaves no envelope to decay through. Measured with a six-byte probe in the
+   debug build: an ordinary keypress reaches `snd_beep`, the last write to
+   `$D40B` is `$41` GATE_ON, and `voice_off(V2)` is called ZERO times after it
+   -- while the same probe in a run that types `SND` afterwards counts one and
+   reads `$40`. **Still open: the one-line fix, which is a released port's
+   audio and so is Jamie's call.** Write-up under "The refusal beep diverges"
+   below.
 2. **The X16's `snd_beep` is 200Hz for ~100ms** where the measured original is
    440Hz for 250ms and three other ports implement that. Not a conflict, just
    a divergence, shipped since v0.10.0.
@@ -7275,17 +7278,61 @@ original -- **440Hz (`BEEP_TENTHS 44`) for 13 PAL / 15 NTSC frames, about
     decay through. **The refusal beep should ring until the next `snd_effect`
     or `snd_off`.**
 
-**Read out of the source, NOT heard.** The MEGA65 has been played by hand
-twice, once for an evening, and nobody reported a stuck tone -- so either the
-tone is real and was tolerated as "the beep is odd", or something about the
-MEGA65's SID makes it inaudible, or the beep is reached less often than the
-twelve call sites suggest. **That conflict is the reason this is written down
-instead of patched.** The experiment that settles it is `make drive`: press an
-invalid key, then screenshot nothing and ask Xemu what the SID voice-2 gate bit
-is a second later. One register read, and it decides between a defect and a
-wrong reading of the code.
+**Read out of the source, NOT heard** -- and that conflict is why it was
+written down instead of patched. **RUN 2026-09-10, and the source read was
+right.**
 
-Both are one line. Neither was fixed here, for the same reason the X16's was
-not: **a sweep's job is to find what is not true, and changing a released
-port's audio on the strength of a source read is a different job with a
-different test.**
+### The experiment I named could not have worked
+
+"Ask Xemu what the SID voice-2 gate bit is." **SID `$D400..$D418` are
+WRITE-ONLY.** They read back `$FF` -- measured here, in the probe's own `ECHO`
+byte, immediately after writing `$41`. Only `$D419..$D41C` read, and the
+envelope and oscillator taps there are voice THREE. So the register read was
+never available, and naming an experiment is not the same as checking it can be
+performed. It went into the open list and into a memory in that state.
+
+### What replaced it, and the run that makes it a measurement
+
+A six-byte probe in the debug build -- `snd_dbg` in `m65snd.c` -- counting
+`snd_beep()` calls, `voice_off(V2)` calls, the last value written to
+`SID[V2+4]`, and a readback. `Z` is an unhandled first letter, so it falls to
+`main.c`'s `else if (c)` and beeps. Two runs, differing by four keystrokes:
+
+    run          beeps  voice_off(V2)  last write to $D40B  readback
+    Z            1      0              $41  GATE_ON         $ff
+    Z then SND   1      1              $40  GATE_OFF        $ff
+
+**The second run is the experiment; the first is only half of it.** A counter
+that reads zero proves nothing until the same counter has been shown reading
+one, in the same build, for a real event -- so `SND`, which routes through
+`snd_off()` to `voice_off(V2)`, is what makes the zero above evidence instead
+of a dead probe. *A break that cannot fail proves nothing*, applied to a
+counter.
+
+So: the beep is reached by ordinary play, it leaves voice 2 gated on, and
+nothing clears it across a saturated count of `snd_poll` calls.
+
+### And the probe itself had the bug it was written to look for
+
+The first version was `uint8_t snd_dbg[6]`. Nothing in the PROGRAM reads those
+bytes -- only a debugger does -- so LTO split the array into six independent
+symbols, deleted the three nobody read, and parked two survivors in zero page.
+`--peek snd_dbg` then reported no such symbol. **A probe the program never
+reads is dead code to the optimiser**, which is the same shape as the Atari's
+stub that folded away and deleted the game. `volatile` is what tells the
+compiler the reader is outside the program.
+
+### What is still an argument rather than a measurement
+
+**Audibility.** Xemu has no audio-to-file -- `-nosound`, `-mastervolume` and
+`-sidmask`, and nothing that writes a WAV -- so the tone was never heard. The
+argument that it sounds: `snd_init` sets V2 exactly as the C128 sets it (pulse
+width, `AD_FLAT`, `SR_FLAT` = sustain 15, release 0) at full volume, and the
+C128's beep is that identical gated state with a `voice_off` 250ms later. A
+voice audible for 250ms there is audible indefinitely here. Say it as an
+argument, because that is what it is.
+
+Both are one line. **The MEGA65's is now confirmed rather than suspected, and
+still not fixed** -- not because the evidence is short, but because it is a
+released port's audio and that is Jamie's call to make, not a side effect of
+the sweep that found it. The X16's is unchanged and unmeasured.
