@@ -63,7 +63,8 @@
  *      trek_score() as well, which turns a hidden dependency into a call
  *      main() can see it must pair with a load.
  *
- *      `make verify` enforces this on all three ports, from -fno-lto objects
+ *      `make verify` enforces this on all four overlay ports (the Amiga has
+ *      none), from -fno-lto objects
  *      -- because in the shipped binary LTO folds the offending caller into
  *      main() and the bad call becomes indistinguishable from the good ones.
  *

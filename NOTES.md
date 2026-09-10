@@ -4811,7 +4811,14 @@ started with RUN (which clears variables) and BASIC is not running while it
 plays. What it rules out is a port that returns to BASIC and expects its far
 data to survive.
 
-## THE MEASUREMENT SESSION PLAN (written 2026-08-24, NOT YET RUN)
+## THE MEASUREMENT SESSION PLAN (written 2026-08-24, OVERTAKEN -- see below)
+
+**[This said NOT YET RUN for sixteen days. It was never run as written: the
+disassembler closed the read list instead, item by item, and by 2026-09-02
+every list this plan was meant to empty was empty. Two sessions here did run
+against the original -- runs 1 and 2, whose readings are marked in place below.
+Kept because the SEQUENCING argument in the next paragraph is the part that
+was right, and because several sessions record what an emulator run costs.]**
 
 Jamie's sequencing, and it is the right one: **take every remaining
 measurement off the original first, then implement them all, then size the
@@ -5596,13 +5603,16 @@ unread list with the disassembler". What each one turned into:
    command level 3 and up; fn 0x151D0 then fires ONCE and sets the deadline to
    `stardate + 1.0 + Random()*3.0`. **UNBUILT** -- the port has PF_SETTLED and
    the +200 rescue but no clock, so a settlement cannot be lost to time, and
-   it has no level gate on the event at all.
+   it has no level gate on the event at all. **[WRONG WHEN WRITTEN AND CLOSED
+   2026-09-02: the clock was already built; only the level gate was missing.
+   See the build list below, which says so and says why the error matters.]**
 2. ~~**The word at `[DS:0x235A + idx*2]`.**~~ **NOT AN UNREAD ITEM.** It is
    the twelve system repair percentages, `DS:0x1188` is the twelve system
    NAMES, and fn 0x15C07 is the SPY. All retracted on 2026-08-27; this entry
    survived because the retraction never reached the paragraph that raised it.
    THE SPY ITSELF IS UNBUILT: one turn in 150 at V > 7, one system down
-   `10 + Random(90)`.
+   `10 + Random(90)`. **[BUILT 2026-09-02 -- `run_spy()`, `EV_SPY`, five
+   BINARY constants. See the build list below.]**
 3. ~~**Where the landing attack roll really lives.**~~ **READ AND FIXED
    2026-09-02** -- and the defect was not the one this entry named. The roll
    was already in the right place; what was wrong was what happens after it.
@@ -5620,6 +5630,7 @@ unread list with the disassembler". What each one turned into:
    only by a new game, tested by both bolt paths. It is NOT spent -- raise it
    once and you are immune for the rest of the game, your own bolts included.
    **UNBUILT**; the port has the item and a test that is always false.
+   **[BUILT 2026-09-02 with the bolt as a USE weapon. See the build list.]**
 7. ~~**Whether `laser_heat` decays over time.**~~ **NOT AN UNREAD ITEM.** It
    decays twice, both BINARY, both built: 20 per command (0x0059BC) and 360
    per stardate (0x0201B3). The comment claiming otherwise sat twelve lines
@@ -5647,7 +5658,10 @@ unread list with the disassembler". What each one turned into:
     generation, calls the save loader, skips the quadrant entry AND skips the
     enemy's first turn, then forces itself to 'N'. The port does the first
     three structurally; only the fourth is unbuilt, and `Setup.restored` is
-    the flag it wants. **The lifetime question is closed**: the "N" assigned
+    the flag it wants. **[BUILT -- `restored_free_turn` in c128/src/main.c
+    consumes it on the first turn after a restore. This entry outlived the
+    work, and so did the copy of it in core/trek.h.]** **The lifetime question
+    is closed**: the "N" assigned
     at 0x014E7A is on the ESC-abort path only, the failure messages loop back
     rather than exiting, and a successful restore reaches the turn loop with
     'Y' intact. See MEASURED.md.
@@ -6286,7 +6300,7 @@ program failed. And `natkeyboard:post_coded` needs `{ENTER}`: a bare `\n`
 types **nothing**, so every command runs together on one line and none of them
 execute, which looks identical to a typing-speed problem.
 
-## SCOPE: the Commander X16, the next port (written 2026-09-05, NOT STARTED)
+## SCOPE: the Commander X16, the next port (written 2026-09-05, RELEASED 2026-09-06 in v0.10.0)
 
 Chosen by measurement rather than by the 2026-08-23 ordering, though it agrees.
 
@@ -6544,7 +6558,7 @@ not CBM), and that it needs hardware the base machine does not have.
 
 **Nothing here is a decision. The row question comes first.**
 
-## SCOPE: the Foenix F256K (written 2026-09-05, NOT STARTED)
+## SCOPE: the Foenix F256K (written 2026-09-05, DROPPED the same day -- see "THREE TARGETS DROPPED" above; kept for the toolchain reasoning)
 
 **The hardest of the remaining 65xx targets, and the toolchain IS the port.**
 
@@ -6693,7 +6707,7 @@ against fifteen.
     Amiga    second -- scoped; it DELETES the overlay machinery
     VBXE     last -- scoped; a TEXT target, but the tightest code budget yet
 
-## SCOPE: the Amiga (written 2026-09-05, NOT STARTED)
+## SCOPE: the Amiga (written 2026-09-05, BUILT AND RELEASED 2026-09-06)
 
 **The last target, and on this evidence the CHEAPEST of the three remaining --
 which is the opposite of what the ordering has said since August.**
@@ -6980,7 +6994,10 @@ not just its length.**
 Two options, and the first helps every port:
 
   * **Move one more function into an overlay.** The C128 has 211 bytes free
-    and the MEGA65 4,244, so a further split helps the tightest port too. But
+    and the MEGA65 4,244, so a further split helps the tightest port too.
+    (Both figures are from 2026-09-05. Re-measured 2026-09-09: the C128 has
+    1,589 and the MEGA65 5,183 -- a count in a comparison goes stale the same
+    way a count in a header does.) But
     the candidate must be MEASURED, not reasoned about -- the fourth overlay
     pass on the C128 named three candidates and all three were wrong, costing
     863 bytes. The call graph decides: a shared callee must stay resident, and
@@ -6989,7 +7006,10 @@ Two options, and the first helps every port:
     help the others. The map is LTO-merged so per-symbol `.bss` sizes are not
     broken out; sizing this needs `-fno-lto` or a per-object link first.
 
-**Not started. The game target does not link yet, by 813 bytes.**
+**[SUPERSEDED 2026-09-06: the 813 bytes were closed, the game target links, and
+the X16 shipped in v0.10.0. The figures in this section are the ones that were
+true on 2026-09-05 -- `cd x16 && make verify` is the authority now. Today it
+reports the largest overlay at 3,809 of 3,968 with 157 spare.]**
 
 
 ## Atari VBXE: what it cost, and four things that transfer (2026-09-09)
@@ -7072,3 +7092,110 @@ into VRAM before it draws anything and every experiment was paying that twice.
 original's as **440Hz for 250ms, measured**, and `c128/src/sid.c` implements
 that. The X16 is released with the divergence; it is one line, and it is
 recorded here rather than fixed inside a task about a different machine.
+
+
+## The sweep of 2026-09-09: twenty claims, and where they hide now
+
+The second sweep in eight days, and the pattern has moved. The 2026-09-02 sweep
+found thirteen stale claims and they were nearly all in `core/`, where the
+mechanics were being built. This one found twenty, and **the ones that had
+survived longest were not in the files being worked on -- they were one file
+sideways from the work.**
+
+Where they were:
+
+  * **A negative about port A, living in port B's source.** `amigastorage.c`
+    opened by explaining that the MEGA65's `plat_write_all()` "is still a stub
+    returning STOR_ERROR because writing there needs a low-memory trampoline
+    nobody has built". The MEGA65 rewrote that seam on 2026-09-08 and its SAVE
+    is verified as a round trip. Nobody re-reads a working driver to check what
+    it says about a different machine.
+
+  * **A retraction that reached the header and not the .c file.** `trek.h`
+    records that `HEAT_PER_UNIT` was "18, fitted from one eyeballed bar
+    position" and is now 15 and BINARY. `trek.c`, at the only place the
+    constant is used, still had the whole original paragraph: FITTED, "the
+    weakest thing here", "a placeholder", and -- the load-bearing half --
+    "nothing reads heat but the gauge, so being wrong costs a picture and not a
+    mechanic". Twenty lines below it, `laser_overheated` reads heat and bites
+    the laser banks. **`make tiers` had been printing FITTED 0 for two weeks
+    over a comment calling a constant fitted.**
+
+  * **Status in a heading.** Three `## SCOPE:` sections still said
+    `NOT STARTED`: the X16 (released four days later), the Amiga (released the
+    same day as the X16) and the F256 (dropped that afternoon). The Atari's
+    sibling heading was fixed on 2026-09-09 and its two neighbours, stale for
+    twice as long, were not -- because the sweep that fixed it was looking for
+    Atari claims. **Sweep the shape, not the subject.**
+
+  * **A closing line that outlived a release.** The X16 overlay section ended
+    `**Not started. The game target does not link yet, by 813 bytes.**` The
+    X16 has shipped twice since.
+
+  * **Counts, always downward.** `all three ports` where four now enforce
+    overlay rule 4; `all four ports` where five share `strpool.c`, five
+    implement `kb_init`, and five read the music note encoding; `the ten code
+    overlays` in the README where the C128 has eleven. Every one of them was
+    true when written. The MEGA65 README already carries the rule -- "a count
+    only ever goes stale downward; re-derive it from the list, never from a
+    header" -- and four more counts went stale under it.
+
+  * **A number quoted twice, corrected once.** `atari/README.md` gives the
+    resident margin in two places. The 2026-09-09 doc sweep fixed the one under
+    "The margin, and where it came from" and left 708 standing in the section
+    above it.
+
+  * **An omission at the front door.** The root README's Building section gave
+    commands for the C128 and the MEGA65 only. The X16 and the Amiga have been
+    released since v0.10.0 and v0.12.0 and neither appeared. Writing them in
+    turned up a trap worth having: **`cd x16 && make` builds the smoke test**,
+    not the game -- it is the only port whose default target is not the game.
+
+**And the thing that nearly went in with the fix.** The Building section drafted
+"The Amiga needs vbcc" from memory, without opening `amiga/Makefile`, which says
+`m68k-amigaos-gcc`. A sweep is exactly where an unverified claim is easiest to
+introduce, because everything around it is being asserted with confidence.
+`WRITING A SUMMARY IS ITSELF A CHANCE TO INVENT A STALE CLAIM` -- and so is
+writing the fix.
+
+**Every port still builds and `trek128.prg` is byte-identical**
+(`6a1b289d4ba5c96ce60d1cc47e163f42`), which is what says these were comments.
+
+
+## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
+
+The repo sweep on 2026-09-09 put all five `snd_beep()` bodies side by side,
+which nothing had done before, and only three of them agree with the measured
+original -- **440Hz (`BEEP_TENTHS 44`) for 13 PAL / 15 NTSC frames, about
+250ms**. The C128, the Atari and the Amiga do that. The other two:
+
+  * **X16** -- `voice_note(V_SFX, 20)` then six frames: 200Hz for ~100ms. A
+    minor third and a half below, a third of the length. Recorded above.
+
+  * **MEGA65** -- and this one is not a wrong number, it is a missing
+    statement:
+
+        void snd_beep(void) { voice_note(V2, BEEP_TENTHS); sfx_on = 0; sfx_left = 0; }
+
+    It gates V2 on at the right pitch and **never gates it off**. Every other
+    port waits its frames and calls `voice_off`. `sfx_on = 0` then guarantees
+    that `tick()`'s effects branch -- the only other code that touches V2 --
+    never runs, so nothing downstream can clear it either. With `SR_FLAT`
+    holding sustain at full and release at zero, the note has no envelope to
+    decay through. **The refusal beep should ring until the next `snd_effect`
+    or `snd_off`.**
+
+**Read out of the source, NOT heard.** The MEGA65 has been played by hand
+twice, once for an evening, and nobody reported a stuck tone -- so either the
+tone is real and was tolerated as "the beep is odd", or something about the
+MEGA65's SID makes it inaudible, or the beep is reached less often than the
+twelve call sites suggest. **That conflict is the reason this is written down
+instead of patched.** The experiment that settles it is `make drive`: press an
+invalid key, then screenshot nothing and ask Xemu what the SID voice-2 gate bit
+is a second later. One register read, and it decides between a defect and a
+wrong reading of the code.
+
+Both are one line. Neither was fixed here, for the same reason the X16's was
+not: **a sweep's job is to find what is not true, and changing a released
+port's audio on the strength of a source read is a different job with a
+different test.**

@@ -345,7 +345,11 @@
  * The burn is deliberately NOT implemented here. It has not been confirmed
  * for EGA Trek, and adopting a gameplay rule from the ancestor unverified is
  * exactly what the laser falloff shows to be unsafe: Anderson rewrote that
- * one from exponential to linear. The gauge reports; nothing acts on it yet.
+ * one from exponential to linear. ~~The gauge reports; nothing acts on it
+ * yet.~~ **The ANCESTOR'S burn is still not implemented and never will be --
+ * nothing in EGA Trek reaches 1500. But EGA Trek has an overheat rule of its
+ * own, read out of the binary on 2026-08-26 and built: see LASER_OVERHEAT_AT
+ * and trek.c's `laser_overheated`. Heat acts.**
  *
  * **[BOTH BULLETS BELOW RE-READ 2026-08-26. The first is wrong -- the cap is
  * 120, at 0x009EFF. The second is right about what it saw and wrong about
@@ -1065,8 +1069,11 @@ uint8_t trek_shields_down(void);
  *   0x005910  skips THE ENEMY'S FIRST TURN
  *
  * and then 0x0059CE forces it to 'N' so turn two is normal. The port already
- * does the first three structurally; the fourth is what is NOT BUILT, and
- * `Setup.restored` is the flag it wants. */
+ * does the first three structurally; ~~the fourth is what is NOT BUILT, and
+ * `Setup.restored` is the flag it wants~~ -- **BUILT 2026-09-05.
+ * `restored_free_turn` in main.c is set from `setup.restored` and spends the
+ * first turn without letting the enemy shoot. This sentence outlived the work
+ * by four days, in the header the work was done from.** */
 #define ENEMY_TURN_OF_N        100  /*@BINARY*/
 #define ENEMY_TURN_AFTER_MOVE   60   /* Random(100) < 60 */  /*@BINARY*/
 
@@ -1172,8 +1179,11 @@ uint8_t trek_shields_down(void);
 /* MEASURED: the shield SYSTEM takes damage when the POOL absorbs a big hit,
    which is a mechanic separate from the pool draining and one this port had
    no part of. 795 absorbed took it to 71%; 385 to 518 absorbed left it alone.
-   PROVISIONAL: the threshold is somewhere in 519..795 and 600 is the middle
-   of that bracket, not a reading. */
+   ~~PROVISIONAL: the threshold is somewhere in 519..795 and 600 is the middle
+   of that bracket, not a reading.~~ **SUPERSEDED by the read below: the
+   threshold is 800, BINARY, and the 600 this paragraph proposed is the fitted
+   value that read replaced. There is no PROVISIONAL constant left in the
+   port -- `make tiers` reports 0.** */
 /* THE ABSORPTION CONSTANT, READ OUT OF THE BINARY 2026-08-26. fn 0x16844
    computes, in Turbo Pascal reals:
 
@@ -1248,7 +1258,8 @@ typedef struct {
 } TrekEvent;
 
 /* THE ONE ENTRY POINT FOR INCOMING DAMAGE, whoever it comes from -- enemy
-   fire, a death pod, and whatever the unbuilt hazards turn out to be. It was
+   fire, a death pod, and the hazards, which are built now: black holes and
+   supernovae landed 2026-08-28. It was
    static until 2026-08-26; making it public is what lets the shield law below
    be tested at a chosen hit size instead of whatever an enemy happened to
    fire, which is the only way to assert a proportion. Appends its events to

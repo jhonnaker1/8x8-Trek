@@ -123,7 +123,7 @@ while writing this one. It matters most where the machine **queues**
 keystrokes: the game is started by typing `work:egatrek` at a shell, and the
 RETURN that launches it is still in Intuition's message port when the title
 screen asks for a key, so the title dismisses itself. It is declared, called
-once before the title, and implemented on all four ports now — the C128's is
+once before the title, and implemented on all five ports now — the C128's is
 an empty function with a comment saying why (it scans CIA1's matrix; there is
 no queue to drain).
 
@@ -319,6 +319,11 @@ Amiga keycodes with separate press and release, not characters.
            fame reads TREK.SCR, inserts into the right rank band and writes
            it again; the endgame, play-again and the quit all work
     NEXT   a human playing it. Everything above was driven by a script.
-The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
+~~The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
 the seven panel titles, because the string pool needs the file seam that is not
-built yet. It is replaced by `c128/src/strpool.c` when storage lands.
+built yet. It is replaced by `c128/src/strpool.c` when storage lands.~~
+
+**Storage landed on 2026-09-06 and this paragraph did not notice, three lines
+under a DONE block that says so.** `smoke.c` reads the real pool out of
+`STRINGS.DAT` through `c128/src/strpool.c`; the stub is gone, and the comment
+where it used to sit says so.

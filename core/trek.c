@@ -1952,12 +1952,20 @@ uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
      * 1500 scale: the bar pegged red after one serious volley and the stored
      * value bore no relation to the original's.
      *
-     * HEAT_PER_UNIT is FITTED from a single reading and is the weakest thing
+     * ~~HEAT_PER_UNIT is FITTED from a single reading and is the weakest thing
      * here: 1,250 units fired left the gauge "around 700 of its 1500 scale",
      * so a word near 70, giving about 18 units of energy per point. One
      * eyeballed bar position, so treat the shape as measured and the constant
      * as a placeholder. Nothing reads heat but the gauge, so being wrong
-     * costs a picture and not a mechanic. */
+     * costs a picture and not a mechanic.~~
+     *
+     * **BOTH HALVES OF THAT ARE NOW FALSE, and it sat here for two weeks.**
+     * HEAT_PER_UNIT is 15 and it is @BINARY -- trek.h carries the retraction,
+     * this copy never got it, and `make tiers` has reported FITTED 0 the whole
+     * time this paragraph called it the weakest thing in the file. And heat is
+     * read by something other than the gauge: twenty lines below, an overheat
+     * above LASER_OVERHEAT_AT bites the laser banks. Being wrong here costs a
+     * mechanic, not a picture. */
     {
         /* Summed first and clamped after, deliberately. Testing
            `heat >= CAP - add` UNDERFLOWS when one shot alone exceeds the cap:

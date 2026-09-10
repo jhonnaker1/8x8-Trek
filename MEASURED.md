@@ -2239,12 +2239,18 @@ scratch, name, command level and self-destruct password. **NO exits to DOS**,
 through a shareware farewell screen crediting Nels Anderson, and lands back at
 `C:\>`.
 
-### Q asks first, and our port does not
+### Q asks first, and ~~our port does not~~ so does ours
 
 Typing `Q` in the original does not quit. It puts `Quit <Y/N>? _` in the
-COMMAND panel and waits. Our port quits on the keystroke. NOT implemented --
+COMMAND panel and waits. ~~Our port quits on the keystroke. NOT implemented --
 noted here rather than fixed, because it is a change to a command rather than
-part of the play-again routine.
+part of the play-again routine.~~
+
+**BUILT, and this entry outlived it.** `main.c` answers `KB_Q` with
+`ui_confirm(S(S_65))`, and string 65 is `QUIT <Y/N>?` -- the original's prompt
+in the port's own words, in the COMMAND panel, exactly as read here. Found by
+the 2026-09-09 sweep; it was the only stale claim about the port left in this
+file, which is otherwise about the original rather than about us.
 
 ### The incomplete-mission penalty is confirmed at -300
 

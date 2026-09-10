@@ -4,9 +4,12 @@
  * THE EASIEST STORAGE SEAM ON THE PROJECT, and it is the first one where
  * WRITING WORKS. There is no KERNAL channel to open and close in the right
  * order, no hypervisor trap, no device number, no secondary address, no 8K
- * window to negotiate and no 512-byte sector to buffer. The MEGA65's
- * plat_write_all() is still a stub returning STOR_ERROR because writing there
- * needs a low-memory trampoline nobody has built; here it is one Write().
+ * window to negotiate and no 512-byte sector to buffer; here it is one
+ * Write(). (~~The MEGA65's plat_write_all() is still a stub returning
+ * STOR_ERROR because writing there needs a low-memory trampoline nobody has
+ * built.~~ **Not since 2026-09-08: the MEGA65 dropped the Hypervisor for the
+ * C65 DOS on device 8 and its SAVE is verified as a round trip. A negative
+ * about ANOTHER port, in this port's file, is the one nobody re-reads.**)
  *
  * PROGDIR:, AND THAT IS THE WHOLE OF THE PATH DESIGN. The game asks for
  * "STRINGS.DAT" and "EGATREK.SAV" -- bare names, because on the other three

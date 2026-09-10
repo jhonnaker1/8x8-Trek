@@ -49,8 +49,10 @@ paged move code**. Both new windows work on the machine, not just in the link.
 
 **`src/stubs.c` is now empty of live code**, so `make early` measures the whole
 thing. The two extra overlays are committed and gated per port — see "The two
-levers that close it" — and the shipping link has **708 bytes free** — see
-"The margin, and where it came from".
+levers that close it" — and the shipping link has **693 bytes free** — see
+"The margin, and where it came from". (This line said 708 for a day after the
+close-status check took 15 of them. The number is quoted twice in this file;
+`make verify` is the only authority for it.)
 
 ## The budget, and it moved
 

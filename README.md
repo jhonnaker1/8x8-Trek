@@ -154,7 +154,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.0](../../releases/latest) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Playable 2026-09-09** — boots from a DOS 2.5 disk, drawn console, turns run. Not released: 62 bytes of resident margin. See [`atari/README.md`](atari/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Playable 2026-09-09** — boots from a DOS 2.5 disk, drawn console, turns run. Not released: saving is unverified, and the resident margin is 693 bytes. See [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
@@ -270,7 +270,7 @@ make test               # and the core's own, from the repository root
 ```
 
 **Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
-music, the ten code overlays and the twelve-page briefing all load from the
+music, the eleven code overlays and the twelve-page briefing all load from the
 disk. `make run` boots a game with no words in it.
 
 The MEGA65 port needs the same llvm-mos plus
@@ -289,6 +289,27 @@ cd mega65 && make drive   # headless: script the keys, screenshot the result
 `make d81` runs `verify` on the way through, so a binary that cannot run —
 wrong load address, stale overlay images, an overlay calling out of its own
 window — cannot reach the disk.
+
+The other three ports, which this section did not mention until 2026-09-09
+although two of them have been released since v0.10.0 and v0.12.0:
+
+```sh
+cd x16 && make game       # build/trekx16.prg -- NOT `make`, which builds the smoke test
+cd x16 && make verify     # load address, window, overlay images, soft stack
+cd x16 && make release    # a folder of files; the X16 has no disk image
+
+cd amiga && make          # build/egatrek, the data files, and the tempo test
+cd amiga && make release  # build/egatrek-amiga.zip
+
+cd atari && make verify   # window, staging regions, the four overlay rules
+cd atari && make atr      # build/egatrek.atr
+```
+
+The X16 is the one port whose default target is not the game: `all: smoke`.
+The Amiga needs bebbo's `m68k-amigaos-gcc` at `$AMIGA_TOOLCHAIN` (default
+`~/amiga-toolchain`); the Atari needs the `mos-atari8-dos` half of llvm-mos.
+**There is no `make release` for the Atari**: its disk needs Atari DOS 2.5,
+which is not ours to redistribute.
 
 ## Reference material is not in this repository
 

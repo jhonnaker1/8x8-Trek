@@ -31,7 +31,7 @@
  * VERA'S PSG lives in VRAM at $1F9C0, four bytes per voice: frequency low,
  * frequency high, volume with pan in the top two bits, then waveform with
  * pulse width. A note byte in MUSIC.DAT is a frequency in TENS OF HZ -- the
- * same encoding all three ports read -- and VERA wants Hz * 2^25 / 25e6, i.e.
+ * same encoding all five ports read -- and VERA wants Hz * 2^25 / 25e6, i.e.
  * tens-of-Hz * 13.42177. Staged as whole and fractional parts so no
  * intermediate leaves 16 bits, exactly as sidfreq.h does for the SID: the
  * widest case is 255 * 108 = 27,540.

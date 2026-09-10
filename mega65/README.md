@@ -216,9 +216,17 @@ no rig here can stand in for.
 
 ## Still open (2026-09-08)
 
-**Nothing.** Saving was the last item and it works: a game SAVEs to the D81,
-a RESTORE brings back a pixel-identical console, and the port no longer touches
-the SD card at all. Played by hand on 2026-09-08 and released in v0.12.0.
+**Nothing on the build list.** Saving was the last item and it works: a game
+SAVEs to the D81, a RESTORE brings back a pixel-identical console, and the port
+no longer touches the SD card at all. Played by hand on 2026-09-08 and released
+in v0.12.0.
+
+**One thing is still unverified rather than unbuilt**, and this section said
+"Nothing" over it until 2026-09-09: **the hall-of-fame WRITE**. Twice above,
+this file says it has never been witnessed, because no driven game has ever
+scored high enough to write a row. It goes through the `plat_write_all` the
+save proves — an argument, not a measurement. "Still open" and "still
+unverified" are different lists and this file was keeping only one of them.
 
 The two deferred features -- the MAIN VIEWER's other nine pages and colour per
 message -- were never started, and are deliberate scope rather than defects.

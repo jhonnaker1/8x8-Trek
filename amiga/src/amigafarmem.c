@@ -7,7 +7,7 @@
  * far offset is an index and far_read is a memcpy.
  *
  * THE SEAM'S SHAPE IS THE 8-BIT MACHINES', not this one's, and it stays that
- * way on purpose: c128/src/strpool.c is shared by all four ports and it is the
+ * way on purpose: c128/src/strpool.c is shared by all five ports and it is the
  * only caller that matters. Making this machine's version return pointers
  * straight into the buffer would be faster and would fork the pool reader,
  * which is a bad trade for a memcpy of sixty-odd bytes.
