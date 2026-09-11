@@ -121,20 +121,25 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-Four things are deliberately absent, each decided rather than left undone.
+**Colour per message is built** (2026-09-10) and ships on all five ports. EGA
+Trek has no department palette at all -- every message site in the original
+picks its own colour -- so this is a department map plus per-event exceptions,
+attributed by reading every message site in the binary back to the `SetColor`
+that governs it. It was deferred for two weeks on the cost of a byte per pooled
+string and a far read at every drawing site; measuring the real split is what
+made it affordable.
 
-Two are **deferred to roomier targets** rather than cut. The **MAIN VIEWER's
+Three things are deliberately absent, each decided rather than left undone.
+
+One is **deferred to roomier targets** rather than cut: the **MAIN VIEWER's
 other nine instrument pages** carry live data and two of them are wider than
-this port's seventeen-column panel; what cycles them was read on 2026-09-02 and
-is no longer a blocker -- a fresh `Random(10)` roughly every six seconds, or the
-page number typed as a command. And **a colour per message**: EGA Trek has no
-department palette at all, every message site picks its own colour, and
-matching that means a byte per pooled string plus a second far read at every
-drawing site. The bytes are nearly free in bank 1; the resident code is not.
-This port keeps a four-way department map instead and `ui.c` says so plainly.
+this port's seventeen-column panel. What cycles them was read on 2026-09-02 and
+is no longer the blocker -- a fresh `Random(10)` roughly every six seconds, or
+the page number typed as a command. It is deferred on every port, the Atari
+included, by Jamie's call.
 
 The **CP437 charset** and **boss mode** were ruled out for this platform
-outright. The reasoning for all four is in `NOTES.md`.
+outright. The reasoning for all three is in `NOTES.md`.
 
 What it needs is **play**, and the little it has had has been the most
 productive thing in the project. Four sessions at the keyboard have found four
@@ -230,9 +235,14 @@ is ordered by **what each actually costs**, cheapest first:
    because it has **the tightest code budget of any target**: VBXE's VRAM
    window occupies part of the 6502 address space, and even narrowed to 4K at
    `$2000–$2FFF` that leaves 36,864 bytes against the 37,612 the C128 build
-   needs. More code has to move into overlays than on any port yet built, and
-   unlike the C128 this machine has no separate home for its variables. It also
-   needs hardware the base machine does not have.
+   needs. More code has to move into overlays than on any port yet built. It
+   also needs hardware the base machine does not have.
+
+   **It has a separate home for its variables after all** — that sentence used
+   to end "unlike the C128 this machine has no separate home for its
+   variables", and dropping Atari DOS on 2026-09-11 made it false. `$0700–$1FFF`
+   is free the moment no DOS is resident, and `.rodata`, `.data`, `.bss` and
+   `.noinit` all live there now.
 
    **And starting it found something the other four ports never had to face: a
    seam costs more than its driver.** Swapping the video stubs for the real
@@ -294,6 +304,7 @@ go on an SD-card image rather than a disk:
 cd mega65 && make         # build/egatrek.prg + build/OVERLAYS.BIN
 cd mega65 && make verify  # load address, resident space, overlays, build stamp
 cd mega65 && make d81     # build/egatrek.d81 -- the whole game, one image
+cd mega65 && make release # build/egatrek-mega65.d81 + .txt
 cd mega65 && make run     # launch it
 cd mega65 && make drive   # headless: script the keys, screenshot the result
 ```
@@ -302,8 +313,7 @@ cd mega65 && make drive   # headless: script the keys, screenshot the result
 wrong load address, stale overlay images, an overlay calling out of its own
 window — cannot reach the disk.
 
-The other three ports, which this section did not mention until 2026-09-09
-although two of them have been released since v0.10.0 and v0.12.0:
+The other three ports:
 
 ```sh
 cd x16 && make game       # build/trekx16.prg -- NOT `make`, which builds the smoke test
@@ -314,7 +324,8 @@ cd amiga && make          # build/egatrek, the data files, and the tempo test
 cd amiga && make release  # build/egatrek-amiga.zip
 
 cd atari && make verify   # window, staging regions, the four overlay rules
-cd atari && make atr      # build/egatrek.atr
+cd atari && make atr      # build/egatrek.atr -- self-booting, no DOS on it
+cd atari && make release  # build/egatrek-atari.atr + .txt
 ```
 
 The X16 is the one port whose default target is not the game: `all: smoke`.

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Where does the 6502 stop when RESTORE is answered?
 
+ARCHIVED INSTRUMENT -- the question is answered. The wedge was the soft
+stack living inside the overlay window; see atari.ld. Kept for the method,
+wired into no Makefile, and NOT maintained against the sources: it named
+plat_dbg_status/plat_dbg_close for a day after ataristorage.c was deleted
+and nothing noticed until a sweep. Expect to repair it before it runs.
+
+
 Pressing RETURN at the restore filename prompt stops the SIMULATOR, not just
 the game: AltirraBridge's frame gate never releases, and a gate is released by
 frames elapsing regardless of what the CPU is doing. A game spinning in a retry

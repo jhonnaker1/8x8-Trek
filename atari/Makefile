@@ -6,9 +6,16 @@
 # which holds the whole game with 211 bytes spare. See NOTES.md, "SCOPE:
 # Atari 800XL + VBXE".
 #
-# --start-addr 0x4000 IS NOT OPTIONAL. Without it the link loads at $2000,
-# vbxe_init() maps the window over the program's own code, and execution falls
-# into VRAM. Uno found that by crashing into it: PC=$25ED illegal=1.
+# THE LOAD ADDRESS COMES FROM atari.ld, NOT FROM A FLAG. This comment used to
+# say "--start-addr 0x4000 IS NOT OPTIONAL" -- describing a flag this Makefile
+# does not pass and an address the program does not use. It loads at $3000,
+# set by `ram (rw) : ORIGIN = 0x3000` in the linker script.
+#
+# The hazard behind it is real and still worth stating: vbxe_init() maps VRAM
+# into the 6502 address space, so a program linked underneath the window has
+# its own code mapped away and execution falls into VRAM. Uno found that by
+# crashing into it: PC=$25ED illegal=1. The window is 4K at $2000..$2FFF here,
+# which is why $3000 is the floor.
 LLVM_MOS ?= $(HOME)/llvm-mos
 ATARICC   = $(LLVM_MOS)/bin/mos-atari8-dos-clang
 

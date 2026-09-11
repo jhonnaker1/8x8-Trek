@@ -211,6 +211,10 @@ What was actually measured, in order:
 | SIO, `.data`/`.bss`/`.noinit` at `$0A00` | 218 |
 | SIO, `.rodata` there as well | **2,379** |
 
+**That last row is the measurement, not today's figure.** The sound and exit
+fixes of 2026-09-11 spent about 450 of it; `make verify` prints the live
+number and is the only authority for it.
+
 The SIO seam is about 2,000 bytes more expensive than the CIO one — it carries
 a directory, a slot allocator and its own sector buffers, where `D:` had DOS
 doing all three off-budget. Paying for that out of the region DOS was sitting
@@ -274,7 +278,7 @@ merely unnecessary, it is unavailable — and it was worth 537, not 512.
 ### How it landed
 
 `TREK_OVL_ENEMY` and `TREK_OVL_MOVE` are opt-in and only `atari/Makefile` sets
-them, so the four released ports compile byte-identically — checked, not
+them, so the other four ports compile byte-identically — checked, not
 assumed: `c128/build/trek128.prg` hashes the same before and after.
 `tools/overlay_check.py` carries the `run_turn` → `.ovl.enemy` pairing, and
 `make verify` here reads rules 2, 3 and 4 off `-fno-lto` objects.
@@ -741,13 +745,14 @@ once with, and the pair says which world this is.
   great."** It found three bugs in two sittings and all three are fixed: see
   "Played, and it was silent" below. The POKEY driver has been **heard** now,
   which is what caught the third.
-* **It is releasable and not released** — item 22, and nothing is in front of
-  it any more. The licence blocker went with the DOS, the port has been
-  played, and the load time is documented rather than fixed. **The release
-  notes must carry the load time**, in the same words as the top of this file.
+* ~~It is releasable and not released~~ — **RELEASED 2026-09-11 in
+  [v0.13.0](../../../releases/latest)**, the first release with all five ports
+  in it. The artefact is `egatrek-atari.atr` with `egatrek-atari.txt` beside
+  it; `make release` builds both.
 
-These are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
-whole project and was re-derived on 2026-09-11 — items 5, 19 and 22.
+**Nothing on THE OPEN LIST touches this port any more.** The two items still
+open there want a person at a keyboard on other machines: nobody has played
+the Amiga, and the C128 wants play.
 
 ## Played, and it was silent
 

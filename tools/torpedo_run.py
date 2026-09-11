@@ -1,5 +1,9 @@
 """Torpedo damage and accuracy runs against the original.
 
+ARCHIVED INSTRUMENT -- the measurement era is closed. Kept for the method;
+needs the DOSBox rig and reference/, which is not in this repository.
+
+
 The trick that unstuck open item 9: write a large hit-point value into the
 target's record so it SURVIVES the torpedo, and read the damage out of the
 enemy table -- the game never prints it.

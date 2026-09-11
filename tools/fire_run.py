@@ -1,4 +1,8 @@
 """The controlled enemy-fire run: one enemy, its hit points pinned, a nil
+
+ARCHIVED INSTRUMENT -- the measurement era is closed. Kept for the method;
+needs the DOSBox rig and reference/, which is not in this repository.
+
 volley for a turn, damage read from the pinned pools and corrected for
 death pods by the fall in the enemy's own hit points.
 

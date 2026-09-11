@@ -1,10 +1,18 @@
 /* Atari 800XL + VBXE. After the stock atari8-dos link.ld, with one change
  * that is the whole reason this file exists.
  *
- * THE PROGRAM STARTS AT $4000, NOT $2000, BECAUSE VBXE'S WINDOW IS IN THE WAY.
- * MEMAC maps VBXE's VRAM INTO the 6502 address space -- commodore-uno's
- * vbxevid.c opens it with MEMAC_CONTROL = 0x29, "window at $2000, CPU enable,
- * 8K" -- so $2000..$3FFF belongs to video memory and not to this program.
+ * THE PROGRAM STARTS AT $3000, BECAUSE VBXE'S WINDOW IS IN THE WAY.
+ * MEMAC maps VBXE's VRAM INTO the 6502 address space. commodore-uno opens it
+ * with MEMAC_CONTROL = 0x29 -- "window at $2000, CPU enable, 8K" -- which puts
+ * $2000..$3FFF out of reach; this port narrows it to 4K ($28), so only
+ * $2000..$2FFF belongs to video memory and the program starts at $3000. That
+ * narrowing was the first lever this port spent and it is worth 4,096 bytes;
+ * see src/vbxevid.c.
+ *
+ * (This comment said $4000 until 2026-09-11, describing uno's 8K window after
+ * this port had already narrowed it. The MEMORY block below has said $3000 all
+ * along -- a header and the code under it disagreeing, which is the shape to
+ * watch for.)
  *
  * FOUND BY CRASHING INTO IT, in uno rather than here: a build that loaded at
  * $2000 had vbxe_init() map the window over its own code, and execution fell

@@ -514,7 +514,11 @@ schedules that.
    **released fixed in v0.12.1.** See "The X16 plays EVERY NOTE AN OCTAVE FLAT"
    below.
 
-### The Atari, the only unreleased port
+### The Atari -- released in v0.13.0 (2026-09-11)
+
+(This heading read "the only unreleased port" until the day it shipped. A
+STATUS IN A HEADING is one of the places stale claims survive longest, because
+a heading is skimmed and never re-derived -- see the sweep notes below.)
 
 3. ~~**SAVE is unverified, not broken.**~~ **VERIFIED 2026-09-10 -- and it WAS
    broken, by something neither reading had reached.** Save, cold boot, restore,
@@ -613,6 +617,10 @@ schedules that.
        SIO, everything in $3000                  -1,344   (did not link)
        SIO, .data/.bss/.noinit at $0A00             218
        SIO, .rodata there as well                 2,379
+
+   **That last figure is the measurement, not today's margin** -- the sound and
+   exit fixes of 2026-09-11 spent about 450 of it. `make verify` prints the
+   live number and is the only authority for it.
 
    The SIO seam costs about 2,000 bytes more than the CIO one -- it carries a
    directory, an allocator and its own sector buffers, where `D:` had DOS doing
@@ -7417,7 +7425,9 @@ and 1,578 bytes here, and that is what took the target from 5,161 over to
 linking.
 
 They are opt-in defines set by one Makefile, so no released port pays for them,
-and the four released ports compile byte-identically with them in the tree.
+and the OTHER four ports compile byte-identically with them in the tree
+(phrased that way on purpose -- "the four RELEASED ports" stopped being the
+same set when the Atari shipped in v0.13.0).
 **And the enemy split measured 3,520 on the C128 against 3,910 here** -- the
 figure is per-target and must be re-measured, not carried across.
 

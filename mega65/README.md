@@ -6,7 +6,8 @@ whole game in 80 columns on an exact EGA palette, with sound, a streamed
 briefing, saving and restoring, and a game playable from the title screen
 through the hall of fame to a second game. It reads and writes **one D81** on
 device 8 and does not touch the SD card. **Played by hand and released in
-v0.12.0** on 2026-09-08.
+v0.12.0** on 2026-09-08; shipping in
+[v0.13.0](../../../releases/latest), which adds colour per message.
 
 ```sh
 make          # build/egatrek.prg + build/OVERLAYS.BIN
@@ -218,8 +219,8 @@ no rig here can stand in for.
 
 **Nothing on the build list.** Saving was the last item and it works: a game
 SAVEs to the D81, a RESTORE brings back a pixel-identical console, and the port
-no longer touches the SD card at all. Played by hand on 2026-09-08 and released
-in v0.12.0.
+no longer touches the SD card at all. Played by hand on 2026-09-08, released in
+v0.12.0, and shipping in v0.13.0 with colour per message.
 
 **Both of the things this section carried are now closed**, and it kept saying
 otherwise for a day after each — this file is one sideways from the work, which
@@ -311,12 +312,16 @@ Against the measured original's 250.6ms this is 9.6% long, which is one tick of
 granularity and the nearest whole tick available. **The fix costs nothing: the
 port has 5,282 bytes free with it in, up 99.**
 
-The two deferred features -- the MAIN VIEWER's other nine pages and colour per
-message -- were never started, and are deliberate scope rather than defects.
-There is about 5K of resident space for them (5,183, `make verify`).
+**Colour per message was built on 2026-09-10** and ships here in v0.13.0 --
+a department map plus per-event exceptions, in the shared `c128/src/ui.c`, so
+every port has it. Only the MAIN VIEWER's other nine pages remain deferred,
+and that is deliberate scope rather than a defect. `make verify` prints the
+resident space left for it.
 
-Both open items here are carried on THE OPEN LIST in `NOTES.md`, which is the
-list for the whole project and was re-derived on 2026-09-09.
+**Nothing on THE OPEN LIST touches this port any more.** The two items still
+open there want a person at a keyboard on other machines: nobody has played
+the Amiga, and the C128 wants play. The list is in `NOTES.md`, re-derived
+2026-09-11.
 
 ## Saving works, and the SD card is gone
 

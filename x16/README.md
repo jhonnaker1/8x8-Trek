@@ -1,7 +1,7 @@
 # EGA Trek — Commander X16
 
 Second port, **released in v0.10.0** and shipping in
-[v0.12.1](../../../releases/latest). The modern 8-bit machine: a 65C02, a
+[v0.13.0](../../../releases/latest). The modern 8-bit machine: a 65C02, a
 CBM-compatible KERNAL, and VERA — a video chip with per-cell foreground and
 background colour, so the nine-panel console renders as designed with no
 mapping.
@@ -167,8 +167,12 @@ noticing, because every measurement was of the thing that was wrong.
 
 ## What is open
 
-Nothing specific to this port. The two features deferred everywhere — the MAIN
-VIEWER's other nine instrument pages and a colour per message — are on THE OPEN
-LIST in [`NOTES.md`](../NOTES.md), along with the one item that touches every
-released port: **nobody has heard v0.12.1**, whose sound fixes were measured
-from a recording rather than by a person listening.
+**Nothing specific to this port, and nothing on THE OPEN LIST touches it any
+more.** Colour per message is built (2026-09-10) and ships on all five ports;
+only the MAIN VIEWER's other nine instrument pages stay deferred, everywhere.
+
+The item that used to sit here — "nobody has heard v0.12.1" — closed on
+2026-09-10 when Jamie listened: *"sounds right."* Every sound figure this port
+had until then came from a recording or a driver probe, and they had all agreed
+with each other for the four months it played an octave flat. See THE OPEN LIST
+in [`NOTES.md`](../NOTES.md).

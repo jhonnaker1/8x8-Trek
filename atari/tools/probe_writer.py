@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """WHO writes EGATREK.SAV into the overlay window?
 
+ARCHIVED INSTRUMENT -- the question is answered. read_field() was writing
+the save filename through the soft stack, which was inside the overlay
+window. Kept for the method, wired into no Makefile, not maintained.
+
+
 The window at $AE00..$BF00 loads `ovl_front` intact -- its first 64 bytes match
 the image byte for byte -- and then something writes the save filename over the
 middle of it. The executing code is corrupted underneath itself, runs into the

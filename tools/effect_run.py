@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Which of EGA Trek's sound effects belongs to which action?
 
+ARCHIVED INSTRUMENT -- the measurement era is closed and every constant is
+read or measured. Kept for the method; wired into no Makefile, and it needs
+the DOSBox rig and reference/, which is not in this repository.
+
+
 tools/extract_music.py found five short tracks and where each is started in the
 code, but not what any of them MEANS. Guessing is exactly what the notes exist
 to prevent, so this asks the game.
