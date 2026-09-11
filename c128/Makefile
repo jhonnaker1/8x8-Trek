@@ -123,7 +123,13 @@ all: $(OUT)
 # gen_music.py, which EXTRACTS Anderson's note data -- that tool is still there
 # and still works, but its output is his creative work, is gitignored, and can
 # never ship on a release disk. See tools/make_music.py.
-music src/music_data.h src/music_data.c:
+# build/music.dat IS NAMED HERE, and that is the fix for a real bug rather
+# than tidiness: the disk rule reads it, but the only declared targets of this
+# recipe were the two source files -- which are COMMITTED. After `rm -rf build`
+# they still existed, make judged the rule satisfied, and `make d64` died on a
+# file nothing knew how to rebuild. A byproduct is not a dependency.
+music src/music_data.h src/music_data.c build/music.dat:
+	@mkdir -p build
 	cd .. && python3 tools/make_music.py
 
 # The prose. Unlike the music this list IS committed -- it is the port's own
@@ -132,7 +138,11 @@ music src/music_data.h src/music_data.c:
 #
 # There is no generated .c any more. strdata.h is ids alone; the offset table
 # that used to be strdata.c now ships inside strings.dat -- see strpool.c.
-strings src/strdata.h:
+# build/strings.dat named for the same reason as build/music.dat above, and
+# this is the one that actually bit: `make d64` on a clean build failed with
+# FileNotFoundError: 'build/strings.dat', and succeeded on a second run.
+strings src/strdata.h build/strings.dat:
+	@mkdir -p build
 	cd .. && python3 tools/gen_strings.py
 
 # The EGA->VDC colour mapping is pure arithmetic, so it is proven natively on
@@ -314,7 +324,9 @@ D64 = build/trek128.d64
 
 d64: $(D64)
 
-$(D64): $(OUT)
+# THE DATA FILES ARE PREREQUISITES NOW. They were read by the recipe and
+# required by nothing, which is what made a clean `make d64` fail.
+$(D64): $(OUT) build/strings.dat build/music.dat
 	@mkdir -p build
 	@# CUT THE IMAGES AGAIN, HERE. build/ovl*.prg is shared between the
 	@# release and debug builds -- whichever linked last wins -- so a disk
@@ -344,8 +356,13 @@ $(D64): $(OUT)
 	@# c128/test/loadbench.c and NOTES.md. The header value is ignored, so
 	@# $4000 is written only so a human LOADing the file by hand sees
 	@# something sensible.
-	@# STRINGS.DAT always exists; MUSIC.DAT only on a tree that has
-	@# reference/, and without it the game simply plays silently.
+	@# ~~STRINGS.DAT always exists; MUSIC.DAT only on a tree that has
+	@# reference/, and without it the game simply plays silently.~~
+	@# BOTH HALVES WERE FALSE. STRINGS.DAT did NOT always exist -- that is
+	@# the bug this rule's prerequisites now fix. And MUSIC.DAT stopped
+	@# needing reference/ on 2026-09-06, which the comment forty lines below
+	@# says and this one went on contradicting: a retraction that reaches one
+	@# copy has not retracted anything.
 	@python3 -c "import sys; d = open('build/strings.dat','rb').read(); \
 	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
 	c1541 -attach $(D64) -write build/strings.pdat strings.dat >/dev/null
@@ -354,14 +371,18 @@ $(D64): $(OUT)
 	@# tools/gen_music.py. make_music.py composes the port's OWN tracks and
 	@# needs nothing but python -- which is the whole point of it, since
 	@# Anderson's extracted note data can never ship on a release disk.
-	@if [ -f build/music.dat ]; then \
-	    python3 -c "import sys; d = open('build/music.dat','rb').read(); \
-	        open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"; \
-	    c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null; \
-	else \
-	    echo "d64: NO MUSIC.DAT -- the game will play SILENTLY."; \
-	    echo "     run \`make music\` to compose it (no reference/ needed)."; \
-	fi
+	@# NO LONGER OPTIONAL. This used to warn and carry on when music.dat was
+	@# missing, which could put a SILENT disk in build/ and call it a
+	@# release. It is a prerequisite of this rule now, so it cannot be
+	@# missing -- and if it somehow is, that is a broken build and not a
+	@# disk worth writing.
+	@test -f build/music.dat || { \
+	    echo "d64: build/music.dat missing after it was required -- refusing"; \
+	    echo "     to write a silent release disk. Run \`make music\`."; \
+	    exit 1; }
+	@python3 -c "import sys; d = open('build/music.dat','rb').read(); \
+	    open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	c1541 -attach $(D64) -write build/music.pdat music.dat >/dev/null
 	@# The overlays, one PRG each. ovl_load() LOADs them into the window.
 	@for o in $(OVERLAYS); do \
 	    c1541 -attach $(D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \

@@ -541,13 +541,17 @@ that is released.**
     deliberate breakages. Two dependency bugs came out with it -- see "The
     C128's resident figure" below.
 
-16. **`make d64` fails on the first run after a clean build**, on a missing
-    `build/strings.dat`; a second run succeeds. Found 2026-09-10 while testing
-    item 15 and **confirmed to predate it** -- it fails identically with those
-    changes stashed. It is the same class as the two bugs item 15 turned up: a
-    file that a recipe happens to produce is not a file that make knows how to
-    rebuild. Not fixed, because it is the release path and not the check that
-    was being repaired.
+16. ~~**`make d64` fails on the first run after a clean build**~~ -- **FIXED
+    2026-09-10.** The generators declared only their COMMITTED source outputs
+    as targets, so after `rm -rf build` make judged them satisfied and the disk
+    rule read files nothing knew how to rebuild. They name their `.dat` outputs
+    now and the disk rule requires them. A clean tree builds a complete disk in
+    one go, music included.
+
+17. **Nothing is running `make ports` automatically.** It exists now and it is
+    the honest gate, but it is not part of `all` -- it needs five cross
+    compilers -- so it only runs when somebody remembers. That is the same
+    shape as the problem it solves, one level up.
 
 **Not on this list, and checked:** the read list, the rig list and the build
 list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports
@@ -7305,12 +7309,63 @@ read from another: the retraction that reached `trek.h` and not `trek.c`, and
 now a variable defined below its use. **Both were invisible because the code
 still ran and still printed something.**
 
-### And a third, which is not mine and is not fixed
+### And a third, which was not mine -- FIXED 2026-09-10
 
-`make d64` fails on the first run after a clean build -- `build/strings.dat`
-missing -- and succeeds on the second. **Confirmed to predate this work**: it
-fails identically with these changes stashed. Same class again, on the release
-path. Open list item 16.
+`make d64` failed on the first run after a clean build (`build/strings.dat`
+missing) and succeeded on the second. Confirmed to predate the work above by
+stashing it and reproducing.
+
+**Same cause, one level further out.** The generators declare only their
+COMMITTED outputs as targets:
+
+    strings src/strdata.h:          <- src/strdata.h is in git
+    music src/music_data.h ...:     <- so is music_data.c
+
+After `rm -rf build` those source files still exist, so make judges both rules
+satisfied and never runs them -- while the disk rule reads `build/strings.dat`
+and `build/music.dat`, which are gone. The recipe produces them; nothing
+declared that it does. They are named as targets now, and the disk rule
+requires them.
+
+**Two stale comments fell out with it.** `# STRINGS.DAT always exists` sat
+directly above the code that proved it does not. And `MUSIC.DAT only on a tree
+that has reference/` was contradicted forty lines below by a comment that
+explicitly retracts it -- dated 2026-09-06, four days of one copy correcting
+the other without reaching it. That is now the third instance in three days of
+a retraction landing on one copy.
+
+**And the music stopped being optional.** The rule used to warn and carry on
+when `music.dat` was missing, which could leave a SILENT disk in `build/` and
+call it a release. It is a prerequisite now, and the fallback is a refusal.
+
+## make ports: the exit status, checked once so nobody has to remember
+
+`tools/check_ports.py`, run as `make ports`. Every port's own gate --
+`make verify` where there is one, `make` on the Amiga, which has no overlays
+for a verify to check -- with the return code captured and PASS/FAIL per port.
+
+**It exists because of a shape, not an incident.** Checking five ports by hand
+means five shell lines, and the convenient shape is
+`cd x && make verify 2>&1 | tail`, which reports TAIL's status. A failed build
+prints its error, scrolls, and reads as a pass. That is how `make test` went two
+days without compiling here, how `budget.py` printed "IT LINKS, 327 bytes spare"
+over a failed link twice in one session -- and I did it twice more on
+2026-09-10, while testing a check written to catch exactly this. **The fix for
+a discipline problem is not more discipline.**
+
+It also prints each port's headline figures together, which no single command
+did before:
+
+    c128    1589 bytes free below the window
+    x16     140 bytes soft stack, largest overlay 157 spare
+    mega65  5282 free
+    atari   693 free, lowram 14 free
+
+**Proved by breaking it**, after the first attempt proved nothing: doctoring
+the C128's map and `.res` produced five passes, because `make` simply rebuilt
+the files I had corrupted. A break the build repairs is not a break. An
+`#error` in `atari/src/atarisnd.c` gives `FAIL atari make verify exit 2`, the
+compiler's line surfaced, the other four still reported, and exit 2 overall.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 

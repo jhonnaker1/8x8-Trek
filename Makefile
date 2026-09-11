@@ -17,7 +17,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check clean
+.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check ports clean
 
 c89-check:
 	@echo "port-check: the core must stay C89 (cc65 needs it)"
@@ -58,6 +58,16 @@ build/test_serial: core/test/test_serial.c core/serial.c core/trek.c \
 # preceding paragraph -- which reported constants as fitted that were not.
 tiers:
 	@python3 tools/tiers.py
+
+# EVERY PORT'S OWN GATE, WITH THE EXIT STATUS ACTUALLY CHECKED. Not part of
+# `all`, because it needs five cross compilers; run it before a release or
+# after anything that touches core/. See tools/check_ports.py for why a
+# one-liner with a pipe in it was never good enough.
+#
+#   make ports            all five
+#   make ports P=atari    one
+ports:
+	@python3 tools/check_ports.py $(P)
 
 # The port's fixed tables against the ORIGINAL BINARY. Added 2026-08-26 after
 # core/planet.c shipped SEVEN planet names against the binary's EIGHT -- the
