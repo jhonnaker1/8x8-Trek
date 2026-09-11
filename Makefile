@@ -24,7 +24,17 @@ c89-check:
 	@cc -std=c89 -fsyntax-only -Werror=declaration-after-statement \
 	    -I core core/*.c
 
-all: test port-check check-tables tiers
+# `ports` IS IN HERE, and that is open-list item 17 rather than a preference.
+# It was written as the honest gate for all five ports and then left out of
+# `all` because it needs five cross compilers -- so it only ran when somebody
+# remembered, which is the same failure it was built to remove, one level up.
+#
+# What made it safe to add: a port whose compiler is not installed SKIPS rather
+# than fails, naming the variable and path it looked for. A fresh clone with no
+# toolchains gets five skips and a green build; this machine gets five real
+# verifies for about ten seconds. Only a port that COULD have been built and
+# was not turns `make` red.
+all: test port-check check-tables tiers ports
 
 test: build/test_trek build/test_serial build/test_hof
 	./build/test_trek

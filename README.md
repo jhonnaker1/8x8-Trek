@@ -267,7 +267,16 @@ cd c128 && make rund    # launch the disk in x128 (the picture is on the VDC win
 cd c128 && make verify  # bounds and encodings the binary can be wrong about
 cd c128 && make test    # the native suites: colour mapping, panels, sound
 make test               # and the core's own, from the repository root
+make ports              # every port's own gate, with the exit status checked
+make all                # the native tests, the audits, and `ports`
 ```
+
+**`make ports` skips what it cannot build.** It runs each port's real gate --
+`make verify`, or `make` on the Amiga, which has no overlays for a verify to
+check -- and a port whose cross compiler is not installed is reported as a skip
+rather than a failure, naming the variable and path it looked for. So a fresh
+clone with no toolchains still gets a green `make all`; a machine with all five
+gets five real verifies in about ten seconds. `make ports P=atari` for one.
 
 **Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
 music, the eleven code overlays and the twelve-page briefing all load from the

@@ -548,10 +548,12 @@ that is released.**
     now and the disk rule requires them. A clean tree builds a complete disk in
     one go, music included.
 
-17. **Nothing is running `make ports` automatically.** It exists now and it is
-    the honest gate, but it is not part of `all` -- it needs five cross
-    compilers -- so it only runs when somebody remembers. That is the same
-    shape as the problem it solves, one level up.
+17. ~~**Nothing is running `make ports` automatically.**~~ **FIXED
+    2026-09-10.** It is part of `all`. What made that safe was making a missing
+    cross compiler a SKIP rather than a failure: a fresh clone with no
+    toolchains gets five skips and a green build, this machine gets five real
+    verifies for about ten seconds, and only a port that COULD have been built
+    and was not turns `make` red.
 
 **Not on this list, and checked:** the read list, the rig list and the build
 list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports
@@ -7366,6 +7368,33 @@ the C128's map and `.res` produced five passes, because `make` simply rebuilt
 the files I had corrupted. A break the build repairs is not a break. An
 `#error` in `atari/src/atarisnd.c` gives `FAIL atari make verify exit 2`, the
 compiler's line surfaced, the other four still reported, and exit 2 overall.
+
+### And then it went into `all`, which was the actual point
+
+Writing the gate and leaving it to be remembered was the same failure one level
+up, and it lasted one commit. **What was blocking it was the toolchains**: five
+cross compilers live on this machine and none on a fresh clone, and a gate that
+turns `make` red for a stranger is a gate that gets deleted.
+
+So a missing compiler is a **skip**, not a failure -- and the port is asked
+where its compiler is rather than the filesystem being guessed at:
+
+    make -C <port> -f Makefile -f - trek_print_cc   <<  'trek_print_cc:; @echo $(VAR)'
+
+`-f -` appends a rule from stdin, so no port Makefile needed changing, and each
+one expands its own `$(LLVM_MOS)` / `$(AMIGA_TOOLCHAIN)` / `$(HOME)` the way it
+always does. **Ask the repo, not the path.**
+
+Three cases, all measured rather than argued:
+
+    this machine                 5 ok, exit 0, about ten seconds
+    no toolchains at all         5 skipped, exit 0, each naming the variable
+                                 and the path it looked for
+    one broken, one absent       FAIL atari exit 2, skip amiga, three ok,
+                                 exit 2 overall
+
+The middle one is the one that matters: `make all` on a clone with nothing
+installed is still green.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
