@@ -675,8 +675,51 @@ is the whole question -- **an unknown, not a blocker.**
   1. **BLIT COST.** The V9958's VRAM is behind I/O ports, so every glyph is
      port writes, and the console is 2,000 cells. At 1.79MHz on a GIME'd CoCo
      3 this is the question the whole port turns on. **A benchmark, not a
-     datasheet check** -- and it is answerable today, in MAME, without writing
-     a port: time a loop that fills the screen through the card.
+     datasheet check.** Attempted 2026-09-11 -- see below.
+
+### The blit benchmark: the machine boots, the benchmark did NOT happen (2026-09-11)
+
+**WHAT WORKS NOW, and it is new: MAME boots a CoCo 3 with a SuperSprite FM+.**
+
+    mame64 coco3 -rompath "$HOME/Library/Application Support/Ample/roms" \
+                 -ext ssfm -video none -seconds_to_run 3 -nothrottle
+
+**Ample already has the CoCo romsets** -- `coco3` verifies GOOD on its own
+rompath, `coco_fdc` included, and `ym2413.zip` is there for the card's OPLL.
+A romset hand-built from XRoar's `coco3.rom` was unnecessary; it does match
+MAME's CRC and SHA1, but Ample's is complete and the FDC roms are the ones the
+hand-built set lacked.
+
+**WHERE IT STOPPED: the V9958's I/O addresses, as the 6809 sees them.** The
+whole `$FF40..$FF7F` range maps to `coco3_state::ff40_read`/`ff60_read`, the
+CoCo 3's generic slot dispatcher, so the card's own decode is invisible to
+`map`. Without the ports there is no program to time.
+
+**AND THE PROBE THAT LOOKED LIKE AN ANSWER WAS BROKEN.** Writing `0x5A` to
+each candidate address with a watchpoint on the VDP's VRAM produced no hits at
+all -- which reads as "none of these is the data port" and is nothing of the
+kind. `wpset :ext:ssfm:v9958,0,0x20000,w` had failed with **"Error in
+expression: stack underflow"**, so THE WATCHPOINT WAS NEVER SET and sixteen
+addresses were probed against a check that could not fire. Caught by reading
+the log rather than trusting the null. **A check that cannot fire proves
+nothing** -- the oldest rule in this file, and it still got a whole probe.
+
+**HOW TO CAPTURE DEBUGGER OUTPUT HEADLESSLY, which took three attempts:**
+`-debug -debugscript <file> -debuglog` writes the console to `debug.log` in
+the working directory. `-video none` alone gives nothing; the debugger console
+is not stdout.
+
+**NEXT ATTEMPT starts here**: get `wpset`'s device-space syntax right (or find
+the addresses another way -- tracing the card's own ROM if it has one), then a
+6809 loop timed with MAME's cycle count.
+
+**AN ARITHMETIC ESTIMATE EXISTS AND IS NOT THE BENCHMARK.** A tight 6809 fill
+loop is about 19 cycles a byte; a 6x8 cell at 4bpp is 24 bytes, so roughly 460
+cycles a character plus address setup, and a full 80x25 repaint is around
+48,000 bytes -- about half a second at 1.79MHz. That suggests incremental panel
+updates are comfortable and full repaints are not, which is a plausible shape
+for this console. **It is arithmetic. The scope called for a benchmark
+precisely because arithmetic is what everyone already has.**
   2. **Does it fit?** Unknown until the whole game links. Every port here
      opened with that measurement (`make early` on the Atari) and it is the
      right first move again.
