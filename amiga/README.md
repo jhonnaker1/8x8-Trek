@@ -279,6 +279,17 @@ Driven on the machine rather than reasoned about:
   crash. Worth stating, because the C128 BRKed into its machine-language
   monitor here and shipped that way in v0.9.0.
 
+  **It skipped the goodbye entirely until v0.13.1, though, and that hid a
+  second fault.** `main()` called `vdc_shutdown()` — which closes the window —
+  *before* waiting for the farewell keypress, so the message vanished the
+  instant it was drawn **and** `kb_waitkey()` returned `KB_RETURN` immediately,
+  because its `if (!w)` guard fired. The wait never happened at all. The
+  teardown moved after the key. With the message finally readable, its second
+  line turned out to be the C128's — "BASIC IS ON THE 40-COLUMN SCREEN.", on a
+  machine with no such screen — unread by anyone precisely because it was being
+  erased; `src/strings.override.txt` says `HIT A KEY TO RETURN TO AMIGADOS.`
+  now.
+
 A −930 score does **not** qualify for an empty table, so the write path had to
 be exercised against a seeded one. That is correct behaviour, not a bug — worth
 writing down, because "the file was not written" looks identical to a broken

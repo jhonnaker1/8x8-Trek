@@ -151,6 +151,14 @@ banking ROM over this program's own code, and the fix is `plat_exit()`: reset
 the machine, which is the only way to hand back a C128 whose entire BASIC text
 area this program is sitting in.
 
+**The teardown moved after the keypress in v0.13.1**, and this port is why it
+was safe to: its `vdc_shutdown()` deliberately does not clear, so the farewell
+was always visible here and the reorder changes only *when* the machine drops
+back to 1MHz — after the key now, and it resets immediately either way. The
+ports that needed the fix were the X16 and the Amiga, which were erasing the
+message before the player could read it. The C128's binary changed as code
+motion; the quit was played through on the posted v0.13.1 disk to confirm it.
+
 **Why it stood for so long is the useful part.** A note in `NOTES.md` claimed
 there was "no way to observe the machine from a session on this host" — which
 was simply wrong; VICE's binary monitor was there all along. The wedge was

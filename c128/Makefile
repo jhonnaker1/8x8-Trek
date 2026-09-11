@@ -327,6 +327,14 @@ run: verify
 # because neither touches a file. Use `make rund` for anything that does.
 D64 = build/trek128.d64
 
+# THE RELEASE ARTEFACT. The .d64 plus the notes beside it -- this port shipped
+# four times with NO notes at all, the only one of the five, because its disk
+# needs no wrapper and nothing noticed the .txt was missing with it.
+release: $(D64)
+	@cp $(D64) build/egatrek-c128.d64
+	@cp README-release.txt build/egatrek-c128.txt
+	@ls -l build/egatrek-c128.d64 build/egatrek-c128.txt
+
 d64: $(D64)
 
 # THE DATA FILES ARE PREREQUISITES NOW. They were read by the recipe and

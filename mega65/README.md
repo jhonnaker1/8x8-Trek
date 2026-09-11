@@ -220,7 +220,7 @@ no rig here can stand in for.
 **Nothing on the build list.** Saving was the last item and it works: a game
 SAVEs to the D81, a RESTORE brings back a pixel-identical console, and the port
 no longer touches the SD card at all. Played by hand on 2026-09-08, released in
-v0.12.0, and shipping in v0.13.0 with colour per message.
+v0.12.0, and shipping in v0.13.1 with colour per message.
 
 **Both of the things this section carried are now closed**, and it kept saying
 otherwise for a day after each — this file is one sideways from the work, which
@@ -312,7 +312,7 @@ Against the measured original's 250.6ms this is 9.6% long, which is one tick of
 granularity and the nearest whole tick available. **The fix costs nothing: the
 port has 5,282 bytes free with it in, up 99.**
 
-**Colour per message was built on 2026-09-10** and ships here in v0.13.0 --
+**Colour per message was built on 2026-09-10** and ships here in v0.13.1 --
 a department map plus per-event exceptions, in the shared `c128/src/ui.c`, so
 every port has it. Only the MAIN VIEWER's other nine pages remain deferred,
 and that is deliberate scope rather than a defect. `make verify` prints the

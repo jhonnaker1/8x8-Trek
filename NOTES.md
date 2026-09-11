@@ -469,6 +469,20 @@ checklist of *which situations need a message*, not as text to copy.
 
 ## v0.13.1, and the release notes that went stale in an hour (2026-09-11)
 
+**THE SWEEP AFTER IT FOUND THE C128 HAD BEEN SHIPPING WITH NO NOTES AT ALL** --
+four releases, the only port of the five without a `README-release.txt`, so a
+player downloading `egatrek-c128.d64` got a bare disk image: no loading
+instructions, no file list, no word about the 80-column requirement, and none
+of the Nels Anderson credit every other port's notes carry. Nothing checked it,
+because the C128 needs no wrapper around its disk and the missing `.txt` was
+invisible next to four ports that have one.
+
+Written, and `make -C c128 release` builds the pair now. The `.d64` is
+byte-identical to the posted one, so the notes were uploaded to the existing
+v0.13.1 rather than re-cut.
+
+
+
 A point release over v0.13.0: the quit order, and the farewell text on the two
 ports that had never been able to show it.
 
