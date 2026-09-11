@@ -168,8 +168,18 @@ noticing, because every measurement was of the thing that was wrong.
 ## What is open
 
 **Nothing specific to this port, and nothing on THE OPEN LIST touches it any
-more.** Colour per message is built (2026-09-10) and ships on all five ports;
-only the MAIN VIEWER's other nine instrument pages stay deferred, everywhere.
+more.** Colour per message is built (2026-09-10), ships on all five ports, and
+was **looked at here on 2026-09-11** -- Jamie: *"the x16 port looks, sounds and
+plays great"* -- which closed this port's share of item 23. Only the MAIN
+VIEWER's other nine instrument pages stay deferred, everywhere.
+
+The **quit** was fixed the same day: `vdc_shutdown()` is `scr_clear()` here, and
+`main()` used to call it before waiting for the farewell keypress, so the
+goodbye was erased one line after it was drawn and the player waited on a blank
+screen. The teardown moved after the key. The message underneath it was wrong
+too -- it was the C128's "BASIC IS ON THE 40-COLUMN SCREEN.", a screen this
+machine does not have -- and had never been read by anyone precisely because it
+was being erased. See `c128/src/main.c` on the quit order.
 
 The item that used to sit here — "nobody has heard v0.12.1" — closed on
 2026-09-10 when Jamie listened: *"sounds right."* Every sound figure this port

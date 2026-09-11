@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (2 open of 24 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (1 open of 24 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,13 +475,14 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**TWO still open, and BOTH want a person: 10** (no human has played the Amiga)
-and **23** (colour per message has never been seen on a screen on the X16 or
-the Amiga).
+**ONE still open: 10 -- no human has played the Amiga.** It is the last item on
+the list, and it wants a person at a keyboard.
 
-**They overlap almost entirely.** Playing the Amiga closes 10 and the Amiga
-third of 23 together, the way the C128 and MEGA65 sittings each closed their
-own. The X16 needs only someone to boot it and look at the message log.
+**Item 23 closed the day it was raised**, in four sittings: Jamie looked at the
+Atari, the C128, the MEGA65 and the X16 and said the same four words about each,
+and the Amiga's console was seen in a driven screenshot during the exit fix.
+**Every port has now had its colour per message looked at on a real screen**,
+where the morning's evidence was a host-side unit test.
 
 **Item 11 closed on 2026-09-11** -- Jamie played the C128 and it "looks, sounds,
 and plays great". It was the OLDEST item on this list, open since the port was
@@ -722,25 +723,23 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
 
 ### Raised 2026-09-11, by re-deriving after the release rather than reciting
 
-23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on two of the five
-    ports** -- the X16 and the Amiga. **SEEN on the Atari, the C128 and the
-    MEGA65, all by Jamie on 2026-09-11**, each reported the same way: "looks,
-    sounds, and plays great". It shipped in v0.13.0 to four released ports and
-    the
-    only verification it has ever had is `c128/test/test_panels.c` -- host-side
-    unit tests, made to fail first, asserting a colour table. No screenshot, no
-    emulator, no machine. The drawing path is shared, but the EGA-to-machine
-    colour MAP is per port, and a wrong map shows up only as wrong colours.
+23. ~~**COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN.**~~ **SEEN ON ALL
+    FIVE, 2026-09-11 -- raised and closed the same day.** It shipped in v0.13.0
+    with one form of verification behind it: `c128/test/test_panels.c`,
+    host-side unit tests asserting a colour table, made to fail first. No
+    screenshot, no emulator, no machine. The drawing path is shared; the
+    EGA-to-machine colour MAP is per port, and a wrong map shows only as wrong
+    colours.
 
-    **This is item 18's shape exactly**, and item 18 is the standing proof that
-    it is not a theoretical worry: the X16's sound numbers agreed with each
-    other for four months while the port played an octave flat, because every
-    measurement was of the thing that was wrong. A visual change checked only
-    by arithmetic is the same bet.
+    **Four by a person, in the same four words each time** -- Jamie on the
+    Atari, the C128, the MEGA65 and the X16: *"looks, sounds, and plays
+    great."* **The Amiga by driven screenshot**, during the exit-order fix: the
+    console up with the HELM line in cyan, which is the department default.
 
-    Jamie has seen it on the ATARI -- he played it on 2026-09-11 with the
-    change in -- which is one port of five and the only reason this is not
-    worse.
+    That last one is weaker evidence and is worth saying so rather than
+    rounding up. It is a real screen rather than a unit test, which is what
+    this item asked for -- but nobody has PLAYED the Amiga, and item 10 is
+    still open for exactly that reason.
 
 24. ~~**THE ATARI'S PITCH FIX HAS NOT BEEN HEARD.**~~ **HEARD AND CONFIRMED --
     Jamie, 2026-09-11: "the atari's pitch fix worked. i heard it."** Raised and

@@ -318,12 +318,11 @@ every port has it. Only the MAIN VIEWER's other nine pages remain deferred,
 and that is deliberate scope rather than a defect. `make verify` prints the
 resident space left for it.
 
-**Nothing on THE OPEN LIST touches this port any more.** The two items still
-open there want a person at a keyboard on other machines: nobody has played
-the Amiga (10), and colour per message has never been seen on a screen on the
-X16 or the Amiga (23) -- **it has been seen here**, 2026-09-11: "the mega65
-looks, sounds, and plays great". The list is in `NOTES.md`, re-derived
-2026-09-11.
+**Nothing on THE OPEN LIST touches this port any more.** Colour per message was
+looked at here on 2026-09-11 -- *"the mega65 looks, sounds, and plays great"* --
+which closed this port's share of item 23; that item is now closed on all five.
+**One item is left on the whole list: nobody has played the Amiga (10).** The
+list is in `NOTES.md`, re-derived 2026-09-11.
 
 ## Saving works, and the SD card is gone
 

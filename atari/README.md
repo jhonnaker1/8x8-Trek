@@ -750,10 +750,10 @@ once with, and the pair says which world this is.
   in it. The artefact is `egatrek-atari.atr` with `egatrek-atari.txt` beside
   it; `make release` builds both.
 
-**Nothing on THE OPEN LIST touches this port any more.** The two items still
-open there want a person at a keyboard on other machines: nobody has played
-the Amiga (10), and colour per message has never been seen on a screen on the
-X16 or the Amiga (23).
+**Nothing on THE OPEN LIST touches this port any more.** **One item is left on
+the whole list: nobody has played the Amiga (10).** Item 23 -- colour per
+message never seen on a screen -- closed on 2026-09-11 across all five ports,
+this one included.
 
 ## Played, and it was silent
 
