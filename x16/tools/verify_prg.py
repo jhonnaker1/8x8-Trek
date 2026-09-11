@@ -114,13 +114,28 @@ def check_headroom(size):
             last = max(last, vma + sz)
     if stack is None:
         die("no __stack in the link -- cannot bound low RAM")
+    # THE FLOOR IS A MEASUREMENT, NOT A FEELING. TREK_STACKPROBE measured the
+    # deepest path -- SAVE -- at 86 bytes on 2026-09-11, when this gap was 80
+    # and the stack had been writing six bytes into .noinit under every save
+    # for two releases. 64 was the old floor and it passed that build.
+    #
+    # 144 is 1.67x the measured demand; the C128 reserves 1.79x its own. Raise
+    # SOFT_STACK_MEASURED and re-run the probe if a deeper path ever turns up
+    # -- do not raise the floor to whatever the build happens to have.
+    SOFT_STACK_MEASURED = 86
+    SOFT_STACK_FLOOR = 144
     gap = stack - last
-    print("verify: low RAM ends $%04X, __stack $%04X -- %d bytes for the "
-          "soft stack" % (last, stack, gap))
+    print("verify: low RAM ends $%04X, __stack $%04X -- %d bytes for the soft "
+          "stack (measured demand %d)" % (last, stack, gap, SOFT_STACK_MEASURED))
     if gap < 0:
         die("low RAM has overrun the overlay window")
-    if gap < 64:
-        die("only %d bytes below __stack -- the soft stack has no room" % gap)
+    if gap <= SOFT_STACK_MEASURED:
+        die("%d bytes below __stack and SAVE measured %d -- THE SOFT STACK "
+            "OVERFLOWS INTO .noinit" % (gap, SOFT_STACK_MEASURED))
+    if gap < SOFT_STACK_FLOOR:
+        die("only %d bytes below __stack, floor is %d (measured demand %d) -- "
+            "take the difference off the overlay window"
+            % (gap, SOFT_STACK_FLOOR, SOFT_STACK_MEASURED))
     print("verify: largest overlay %s %d + 2 stamp of %d, %d spare"
           % (bigname, biggest, size, size - biggest - 2))
     if biggest + 2 > size:
