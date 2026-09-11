@@ -7,7 +7,7 @@ briefing, saving and restoring, and a game playable from the title screen
 through the hall of fame to a second game. It reads and writes **one D81** on
 device 8 and does not touch the SD card. **Played by hand and released in
 v0.12.0** on 2026-09-08; shipping in
-[v0.13.0](../../../releases/latest), which adds colour per message.
+[v0.13.1](../../../releases/latest), which adds colour per message.
 
 ```sh
 make          # build/egatrek.prg + build/OVERLAYS.BIN

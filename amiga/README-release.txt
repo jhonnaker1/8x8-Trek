@@ -17,7 +17,8 @@ anywhere and run it from a shell:
     egatrek
 
 It opens its own 640x200 screen in sixteen colours and gives the machine back
-when you quit. The files it needs are found through PROGDIR:, which means the
+when you quit: answering NO to "Play Again?" shows a farewell, waits for a key,
+then closes the screen and returns you to the shell. The files it needs are found through PROGDIR:, which means the
 program's own drawer -- so it does not matter what directory you run it from,
 and it works from Workbench.
 

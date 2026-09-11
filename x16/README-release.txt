@@ -62,6 +62,9 @@ SAVE writes EGATREK.SAV into the directory you started from, and the setup
 screen offers to restore it. The hall of fame is TREK.SCR and is created on
 first use.
 
+Answering NO to "Play Again?" shows a farewell, waits for a key, and hands you
+back to BASIC on this screen.
+
 
 THIS IS NOT NELS ANDERSON'S CODE
 

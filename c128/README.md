@@ -1,7 +1,7 @@
 # EGA Trek — Commodore 128 (VDC)
 
 First port, **released in v0.9.0** and shipping in
-[v0.13.0](../../../releases/latest). The machine the project started on, and
+[v0.13.1](../../../releases/latest). The machine the project started on, and
 the one every other port is a diff against: `main.c`, `ui.c`, `layout.c` and
 `strpool.c` live here and are compiled unchanged by all five.
 

@@ -1,7 +1,7 @@
 # EGA Trek — Commander X16
 
 Second port, **released in v0.10.0** and shipping in
-[v0.13.0](../../../releases/latest). The modern 8-bit machine: a 65C02, a
+[v0.13.1](../../../releases/latest). The modern 8-bit machine: a 65C02, a
 CBM-compatible KERNAL, and VERA — a video chip with per-cell foreground and
 background colour, so the nine-panel console renders as designed with no
 mapping.
