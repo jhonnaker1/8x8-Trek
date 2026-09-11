@@ -547,10 +547,14 @@ that is released.**
     missing, and the list did not know the release had happened.** Fourth time
     re-deriving has beaten reciting.
 
-9. **The MEGA65's hall-of-fame WRITE has never been witnessed** -- but there
-   is a METHOD for it now, proved on the Atari 2026-09-10: poke `ship.killed`
-   high enough to clear the -930 floor a self-destruct forces, and the insert
-   and the write both run. See "The hall-of-fame write" below. No driven game
+9. ~~**The MEGA65's hall-of-fame WRITE has never been witnessed.**~~
+   **WITNESSED 2026-09-10**, by the method the Atari proved: poke
+   `ship.killed` past the -930 floor a self-destruct forces. `TREK.SCR` on the
+   D81, 302 bytes, `JAMIE....................\r\n570\r\n` at offset 0 -- and
+   302 is the format agreeing with itself, since `core/hof.h` says the file is
+   300 bytes when every score is a single 0. Unlike the Atari, this port's
+   disk is honest evidence: c1541 reads the D81 back. Historical text below.
+   No driven game
    scores high enough to write a row, so there is no file to check. It goes
    through the `plat_write_all` the save proves -- an argument, not a
    measurement, and the port's README now says so under "Still open" as well.

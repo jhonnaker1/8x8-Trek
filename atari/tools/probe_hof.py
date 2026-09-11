@@ -82,7 +82,10 @@ def main():
         s.shot("3-loss-memo.png")
         # memo -> evaluation -> hall of fame. THREE screens, not two.
         s.keys("RETURN", 400); s.shot("4-evaluation-scored.png")
-        s.keys("RETURN", 500); s.shot("5-hall-of-fame-scored.png")
+        # NAMED FOR WHAT IT SHOWS. This was "5-hall-of-fame-scored.png" and
+        # it is the EVALUATION -- the endgame is three screens and this is the
+        # second. The write happens on the third, which the later keys reach.
+        s.keys("RETURN", 500); s.shot("5-evaluation-total.png")
         print("hof: write status $%02X, close $%02X"
               % (s.byte("plat_dbg_status"), s.byte("plat_dbg_close")), flush=True)
 
