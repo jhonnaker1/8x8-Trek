@@ -6678,7 +6678,10 @@ the same point.
 
 **The code space is the same shape, slightly roomier.** `cx16/lib/link.ld` has
 `ram : ORIGIN = 0x0801, LENGTH = 0x96FF` = **38,655 bytes**, against the C128's
-37,823 -- which currently holds the entire game with 211 to spare. So the
+37,823 -- which held the entire game with 211 to spare when this was written.
+**[2026-09-11: 211 was true for about a day. `make verify` says 1,459 now, and
+said 1,589 on 2026-09-09 -- it drifted unseen because the C128 was the one port
+whose verify did not print the figure. Do not quote 211; run verify.]** So the
 ten-overlay machinery transfers rather than being redesigned.
 
 **The disk seam should nearly copy across.** Every KERNAL entry
@@ -6832,8 +6835,9 @@ reported it.
 > game links there with about 700 bytes spare -- see atari/README.md.]**
 
 So the real figure is **$4000..$BFFF = 32,768 bytes** with an 8K window --
-about 4.8K LESS than the C128's 37,823, which currently holds the game with 211
-bytes spare. The window size is configurable (`bits0-1 = 4K << n`), so a 4K
+about 4.8K LESS than the C128's 37,823, which held the game with 211 bytes
+spare when this was written -- **1,459 now; see the note above, and run
+`make -C c128 verify` rather than quoting either figure.** The window size is configurable (`bits0-1 = 4K << n`), so a 4K
 window at $2000 would give `$3000..$BFFF` = 36,864, still under the C128.
 **Either way this is the TIGHTEST target so far, not the roomiest, and more
 code would have to move into overlays than on any existing port.** Measure it

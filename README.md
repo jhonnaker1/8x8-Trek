@@ -103,6 +103,10 @@ binary and absent from the docs.
 
 ## Where the C128 port stands (2026-09-02)
 
+*The port's own documentation is [`c128/README.md`](c128/README.md) — the
+memory map, bank 1, the overlay rules, the disk, and the three traps it found
+first. This section is the project-level summary.*
+
 The C128 port is **feature complete against the original's mechanics**. Every
 constant it uses was read out of the binary or measured against it running:
 
@@ -158,7 +162,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
-| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.13.0](../../releases/latest) |
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.13.0](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.13.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.13.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.13.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
