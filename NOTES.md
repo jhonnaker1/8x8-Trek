@@ -467,6 +467,35 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
+## v0.13.1, and the release notes that went stale in an hour (2026-09-11)
+
+A point release over v0.13.0: the quit order, and the farewell text on the two
+ports that had never been able to show it.
+
+**THREE ARTEFACTS CHANGED, NOT TWO**, and the difference came from measuring
+rather than from the request. The fix is in the SHARED `c128/src/main.c`, so:
+
+    egatrek-x16.zip       changed -- binary, STRINGS.DAT, README
+    egatrek-amiga.zip     changed -- binary, STRINGS.DAT, README
+    egatrek-c128.d64      changed -- code motion only, same length
+    egatrek-mega65.d81    BYTE-IDENTICAL
+    egatrek-atari.atr     BYTE-IDENTICAL
+
+The MEGA65 and Atari take the same source change and compile to the same bytes,
+because their `vdc_shutdown()` is empty. The C128's does something -- it drops
+the clock -- so its code moved, though its farewell was never the one being
+erased.
+
+**THE NOTES SHIPPED SAYING "the C128 binary in this release has not been
+played", AND THAT WAS TRUE FOR ABOUT AN HOUR.** Jamie then played the posted
+disk -- hash-checked against the attached file first -- to a self-destruct and
+a quit: farewell up, waiting, then the reset. *"It works."*
+
+**A PUBLISHED NEGATIVE ABOUT OUR OWN WORK IS STILL A NEGATIVE ABOUT OUR OWN
+WORK.** `gh release edit --notes-file` updates the body; the tag annotation
+keeps the original, which is the honest split -- the tag is what was said at
+the time, the release page is what is true now. Do not re-tag to tidy history.
+
 ## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 24 raised -- EMPTY)
 
 **Re-derived from the five ports, not recited from the version below** -- that
