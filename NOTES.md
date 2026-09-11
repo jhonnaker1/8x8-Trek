@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (12 open of 18 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (13 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -491,12 +491,26 @@ that is released.**
 
 ### The Atari, the only unreleased port
 
-3. **SAVE is unverified, not broken** -- the "broken" reading was Altirra's
-   virtual write mode and is retracted. The deciding test is save-then-restore
-   in ONE session, which wants the bridge's `state_save`/`state_load` rather
-   than another pair of five-minute cold boots. **Build the harness first.**
+3. ~~**SAVE is unverified, not broken.**~~ **VERIFIED 2026-09-10 -- and it WAS
+   broken, by something neither reading had reached.** Save, cold boot, restore,
+   all in one session: the game comes back to a drawn nine-panel console at the
+   saved stardate, quadrant and ship state. Getting there found a real defect:
+   **the soft stack was inside the overlay window.** See "The restore wedge"
+   below.
 4. **It has never fought, docked, landed on a planet or reached the hall of
-   fame.** A turn is not a game.
+   fame.** A turn is not a game. (Save and restore are off this list now.)
+
+19. **The Atari link is NOT DETERMINISTIC.** Two clean builds from identical
+    sources alternate between binaries 20 bytes apart. The other four ports
+    are reproducible -- three clean links each, matching the v0.12.1 tag -- so
+    this is Atari-only, and it cost an hour: a resident figure that moved was
+    read as a stale build, the finding was retracted, and the retraction was
+    wrong. A binary you cannot reproduce is a bug report you cannot pin.
+
+20. **35 rules compile without depending on their Makefile.** Every game link
+    rule now does; the probe and smoke builds do not. `make check-makefiles`
+    reports them without failing the build, which is a decision to revisit
+    rather than a permanent state.
 5. **The boot load is untimed against a real 1050.** Packing `OVERLAYS.BIN`
    cut it by 40% and nobody has held a stopwatch to what is left.
 6. **No release bundle** -- a licence fact rather than a task. What ships is
@@ -7444,6 +7458,87 @@ fire.
 **This is the same failure as the doc sweeps, in a different file type.** A
 thing is correct where it is written and read somewhere it is not; nothing
 errors; only a check that knows the shape can see it.
+
+
+## The restore wedge: the soft stack was inside the overlay window (2026-09-10)
+
+**SAVE works and always did. RESTORE jammed the CPU**, and the two facts
+together are why this took a day: the save wrote cleanly ($01 on the transfer
+AND the close), so every look went to the disk seam, and the disk seam was
+fine.
+
+### What it actually was
+
+`_start` on this target sets the soft stack to **MEMTOP+1** and grows it down:
+
+    3003: lda $2E5 / adc #$01 / sta $80     ; __rc0 = MEMTOP+1
+          lda $2E6 / adc #$00 / sta $81     ; __rc1
+
+MEMTOP was **$BC1F**. The overlay window runs **$AE00..$C000**. So the stack
+started at $BC20 -- 1,055 bytes INSIDE the window -- and every local written
+there landed on live overlay code.
+
+`ui_setup()` is `OVL_CODE("front")` and declares `char fname[18]` for the
+restore prompt. It sat at **$BBE8**. `read_field()` wrote the filename through
+`($E5),Y` onto it, corrupting the running `ovl_front` image under its own feet.
+Execution reached the string, hit **$52 -- kil**, and Altirra stopped the CPU.
+
+**A stopped CPU never releases the bridge's frame gate**, which is why this
+presented for a day as a hang rather than a crash, across two processes and an
+overnight. It is the same bug the C128 shipped in v0.9.0 -- whose linker script
+has carried the warning ever since, and even names the X16 as carrying the same
+hazard. **Nobody checked the Atari, which had no guard at all.**
+
+### The fix, and the measurement that sized it
+
+Two lines. A reserve the linker enforces:
+
+    __stack_reserve = 0x100;
+    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - __ovl_size - __stack_reserve
+
+and, in the XEX's OUTPUT_FORMAT, two bytes that lower MEMTOP **before `_start`
+ever reads it** -- an XEX segment is just "start, end, bytes", so no code and
+no INITAD is needed:
+
+    SHORT(0x02e5) SHORT(0x02e6) SHORT(ORIGIN(window) - 1)    /* $ADFF */
+
+**DEPTH MEASURED, NOT GUESSED.** `tools/probe_stack.py` samples $80/$81 across
+title, setup, console, SAVE, chart and a warp: deepest **28 bytes**. 256 is
+nine times that. The C128's first guess of 64 was overrun by 79, which is the
+whole argument for measuring.
+
+**And the measurement corrected a wrong one of mine.** I first read the depth
+as ~1,048 bytes, from $C000 - $BBE8 -- arithmetic on the assumption that the
+stack began at $C000. It began at $BC20. The problem was never depth; it was
+PLACEMENT, and that is what made the fix cost 256 bytes instead of a kilobyte
+the port does not have.
+
+**The sentinel fill the C128 used is not available here** and that is worth
+saying: the stack's address range IS the overlay window, so any pattern laid
+down is erased by the next `ovl_load` and the low-water mark would be a reading
+about ovl_load. Sampling per frame is a LOWER BOUND. Re-run the probe rather
+than reasoning if a deeper path appears.
+
+### Where it landed
+
+    verify: resident $3000..$AB4B, 437 bytes free below the stack reserve at $AD00
+    verify: soft stack $AD00..$AE00, 256 bytes reserved (MEMTOP set to $ADFF at load)
+
+    stack starts $ADDC, deepest $ADC0 -- 28 bytes, entirely inside the reserve
+
+693 -> 437 bytes free, and `make verify` REPORTS the reserve now, because a
+free-space figure that quietly ignored it would have been the next stale number
+in a file full of them. That took two attempts: the first read the map's VMA
+column, which is 0 for an absolute assignment, so the check disabled itself and
+reprinted the old 693. The number not moving is what caught it.
+
+### What the restore comes back to
+
+    STARDATE 3500.0   ENERGY 5000   SHIELDS 2500   TORPS 9   MONGOLS 18
+    LEXINGTON IN QUAD 7,4      HELM: AWAITING ORDERS CAPTAIN
+
+Not merely "did not crash" -- the nine-panel console, drawn, with the saved
+state in it.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 

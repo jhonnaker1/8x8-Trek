@@ -33,12 +33,26 @@ def setup_new_game(s):
     s.keys("T,R,E,K,RETURN")
 
 
-def to_restore_prompt(s):
-    """Title, no briefing, YES to restore, then accept the default name."""
-    s.keys("RETURN")
-    s.keys("N,RETURN")
-    s.keys("Y,RETURN", 300)
-    s.keys("RETURN", 900)
+def to_restore_prompt(s, tag):
+    """Title, no briefing, YES to restore, then accept the default name.
+
+    SHOT AT EVERY STEP, WITH SHORT SETTLES. The first version pressed the
+    last RETURN and waited 900 frames, and the simulator stopped advancing
+    inside that wait -- which is indistinguishable from a slow disk read from
+    outside. "The rig is ignoring me" has meant five different things on this
+    project and the game has said which IN WORDS every time, so the screen is
+    read before anything is concluded from a stalled frame gate.
+    """
+    s.keys("RETURN");            s.shot("%s-a-title.png" % tag)
+    s.keys("N,RETURN");          s.shot("%s-b-nobrief.png" % tag)
+    s.keys("Y,RETURN", 300);     s.shot("%s-c-restore-prompt.png" % tag)
+    s.a.key("RETURN")
+    # SMALL STEPS from here: the wedge lives in this wait, so walk into it.
+    for i, n in enumerate((30, 120, 300, 600), 1):
+        s.a.frame(n)
+        s.shot("%s-d%d-after-%d.png" % (tag, i, n))
+        print("       %s +%-4d frames  PC %s" % (tag, n, s.a.regs()["PC"]),
+              flush=True)
 
 
 def main():
@@ -61,16 +75,16 @@ def main():
         # If this fails, SAVE itself is broken and arm B says nothing.
         s.a.cold_reset()
         s.boot(slot="rebooted")
-        to_restore_prompt(s)
-        a_shot = s.shot("2-armA-no-rewind.png")
+        to_restore_prompt(s, "2-armA")
+        a_shot = s.shot("2-armA-final.png")
         print("probe: ARM A (no rewind)  PC %s  -> %s"
               % (s.a.regs()["PC"], a_shot.name), flush=True)
 
         # ARM B: rewind to the pre-save snapshot, then try the same restore.
         # Same keys, same game, the only difference is the state_load.
         s.rewind("booted")
-        to_restore_prompt(s)
-        b_shot = s.shot("3-armB-after-rewind.png")
+        to_restore_prompt(s, "3-armB")
+        b_shot = s.shot("3-armB-final.png")
         print("probe: ARM B (rewound)    PC %s  -> %s"
               % (s.a.regs()["PC"], b_shot.name), flush=True)
 

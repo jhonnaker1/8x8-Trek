@@ -75,7 +75,7 @@ all: $(OUT)
 music src/music_data.c src/music_data.h:
 	cd .. && python3 tools/make_music.py && cp c128/src/music_data.c c128/src/music_data.h mega65/src/
 
-$(OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld
+$(OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld Makefile
 	@mkdir -p build
 	$(M65CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=build/egatrek.map \
 	    -o build/egatrek.elf $(SRC) $(LIBC_A)

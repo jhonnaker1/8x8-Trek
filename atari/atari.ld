@@ -31,6 +31,9 @@ ASSERT(__rc31 == 0x9f, "Inconsistent zero page map.")
    staging region per overlay, and images cut from the same link. */
 __ovl_size = 0x1200;
 
+/* The soft stack's reserve, just below the window -- see the MEMORY block. */
+__stack_reserve = 0x100;
+
 MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
 
@@ -42,8 +45,32 @@ MEMORY {
        must be write-before-read. See core/lowmem.h. */
     lowram (rw) : ORIGIN = 0x0480, LENGTH = 0x0280
 
-    /* $4000 up to the window. */
-    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - __ovl_size
+    /* THE SOFT STACK GETS ITS OWN 256 BYTES, AND THIS IS THE C128'S BUG
+       ARRIVING ON A SECOND MACHINE.
+
+       llvm-mos's _start sets the soft stack to MEMTOP+1 ($02E5) and grows it
+       DOWN. On this port MEMTOP is $BC1F -- so the stack started at $BC20,
+       INSIDE the overlay window, and every local written there landed on live
+       overlay code. MEASURED 2026-09-10: ui_setup()'s `char fname[18]` sat at
+       $BBE8, read_field() wrote the save filename onto it through ($E5),Y, the
+       running ovl_front image was corrupted under its own feet, execution
+       reached the string and hit $52 -- kil. That JAM stopped the CPU, which
+       is why a restore "never came back" and why the bridge's frame gate
+       never released.
+
+       c128/trek128.ld has carried the warning since v0.9.0: "the stock script
+       lets a build succeed and then corrupt itself, with the linker none the
+       wiser". It even names the X16 as carrying the same hazard. Nobody
+       checked the Atari, which had NO guard at all.
+
+       DEPTH IS MEASURED, NOT GUESSED -- the C128's first guess of 64 was
+       overrun by 79. Sampling $80/$81 across title, setup, console, SAVE,
+       chart and a warp put the deepest at 28 bytes below the top. 256 is an
+       order of magnitude over that, and it costs 256 of the 693 bytes that
+       were free below the window. See tools/probe_stack.py; re-run it rather
+       than reasoning if a deeper path is ever found. */
+    /* $3000 up to the stack reserve, which sits just below the window. */
+    ram (rw) : ORIGIN = 0x3000, LENGTH = 0x9000 - __ovl_size - __stack_reserve
 
     /* The window sits at the TOP of the region, below the OS ROM at $C000. */
     window (rwx) : ORIGIN = 0x3000 + 0x9000 - __ovl_size, LENGTH = __ovl_size
@@ -96,6 +123,17 @@ __ovl_start = ORIGIN(window);
 
 OUTPUT_FORMAT {
     SHORT(0xffff)    /* XEX magic number. */
+
+    /* LOWER MEMTOP BEFORE _start EVER READS IT. An XEX segment is just
+       "start, end, bytes", so two bytes loaded at $02E5 set the OS's
+       top-of-free-RAM at LOAD time -- no code, no INITAD, and it happens
+       before the run vector is taken. _start then computes MEMTOP+1 and the
+       soft stack begins at the window base, growing DOWN into the reserve
+       above instead of into the overlay window. */
+    SHORT(0x02e5)                 /* first byte: MEMTOP low  */
+    SHORT(0x02e6)                 /* last byte:  MEMTOP high */
+    SHORT(ORIGIN(window) - 1)     /* = $ADFF, so SP starts at the window base */
+
     SHORT(0x02e0)    /* First byte of Run vector. */
     SHORT(0x02e1)    /* Last byte of Run vector. */
     SHORT(_start)    /* Segment to be loaded to Run vector. */

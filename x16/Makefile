@@ -127,7 +127,7 @@ GAME_OUT = build/trekx16.prg
 
 game: $(GAME_OUT)
 
-$(GAME_OUT): $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
+$(GAME_OUT): $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld Makefile
 	@mkdir -p build
 	$(X16CC) $(OVLFLAGS) $(LDFLAGS) -o build/trekx16.elf $(GAME_SRC)
 	$(OBJCOPY) -O binary "--remove-section=.ovl_*" build/trekx16.elf build/trekx16.res

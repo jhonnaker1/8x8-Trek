@@ -59,7 +59,7 @@ early:
 music src/music_data.c src/music_data.h:
 	cd .. && python3 tools/make_music.py && cp c128/src/music_data.c c128/src/music_data.h atari/src/
 
-build/early.elf: $(EARLY_SRC) src/music_data.h atari.ld
+build/early.elf: $(EARLY_SRC) src/music_data.h atari.ld Makefile
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(EARLY_DEFS) $(LDFLAGS) -Wl,-Map=build/early.map -o $@ $(EARLY_SRC)
 
@@ -207,7 +207,8 @@ verify: $(GAME_OUT) nolto
 #
 game: $(GAME_OUT)
 
-$(GAME_OUT): $(GAME_SRC) src/vbxevid.h src/atarimem.h src/music_data.h atari.ld
+$(GAME_OUT): $(GAME_SRC) src/vbxevid.h src/atarimem.h src/music_data.h \
+               src/music_data.c atari.ld Makefile
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) $(LDFLAGS) \
 	    -Wl,-Map=build/trekatari.map -o $(GAME_OUT) $(GAME_SRC)
@@ -221,9 +222,15 @@ NM      = $(LLVM_MOS)/bin/llvm-nm
 # THE DATA FILES. Same set as every other port assembles.
 DATA = build/data
 
-data: $(GAME_OUT)
+# src/music_data.c IS A PREREQUISITE, NOT SOMETHING THIS RECIPE MAKES.
+# It used to run make_music.py HERE -- after $(GAME_OUT) had already linked
+# against the previous copy -- which left the generated source newer than the
+# binary built from it, so the next build relinked and the link was
+# permanently one step behind its own input. The `music` rule owns generating
+# it; this rule just needs it to exist.
+data: $(GAME_OUT) src/music_data.c
 	@mkdir -p $(DATA)
-	@cd .. && python3 tools/gen_strings.py >/dev/null && python3 tools/make_music.py >/dev/null
+	@cd .. && python3 tools/gen_strings.py >/dev/null
 	@# THE POOL IS SHARED; THE THREE STRINGS THAT NAME THE MACHINE ARE NOT.
 	@# Same ids, same count, same strdata.h -- see src/strings.override.txt.
 	@cd .. && python3 tools/gen_strings.py --override atari/src/strings.override.txt \

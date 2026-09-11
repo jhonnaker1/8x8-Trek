@@ -131,9 +131,29 @@ def check_headroom(window):
         die("no __heap_start or __bss_end in build/early.map -- cannot bound "
             "resident")
     top = TOP - window
-    free = top - end
-    print("verify: resident $%04X..$%04X, %d bytes free below the window at $%04X"
-          % (BASE, end, free, top))
+    # THE SOFT STACK'S RESERVE COMES OFF THE FREE SPACE, and reporting the
+    # figure without it is how this check would start lying. The stack lives in
+    # $AD00..$AE00 now -- see atari.ld -- because llvm-mos points it at
+    # MEMTOP+1, which landed INSIDE the overlay window and corrupted the
+    # running image. Read from the map so the two cannot drift apart.
+    # THE VALUE AFTER THE `=`, NOT THE VMA COLUMN. An absolute assignment in
+    # the map reads `0 0 0 1 __stack_reserve = 0x100`, so sym() above -- which
+    # returns the first column -- gives 0 for it. That silently disabled this
+    # check on its first run.
+    m = re.search(r"^\s+[0-9a-f]+\s+[0-9a-f]+\s+\d+\s+\d+\s+"
+                  r"__stack_reserve\s*=\s*(0x[0-9a-fA-F]+|\d+)\s*$",
+                  txt, re.M)
+    reserve = int(m.group(1), 0) if m else 0
+    stack_top = top - reserve
+    free = stack_top - end
+    print("verify: resident $%04X..$%04X, %d bytes free below the stack "
+          "reserve at $%04X" % (BASE, end, free, stack_top))
+    if reserve:
+        print("verify: soft stack $%04X..$%04X, %d bytes reserved (MEMTOP is "
+              "set to $%04X at load)" % (stack_top, top, reserve, top - 1))
+    else:
+        die("no __stack_reserve in the map -- the soft stack starts at "
+            "MEMTOP+1 and would grow into the overlay window")
     if free < 0:
         die("resident has overrun the window by %d bytes" % -free)
     if free < 256:

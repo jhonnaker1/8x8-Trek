@@ -101,7 +101,7 @@ all: game data test
 
 game: $(GAME_OUT)
 
-$(GAME_OUT): $(GAME_SRC)
+$(GAME_OUT): $(GAME_SRC) Makefile
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ $(GAME_SRC)
 	@ls -l $@
