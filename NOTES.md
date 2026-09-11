@@ -510,9 +510,12 @@ WORK.** `gh release edit --notes-file` updates the body; the tag annotation
 keeps the original, which is the honest split -- the tag is what was said at
 the time, the release page is what is true now. Do not re-tag to tidy history.
 
-## THE X16'S SOFT STACK OVERFLOWS ON SAVE -- MEASURED 2026-09-11
+## THE X16'S SOFT STACK OVERFLOWED ON SAVE -- MEASURED AND FIXED 2026-09-11
 
-**Item 25, and it is a live defect in a released port.**
+**Item 25, CLOSED. Fixed in v0.13.2: the window gave up 80 bytes and the gap
+is 184 against a measured 86. `verify_prg.py` carries the demand and a floor
+of 144 and fails below either -- the old floor was 64, which the overflowing
+build passed.**
 
     demand on SAVE    86 bytes   MEASURED, twice, same figure
     available         80 bytes   low RAM ends $8F30, __stack $8F80
@@ -585,7 +588,7 @@ stopped being true the day Atari DOS was dropped:
     atari  1,932 free  + 1,577 low data + 14 lowram
     mega65 4,997 free
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (1 open of 25 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 25 raised -- EMPTY)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -593,11 +596,13 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**ONE OPEN: 25 -- the X16's soft stack is 80 bytes and its demand has never
-been measured.** Raised 2026-09-11 by sweeping for load-bearing claims, hours
-after the list first reached empty. Twenty-four had been raised and all
-twenty-four closed or decided; this is the twenty-fifth, and it is the only one
-that was found by looking rather than by playing.
+**THE LIST IS EMPTY AGAIN.** Twenty-five raised, twenty-five closed or decided.
+
+Item 25 was raised and closed the same day: the X16's soft stack overflowed on
+SAVE, measured at 86 bytes against 80, fixed in v0.13.2. **It is the only item
+of the twenty-five found by LOOKING rather than by playing** -- a sweep for
+load-bearing claims, hours after the list first reached empty -- and it was a
+live defect in a port that had been played, driven and released twice.
 
 **All five ports have now been played by a person**, each reported in the same
 four words: the Atari, the C128, the MEGA65, the X16 and the Amiga all "look,
@@ -852,8 +857,12 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
     It also closed the Amiga's share of item 23 properly. That item had been
     closed on the strength of a DRIVEN screenshot here, which the entry said
     plainly was the weaker evidence; a person has now looked at it.
-25. **THE X16'S SOFT STACK IS 80 BYTES AND ITS DEMAND HAS NEVER BEEN
-    MEASURED.** The C128 measured 143 on the deepest path -- evaluation, hall
+25. ~~**The X16's soft stack is 80 bytes and its demand has never been
+    measured.**~~ **MEASURED AND FIXED 2026-09-11, released in v0.13.2.** SAVE
+    reaches 86 bytes; the port had 80 and has 184 now, bought from the overlay
+    window's spare. It was writing six bytes into `.noinit` under every save in
+    every release since v0.10.0, with no crash and no wrong picture to show for
+    it. Full write-up above. Original wording: The C128 measured 143 on the deepest path -- evaluation, hall
     of fame -- and the two ports share the code that walks it. Not proof of a
     fault: the path has been driven and played here with nothing visibly
     wrong, and codegen differs per target. But an overrun here goes DOWN into
