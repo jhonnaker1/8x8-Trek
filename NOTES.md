@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (12 open of 18 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,20 +475,19 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-### Sound -- both found by the 2026-09-09 sweep, both one line, neither fixed
+### Sound -- found 2026-09-09, both fixed and RELEASED in v0.12.1 on 2026-09-10
 
 1. ~~**The MEGA65's `snd_beep` never gates the voice off.**~~ **CONFIRMED on
    the machine and FIXED, both 2026-09-10.** `beep_left` counts down in
    `tick()` and calls `voice_off`; measured at 275ms against 274.6 predicted,
-   over eight beeps. It shipped in v0.12.0 and **the fix is not in any
-   release**, so a re-release is the only thing left on it. Write-up under "The
-   refusal beep diverges" below.
+   over eight beeps. **Released in v0.12.1.** Write-up under "The refusal beep
+   diverges" below.
 2. ~~**The X16's sound: an octave flat, a wrong beep and a 1% pulse.**~~
    **ALL THREE FIXED 2026-09-10** and measured: references at x1.000/x0.999/
    x1.009, beep 439.9Hz for 253.0ms at 49.7% duty against a spec of 440Hz and
-   250.6ms. **v0.10.0, v0.11.0 and v0.12.0 all ship all three**, so as with the
-   MEGA65's beep the fixes are in no release. That is now the only thing left
-   on X16 sound. See "The X16 plays EVERY NOTE AN OCTAVE FLAT" below.
+   250.6ms. v0.10.0 through v0.12.0 shipped all three for four months;
+   **released fixed in v0.12.1.** See "The X16 plays EVERY NOTE AN OCTAVE FLAT"
+   below.
 
 ### The Atari, the only unreleased port
 
@@ -508,6 +507,16 @@ that is released.**
    and cannot be split. 693 bytes resident today.
 
 ### Verification gaps on released ports
+
+18. **NOBODY HAS HEARD v0.12.1.** Every sound figure in items 1 and 2 came out
+    of an emulator's audio recording or a driver probe -- never a speaker with
+    a person in front of it. **The X16's music moved an octave AND changed
+    timbre**, from a 1% pulse to a 50% square: a larger audible change than any
+    measurement here covers, shipped on the strength of arithmetic. This item
+    was not on the list until 2026-09-10, when "what is left?" was asked and
+    the list was RE-DERIVED rather than recited -- **the largest live item was
+    missing, and the list did not know the release had happened.** Fourth time
+    re-deriving has beaten reciting.
 
 9. **The MEGA65's hall-of-fame WRITE has never been witnessed.** No driven game
    scores high enough to write a row, so there is no file to check. It goes
