@@ -168,6 +168,17 @@ test:
 # the shipped binary, because LTO inlines the offending resident function into
 # main and the bad call then looks like the thirteen good ones. See
 # tools/overlay_check.py; a crash on the X16 is what bought this.
+# HDR IS DEFINED HERE, ABOVE `nolto`, for the reason the top of this file
+# gives about RES and MAP: make expands prerequisites as it parses the line, so
+# with HDR defined further down `nolto: $(SRC) $(HDR)` was really
+# `nolto: $(SRC)`. The objects `make verify` reads to check overlay rule 4 were
+# not rebuilt when a HEADER changed. Found by tools/check_makefiles.py.
+HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
+      src/sid.h src/sidfreq.h src/music_data.h \
+      ../core/ega.h ../core/trek.h ../core/hof.h ../core/storage.h \
+      ../core/farmem.h ../core/strpool.h src/strdata.h \
+      ../core/serial.h
+
 NOLTO = build/nolto
 
 nolto: $(SRC) $(HDR)
@@ -193,12 +204,6 @@ verify: $(OUT) $(RES) $(MAP) nolto
 	    print('verify: lowram (writable data) %d of 2304 used, %d free' % (e - 0x1300, free)); \
 	    sys.exit('lowram is FULL -- writable data has overrun 0x1C00') if free < 0 else None"
 	python3 tools/verify_prg.py
-
-HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
-      src/sid.h src/sidfreq.h src/music_data.h \
-      ../core/ega.h ../core/trek.h ../core/hof.h ../core/storage.h \
-      ../core/farmem.h ../core/strpool.h src/strdata.h \
-      ../core/serial.h
 
 # -m emits a map file. That is not housekeeping: tools/vice_mon.py can write
 # guest memory, but only if it knows where a variable lives, and the map is

@@ -159,6 +159,28 @@ run-storetest: storetest
 # that only works with one particular overlay loaded is indistinguishable from
 # the correct ones -- which is exactly how the hall-of-fame crash got out on
 # three ports at once. See tools/overlay_check.py, rule 4.
+# THESE THREE ARE DEFINED HERE, ABOVE THE RULES THAT NAME THEM, AND THAT IS
+# NOT A STYLE CHOICE. They used to live with the game rule two hundred lines
+# below -- and make expands a rule's prerequisites AS IT PARSES THE LINE, so
+# `verify: $(GAME_OUT)` expanded to `verify:` and `nolto: $(GAME_SRC)` to
+# `nolto:`. Neither depended on anything. It showed up on 2026-09-10 as a
+# `make verify` that failed on a clean tree because nothing had built the game,
+# and the quieter half is worse: nolto's objects are what `make verify` reads
+# to check overlay rule 4, and they were never rebuilt when a source changed.
+# Same bug as c128/Makefile's, found by tools/check_makefiles.py.
+# ORDER MATTERS AND IS NOT ALPHABETICAL -- the loader indexes OVERLAYS.BIN by
+# the OVL_* id, so this list must read in the same order as core/overlay.h.
+# `enemy` and `move` are last because they are the two opt-in windows.
+OVERLAYS = eval hof front info repair msgs planet cmds title events xtra \
+           enemy move
+
+GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
+           ../c128/src/strpool.c \
+           ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
+           src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c \
+           src/atarisnd.c src/ataristorage.c src/music_data.c
+GAME_OUT = build/trekatari.xex
+
 NOLTO = build/nolto
 
 nolto: $(GAME_SRC) src/music_data.h
@@ -176,19 +198,6 @@ verify: $(GAME_OUT) nolto
 # is not tidiness: an overlay is linked WITH the resident half, so the two are
 # only valid together. See src/atariovl.c on the build stamp that enforces it.
 #
-# ORDER MATTERS AND IS NOT ALPHABETICAL -- the loader indexes OVERLAYS.BIN by
-# the OVL_* id, so this list must read in the same order as core/overlay.h.
-# `enemy` and `move` are last because they are the two opt-in windows.
-OVERLAYS = eval hof front info repair msgs planet cmds title events xtra \
-           enemy move
-
-GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
-           ../c128/src/strpool.c \
-           ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c \
-           src/atarisnd.c src/ataristorage.c src/music_data.c
-GAME_OUT = build/trekatari.xex
-
 game: $(GAME_OUT)
 
 $(GAME_OUT): $(GAME_SRC) src/vbxevid.h src/atarimem.h src/music_data.h atari.ld

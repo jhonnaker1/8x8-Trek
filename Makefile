@@ -17,7 +17,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check ports clean
+.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check ports check-makefiles clean
 
 c89-check:
 	@echo "port-check: the core must stay C89 (cc65 needs it)"
@@ -34,7 +34,7 @@ c89-check:
 # toolchains gets five skips and a green build; this machine gets five real
 # verifies for about ten seconds. Only a port that COULD have been built and
 # was not turns `make` red.
-all: test port-check check-tables tiers ports
+all: test port-check check-tables tiers check-makefiles ports
 
 test: build/test_trek build/test_serial build/test_hof
 	./build/test_trek
@@ -78,6 +78,14 @@ tiers:
 #   make ports P=atari    one
 ports:
 	@python3 tools/check_ports.py $(P)
+
+# A VARIABLE USED IN A RULE'S PREREQUISITES MUST BE DEFINED ABOVE THAT RULE.
+# Make expands prerequisites as it parses the line, so one defined below
+# expands to nothing and the rule silently depends on less than it says. Three
+# instances in two days, two of them leaving `make verify` reading STALE
+# objects. Costs milliseconds; see tools/check_makefiles.py.
+check-makefiles:
+	@python3 tools/check_makefiles.py
 
 # The port's fixed tables against the ORIGINAL BINARY. Added 2026-08-26 after
 # core/planet.c shipped SEVEN planet names against the binary's EIGHT -- the

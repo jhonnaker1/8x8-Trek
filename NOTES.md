@@ -7396,6 +7396,46 @@ Three cases, all measured rather than argued:
 The middle one is the one that matters: `make all` on a clone with nothing
 installed is still green.
 
+
+## A variable defined below its use: three times in two days (2026-09-10)
+
+Found while cutting v0.12.1, by a clean rebuild turning `make all` red.
+
+**Make expands a rule's prerequisites AS IT PARSES THE LINE.** A variable
+defined further down the file expands to NOTHING, and the rule still runs,
+still prints, and still passes -- it just depends on less than it says.
+
+    verify: $(GAME_OUT) nolto       with GAME_OUT defined 20 lines below
+    is really
+    verify: nolto
+
+Three instances, and the order they were found in is the point:
+
+  * `c128/Makefile`, 2026-09-09. `verify: $(RES) $(MAP)` depended on neither,
+    so the checks reading them did not run. Found by accident, while fixing
+    something else.
+  * `atari/Makefile`, 2026-09-10. `verify: $(GAME_OUT)` depended on nothing --
+    which surfaced only because a release cut deleted every `build/` and the
+    verify then had no game to read. **It had been wrong since the port was
+    written and passed every time**, because the game always happened to exist.
+  * `atari` and `c128`, same minute. `nolto: $(GAME_SRC)` and
+    `nolto: $(SRC) $(HDR)`. **THIS IS THE QUIET ONE.** Those objects are what
+    `make verify` reads to check overlay rule 4 -- the rule whose violation
+    dropped three ports into their monitors -- and they were not rebuilt when
+    a source or a header changed. **A stale object passing a check is worse
+    than a missing one.**
+
+The first two were accidents. The third was found by `tools/check_makefiles.py`
+in the minute it was written, which is the argument for writing it:
+`make check-makefiles` now runs from `all` and fails the build on any rule
+whose prerequisites reference a variable defined later in the same file.
+Proved by putting the Atari's `GAME_OUT` back where it was and watching it
+fire.
+
+**This is the same failure as the doc sweeps, in a different file type.** A
+thing is correct where it is written and read somewhere it is not; nothing
+errors; only a check that knows the shape can see it.
+
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
 The repo sweep on 2026-09-09 put all five `snd_beep()` bodies side by side,
