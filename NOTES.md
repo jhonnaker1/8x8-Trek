@@ -3003,14 +3003,38 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
 
   **TT030 and Falcon030 do qualify on paper** -- TT Medium is 640x480 in 16
   colours and the Falcon's VIDEL reaches 640x480 in 256 -- and Hatari emulates
-  both (`--machine tt|falcon`, `--tos-res ttmed`). Never verified here: the only
-  EmuTOS image on this machine is the ARAnyM build, which bus-errors on TT
-  hardware.
+  both (`--machine tt|falcon`, `--tos-res ttmed`).
 
-  It does not matter, because **the machines that could show the console are the
-  ones nobody has, and the ones people own cannot show it.** Targeting TT and
-  Falcon alone would be a port with almost no installed base. Do not re-open
-  this.
+  **THE "NEVER VERIFIED HERE" WAS TRUE OF THE VIDEO AND WRONG ABOUT THE
+  REASON (2026-09-11).** This said "the only EmuTOS image on this machine is
+  the ARAnyM build, which bus-errors on TT hardware", and that blocked the
+  check. It is not the only one: `~/hatari/rom/etos512us.img` is **EmuTOS
+  1.3.0**, and it boots a TT -- Hatari's own status bar reads
+  `32MHz/030(CED)/68882 14MB TT, EmuTOS 1.3.0, VDI`. There are bus-error
+  WARNINGS during hardware probing and the machine runs straight through them.
+  A Falcon boots too, on `MacAranym/Aranym_files/system/TOS404.img`. So the
+  instrument was there all along and a negative about our own environment kept
+  it shut -- the usual shape, in the usual place.
+
+  **MAME IS NOT THE ALTERNATIVE.** Asked about it on 2026-09-11: MAME has
+  `tt030` and `falcon30` drivers, both `status="preliminary"`, and Ample's
+  romset collection has neither. **Hatari is the instrument for this line**,
+  and it has `--control-socket` and `--cmd-fifo`, so it scripts the way
+  Amiberry does.
+
+  **AND EmuTOS IS FREE SOFTWARE**, which is the lever that mattered on the
+  8-bit Atari: a bootable TT or Falcon image built on EmuTOS would be ours to
+  redistribute, where one built on Atari's TOS would not. See "The two Atari
+  DOS questions are one lever".
+
+  **What is still NOT established is the video** -- the modes are documented,
+  not measured here, exactly as with MSX2's SCREEN 7 below.
+
+  **NONE OF THAT CHANGES THE VERDICT, because the verdict was never about
+  capability**: the machines that could show the console are the ones nobody
+  has, and the ones people own cannot show it. Targeting TT and Falcon alone
+  would be a port with almost no installed base. **Do not re-open this** --
+  Jamie's call, and an instrument being available is not a reason to.
 - **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
   buys only a second colour pair -- four colours, same trap as the ST.
 
