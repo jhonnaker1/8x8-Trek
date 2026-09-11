@@ -320,8 +320,8 @@ resident space left for it.
 
 **Nothing on THE OPEN LIST touches this port any more.** The two items still
 open there want a person at a keyboard on other machines: nobody has played
-the Amiga, and the C128 wants play. The list is in `NOTES.md`, re-derived
-2026-09-11.
+the Amiga (10), and colour per message has never been seen on a screen here
+or on the X16 or Amiga (23). The list is in `NOTES.md`, re-derived 2026-09-11.
 
 ## Saving works, and the SD card is gone
 

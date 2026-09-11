@@ -101,7 +101,7 @@ parties, plasma bolts, Vandal cloaking, long-range tractor beams, scanner
 jamming, black holes, supernovas and defective energium crystals are all in the
 binary and absent from the docs.
 
-## Where the C128 port stands (2026-09-02)
+## Where the C128 port stands (2026-09-02, played and closed 2026-09-11)
 
 *The port's own documentation is [`c128/README.md`](c128/README.md) — the
 memory map, bank 1, the overlay rules, the disk, and the three traps it found
@@ -145,15 +145,20 @@ included, by Jamie's call.
 The **CP437 charset** and **boss mode** were ruled out for this platform
 outright. The reasoning for all three is in `NOTES.md`.
 
-What it needs is **play**, and the little it has had has been the most
-productive thing in the project. Four sessions at the keyboard have found four
-bugs no build check could see: FIX was missing half its command, nine letters
-of the alphabet could not be typed (the self-destruct password JAMIE has a J
-and an I in it), a yes/no question was drawn in the wrong panel, and the last
-page of the briefing never waited for a key. Each one lived exactly where an
-automated check does not go, and each fix shipped the check that closes its
-class. Whether the game they add up to is survivable, readable and fair is
-still an open question, and only playing it will answer that one too.
+**It has been played, and it is done.** Jamie, 2026-09-11: *"looks, sounds, and
+plays great."* That closed the oldest item on the open list.
+
+Play was the most productive thing in the project while it was open. Four
+sessions at the keyboard found four bugs no build check could see: `FIX` was
+missing half its command; nine letters of the alphabet could not be typed, and
+the self-destruct password `JAMIE` has a J and an I in it; a yes/no question
+was drawn in the wrong panel; and the last page of the briefing never waited
+for a key. Each lived exactly where an automated check does not go, and each
+fix shipped the check that closes its class.
+
+**The fifth session found nothing**, which had not happened before — and
+whether the game adds up to something survivable, readable and fair was the
+part no build check could ever have answered.
 
 ## Targets
 

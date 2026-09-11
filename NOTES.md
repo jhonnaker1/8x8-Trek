@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 24 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (2 open of 24 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,9 +475,14 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**THREE still open, and ALL THREE want a person: 10** (no human has played the
-Amiga), **11** (the C128 wants play) and **23** (colour per message has never
-been seen on a screen on four of the five ports).
+**TWO still open, and BOTH want a person: 10** (no human has played the Amiga)
+and **23** (colour per message has never been seen on a screen on the MEGA65,
+the X16 or the Amiga).
+
+**Item 11 closed on 2026-09-11** -- Jamie played the C128 and it "looks, sounds,
+and plays great". It was the OLDEST item on this list, open since the port was
+released as v0.9.0, and it paid four times over before it closed. **The run that
+closed it found nothing, which has never happened before on this project.**
 
 **23 and 24 were both raised by this re-derivation, minutes after the release
 that shipped them, and 24 closed within the hour** -- Jamie listened and the
@@ -697,14 +702,27 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
 10. **No human has played the Amiga.** End to end, yes -- by
     `tools/amiga_type.py`. Every fault worth having on this project was found
     by a person at a keyboard, so this is a real gap.
-11. **The C128 wants play.** The oldest item here and the only one that has
-    paid four times over: whether the game it adds up to is survivable,
-    readable and fair is not a question any build check reaches.
+11. ~~**The C128 wants play.**~~ **PLAYED AND CLOSED 2026-09-11, Jamie:
+    "looks, sounds, and plays great."** The oldest item on this list -- raised
+    when the port was released as v0.9.0 -- and the one that paid four times
+    over before it closed: `FIX` missing half its command, nine letters that
+    could not be typed (and the self-destruct password `JAMIE` has a J and an
+    I in it), a yes/no question drawn in the wrong panel, and the last
+    briefing page never waiting for a key. Each lived exactly where an
+    automated check does not go, and each fix shipped the check that closes
+    its class.
+
+    **This run found nothing**, which is the first time that has been true of
+    a play session on this project -- and "looks" is what closed the C128's
+    half of item 23 as well.
 
 ### Raised 2026-09-11, by re-deriving after the release rather than reciting
 
-23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on four of the five
-    ports.** It shipped in v0.13.0 to the C128, MEGA65, X16 and Amiga, and the
+23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on three of the five
+    ports** -- the MEGA65, the X16 and the Amiga. **SEEN on the Atari and the
+    C128, both by Jamie on 2026-09-11** ("looks... great" on the C128, which is
+    the word that settles it). It shipped in v0.13.0 to four released ports and
+    the
     only verification it has ever had is `c128/test/test_panels.c` -- host-side
     unit tests, made to fail first, asserting a colour table. No screenshot, no
     emulator, no machine. The drawing path is shared, but the EGA-to-machine

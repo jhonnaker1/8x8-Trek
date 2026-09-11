@@ -177,13 +177,16 @@ the check that closes its class.
 
 ## What is open
 
-**Play.** Whether the game this adds up to is survivable, readable and fair is
-not a question any build check reaches, and it is item 11 on THE OPEN LIST in
-[`NOTES.md`](../NOTES.md) — one of only two still open, both wanting a person
-at a keyboard.
+**Nothing.** Item 11 — "the C128 wants play" — was the oldest entry on THE OPEN
+LIST in [`NOTES.md`](../NOTES.md), open since this port was released as v0.9.0,
+and it closed on 2026-09-11: *"looks, sounds, and plays great."*
 
-Colour per message is built (2026-09-10) and ships here. The MAIN VIEWER's other
-nine instrument pages are deferred on every port.
+That run also settled this port's half of item 23, which asks whether **colour
+per message** has ever been seen on a screen rather than only asserted by a unit
+test. It has, here. It has not on the MEGA65, the X16 or the Amiga.
+
+The MAIN VIEWER's other nine instrument pages are deferred on every port, by
+Jamie's call, and that is scope rather than a defect.
 
 ## Verifying the glyphs against the machine, not against a guess
 
