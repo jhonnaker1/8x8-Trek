@@ -86,8 +86,8 @@ def main():
         # it is the EVALUATION -- the endgame is three screens and this is the
         # second. The write happens on the third, which the later keys reach.
         s.keys("RETURN", 500); s.shot("5-evaluation-total.png")
-        print("hof: write status $%02X, close $%02X"
-              % (s.byte("plat_dbg_status"), s.byte("plat_dbg_close")), flush=True)
+        print("hof: SIO status $%02X"
+              % (s.byte("sio_dbg_status"),), flush=True)
 
         # THE ONLY HONEST READ-BACK IS IN THIS SESSION. Altirra's disk writes
         # are VIRTUAL by default -- the emulated drive takes them and the host

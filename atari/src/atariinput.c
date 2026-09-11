@@ -29,6 +29,7 @@
 #include <stdint.h>
 
 #include "input.h"
+#include "../../c128/src/sid.h"       /* snd_poll -- see kb_waitkey below */
 
 #define CH     (*(volatile unsigned char *)0x02FC)   /* OS key code, $FF = none */
 #define KEYDEF (*(const unsigned char *const *)0x0079)
@@ -77,20 +78,42 @@ static char to_ascii(unsigned char at) {
  * turning one press into a burst. That is what the POKEY documentation says
  * and it is not what a probe here proved: `KEY` on the bridge queues a
  * press-and-release and cannot hold a key down, so the rig cannot reach this
- * case. First real play is what will settle it. */
+ * case. First real play is what will settle it.
+ *
+ * AND IT IS WHERE THE SOUND DRIVER IS DRIVEN FROM, which is the whole reason
+ * this port was SILENT until Jamie played it on 2026-09-11. snd_init() ran,
+ * the game called snd_music(), snd_effect() and snd_beep() from a hundred
+ * sites, POKEY was configured correctly -- and nothing ever called
+ * snd_poll(), so no note was ever started and no effect ever advanced. The
+ * driver holds state and a frame counter; polling is what turns that into
+ * sound.
+ *
+ * c128/src/input.c has both of these calls and has had since the driver
+ * landed. This file is the Atari's own input seam and was written without
+ * them: the one function the two ports do not share is the one that drives
+ * the one thing they do.
+ *
+ * `make run-sndtest` could not see it. It links src/sndtest.c against the
+ * driver and calls snd_poll() ITSELF -- twelve checks, both video standards,
+ * worst pitch error 0.05%, all of them true and none of them about the game.
+ * A seam measured in isolation says nothing about whether anything calls it.
+ *
+ * BOTH LOOPS, not just the first. A held key sits in the release wait, and
+ * that is exactly where a refusal beep has to be able to finish. */
 char kb_waitkey(void) {
     unsigned char code;
     char c;
 
     for (;;) {
         kb_entropy++;
+        snd_poll();
         code = CH;
         if (code == 0xFF) continue;
         CH = 0xFF;
         if (code >= 192) continue;          /* shift+ctrl: not in the table */
         c = to_ascii(KEYDEF[code]);
         if (c == KB_NONE) continue;         /* a key this game has no use for */
-        while ((SKSTAT & 0x04) == 0) {}     /* ...and released */
+        while ((SKSTAT & 0x04) == 0) { snd_poll(); }   /* ...and released */
         return c;
     }
 }

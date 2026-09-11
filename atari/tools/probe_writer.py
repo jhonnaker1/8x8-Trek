@@ -51,7 +51,7 @@ def main():
         s.keys("S,A,V,E,RETURN", 240)
         s.keys("RETURN", 600)
         print("writer: SAVE transfer $%02X close $%02X"
-              % (s.byte("plat_dbg_status"), s.byte("plat_dbg_close")), flush=True)
+              % (s.byte("sio_dbg_status"),), flush=True)
 
         s.boot(slot="rebooted")
         s.keys("RETURN"); s.keys("N,RETURN")

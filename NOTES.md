@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (5 open of 22 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (4 open of 22 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,10 +475,16 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-The five still open are **10** (no human has played the Amiga), **11** (the
-C128 wants play), **19** (the Atari link is not deterministic), **21** (no
-human has played the Atari either) and **22** (the Atari is releasable and not
-released). **Three of the five want a person, not an instrument.**
+The four still open are **10** (no human has played the Amiga), **11** (the
+C128 wants play), **19** (the Atari link is not deterministic) and **22** (the
+Atari is releasable and not released).
+
+**Item 21 closed the same day it was raised, and cost two bugs to close.**
+Jamie played the Atari on 2026-09-11 and found that the port was SILENT and
+that quitting left a screen of garbage -- neither of which any instrument here
+could see, and one of which had TWELVE passing checks over it. That is the
+second time on this project that measurement and a person disagreed and the
+person was right; item 18 is the first.
 
 Items 21 and 22 were added on 2026-09-11, by re-deriving rather than reciting.
 Neither existed the day before: dropping Atari DOS closed items 6 and 7 and in
@@ -657,15 +663,54 @@ schedules that.
 11. **The C128 wants play.** The oldest item here and the only one that has
     paid four times over: whether the game it adds up to is survivable,
     readable and fair is not a question any build check reaches.
-21. **No human has played the ATARI either.** Driven, yes, and thoroughly --
-    combat, docking, landing, the evaluation, the hall of fame, SAVE and
-    restore, all off real state read out of the core rather than off hope.
-    **But every fault worth having on this project was found by a person at a
-    keyboard**, and item 18 is the standing proof: the X16's numbers agreed
-    with each other for four months while the port played an octave flat,
-    because every measurement was of the thing that was wrong. Nobody has
-    HEARD this port's POKEY driver either -- it is verified in both video
-    standards, by arithmetic, which is exactly the position the X16 was in.
+21. ~~**No human has played the ATARI either.**~~ **PLAYED 2026-09-11, Jamie:
+    "The game plays great." IT FOUND TWO BUGS IN ONE SITTING, and both were
+    invisible to every instrument here.**
+
+    **THE PORT WAS SILENT.** `snd_init()` ran, POKEY was configured correctly,
+    and the game called `snd_music()`, `snd_effect()` and `snd_beep()` from a
+    hundred sites -- and **nothing ever called `snd_poll()`**, so no note was
+    ever started and no effect ever advanced. `c128/src/input.c` has the call
+    and has had since the driver landed; `atari/src/atariinput.c` is this
+    port's own input seam and was written without it. **The one function the
+    two ports do not share is the one that drives the one thing they do.**
+
+    `make run-sndtest` passed TWELVE checks on this -- both video standards,
+    the pitch at each end of the music's range, the tempo, the loop, worst
+    error 0.05% -- because it links `src/sndtest.c` against the driver and
+    calls `snd_poll()` ITSELF. Every one of those numbers was true and none of
+    them was about the game. **A seam measured in isolation says nothing about
+    whether anything calls it.** `make run-probe-sound` asks the other
+    question now: it boots the real disk and asks Altirra what POKEY is
+    emitting under the title screen, with nothing under test that the script
+    also drives.
+
+    **AND "PLAY AGAIN? NO" DID NOT EXIT CLEANLY.** Two faults stacked:
+    `vdc_shutdown()` handed ANTIC its playfield back BEFORE main() waited for
+    the farewell keypress -- and on this machine the console is in VBXE's
+    overlay while the ANTIC screen sits at $BC20, INSIDE the overlay window
+    this program pages code through, so it did not reveal the console, it
+    revealed four thousand bytes of the last overlay image rendered as text.
+    The comment above it was copied from the C128, where it is true. Under
+    that garbage the game was fine, waiting in `kb_waitkey` for a key nobody
+    could know to press, with "MISSION ENDED, CAPTAIN. HIT A KEY AND THE ATARI
+    RESTARTS." switched off one line earlier.
+
+    Then the key did not restart it. **`jmp $e477` -- COLDSV, the documented
+    XL cold-start vector -- did not cold-start this machine**: measured, twelve
+    thousand frames with `far_used` flat at 0 and a black screen, against a
+    cold reset asked of the emulator reaching the title in under a thousand.
+    WHY was not determined and is not claimed; the ROM is demonstrably mapped,
+    since the whole disk seam runs on SIOV at $E459. It is REPLACED, by
+    `jmp $0706` -- **this port's own boot record**, which finds EGATREK.XEX by
+    name and reloads it with nothing but SIO and code we wrote. That $0700 is
+    still intact after a full game is checked by the probe, not argued from
+    the linker script.
+
+    `make run-probe-exit` walks it: to the prompt, N, the farewell, the key,
+    the restart. tools/probe_hof.py had typed N at that prompt for a day and
+    rewound on the very next line, with a comment saying "back round" -- a
+    guess about a screen it never waited to see.
 22. **The Atari is releasable and not released.** The licence blocker went
     with Atari DOS on 2026-09-11 (items 6 and 7): `make -C atari atr` now
     builds one self-booting `.ATR` with no Atari code on it. What stands

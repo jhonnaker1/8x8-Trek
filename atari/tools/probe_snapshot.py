@@ -66,8 +66,8 @@ def main():
         s.keys("S,A,V,E,RETURN", 240)
         s.keys("RETURN", 600)
         s.shot("1-saved.png")
-        print("probe: SAVE  transfer $%02X  close $%02X  open_live %d"
-              % (s.byte("plat_dbg_status"), s.byte("plat_dbg_close"),
+        print("probe: SAVE  SIO status $%02X  open_live %d"
+              % (s.byte("sio_dbg_status"),
                  s.byte("open_live")), flush=True)
         s.snap("saved")
 

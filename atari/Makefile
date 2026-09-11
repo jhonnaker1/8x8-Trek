@@ -50,7 +50,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/atarisio.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest nodostest run-nodostest run-probe-snapshot run-probe-boottime reproducible nolto verify game data boot atr run clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest nodostest run-nodostest run-probe-sound run-probe-exit run-probe-snapshot run-probe-boottime reproducible nolto verify game data boot atr run clean
 
 all: early
 
@@ -167,6 +167,16 @@ nodostest: src/nodostest.c src/atarisio.c Makefile
 
 run-nodostest: nodostest atr
 	python3 tools/probe_nodos.py
+
+# DOES THE GAME MAKE A SOUND? A different question from run-sndtest, which
+# passed twelve checks on a port that played nothing at all because it drives
+# snd_poll() itself. See tools/probe_sound.py.
+run-probe-sound: atr
+	python3 tools/probe_sound.py
+
+# WHAT DOES "PLAY AGAIN? NO" ACTUALLY DO? See tools/probe_exit.py.
+run-probe-exit: atr
+	python3 tools/probe_exit.py
 
 # THE SNAPSHOT HARNESS PROBE. Before any save test is believed, settle whether
 # rewinding a snapshot also rewinds the emulated DISK -- Altirra's writes are

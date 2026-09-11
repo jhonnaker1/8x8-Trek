@@ -63,7 +63,7 @@ def main():
             s.keys("S,A,V,E,RETURN", 240)
             s.keys("RETURN", 600)
             print("wedge: SAVE transfer $%02X close $%02X"
-                  % (s.byte("plat_dbg_status"), s.byte("plat_dbg_close")),
+                  % (s.byte("sio_dbg_status"),),
                   flush=True)
             s.boot(slot="rebooted")
             print("wedge: rebooted, far_used %d" % s.loaded, flush=True)

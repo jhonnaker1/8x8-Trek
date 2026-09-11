@@ -731,5 +731,75 @@ once with, and the pair says which world this is.
   with the DOS. What stands in the way is the bullet above and the load-time
   judgement.
 
-All four are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
-whole project and was re-derived on 2026-09-11 — items 5, 19, 21 and 22.
+These are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
+whole project and was re-derived on 2026-09-11 — items 5, 19 and 22.
+
+## Played, and it was silent
+
+Two faults, one sitting, neither visible to any instrument in this directory.
+
+### The port made no sound at all
+
+`snd_init()` ran. POKEY was configured correctly. The game called
+`snd_music()`, `snd_effect()` and `snd_beep()` from a hundred sites. **Nothing
+ever called `snd_poll()`**, so no note was ever started and no effect ever
+advanced — the driver holds state and a frame counter, and polling is what
+turns that into sound.
+
+`c128/src/input.c` has the call, in both of its blocking loops, and has had
+since the driver landed. `src/atariinput.c` is this port's own input seam,
+written from scratch because the Atari scans its keyboard through the OS —
+**and the one function the two ports do not share is the one that drives the
+one thing they do.**
+
+**`make run-sndtest` passed twelve checks on this.** Both video standards, the
+pitch at each end of the music's range, the tempo, the loop, worst error
+0.05%. It links `src/sndtest.c` against the driver and calls `snd_poll()`
+*itself*. Every number was true and none of them was about the game. A seam
+measured in isolation says nothing about whether anything calls it.
+
+`make run-probe-sound` asks the other question: boot the real disk, wait out
+the title screen without pressing anything, and ask Altirra what POKEY is
+actually emitting. It reports the tones and fails on silence — and on a single
+tone, which is a voice gated on but never advancing, a different fault with
+the same symptom from outside.
+
+Fixing it cost 452 bytes, because until then the optimiser could see that most
+of the driver was unreachable.
+
+### "Play Again? No" left a screen of garbage
+
+Two faults stacked.
+
+`vdc_shutdown()` handed ANTIC its playfield back **before** `main()` waited for
+the farewell keypress. On the C128 that is right — the VDC picture survives
+being handed back, and the comment above it said so. On this machine the
+console lives in VBXE's overlay, and the ANTIC screen the OS set up at boot is
+at `$BC20`, **inside the overlay window** this program pages code through all
+game. So it did not reveal the console. It revealed about four thousand bytes
+of the last overlay image, rendered as text.
+
+Under that, the game was fine: waiting in `kb_waitkey` for a key nobody could
+know to press, with "MISSION ENDED, CAPTAIN. HIT A KEY AND THE ATARI RESTARTS."
+drawn and then switched off one line later.
+
+And the key did not restart it. **`jmp $e477` — COLDSV, the documented XL
+cold-start vector — does not cold-start this machine.** Measured: twelve
+thousand frames after the key with `far_used` flat at 0 and a black screen,
+against a cold reset asked of the emulator instead reaching the title screen in
+under a thousand. *Why* was not determined and is not claimed here; the OS ROM
+is demonstrably mapped, since the entire disk seam runs on SIOV at `$E459`.
+
+It is replaced rather than explained. `plat_exit()` now closes the VBXE window
+— MEMAC survives every kind of reset and maps VRAM over `$2000..$3FFF`, which
+is where the loader is about to write — resets the hardware stack, and jumps to
+**`$0706`, this port's own boot record**, which finds `EGATREK.XEX` by name and
+reloads it with nothing but SIO and code we wrote.
+
+That `$0700` is still intact after a full game is *checked*, not argued from
+the linker script: `make run-probe-exit` reads the six header bytes back at the
+Play Again prompt and compares them with `build/boot.bin`.
+
+**`tools/probe_hof.py` had been typing N at that prompt for a day**, and
+rewinding to a snapshot on the very next line. Its comment says "back round" —
+a guess about a screen the probe never waited to see.

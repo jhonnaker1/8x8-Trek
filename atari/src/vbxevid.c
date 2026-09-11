@@ -321,23 +321,73 @@ void vdc_init(void) {
     OS_SDMCTL = 0;
 }
 
-void vdc_shutdown(void) {
-    /* Give ANTIC its playfield back and close the window, so whatever runs
-       next sees a normal machine. Deliberately does NOT clear the screen:
-       the final console staying up is more useful and more honest than a
-       black screen, which reads as a crash. Same call the C128 makes. */
-    VIDEO_CONTROL = 0;
-    MEMAC_CONTROL = 0;
-    OS_SDMCTL = 0x22;
-}
+/* DELIBERATELY LEAVES THE PICTURE UP, and that is the repair rather than the
+   omission it looks like.
 
-/* RESET, because there is nothing to return to -- this program occupies
-   $3000..$BFFF, which is everything between DOS and the OS ROM. COLDSV at
-   $E477 is the XL OS's own cold-start entry; the ROM is mapped there
-   throughout, since nothing here ever banks it out. */
+   main() calls this on the way out, draws its farewell FIRST and then waits
+   for a keypress -- so whatever this leaves on screen is what the player
+   reads. It used to hand ANTIC its playfield back here and close the VBXE
+   window, carrying a comment copied from the C128: "deliberately does NOT
+   clear the screen: the final console staying up is more useful and more
+   honest than a black screen". On the C128 that is true, because the VDC
+   picture survives being handed back.
+
+   IT IS NOT TRUE ON THIS MACHINE. The console lives in VBXE's overlay, not in
+   ANTIC's playfield, and the ANTIC screen the OS set up at boot is INSIDE the
+   overlay window at $AE00..$BFFF, which this program has been paging code
+   through all game. So turning the overlay off did not reveal the console. It
+   revealed four thousand bytes of the last overlay image, rendered as text.
+
+   Jamie found it on the first play, 2026-09-11: "at the end of the game when
+   it asks if you want to play again and you say no, it does not exit
+   cleanly." The game was not crashed and never had been -- it was sitting in
+   kb_waitkey behind a screen of garbage, waiting for a key nobody could know
+   to press, with the farewell it had just drawn switched off one line
+   earlier. See tools/probe_exit.py.
+
+   The handback moved to plat_exit(), which is the only thing that runs after
+   the key and which repaints the world anyway. */
+void vdc_shutdown(void) { }
+
+/* RESTART BY RE-ENTERING OUR OWN BOOT RECORD, not the OS's cold-start vector.
+ *
+ * There is nothing to return to: this program occupies $3000..$BFFF, and the
+ * screen says "HIT A KEY AND THE ATARI RESTARTS", so restarting is the
+ * promise that has to be kept.
+ *
+ * THIS USED TO BE `jmp $e477`, COLDSV, and it did not restart the machine.
+ * MEASURED 2026-09-11 with tools/probe_exit.py: after the key, twelve
+ * thousand frames with `far_used` flat at 0 and a black screen, while a cold
+ * reset asked of the emulator instead reached the title screen in under a
+ * thousand. WHY $E477 does not cold-start this machine was NOT determined --
+ * the ROM is mapped throughout (SIOV at $E459 is what the disk seam runs on,
+ * so the vector table is demonstrably live) and the vector is the documented
+ * one. It is replaced rather than explained.
+ *
+ * $0706 IS OUR BOOT RECORD'S ENTRY -- the OS jumps there at power-on, six
+ * bytes past the load address, and src/boot.s finds EGATREK.XEX by name and
+ * loads it. Re-entering it reloads the game from the disk with nothing but
+ * SIO and code this port wrote.
+ *
+ * IT IS STILL THERE BECAUSE NOTHING IN THIS PORT CAN REACH IT, and that is
+ * checked rather than assumed: `lowram` is $0480..$06FF, `lowdata` starts at
+ * $0A00 exactly so the loader and its $0900 buffer survive, and with no DOS
+ * resident the OS itself never allocates above MEMLO. tools/probe_exit.py
+ * reads the six header bytes back after a full game and compares them.
+ *
+ * THE WINDOW MUST CLOSE FIRST. MEMAC maps VRAM over $2000..$3FFF, which is
+ * where the loader is about to write the program, and it is a VBXE register
+ * that no reset of any kind clears.
+ *
+ * THE HARDWARE STACK IS RESET because this arrives by JMP where the OS
+ * arrived by JSR, and _start does not reset it -- so without this, a player
+ * who quit and restarted repeatedly would walk the stack down a few bytes at
+ * a time. */
 void plat_exit(void) {
-    vdc_shutdown();
-    __asm__ volatile("jmp $e477");
+    VIDEO_CONTROL = 0;
+    OS_SDMCTL = 0x22;
+    MEMAC_CONTROL = 0;
+    __asm__ volatile("ldx #$ff\n\ttxs\n\tjmp $0706" : : : "x");
 }
 
 /* ANTIC's VCOUNT keeps running under VBXE -- the overlay rides on top of the
