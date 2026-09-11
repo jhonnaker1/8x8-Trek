@@ -68,6 +68,11 @@ static const char autoplay[] = {
                                machine with a voice sounding, and the exact
                                keys that then answered NO SUCH ORDER. The
                                console reads WARP 5.0 when both are fixed. */
+#ifdef TREK_STACKPROBE
+    /* A SAVE, and it is the deep one: 86 bytes on 2026-09-11 against the 59
+       the rest of this table reaches. The serialiser is ~2.5K of code. */
+    's','a','v','e', 13, 13,
+#endif
     's', 13, 'x', 13,       /* SELF DESTRUCT. The password is what the setup
                                screen took above -- 'x' answered the PASSWORD
                                field, not an "accept" that does not exist. */
@@ -95,7 +100,64 @@ static unsigned char getin(void) {
     return c;
 }
 
-void kb_init(void) { while (getin()) { } }   /* drain anything already queued */
+#ifdef TREK_STACKPROBE
+/* HOW DEEP DOES THE SOFT STACK GO? Debug builds only, and the answer on
+ * 2026-09-11 was EIGHTY-SIX BYTES against the eighty this port has.
+ *
+ * llvm-mos points the soft stack at `__stack` and grows it DOWN. Here
+ * `__stack` IS `__ovl_start` -- the overlay window base -- so it grows into
+ * the gap above `__heap_start` and an overrun lands in `.noinit`, not in the
+ * window. `make verify` calls that gap "N bytes for the soft stack"; it is
+ * also the port's entire remaining headroom.
+ *
+ * BOTH BOUNDS ARE LINKER SYMBOLS, so the probe cannot go stale against a
+ * build that moved.
+ *
+ * BUILDING IT: the probe does not fit in the hole it measures. Shrink the
+ * window to make room -- the largest overlay is 3,813 bytes, so 3,816 leaves
+ * the minimum -- which also WIDENS the sentinel region, so the measurement is
+ * not clipped at the shipping figure:
+ *
+ *     sed -i 's/0x0f80/0x0ee8/' x16.ld
+ *     make autoplay OVL_WINDOW=3816 STACKPROBE=-DTREK_STACKPROBE
+ *     cd build/data && x16emu -prg autoplay.prg -run -echo > /tmp/sp.txt
+ *     # depth = (max byte in 33..33+gap) - 33 ; SATURATION means lower bound
+ *
+ * REPORTED AS ONE CHARACTER THROUGH CHROUT, and every step of that is a size
+ * decision. Drawing a bar with scr_put cost 183 bytes. One '*' per disturbed
+ * byte still missed by 23. Counting first and emitting `33 + n` keeps the
+ * call out of the loop. */
+extern char __heap_start[], __stack[];
+#define SENTINEL 0xA5
+
+static void stack_fill(void) {
+    unsigned char *p;
+    for (p = (unsigned char *)__heap_start; p < (unsigned char *)__stack; p++)
+        *p = (unsigned char)SENTINEL;
+}
+
+static void chout(unsigned char c) {
+    __asm__ volatile("jsr $FFD2" : : "a"(c) : "x", "y", "p", "memory");
+}
+
+static void stack_report(void) {
+    unsigned char *p = (unsigned char *)__heap_start;
+    unsigned char n = 0;
+
+    while (p < (unsigned char *)__stack) {
+        if (*p != (unsigned char)SENTINEL) n++;
+        p++;
+    }
+    chout((unsigned char)(33 + n));
+}
+#endif
+
+void kb_init(void) {
+#ifdef TREK_STACKPROBE
+    stack_fill();
+#endif
+    while (getin()) { }                      /* drain anything already queued */
+}
 
 /* The rest of the port is written for the C128's scanner, which hands over
    UPPERCASE ASCII. Folding case here rather than at each comparison is the
@@ -116,6 +178,13 @@ static char translate(unsigned char c) {
 
 char kb_waitkey(void) {
     unsigned char c;
+
+#ifdef TREK_STACKPROBE
+    /* The sentinel is CUMULATIVE -- once a byte is overwritten it stays
+       overwritten -- so sampling here catches a high-water mark reached
+       mid-turn, not just the depth at a key wait. */
+    stack_report();
+#endif
 
 #ifdef TREK_AUTOPLAY
     if (ap_at < sizeof autoplay) return translate((unsigned char)autoplay[ap_at++]);

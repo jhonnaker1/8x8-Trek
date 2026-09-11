@@ -233,7 +233,7 @@ AUTO_OUT = build/autoplay.prg
 
 autoplay: $(GAME_SRC) src/x16vera.h src/x16mem.h x16.ld
 	@mkdir -p build $(DATA)
-	$(X16CC) $(OVLFLAGS) -DTREK_AUTOPLAY $(LDFLAGS) -o build/auto.elf $(GAME_SRC)
+	$(X16CC) $(OVLFLAGS) -DTREK_AUTOPLAY $(STACKPROBE) $(LDFLAGS) -o build/auto.elf $(GAME_SRC)
 	$(OBJCOPY) -O binary "--remove-section=.ovl_*" build/auto.elf build/auto.res
 	@python3 -c "d=open('build/auto.res','rb').read(); \
 	    open('$(AUTO_OUT)','wb').write(bytes([0x01,0x08]) + d)"

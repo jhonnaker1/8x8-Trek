@@ -510,10 +510,44 @@ WORK.** `gh release edit --notes-file` updates the body; the tag annotation
 keeps the original, which is the honest split -- the tag is what was said at
 the time, the release page is what is true now. Do not re-tag to tidy history.
 
-## THE X16'S SOFT STACK IS 80 BYTES, AND ITS DEMAND HAS NEVER BEEN MEASURED
-## (found 2026-09-11 by sweeping for load-bearing claims)
+## THE X16'S SOFT STACK OVERFLOWS ON SAVE -- MEASURED 2026-09-11
 
-**Raised as open list item 25.**
+**Item 25, and it is a live defect in a released port.**
+
+    demand on SAVE    86 bytes   MEASURED, twice, same figure
+    available         80 bytes   low RAM ends $8F30, __stack $8F80
+    ---------------------------------------------------------------
+    overrun            6 bytes   into the top of .noinit ($8E51..$8F2F)
+
+`__stack` IS `__ovl_start` here, so the stack grows DOWN out of the window
+base and an overrun lands in `.noinit`, not in the window. That is the quiet
+failure of the two: no crash, no wrong picture -- six bytes of a buffer
+changed underneath a save.
+
+**HOW THE MEASUREMENT WENT.** Sentinel fill between the two linker symbols,
+report the disturbed count through CHROUT, read it off `x16emu -echo`. The
+probe does not fit in the hole it measures -- 183 bytes as a drawn bar, 23 over
+even after moving to CHROUT -- so the window was shrunk to 3,816 (the largest
+overlay is 3,813) which both makes room AND widens the sentinel region so the
+answer is not clipped at 80.
+
+    driven path, no briefing, no save     59 of 100   a real measurement
+    + briefing + save                     82 of 82    SATURATED, lower bound
+    + save only                           86 of 94    a real measurement, twice
+
+**SAVE is the deep path**, and the rest of the game does not come close: 59.
+The serialiser is about 2.5K of code and the reason this port has a lowram
+region at all.
+
+**WHAT IT DOES NOT PROVE.** The probe build is not the shipping build -- a
+smaller window, the probe's own code, a longer key table -- so codegen differs
+and 86 is that build's figure. The call chain is the same one, which is why
+the number is worth acting on rather than re-arguing.
+
+The instrument is kept: `TREK_STACKPROBE` in `src/x16input.c`, with the build
+recipe in its comment.
+
+### Historical: how it was found
 
     x16     80 bytes   low RAM ends $8F30, __stack $8F80
     c128   143 bytes   MEASURED demand, deepest path: evaluation, hall of fame
