@@ -476,8 +476,12 @@ checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
 **TWO still open, and BOTH want a person: 10** (no human has played the Amiga)
-and **23** (colour per message has never been seen on a screen on the MEGA65,
-the X16 or the Amiga).
+and **23** (colour per message has never been seen on a screen on the X16 or
+the Amiga).
+
+**They overlap almost entirely.** Playing the Amiga closes 10 and the Amiga
+third of 23 together, the way the C128 and MEGA65 sittings each closed their
+own. The X16 needs only someone to boot it and look at the message log.
 
 **Item 11 closed on 2026-09-11** -- Jamie played the C128 and it "looks, sounds,
 and plays great". It was the OLDEST item on this list, open since the port was
@@ -718,10 +722,10 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
 
 ### Raised 2026-09-11, by re-deriving after the release rather than reciting
 
-23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on three of the five
-    ports** -- the MEGA65, the X16 and the Amiga. **SEEN on the Atari and the
-    C128, both by Jamie on 2026-09-11** ("looks... great" on the C128, which is
-    the word that settles it). It shipped in v0.13.0 to four released ports and
+23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on two of the five
+    ports** -- the X16 and the Amiga. **SEEN on the Atari, the C128 and the
+    MEGA65, all by Jamie on 2026-09-11**, each reported the same way: "looks,
+    sounds, and plays great". It shipped in v0.13.0 to four released ports and
     the
     only verification it has ever had is `c128/test/test_panels.c` -- host-side
     unit tests, made to fail first, asserting a colour table. No screenshot, no

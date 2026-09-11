@@ -753,7 +753,7 @@ once with, and the pair says which world this is.
 **Nothing on THE OPEN LIST touches this port any more.** The two items still
 open there want a person at a keyboard on other machines: nobody has played
 the Amiga (10), and colour per message has never been seen on a screen on the
-MEGA65, the X16 or the Amiga (23).
+X16 or the Amiga (23).
 
 ## Played, and it was silent
 

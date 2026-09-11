@@ -183,7 +183,8 @@ and it closed on 2026-09-11: *"looks, sounds, and plays great."*
 
 That run also settled this port's half of item 23, which asks whether **colour
 per message** has ever been seen on a screen rather than only asserted by a unit
-test. It has, here. It has not on the MEGA65, the X16 or the Amiga.
+test. It has, here — and on the Atari and the MEGA65. It has not on the X16
+or the Amiga.
 
 The MAIN VIEWER's other nine instrument pages are deferred on every port, by
 Jamie's call, and that is scope rather than a defect.
