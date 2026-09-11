@@ -608,7 +608,13 @@ that is released.**
 12. **The MAIN VIEWER's other nine instrument pages** -- deferred to roomier
     targets, Jamie 2026-08-29. What cycles them is read; the RESIDENT cost is
     the blocker, not the data.
-13. **A colour per message** -- deferred, Jamie 2026-09-02. EGA Trek has no
+13. **A colour per message** -- deferred, Jamie 2026-09-02. **MEASURED on the
+    Atari 2026-09-10 and it FITS: 187 bytes resident.** The deferral's premise
+    was "the bytes are nearly free, the resident code is not"; on the tightest
+    port of the five the resident code is 187 bytes and there are 437. Build a
+    prototype, measure, revert -- see "Colour per message, measured" below.
+    Still deferred: what is left is not budget but CONTENT, 74 colours that
+    have to be read off the original. EGA Trek has no
     department palette; every site picks its own colour. Same shape: the bytes
     are nearly free, the resident code is not.
 
@@ -7759,6 +7765,54 @@ then it stays in reserve, which is what it was always for.
 when they did not the boot poll read a `far_used` that never settled --
 presenting as "the load stalled at 20041" rather than as a mismatch. It now
 refuses to start when the ELF is newer than the disk, and says `make atr`.
+
+
+## Colour per message, measured: 187 bytes (2026-09-10)
+
+Deferred since 2026-09-02 on the grounds that "the bytes are nearly free in
+bank 1; the resident code is not". **Nobody had measured the resident code**,
+and this project's own rule is that a split is measured, never reasoned about
+-- the fourth overlay pass named three candidates and all three were wrong.
+
+### What it actually needs, which is not what the note says
+
+The note says "a byte per pooled string plus a second far read at every drawing
+site", and reading the code says otherwise. The colour is chosen at DRAW time
+by `dept_color(view_dept)`, from the department TEXT stored in the log -- the
+string id was resolved to a pointer at the call site and is long gone. So a
+per-message colour has to TRAVEL with the message: `ui_message` takes it, the
+log carries it, `msg_box` reads it back.
+
+**I had this wrong too**, and said so before measuring: I first read
+`ui_message` as a single resident function where one `far_read` keyed by string
+id would do. It cannot -- the id is not there.
+
+  * **74 call sites** in this port (the original has 145 message sites).
+  * **The log record has NINE UNUSED BYTES** (55..63 of a 64-byte stride), so
+    the colour rides free. Far memory does not grow by a single byte.
+  * `dept_color` is deleted, which the figure below already nets off.
+
+### Measured by building it
+
+    baseline           437 bytes free      largest overlay 4202 of 4608
+    with the feature   250 bytes free      largest overlay 4360 of 4608
+
+**187 bytes resident, and 158 more in the overlays** -- overlay code calls
+`ui_message` too. Measured three times against the link's known +/-20 wobble
+(250 / 230 / 250 against 437 / 417); the wobble moves both ends equally, so the
+DELTA is clean.
+
+**It fits.** On the tightest of the five ports, with 250 bytes resident and 248
+bytes of overlay margin left. The prototype was then REVERTED -- this was a
+measurement, not a change.
+
+### So what is actually left is content, not budget
+
+The prototype passes an arbitrary varying constant per site. The real feature
+needs the colours themselves: MEASURED.md records ten distinct colours across
+the original's 145 sites and four read so far (NAVIGATION cyan, COMMUNICATIONS
+light gray, SCIENCE brown, DAMAGE brown). **That is a reading job against the
+binary, not a budget question**, and the budget question is now answered.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
