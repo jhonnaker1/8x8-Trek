@@ -497,8 +497,17 @@ that is released.**
    saved stardate, quadrant and ship state. Getting there found a real defect:
    **the soft stack was inside the overlay window.** See "The restore wedge"
    below.
-4. **It has never fought, docked, landed on a planet or reached the hall of
-   fame.** A turn is not a game. (Save and restore are off this list now.)
+4. ~~**It has never fought**~~ or **reached the evaluation** -- both done
+   2026-09-10, off ONE boot with `tools/probe_play.py`. It moved to a quadrant
+   holding two battleships, two scouts and a starbase, fired, and
+   `441 UNIT HIT ON MONGOL / MONGOL DESTROYED!` -- with the kill confirmed in
+   `sector[]`, not just on screen. A self-destruct then ran `.ovl_cmds`,
+   `.ovl_eval` and the DETAILED EVALUATION for the first time on this machine,
+   totalling **-930**, the same figure the MEGA65's driven self-destruct gives.
+   **Still not done: DOCKED and LANDED** -- neither the start quadrant nor the
+   combat one put the ship next to the base, and no planet has been visited.
+   The hall of fame itself is one RETURN past the evaluation and was not
+   captured.
 
 19. **The Atari link is NOT DETERMINISTIC.** Two clean builds from identical
     sources alternate between binaries 20 bytes apart. The other four ports
