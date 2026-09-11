@@ -588,6 +588,106 @@ stopped being true the day Atari DOS was dropped:
     atari  1,932 free  + 1,577 low data + 14 lowram
     mega65 4,997 free
 
+## SCOPE: the CoCo 3 + SuperSprite FM+ (written 2026-09-11)
+
+**Scoped at Jamie's request. It does NOT re-open the target** -- that call was
+made on installed base and stands. This is the measurement a scope is for, done
+before anyone writes `cocovid.c`, so the answer exists if it is ever asked
+again.
+
+### What it is
+
+A **CoCo 3** with a **SuperSprite FM+** in the cartridge port, and a disk
+controller, so a **Multi-Pak Interface** as well. Three pieces of hardware.
+MAME models the card as `ssfm` and Ample's MAME is the instrument.
+
+### MEASURED TODAY, not recalled
+
+  * **`ssfm` carries a Yamaha V9958 and a YM2413**, verified with
+    `coco3 -ext ssfm -listdevices`. It is offered on `coco` and `coco2b` too,
+    so the card spans the 6809 line.
+  * **`core/` COMPILES FOR 6809 TODAY.** All four files through cmoc 0.1.86
+    (`~/cmoc/bin/cmoc`, a five-typedef `stdint.h` shim on the include path).
+    Only signed/unsigned ternary warnings, the informational kind.
+  * **THE 6809 NEEDS 36% FEWER INSTRUCTIONS THAN THE 6502** for the same
+    `core/`:
+
+        trek.c     7,884 vs 12,331    0.64
+        planet.c     866 vs  1,180    0.73
+        hof.c        585 vs  1,088    0.54
+        serial.c   1,137 vs  1,826    0.62
+        TOTAL     10,472 vs 16,425    0.64
+
+    **That is an instruction count, NOT a byte count**, and 6809 instructions
+    average more bytes than 6502 ones. It says the 6809 is a better C target,
+    which is expected -- 16-bit registers, better addressing -- and it does NOT
+    say the game is 36% smaller. The byte figure needs a link.
+  * **The machines, from MAME's own tables:** CoCo 1 and CoCo 2 are 64K flat;
+    the CoCo 3 is 128K or 512K. All three are MC6809E at 894,886 Hz, and only
+    the CoCo 3's GIME doubles it.
+
+### The video plan
+
+**SCREEN 7 / GRAPHIC6: 512x212, sixteen colours per pixel, no attribute
+clash.** A six-pixel font puts 85 columns in that 512 -- 80 with room over --
+and eight-pixel rows give 26 of the 25 needed. **This is the AMIGA's shape**: a
+bitmap with a software-drawn font, which this project already has a working
+port of, rather than the per-cell text the four 6502 ports use.
+
+TEXT2 is a dead end: 80x24 but the blink attribute buys only a second colour
+pair, four colours, the trap that put the Atari ST out.
+
+**NOT MEASURED.** The mode is documented and the arithmetic is certain; nobody
+here has put a pixel on a V9958. Same standing as the MSX2 entry says of the
+same mode.
+
+### The toolchain, and the drop entry OVERSTATES this now
+
+"CMOC is non-conforming" is true and was decisive in 2026-09-05, but the two
+concrete faults it named are FIXED and the fixes shipped:
+
+  * The `(sec_y + 1) << 8` miscompile was **found by cmoc** and corrected in
+    `core/` for every port. It cost zero bytes on the C128.
+  * The static assert was rebuilt as a **negative bit-field width**, which all
+    four compilers reject properly, and `serial.c` compiles on 6809.
+
+So the toolchain risk is no longer "the core will not build". It is that cmoc
+is a weaker optimiser than llvm-mos with no LTO, on a target where the budget
+is the whole question -- **an unknown, not a blocker.**
+
+### The seams
+
+    video      NEW. V9958 through I/O ports. The Amiga's font renderer is the
+               model; the register programming is not shared with anything.
+    far memory THE CARD HAS 128K OF VRAM. Put the string pool, music and
+               overlay images there -- exactly what the Atari does with VBXE's
+               VRAM. core/farmem.h already has this shape.
+    sound      NEW, and the card brings a YM2413 (FM), which is richer than
+               anything else this project drives. AY-3-8910 on the original
+               SuperSprite; the FM+ adds the OPLL.
+    input      NEW but small: the CoCo keyboard matrix.
+    storage    NEW. Disk BASIC or OS-9, through the controller in the Multi-Pak.
+    overlays   PROBABLY NEEDED, and the CoCo 3's GIME pages 8K blocks, which is
+               a coarser granularity than any current port uses.
+
+### The risks, in order
+
+  1. **BLIT COST.** The V9958's VRAM is behind I/O ports, so every glyph is
+     port writes, and the console is 2,000 cells. At 1.79MHz on a GIME'd CoCo
+     3 this is the question the whole port turns on. **A benchmark, not a
+     datasheet check** -- and it is answerable today, in MAME, without writing
+     a port: time a loop that fills the screen through the card.
+  2. **Does it fit?** Unknown until the whole game links. Every port here
+     opened with that measurement (`make early` on the Atari) and it is the
+     right first move again.
+  3. Three pieces of hardware to run it.
+
+### If it were ever built
+
+Same staging as the Atari: **link the whole game against stubbed seams and
+read the overflow FIRST.** Then video, then far memory into the card's VRAM,
+then the rest. The `make early` pattern exists and transfers.
+
 ## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 25 raised -- EMPTY)
 
 **Re-derived from the five ports, not recited from the version below** -- that
@@ -7415,9 +7515,15 @@ aftermarket board. So "needs an add-on nobody has" cannot be the disqualifier
 on its own, or that port would not exist. What separates them is not
 popularity at all -- **the Atari port needed no new compiler.**
 
-**THE SECOND REASON STANDS UNTOUCHED.** A card does nothing about CMOC: a
-fourth CPU family whose only compiler silently miscompiled `(sec_y + 1) << 8`
-and cannot evaluate the save-record static assert. **So this note narrows the
+**THE SECOND REASON STANDS, BUT IT IS WEAKER THAN THIS ENTRY SAYS** -- see
+"SCOPE: the CoCo 3 + SuperSprite FM+" above, written 2026-09-11. A card does
+nothing about CMOC, and CMOC is still a weaker optimiser than llvm-mos with no
+LTO. **But the two concrete faults named here are FIXED and shipped**: the
+`(sec_y + 1) << 8` miscompile was FOUND BY cmoc and corrected in `core/` for
+every port at zero cost, and the static assert was rebuilt as a negative
+bit-field that all four compilers reject properly. **`core/` compiles for 6809
+today** -- re-measured 2026-09-11, all four files, warnings only. So the
+toolchain risk is an unknown budget, not a core that will not build. **So this note narrows the
 drop from "two reasons" to "one reason and an unmeasured cost", and does not
 reopen it.** The VBXE precedent means "CoCo 3 + SuperSprite FM+" is a shape
 this project accepts -- the Atari port requires a card too -- so if it is ever
