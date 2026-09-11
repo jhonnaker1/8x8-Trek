@@ -257,12 +257,18 @@ same build, a gate-off that DID happen and was seen. So the first run's zero is
 a measurement rather than a dead counter -- the beep leaves voice 2 gated on
 and nothing clears it, across a saturated count of `snd_poll` calls.
 
-**What is still an argument rather than a measurement: audibility.** Xemu has
-no audio-to-file, so the tone was not heard. But `snd_init` sets V2 exactly as
-the C128 sets it -- pulse width, `AD_FLAT`, `SR_FLAT` sustain 15 with release
-0 -- at full volume, and the C128's beep is that same gated state with a
-`voice_off` after it. A voice that is audible for 250ms there is audible
-indefinitely here.
+**What was an argument rather than a measurement: audibility.** Xemu has no
+audio-to-file, so the tone could not be heard by any rig here. The argument
+was: `snd_init` sets V2 exactly as the C128 sets it -- pulse width, `AD_FLAT`,
+`SR_FLAT` sustain 15 with release 0 -- at full volume, and the C128's beep is
+that same gated state with a `voice_off` after it, so a voice audible for 250ms
+there is audible indefinitely here.
+
+**SETTLED 2026-09-10 BY JAMIE, NOT BY A RIG: "beeps and stops".** That is the
+whole of the evidence that this is fixed, and there was never going to be any
+other kind. The X16's beep could be read out of a WAV because x16emu records
+one; this machine's could only ever be read out of the driver. **A probe that
+counts `voice_off(V2)` establishes the code and never the sound.**
 
 **The release binary is byte-identical with the probe in the tree** (`make`
 without `TREK_DEBUG_INPUT` never sees it), which is what makes it safe to keep.
