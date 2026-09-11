@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (1 open of 24 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 24 raised -- EMPTY)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,8 +475,24 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**ONE still open: 10 -- no human has played the Amiga.** It is the last item on
-the list, and it wants a person at a keyboard.
+**THE LIST IS EMPTY. Nothing is open.** Twenty-four items raised, twenty-four
+closed or decided, and the last of them -- "no human has played the Amiga" --
+closed on 2026-09-11.
+
+**All five ports have now been played by a person**, each reported in the same
+four words: the Atari, the C128, the MEGA65, the X16 and the Amiga all "look,
+sound, and play great". Four of those five sittings happened on one day, and
+the first of them found three bugs no instrument here could see.
+
+**TEN items moved on 2026-09-11**, and the arithmetic is worth getting right
+rather than rounding: **eight closed** -- 6, 7, 10, 11, 21, 22, 23, 24 -- and
+**two decided rather than fixed**, 5 (the 112-second load is a 1050, document
+it) and 19 (the non-deterministic link is a property, park it). **Four of the
+eight were raised the same day they closed**: 21, 22, 23 and 24, all of them
+created by dropping Atari DOS or by the release that followed.
+
+A release creates the most items, and they close fastest when somebody is
+actually looking.
 
 **Item 23 closed the day it was raised**, in four sittings: Jamie looked at the
 Atari, the C128, the MEGA65 and the X16 and said the same four words about each,
@@ -704,9 +720,18 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
    scores high enough to write a row, so there is no file to check. It goes
    through the `plat_write_all` the save proves -- an argument, not a
    measurement, and the port's README now says so under "Still open" as well.
-10. **No human has played the Amiga.** End to end, yes -- by
-    `tools/amiga_type.py`. Every fault worth having on this project was found
-    by a person at a keyboard, so this is a real gap.
+10. ~~**No human has played the Amiga.**~~ **PLAYED AND CLOSED 2026-09-11,
+    Jamie: "the amiga port looks, sounds, and plays great."**
+
+    **It was the LAST ITEM ON THE LIST.** Raised because everything the port
+    had ever done was driven by `tools/amiga_type.py` -- the console, the
+    save, the hall of fame, and as of that morning the exit fix as well -- and
+    every fault worth having on this project was found by a person at a
+    keyboard, not by a script.
+
+    It also closed the Amiga's share of item 23 properly. That item had been
+    closed on the strength of a DRIVEN screenshot here, which the entry said
+    plainly was the weaker evidence; a person has now looked at it.
 11. ~~**The C128 wants play.**~~ **PLAYED AND CLOSED 2026-09-11, Jamie:
     "looks, sounds, and plays great."** The oldest item on this list -- raised
     when the port was released as v0.9.0 -- and the one that paid four times

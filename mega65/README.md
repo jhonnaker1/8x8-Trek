@@ -321,8 +321,8 @@ resident space left for it.
 **Nothing on THE OPEN LIST touches this port any more.** Colour per message was
 looked at here on 2026-09-11 -- *"the mega65 looks, sounds, and plays great"* --
 which closed this port's share of item 23; that item is now closed on all five.
-**One item is left on the whole list: nobody has played the Amiga (10).** The
-list is in `NOTES.md`, re-derived 2026-09-11.
+**THE OPEN LIST IS EMPTY** as of 2026-09-11 -- all twenty-four items closed or
+decided, and all five ports played by a person. It is in `NOTES.md`.
 
 ## Saving works, and the SD card is gone
 

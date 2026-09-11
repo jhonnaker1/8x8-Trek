@@ -318,9 +318,10 @@ Amiga keycodes with separate press and release, not characters.
            restores it (warp 5 and the same chart come back); the hall of
            fame reads TREK.SCR, inserts into the right rank band and writes
            it again; the endgame, play-again and the quit all work
-    NEXT   a human playing it. Everything above was driven by a script.
-           On THE OPEN LIST in NOTES.md as item 10, because every fault
-           worth having on this project was found by a person at a keyboard.
+    PLAYED 2026-09-11 -- Jamie: "the amiga port looks, sounds, and plays
+           great." Everything above it was driven by a script; this was the
+           last port no person had touched, and item 10 was the LAST ITEM on
+           THE OPEN LIST. The list is empty now.
 ~~The smoke build links the shared `layout.c` and supplies a **stub `S()`** for
 the seven panel titles, because the string pool needs the file seam that is not
 built yet. It is replaced by `c128/src/strpool.c` when storage lands.~~

@@ -17,6 +17,8 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > [`atari/README.md`](atari/README.md).
 > All five ports also gain **colour per message**: the console colours each
 > line by the department that speaks it, as the original does.
+> **All five have now been played by a person** (2026-09-11) and the project's
+> open list is empty — twenty-four items raised, twenty-four closed or decided.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
