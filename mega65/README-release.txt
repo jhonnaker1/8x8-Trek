@@ -59,9 +59,11 @@ ray's five outcomes, tractor beams, wear and tear, reinforcements, a spy who
 sabotages a system, a settlement with a clock running against it, and a
 damaged ship that keeps getting worse if you do not fix it.
 
-The MAIN VIEWER shows one page. The original cycles ten; the other nine, and
-colour per message, are deferred to a machine with more room for resident
-code -- this one has about 5K left.
+Messages are coloured by the department that speaks them, as the original's
+are.
+
+The MAIN VIEWER shows one page. The original cycles ten; the other nine are
+deferred to a machine with more room for resident code.
 
 SAVE writes EGATREK.SAV onto the disk and the setup screen offers to restore
 it. The hall of fame is TREK.SCR and is created on first use. Both go through

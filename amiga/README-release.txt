@@ -54,6 +54,9 @@ ray's five outcomes, tractor beams, wear and tear, reinforcements, a spy who
 sabotages a system, a settlement with a clock running against it, and a
 damaged ship that keeps getting worse if you do not fix it.
 
+Messages are coloured by the department that speaks them, as the original's
+are.
+
 The MAIN VIEWER shows one page. The original cycles ten; the other nine are
 deferred.
 

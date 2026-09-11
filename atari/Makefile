@@ -50,7 +50,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/atarisio.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest nodostest run-nodostest run-probe-sound run-probe-exit run-probe-snapshot run-probe-boottime reproducible nolto verify game data boot atr run clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest nodostest run-nodostest run-probe-sound run-probe-exit run-probe-snapshot run-probe-boottime reproducible nolto verify game data boot atr release run clean
 
 all: early
 
@@ -312,6 +312,13 @@ atr: data build/boot.bin
 	@python3 tools/nodos.py $(GAME_ATR) --boot build/boot.bin \
 	    $(DATA)/EGATREK.XEX $(DATA)/OVERLAYS.BIN $(DATA)/STRINGS.DAT \
 	    $(DATA)/MUSIC.DAT $(DATA)/BRIEF.TXT
+
+# THE RELEASE ARTEFACT. One self-booting .ATR and the notes beside it -- the
+# same shape the MEGA65 posts, because this machine mounts one image too.
+release: atr
+	@cp $(GAME_ATR) build/egatrek-atari.atr
+	@cp README-release.txt build/egatrek-atari.txt
+	@ls -l build/egatrek-atari.atr build/egatrek-atari.txt
 
 run: atr
 	python3 tools/run_atari.py --disk $(GAME_ATR) build/run.png 900

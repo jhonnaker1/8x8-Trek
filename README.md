@@ -7,16 +7,16 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: four ports released, a fifth playable.** The **Commodore 128**,
-> **Commander X16**, **Amiga** and **MEGA65** ports are feature complete and
-> released as [v0.12.1](../../releases/latest) — a sound-only point release on
-> 2026-09-10 that fixes a refusal beep which never stopped on the MEGA65 and
-> three separate faults on the X16, the largest of which had it **playing every
-> note an octave flat since v0.10.0**. The C128 and Amiga binaries are
-> byte-identical to v0.12.0.
-> The **Atari 800XL + VBXE** port boots, draws the console and runs turns as of
-> 2026-09-09, and is **not released**: saving is unverified and the resident
-> margin is under 700 bytes. See [`atari/README.md`](atari/README.md).
+> **Status: five ports released.** The **Commodore 128**, **Commander X16**,
+> **Amiga**, **MEGA65** and now the **Atari 800XL + VBXE** are feature complete
+> and released as [v0.13.0](../../releases/latest), 2026-09-11.
+> The Atari is the new one: a **self-booting disk with no Atari DOS on it** —
+> its own boot record, its own directory, SIO underneath — which is what makes
+> the image ours to give away. **It takes about two minutes to load on a stock
+> 1050** and a few seconds on an emulator or a fast-SIO drive; see
+> [`atari/README.md`](atari/README.md).
+> All five ports also gain **colour per message**: the console colours each
+> line by the department that speaks it, as the original does.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
@@ -153,11 +153,11 @@ per-cell colour; anything that can hold that runs the game as designed.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
-| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.12.0](../../releases/latest) |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.1](../../releases/latest); see [`x16/README.md`](x16/README.md) |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
-| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Plays, self-boots with no DOS, and has been played by a person (2026-09-11)** — saves, restores, fights, docks, lands, writes the hall of fame, and makes a noise. The licence blocker is gone: the disk carries this port's own boot record and directory, not Atari's. **It takes about two minutes to load on a stock 1050** and a few seconds on an emulator or a fast-SIO drive — see [`atari/README.md`](atari/README.md). Not yet released. |
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.13.0](../../releases/latest) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.13.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.13.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.13.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.13.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
