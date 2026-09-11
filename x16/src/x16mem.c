@@ -8,7 +8,8 @@
  * offset off can span two banks, and the C128 implementation has no code for
  * that case because it cannot happen there.
  *
- * The string pool is 7,275 bytes -- just under one 8K page -- so the FIRST
+ * The string pool is just under one 8K page -- 7,275 bytes when this was
+ * written, 7,289 today, and the point is the PAGE not the figure -- so the FIRST
  * read to cross $2000 is the one that would break, and it would break for the
  * music rather than the prose. Both far_read and far_write below therefore
  * loop, clipping each pass at the window edge, and there is a test that

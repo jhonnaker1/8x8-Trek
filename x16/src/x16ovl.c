@@ -1,7 +1,7 @@
 /* Code overlays for the Commander X16.
  *
  * SHAPED LIKE THE MEGA65'S, NOT THE C128'S. The C128 loads each overlay off
- * disk on every swap; this port holds all ten images in banked RAM and copies
+ * disk on every swap; this port holds all ELEVEN images in banked RAM and copies
  * the wanted one into a low-RAM window, so a swap is a memcpy rather than a
  * disk load. The images ride in the far store as one more tenant, beside the
  * string pool and the music -- which means they arrive through the storage and

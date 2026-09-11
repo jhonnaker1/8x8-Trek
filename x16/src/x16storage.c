@@ -3,7 +3,10 @@
 
 #include "../../core/storage.h"
 
-/* The C128 half of the disk seam: KERNAL file I/O behind core/storage.h.
+/* The disk seam for the X16: KERNAL file I/O behind core/storage.h.
+ *
+ * (This said "The C128 half of the disk seam" until 2026-09-10 -- the header
+ * came over with the code and named the wrong machine for months.)
  *
  * Written against the RAW KERNAL calls rather than a convenience wrapper,
  * because llvm-mos's <cbm.h> has the entire high-level file API --

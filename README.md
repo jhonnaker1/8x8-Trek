@@ -154,7 +154,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | Platform | Display | CPU | Status |
 |---|---|---|---|
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.12.0](../../releases/latest) |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.0](../../releases/latest) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.1](../../releases/latest); see [`x16/README.md`](x16/README.md) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Playable 2026-09-09** — boots from a DOS 2.5 disk, drawn console, turns run. Not released: saving is unverified, and the resident margin is 693 bytes. See [`atari/README.md`](atari/README.md) |

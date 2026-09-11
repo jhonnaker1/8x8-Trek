@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (12 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (11 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -579,9 +579,13 @@ that is released.**
 
 ### Repository
 
-14. **The X16 has no README.** The only released port without one -- and the
-    sweep that finally documented its build found the reason it needs one:
-    `cd x16 && make` builds the smoke test, not the game.
+14. ~~**The X16 has no README.**~~ **WRITTEN 2026-09-10.** `x16/README.md`.
+    Writing it found three stale claims in the port itself, which is the usual
+    return on documenting something: `x16ovl.c` said it holds "all ten images"
+    against eleven, `x16storage.c`'s header called itself "the C128 half of
+    the disk seam", and `x16mem.c` quoted a string-pool size that had drifted
+    14 bytes. Two claims in the README's own first draft were wrong too and
+    were corrected against the source before it was committed.
 15. ~~**The C128's `make verify` does not report resident free.**~~ **FIXED
     2026-09-10.** It prints `resident $1c01..$a8cb, 1589 bytes free below the
     window at $af00`, cross-checked between the map and `trek128.res` so a
