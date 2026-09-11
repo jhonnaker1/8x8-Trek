@@ -512,8 +512,8 @@ that is released.**
    read the type and did not merely succeed. Orbited and landed at the planet
    in 1,6: `STANDARD ORBIT`, then the LANDING PARTY dialog offering shuttle,
    transporter or abort -- `.ovl_planet` executing for the first time here.
-   **The hall of fame screen itself is one RETURN past the evaluation and was
-   not captured**; everything else on this item is done.
+   **And the hall of fame, with the TREK.SCR WRITE WITNESSED** -- the first
+   time on any port. See "The hall-of-fame write" below. Item 4 is closed.
 
 19. **The Atari link is NOT DETERMINISTIC.** Two clean builds from identical
     sources alternate between binaries 20 bytes apart. The other four ports
@@ -547,7 +547,10 @@ that is released.**
     missing, and the list did not know the release had happened.** Fourth time
     re-deriving has beaten reciting.
 
-9. **The MEGA65's hall-of-fame WRITE has never been witnessed.** No driven game
+9. **The MEGA65's hall-of-fame WRITE has never been witnessed** -- but there
+   is a METHOD for it now, proved on the Atari 2026-09-10: poke `ship.killed`
+   high enough to clear the -930 floor a self-destruct forces, and the insert
+   and the write both run. See "The hall-of-fame write" below. No driven game
    scores high enough to write a row, so there is no file to check. It goes
    through the `plat_write_all` the save proves -- an argument, not a
    measurement, and the port's README now says so under "Still open" as well.
@@ -7554,6 +7557,58 @@ reprinted the old 693. The number not moving is what caught it.
 
 Not merely "did not crash" -- the nine-panel console, drawn, with the saved
 state in it.
+
+
+## The hall-of-fame write, witnessed at last (2026-09-10)
+
+Open list item 9 has said since 2026-09-03 that this has never been seen, on
+any port, and the reason was always stated as circumstance: "a driven
+self-destruct scores -930, which qualifies for no slot, so nothing is written
+and there is no file to check".
+
+**That is not circumstance, it is arithmetic, and it can be solved.**
+`hof_offer()` takes a score only if it beats the slot already there; a fresh
+table is all zeros; so a qualifying score must be POSITIVE. A self-destruct
+books -200 for the ship and the whole crew as casualties (-430) plus -300 for
+the incomplete mission: **a hard floor of -930**, which no play can climb out
+of in one session, because clearing the -300 means killing every Mongol alive.
+
+So `ship.killed` is poked, and **this is a test of the WRITE, not of scoring**
+-- said plainly, because a poked input makes every number on that screen
+meaningless except the ones under test. Everything downstream runs for real:
+hof_offer, the serialiser, plat_write_all, the bytes on the disk.
+
+    150 MONGOLS KILLED @ 10 EACH ....... 1500
+    TOTAL .............................   570
+
+and on the disk, at offset $16D10:
+
+    JAMIE....................\r\n570\r\n
+
+which is `core/hof.h`'s record format exactly -- 25-byte name padded with
+dots, CRLF, the score, CRLF -- and 570 is the only number it could be:
+-930 + 1500.
+
+### Three corrections this cost, and the last one matters most
+
+**The offsets were calibrated, not trusted.** `Ship` is packed for the 6502, so
+a host `offsetof` would lie. The probe reads `ship` and checks energy 5000,
+shields 2500, stardate 35000 against the console before poking, and refuses to
+poke if they disagree.
+
+**Casualties cannot be poked in advance.** The first run set them to zero and
+the score moved -930 -> -330, a difference of exactly 600 = 60 kills x 10 and
+nothing else. The kills landed; the casualties were overwritten, because a
+self-destruct kills the crew AFTER the poke. That -600-shaped gap is what
+identified it.
+
+**AND THE HOST .ATR IS EVIDENCE AFTER ALL.** This file has said since
+2026-09-09 that Altirra's disk writes are virtual and "never reach the host
+.ATR" -- a claim that shaped an entire day of the SAVE investigation. The
+fresh disk carries no TREK.SCR (the Makefile plants none), and after this run
+the host image holds one, three sectors, with the right bytes in it. **So
+writes DO reach the host image, at least on a clean shutdown.** The original
+reading was taken under different conditions and was generalised too far.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
