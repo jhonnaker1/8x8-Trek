@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (5 open of 22 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,9 +475,17 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-The three still open are **10** (no human has played the Amiga), **11** (the
-C128 wants play) and **19** (the Atari link is not deterministic). Two of the
-three want a person, not an instrument.
+The five still open are **10** (no human has played the Amiga), **11** (the
+C128 wants play), **19** (the Atari link is not deterministic), **21** (no
+human has played the Atari either) and **22** (the Atari is releasable and not
+released). **Three of the five want a person, not an instrument.**
+
+Items 21 and 22 were added on 2026-09-11, by re-deriving rather than reciting.
+Neither existed the day before: dropping Atari DOS closed items 6 and 7 and in
+doing so made "cut an Atari release" a real task for the first time, and the
+port's own README had grown a "a person has not played it" bullet that claimed
+to be carried here and was not. **Closing items creates items**, and nothing
+schedules that.
 
 ### Sound -- found 2026-09-09, both fixed and RELEASED in v0.12.1 on 2026-09-10
 
@@ -639,6 +647,21 @@ three want a person, not an instrument.
 11. **The C128 wants play.** The oldest item here and the only one that has
     paid four times over: whether the game it adds up to is survivable,
     readable and fair is not a question any build check reaches.
+21. **No human has played the ATARI either.** Driven, yes, and thoroughly --
+    combat, docking, landing, the evaluation, the hall of fame, SAVE and
+    restore, all off real state read out of the core rather than off hope.
+    **But every fault worth having on this project was found by a person at a
+    keyboard**, and item 18 is the standing proof: the X16's numbers agreed
+    with each other for four months while the port played an octave flat,
+    because every measurement was of the thing that was wrong. Nobody has
+    HEARD this port's POKEY driver either -- it is verified in both video
+    standards, by arithmetic, which is exactly the position the X16 was in.
+22. **The Atari is releasable and not released.** The licence blocker went
+    with Atari DOS on 2026-09-11 (items 6 and 7): `make -C atari atr` now
+    builds one self-booting `.ATR` with no Atari code on it. What stands
+    between here and a v0.13.0 is item 21 and one judgement -- **whether a
+    112-second boot through a real 1050 is acceptable**, which is Jamie's and
+    not a measurement. Item 5 measured it; nobody has decided about it.
 
 ### Deliberate scope, listed so they are not mistaken for defects
 

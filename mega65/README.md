@@ -214,26 +214,30 @@ below. **He played it again on 2026-09-08, after the D81 rewrite: "it works
 great."** That is the whole port confirmed by a human, which is the one thing
 no rig here can stand in for.
 
-## Still open (2026-09-08)
+## Still open (2026-09-08, swept 2026-09-11)
 
 **Nothing on the build list.** Saving was the last item and it works: a game
 SAVEs to the D81, a RESTORE brings back a pixel-identical console, and the port
 no longer touches the SD card at all. Played by hand on 2026-09-08 and released
 in v0.12.0.
 
-**One thing is still unverified rather than unbuilt**, and this section said
-"Nothing" over it until 2026-09-09: **the hall-of-fame WRITE**. Twice above,
-this file says it has never been witnessed, because no driven game has ever
-scored high enough to write a row. It goes through the `plat_write_all` the
-save proves — an argument, not a measurement. "Still open" and "still
-unverified" are different lists and this file was keeping only one of them.
+**Both of the things this section carried are now closed**, and it kept saying
+otherwise for a day after each — this file is one sideways from the work, which
+is where a stale claim survives longest.
 
-**And one defect, found by source read on 2026-09-09 and CONFIRMED ON THE
-MACHINE on 2026-09-10.** `snd_beep()` gates SID voice 2 on at 440Hz and never
-gates it off; `sfx_on = 0` then stops `tick()`'s effects branch -- the only
-other code that touches V2 -- from clearing it, and `SR_FLAT` leaves no
-envelope to decay through. Every other port waits its frames and calls
-`voice_off`.
+**The hall-of-fame WRITE is WITNESSED (2026-09-10).** It had never been, because
+no driven game scored high enough to write a row; the method is the Atari's —
+poke `ship.killed` past the -930 floor a self-destruct forces. `TREK.SCR` on the
+D81, 302 bytes, `JAMIE....................\r\n570\r\n` at offset 0, and c1541
+reads it back. "Still open" and "still unverified" are different lists, and this
+file was keeping only one of them.
+
+**And the refusal beep is FIXED and RELEASED in v0.12.1 (2026-09-10),** heard by
+Jamie — *"beeps and stops"*. `snd_beep()` gated SID voice 2 on at 440Hz and
+never gated it off; `sfx_on = 0` then stopped `tick()`'s effects branch — the
+only other code that touches V2 — from clearing it, and `SR_FLAT` left no
+envelope to decay through. `beep_left` counts down in `tick()` now and calls
+`voice_off`, measured at 275ms against 274.6 predicted, over eight beeps.
 
 **The experiment, and it is not the one first written down.** That said "ask
 Xemu for the voice-2 gate bit", which cannot work: SID `$D400..$D418` are

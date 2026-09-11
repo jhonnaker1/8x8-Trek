@@ -715,9 +715,14 @@ once with, and the pair says which world this is.
 * **The link is not deterministic.** `make reproducible` reports it. Two
   distinct binaries chosen at random, differing by exactly 20 bytes in exactly
   one function. Characterised, not fixed — item 19 on THE OPEN LIST.
-* **A person has not played it.** Driven through combat, docking, landing, the
-  evaluation and the hall of fame by `tools/probe_*.py`, off real state rather
-  than hope — but driven, not played.
+* **A person has not played it** — item 21. Driven through combat, docking,
+  landing, the evaluation and the hall of fame by `tools/probe_*.py`, off real
+  state rather than hope, but driven and not played. **Nor has anyone heard the
+  POKEY driver**, which is verified in both video standards by arithmetic —
+  exactly where the X16 stood for the four months it played an octave flat.
+* **It is releasable and not released** — item 22. The licence blocker went
+  with the DOS. What stands in the way is the bullet above and the load-time
+  judgement.
 
-These are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
-whole project and was re-derived on 2026-09-11.
+All four are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
+whole project and was re-derived on 2026-09-11 — items 5, 19, 21 and 22.
