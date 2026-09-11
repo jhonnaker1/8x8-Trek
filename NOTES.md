@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 22 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (2 open of 22 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,15 +475,16 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-The three still open are **10** (no human has played the Amiga), **11** (the
-C128 wants play) and **22** (the Atari is releasable and not released).
+**TWO still open, and BOTH want a person at a keyboard: 10** (no human has
+played the Amiga) and **11** (the C128 wants play). Nothing else is left.
 
 **Item 19 is documented and parked** by Jamie's call -- the non-deterministic
 Atari link is a property to be aware of, not work to be done, and it reopens
 only if a binary ever has to be reproduced byte-for-byte. **Item 5's judgement
 is made**: 112 seconds on a stock 1050 is a 1050, not a defect, and it is
-documented rather than fixed. **Which leaves item 22 with nothing in front of
-it but the decision to cut a release.**
+documented rather than fixed. **Item 22 CLOSED the same day: v0.13.0 was cut on 2026-09-11** -- five ports,
+the Atari included, and all four existing binaries changed because colour per
+message had landed in the shared `c128/src/ui.c` since v0.12.1.
 
 **Item 21 closed the same day it was raised, and cost two bugs to close.**
 Jamie played the Atari on 2026-09-11 and found that the port was SILENT and
@@ -743,14 +744,19 @@ schedules that.
     the restart. tools/probe_hof.py had typed N at that prompt for a day and
     rewound on the very next line, with a comment saying "back round" -- a
     guess about a screen it never waited to see.
-22. **The Atari is releasable and not released, and nothing is in front of it
-    any more.** The licence blocker went with Atari DOS on 2026-09-11 (items 6
+22. ~~**The Atari is releasable and not released.**~~ **RELEASED 2026-09-11 in
+    v0.13.0 -- five ports, and the first release with all five in it.** The licence blocker went with Atari DOS on 2026-09-11 (items 6
     and 7): `make -C atari atr` builds one self-booting `.ATR` with no Atari
     code on it. Item 21 closed the same day -- Jamie played it, and the three
     faults he found are fixed. Item 5's judgement is made: the load time gets
-    documented, not fixed. **The release notes must carry the load time**, in
-    the same words the port README uses: about two minutes on a stock 1050, a
-    few seconds on an emulator or a fast-SIO drive.
+    documented, not fixed -- and the release notes carry it in the same words
+    the port README uses: about two minutes on a stock 1050, a few seconds on
+    an emulator or a fast-SIO drive.
+
+    **The cut found three shipped `README-release.txt` files stale on the same
+    line** -- colour per message called "deferred" a day after it was built in
+    the shared ui.c, so v0.12.1 went out with them already wrong. Those are the
+    files a PLAYER reads and no check touches them. See [[cutting-a-release]].
 
 ### Deliberate scope, listed so they are not mistaken for defects
 
