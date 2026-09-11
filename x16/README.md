@@ -155,6 +155,16 @@ part of the game build.
 the screen. It is what caught the case bug — `src/x16input.c`'s header had
 *reasoned* that GETIN speaks PETSCII, and it does not.
 
+## Heard, and confirmed
+
+**Jamie listened to it on 2026-09-10 and said it sounds right** -- which is the
+only check that could settle the two changes above. The octave fix and the
+waveform fix both shipped on arithmetic: a reference tone reading 439.9Hz
+against 440, and a duty cycle reading 49.7% against 50. Those say the numbers
+agree with each other. They cannot say the music sounds like music, and this
+port had been a full octave flat for four months without any measurement
+noticing, because every measurement was of the thing that was wrong.
+
 ## What is open
 
 Nothing specific to this port. The two features deferred everywhere — the MAIN

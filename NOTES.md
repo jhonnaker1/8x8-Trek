@@ -544,7 +544,13 @@ that is released.**
 
 ### Verification gaps on released ports
 
-18. **NOBODY HAS HEARD v0.12.1.** Every sound figure in items 1 and 2 came out
+18. **THE X16 HAS BEEN HEARD -- Jamie, 2026-09-10: "sounds right".** That is
+    the octave and the timbre confirmed by ear, which no measurement here
+    could do: the port had been a full octave flat since v0.10.0 and the
+    waveform went from a 0.9%-duty spike to a 50% square, and both changes
+    shipped on arithmetic alone. **Still unheard: the MEGA65's beep fix**, and
+    the X16's refusal beep was not separately exercised. Original entry:
+    NOBODY HAS HEARD v0.12.1. Every sound figure in items 1 and 2 came out
     of an emulator's audio recording or a driver probe -- never a speaker with
     a person in front of it. **The X16's music moved an octave AND changed
     timbre**, from a 1% pulse to a 50% square: a larger audible change than any
