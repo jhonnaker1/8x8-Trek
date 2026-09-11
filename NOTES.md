@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (6 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (5 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -615,8 +615,10 @@ that is released.**
     deferred to roomier
     targets, Jamie 2026-08-29. What cycles them is read; the RESIDENT cost is
     the blocker, not the data.
-13. **A colour per message** -- deferred, Jamie 2026-09-02. **MEASURED on the
-    Atari 2026-09-10 and it FITS: 187 bytes resident.** The deferral's premise
+13. ~~**A colour per message.**~~ **BUILT 2026-09-10 as a department map plus
+    per-event exceptions -- Jamie's call**, which is what the data turned out
+    to say. See "Colour per message, built" below. Earlier note: **MEASURED on
+    the Atari and it FITS: 187 bytes resident.** The deferral's premise
     was "the bytes are nearly free, the resident code is not"; on the tightest
     port of the five the resident code is 187 bytes and there are 437. Build a
     prototype, measure, revert -- see "Colour per message, measured" below.
@@ -7870,6 +7872,64 @@ segment base explains MANY sites, a coincidence explains one. Counting how many
 sites each candidate base can serve, and giving each site the best-supported
 one, makes `$0E315` read correctly. **The tool prints that check on every run
 and says outright that nothing is evidence if it fails.**
+
+
+## Colour per message, built (2026-09-10)
+
+Not the design that was measured. The 187-byte per-site version was costed
+first; then reading the original's table showed most messages take their
+DEPARTMENT's colour and only a few events break out, so what shipped is a
+department map plus an override -- cheaper, and closer to what the original
+does.
+
+### The departments, read rather than chosen
+
+    NAVIGATION / HELM   EGA 3   cyan
+    ENGINEERING         EGA 6   brown
+    SCIENCE             EGA 6   brown
+    COMMUNICATIONS      EGA 7   light gray
+    DAMAGE              EGA 6   brown
+    SECURITY, COMPUTER  unmeasured -- left at the default rather than guessed
+
+**COMMUNICATIONS WAS YELLOW AND IS NOT.** That came from one screen capture,
+and a capture can only show the sites that happen to be on screen. The binary
+and a second capture agree on 7.
+
+### The exception, and why there is only one
+
+The original paints four events out of their department's colour: a black hole
+13, a defective crystal 13, a good crystal 14, energium mined 15. **Three of
+those are `ui_dialog_line` calls in this port**, inside the USE and mining
+dialogs, which colour themselves and never reach the message panel. So one
+site takes an override today -- the black hole -- and the mechanism is there
+for the rest as they are read.
+
+### Where the override lives, and the port that decided it
+
+First version put it in the log record's unused tail, which looked free. **The
+X16 refused to link: `.noinit` overflowed by 31 bytes**, because two VDC
+round-trip helpers are not free even when the storage is. That failure pointed
+at a better answer already in MEASURED.md: **the MSGS overlay FLATTENS whatever
+colour the panel used**, so the archive never shows it and storing it there was
+carrying a byte for nobody to read. It lives in a four-byte array beside
+`panel_slot` now.
+
+    c128    1589 -> 1459      atari  437 -> 323
+    mega65  5282 -> 4997      x16    157 -> 155 spare in its largest overlay
+
+### Two tests, and both were made to fail before being believed
+
+`test_panels.c` asserted the old colours -- including a slot commented
+"everything else, unmeasured", which is exactly what got measured. Updating it
+broke a SECOND assertion: `cols[2]` was doing double duty as "the default" for
+the COMPUTER-is-not-COMMUNICATIONS check, and giving it a department's colour
+moved the fixture under a test that was not about departments at all. **The
+redundant-looking test earned its place.** The default has its own slot now.
+
+The new tests cover the override and the case most likely to break -- an
+override travelling with its message when the panel scrolls, since the colour
+array has to shift alongside `panel_slot`. Deleting that one line fails both
+new checks, which is the only reason to believe they work.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 

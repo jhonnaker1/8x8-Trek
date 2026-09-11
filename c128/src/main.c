@@ -825,7 +825,7 @@ OVL_CODE_MOVE static void report_move(uint8_t r) {
            is why these read as a sentence continued. */
         case MOVE_HOLE_THROWN: {
             uint8_t k;
-            ui_message(S(S_52), S(S_294));
+            ui_message_col(S(S_52), S(S_294), EGA_TO_VDC(EGA_LTMAGENTA));
             k  = put_str(linebuf, S(S_295));
             k += put_quad(linebuf + k, ship.quad_y, ship.quad_x);
             linebuf[k++] = '.';
@@ -836,7 +836,7 @@ OVL_CODE_MOVE static void report_move(uint8_t r) {
             break;
         }
         case MOVE_HOLE_LOST:
-            ui_message(S(S_52), S(S_294));
+            ui_message_col(S(S_52), S(S_294), EGA_TO_VDC(EGA_LTMAGENTA));
             ui_message(S(S_52), S(S_296));
             snd_effect(SFX_D);
             break;

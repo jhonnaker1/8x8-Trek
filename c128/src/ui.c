@@ -815,12 +815,51 @@ static unsigned char msg_count = 0;
  * describe it as measured, and do not "fix" it here by swapping green for
  * cyan -- that would trade one department's error for four others'. */
 static unsigned char dept_color(const char *dept) {
-    if (dept[0] == 'D')                    /* DAMAGE */
+    /* THE DEPARTMENT DEFAULTS, READ OFF THE ORIGINAL 2026-09-10 rather than
+       chosen. tools/msg_colours.py attributes each of the original's message
+       sites to the SetColor immediately before it; the departments come out
+       consistent, which is what "per site, ten colours" obscured:
+
+           NAVIGATION       EGA 3   cyan      14 sites
+           ENGINEERING      EGA 6   brown     16 sites
+           SCIENCE          EGA 6   brown
+           COMMUNICATIONS   EGA 7   lt gray    3 sites
+
+       **COMMUNICATIONS WAS YELLOW HERE AND IS NOT YELLOW.** That came from a
+       screen capture, and a capture can only show the sites that happen to be
+       on screen -- see MEASURED.md, "Message colour is PER SITE". The binary
+       and a second capture agree on 7.
+
+       HELM is this port's name for NAVIGATION, so it takes NAVIGATION's
+       colour. SECURITY and COMPUTER have no reading behind them and keep the
+       default rather than being given a plausible one. */
+    switch (dept[0]) {
+    case 'N':                                   /* NAVIGATION */
+    case 'H':                                   /* HELM, this port's name */
+        return EGA_TO_VDC(EGA_CYAN);
+    case 'E':                                   /* ENGINEERING */
         return EGA_TO_VDC(EGA_BROWN);
-    if (dept[0] == 'C' && dept[1] == 'O' && dept[2] == 'M' && dept[3] == 'M')
-        return EGA_TO_VDC(EGA_YELLOW);     /* COMMUNICATIONS, not COMPUTER */
-    return COL_MSG;
+    case 'D':                                   /* DAMAGE */
+        return EGA_TO_VDC(EGA_BROWN);
+    case 'S':
+        /* SCIENCE is measured; SECURITY is not, and they share a letter. */
+        return dept[1] == 'C' ? EGA_TO_VDC(EGA_BROWN) : COL_MSG;
+    case 'C':
+        /* COMMS/COMMUNICATIONS, and deliberately NOT COMPUTER. */
+        return (dept[1] == 'O' && dept[2] == 'M' && dept[3] == 'M')
+               ? EGA_TO_VDC(EGA_LTGRAY) : COL_MSG;
+    default:
+        return COL_MSG;
+    }
 }
+
+/* THE OVERRIDE LIVES BESIDE THE PANEL, NOT IN THE LOG, and that is measured
+   rather than thrifty: MEASURED.md records that the MSGS overlay FLATTENS
+   whatever colour the panel used. The archive never shows it, so storing it
+   there would have been carrying a byte through VDC RAM for nobody to read --
+   and it cost the X16 31 bytes of `.noinit` it has not got, which is how the
+   first version was caught. Four bytes, one per panel slot. */
+static unsigned char slot_colour[MSG_SLOTS];
 
 static void msg_clear_region(void) {
     scr_fill_rect(MSG_X, MSG_Y, MSG_W, MSG_H, SC_SPACE, COL_LABEL);
@@ -865,6 +904,7 @@ static void msg_clear_region(void) {
      55..63  unused */
 #define LOG_OFF_DEPT  2
 #define LOG_OFF_TEXT  (LOG_OFF_DEPT + LOG_DEPT)
+
 
 static unsigned char log_count = 0;   /* entries written, capped at LOG_SLOTS */
 static unsigned char log_head  = 0;   /* next slot to write; wraps */
@@ -921,6 +961,7 @@ static void log_fetch_slot(unsigned char slot) {
     view_text[LOG_TEXT] = '\0';
 }
 
+
 /* By position from the OLDEST entry still held, which is how MSGS reads it.
    Once the log has wrapped, entry 0 is whatever log_head points at, because
    that is the slot about to be overwritten. */
@@ -951,7 +992,7 @@ static void msg_box(unsigned char slot) {
        below reads those, not arrays of its own. C89 wants the declarations
        first, so the fetch comes after them rather than beside its comment. */
     log_fetch_slot(panel_slot[slot]);
-    color = dept_color(view_dept);
+    color = slot_colour[slot] ? slot_colour[slot] : dept_color(view_dept);
 
     scr_hline((unsigned char)(MSG_X + 1), y, (unsigned char)(MSG_W - 2),
               G_HLINE, color);
@@ -990,21 +1031,48 @@ static void msg_redraw(void) {
     for (i = 0; i < msg_count; i++) msg_box(i);
 }
 
-void ui_message(const char *dept, const char *text) {
+/* THE HANDFUL OF MESSAGES THAT BREAK OUT OF THEIR DEPARTMENT'S COLOUR.
+ *
+ * Read off the original 2026-09-10 (tools/msg_colours.py). Most messages take
+ * the colour of the department that speaks them; a few moments do not, and
+ * they are all EVENTS rather than reports:
+ *
+ *     EGA 13   the ship enters a black hole
+ *     EGA 13   this crystal is defective
+ *     EGA 14   crystal loaded, it appears good
+ *     EGA 15   energium successfully mined
+ *
+ * ONLY THE FIRST IS A PANEL MESSAGE IN THIS PORT. The other three are
+ * `ui_dialog_line` calls inside the USE and mining dialogs, which colour
+ * themselves and never reach here -- so one site takes an override today and
+ * the mechanism is there for the rest as they are read.
+ *
+ * Passing 0 means "use the department's colour", which every other site does.
+ * The override rides in the log record's unused tail, so it costs nothing. */
+void ui_message_col(const char *dept, const char *text, unsigned char colour) {
     unsigned char i;
     unsigned char slot = log_head;      /* where log_append is about to put it */
 
     log_append(dept, text, ship.stardate);
 
+
     if (msg_count == MSG_SLOTS) {
         /* Oldest scrolls off the panel, as the original's stack does. It
            stays in the log: falling off the panel is not acknowledgement. */
-        for (i = 1; i < MSG_SLOTS; i++) panel_slot[i - 1] = panel_slot[i];
+        for (i = 1; i < MSG_SLOTS; i++) {
+            panel_slot[i - 1]  = panel_slot[i];
+            slot_colour[i - 1] = slot_colour[i];
+        }
         msg_count--;
     }
 
+    slot_colour[msg_count] = colour;
     panel_slot[msg_count++] = slot;
     msg_redraw();
+}
+
+void ui_message(const char *dept, const char *text) {
+    ui_message_col(dept, text, 0);      /* 0 = the department's own colour */
 }
 
 /* A#, MEASURED 2026-08-23. `n` is 1-based by position down the panel, which

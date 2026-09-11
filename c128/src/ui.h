@@ -21,6 +21,8 @@ void ui_draw_position(void);
    the top. `dept` is the originating department, as the original prefixes
    every message with (manual l.310). */
 void ui_message(const char *dept, const char *text);
+/* Same, with a per-event colour that overrides the department's. See ui.c. */
+void ui_message_col(const char *dept, const char *text, unsigned char colour);
 void ui_clear_messages(void);
 
 /* A#, and MSGS. MEASURED 2026-08-23: the panel is a QUEUE awaiting

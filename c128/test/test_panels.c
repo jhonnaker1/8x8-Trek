@@ -986,11 +986,28 @@ static void test_message_stack(void) {
     unsigned char i;
     char msg[64];
     static const unsigned char want[4] = { 0, 1, 2, 1 };  /* index into cols[] */
-    unsigned char cols[3];
+    unsigned char cols[4];
 
-    cols[0] = EGA_TO_VDC(EGA_YELLOW);   /* COMMUNICATIONS */
+    /* READ OFF THE ORIGINAL 2026-09-10, tools/msg_colours.py -- these were
+       a capture-derived yellow and an admitted guess until then.
+
+       COMMUNICATIONS is EGA 7, not yellow. The yellow came from one screen
+       capture, and a capture can only show the sites that happen to be on
+       screen; the binary and a second capture agree on 7 (MEASURED.md,
+       "Message colour is PER SITE").
+
+       HELM is this port's name for NAVIGATION, which is EGA 3 across all
+       fourteen of its sites -- so box 2 is no longer "everything else,
+       unmeasured". */
+    cols[0] = EGA_TO_VDC(EGA_LTGRAY);   /* COMMUNICATIONS */
     cols[1] = EGA_TO_VDC(EGA_BROWN);    /* DAMAGE         */
-    cols[2] = EGA_TO_VDC(EGA_LTGREEN);  /* everything else, unmeasured    */
+    cols[2] = EGA_TO_VDC(EGA_CYAN);     /* HELM = NAVIGATION */
+    /* THE DEFAULT GETS ITS OWN SLOT. cols[2] used to be "everything else"
+       AND the expectation for the COMPUTER check below; giving it a
+       department's colour broke that check, which is the redundant-looking
+       test earning its place -- it caught a shared fixture changing meaning
+       under an assertion that was not about departments at all. */
+    cols[3] = EGA_TO_VDC(EGA_LTGREEN);  /* no reading behind it */
 
     screen_reset();
     ui_clear_messages();
@@ -1011,8 +1028,33 @@ static void test_message_stack(void) {
     screen_reset();
     ui_clear_messages();
     ui_message("COMPUTER: ", "M)OVE W)ARP");
-    check(attr[MSG_Y][MSG_X] == cols[2],
+    check(attr[MSG_Y][MSG_X] == cols[3],
           "COMPUTER is not mistaken for COMMUNICATIONS");
+
+    /* THE PER-EVENT OVERRIDE. Most messages take their department's colour;
+       a few events do not -- the original paints the black hole EGA 13 from
+       a NAVIGATION site that is otherwise EGA 3 (tools/msg_colours.py). */
+    screen_reset();
+    ui_clear_messages();
+    ui_message_col("NAVIGATION: ", "BLACK HOLE", EGA_TO_VDC(EGA_LTMAGENTA));
+    check(attr[MSG_Y][MSG_X] == EGA_TO_VDC(EGA_LTMAGENTA),
+          "an override beats the department's colour");
+
+    /* AND IT TRAVELS WITH ITS MESSAGE WHEN THE PANEL SCROLLS. The colour
+       lives in an array parallel to panel_slot, so the shift that drops the
+       oldest box has to move both -- miss it and every override slides onto
+       whatever message inherits its slot. Five messages into four boxes. */
+    screen_reset();
+    ui_clear_messages();
+    ui_message("HELM: ", "ONE");
+    ui_message_col("NAVIGATION: ", "BLACK HOLE", EGA_TO_VDC(EGA_LTMAGENTA));
+    ui_message("HELM: ", "THREE");
+    ui_message("HELM: ", "FOUR");
+    ui_message("HELM: ", "FIVE");          /* ONE scrolls off; the rest shift */
+    check(attr[MSG_Y][MSG_X] == EGA_TO_VDC(EGA_LTMAGENTA),
+          "an override moves up with its message when the panel scrolls");
+    check(attr[MSG_Y + 3][MSG_X] == cols[2],
+          "and the message below it keeps its own department colour");
 }
 
 /* The stardate stamp sits in the top border, and it is the date the message
