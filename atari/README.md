@@ -767,6 +767,44 @@ the same symptom from outside.
 Fixing it cost 452 bytes, because until then the optimiser could see that most
 of the driver was unreachable.
 
+### And then it was three octaves sharp
+
+Jamie, one play later: *"the pitch is way too high."*
+
+**The Atari OS takes POKEY back on every disk read.** SIO drives the serial
+port from POKEY — it joins channels 3+4 as the baud generator and clocks
+channel 3 at 1.79 MHz, which is `AUDCTL = $28` — and it writes the *whole*
+register, so bit 4 (join 1+2) and bit 6 (clock channel 1 fast) come back
+**clear**. Those two are the music voice. Without them channel 2 stops being
+the high half of a 16-bit divisor and becomes an ordinary 8-bit channel on the
+64 kHz clock.
+
+Measured at the title screen, by asking Altirra for POKEY's write-side state —
+`$D200-$D207` are **write-only** and reading them returns the paddle ports,
+which is how the first attempt got `AUDF1 = AUDF2 = 228` for fourteen samples
+while the music changed:
+
+```
+AUDCTL $28   AUDF1 6   AUDF2 12      divisor 3078 = the 290 Hz note intended
+                                     sounding  2458 Hz = 63921/(2*(12+1))
+```
+
+`snd_poll()` re-asserts `AUDCTL` now — there rather than in `voice_note()`,
+because a note that starts before an overlay load and is still sounding after
+it would otherwise stay wrong for its whole length. After the fix: `AUDCTL
+$78`, and Altirra reports 290 Hz for the same divisor.
+
+**`make run-sndtest` passed twelve checks on this too, at 0.05% worst error.**
+It links `src/sndtest.c` with no storage seam at all — the rule names five
+sources and not one of them can touch a disk — so SIO never ran, `AUDCTL`
+stayed `$78`, and every pitch was right. The game reads an overlay off the
+disk on the hot path. **Two tests measured this driver in a world it does not
+run in**: one never called `snd_poll()`, the other never touched a disk.
+
+And `make run-probe-sound` had already printed `1332, 1998, 2458, 3196 Hz`
+against a 90–930 Hz tune, called it a pass, and I noted the numbers looked
+high without acting. It bounds them now, and reverting the fix makes it fail.
+
 ### "Play Again? No" left a screen of garbage
 
 Two faults stacked.

@@ -675,6 +675,18 @@ schedules that.
     port's own input seam and was written without it. **The one function the
     two ports do not share is the one that drives the one thing they do.**
 
+    **AND THEN IT WAS THREE OCTAVES SHARP.** Jamie, one play later: "the
+    pitch is way too high." **The OS takes POKEY back on every disk read** --
+    SIO joins channels 3+4 as its baud generator and clocks channel 3 fast,
+    which is `AUDCTL = $28`, and it writes the WHOLE register, so bit 4 (join
+    1+2) and bit 6 come back CLEAR. Those two are the music voice. Measured at
+    the title: AUDCTL $28, AUDF1 6, AUDF2 12 -- a divisor of 3078, the 290 Hz
+    note intended -- sounding 2458 Hz, exactly 63921/(2*(12+1)). `snd_poll()`
+    re-asserts AUDCTL now. **$D200-$D207 ARE WRITE-ONLY** and reading them
+    returns the paddle ports; the first attempt at this got AUDF1 = AUDF2 =
+    228 for fourteen samples while the music changed, and only the constancy
+    gave it away. Ask Altirra for POKEY's state instead.
+
     `make run-sndtest` passed TWELVE checks on this -- both video standards,
     the pitch at each end of the music's range, the tempo, the loop, worst
     error 0.05% -- because it links `src/sndtest.c` against the driver and

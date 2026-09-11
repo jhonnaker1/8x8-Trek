@@ -261,8 +261,37 @@ static void music_tick(void) {
     }
 }
 
+/* RE-ASSERTED EVERY POLL, BECAUSE THE OS TAKES POKEY BACK ON EVERY DISK READ.
+ *
+ * SIO drives the serial port from POKEY: it joins channels 3+4 as the baud
+ * generator and clocks channel 3 at 1.79MHz, which is AUDCTL = $28 -- and it
+ * writes the WHOLE register, so bit 4 (join 1+2) and bit 6 (clock channel 1
+ * fast) come back CLEAR. Those two are the music voice. Without them channel
+ * 2 stops being the high half of a 16-bit divisor and becomes an ordinary
+ * 8-bit channel on the 64kHz clock, which is about three octaves up.
+ *
+ * MEASURED 2026-09-11, at the title screen, by asking Altirra for POKEY's
+ * write-side state: AUDCTL $28 where snd_init wrote $78, AUDF1 6 and AUDF2 12
+ * -- a divisor of 3078, which is the 290 Hz note the driver intended -- while
+ * the machine sounded 2458 Hz, exactly 63921/(2*(12+1)). Jamie heard it on
+ * the first play with sound: "the pitch is way too high."
+ *
+ * AND THIS IS WHY `make run-sndtest` PASSED, twelve checks and 0.05% worst
+ * error. It links src/sndtest.c with NO storage seam at all -- the rule names
+ * five sources and none of them can touch a disk -- so SIO never ran, AUDCTL
+ * stayed $78 and every pitch was right. The game reads an overlay off the
+ * disk on the hot path. TWO tests measured this driver in a world it does not
+ * run in: one never called snd_poll, this one never touched a disk.
+ *
+ * Here rather than in voice_note() because a note that starts before an
+ * overlay load and is still sounding after it would otherwise stay wrong for
+ * its whole length. Here it is repaired within a frame of the read finishing.
+ * Not in atarisio.c: SIO is synchronous, so nothing polls during a transfer,
+ * and the disk seam has no business knowing this port has a sound chip. */
 void snd_poll(void) {
     unsigned char n = frames_since();   /* ALWAYS, even when idle */
+
+    AUDCTL = AUDCTL_TWO_VOICE;
 
     if (!enabled || (!mus_on && !sfx_on)) return;
     if (n > CATCH_UP_MAX) n = CATCH_UP_MAX;
