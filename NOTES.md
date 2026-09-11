@@ -7378,6 +7378,43 @@ question is whether blitting an 80x25 console is affordable on a 1.8MHz 6809 --
 **a benchmark, not a datasheet check**, and the 6809 is slower than the 3.58MHz
 Z80 the same question was asked about for MSX2.
 
+#### WHICH MACHINES COULD ACTUALLY RUN IT, AND THE VBXE PRECEDENT (2026-09-11)
+
+**COCO 3 ONLY, AND ON RAM RATHER THAN ON VIDEO.** MAME offers `ssfm` on `coco`
+and `coco2b` as well as `coco3`, so the card is a cartridge-port device across
+the 6809 line and a CoCo 1 would show the same picture -- the host's own video
+is irrelevant once the console lives on the V9958. What stops it is the
+machine, and MAME's own tables say so:
+
+    coco     RAM 4K/16K/32K/64K    MC6809E @ 894,886 Hz
+    coco2b   RAM 4K/16K/32K/64K    MC6809E @ 894,886 Hz
+    coco3    RAM 128K/512K         MC6809E @ 894,886 Hz  (GIME doubles to 1.79)
+
+A CoCo 1 or 2 tops out at **64K flat with no banking**, and that 64K also
+carries Extended Color BASIC's workspace and the disk controller's, against a
+resident half that is 37,612 bytes on the C128 BEFORE overlays. The card's 128K
+of VRAM could carry the far memory -- exactly what the Atari does with VBXE's
+VRAM -- but that moves the DATA, not the resident code, and there is no banking
+on a CoCo 1/2 to help it. Speed is the second problem: only the CoCo 3's GIME
+doubles the clock, so the unmeasured blit cost through the V9958's I/O ports
+would be paid at half speed.
+
+**POPULARITY, AND IT DOES NOT SETTLE WHAT IT LOOKS LIKE IT SETTLES.** The CoCo
+line outsold the Falcon by a wide margin -- a decade in Radio Shack's retail
+network against a machine Atari killed for the Jaguar. **But the comparison
+that matters is what can RUN it**, and that is CoCo 3 *plus* a SuperSprite FM+
+*plus* a disk controller, hence a Multi-Pak as well. The FM+ is a modern
+small-batch recreation of a niche 1980s product, so the fitted population is
+plausibly SMALLER than the number of Falcons. **Marked as a guess: no figures
+are recorded for any of these machines, here or above, because there is nothing
+on this machine to check them against.**
+
+**AND THE VBXE PRECEDENT CUTS BOTH WAYS.** This project SHIPPED a card-dependent
+port: the released Atari 800XL build requires a VBXE, which is also a rare
+aftermarket board. So "needs an add-on nobody has" cannot be the disqualifier
+on its own, or that port would not exist. What separates them is not
+popularity at all -- **the Atari port needed no new compiler.**
+
 **THE SECOND REASON STANDS UNTOUCHED.** A card does nothing about CMOC: a
 fourth CPU family whose only compiler silently miscompiled `(sec_y + 1) << 8`
 and cannot evaluate the save-record static assert. **So this note narrows the
