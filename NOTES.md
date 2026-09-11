@@ -2972,7 +2972,10 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
 
 (MEGA65 was here until 2026-08-23, when Jamie built it -- see below.)
 
-- **CoCo 3 -- VERIFIED 2026-08-22, and it qualifies.** Booted a real CoCo 3
+- **CoCo 3 -- VERIFIED 2026-08-22, and it qualified under a colour requirement
+  that turned out to be wrong. DROPPED 2026-09-05; see "THREE TARGETS DROPPED".
+  A SuperSprite FM+ (Yamaha V9958) would answer the colour half -- in a BITMAP
+  mode, not in text -- and answers nothing about CMOC. Recorded 2026-09-11.** Booted a real CoCo 3
   ROM in XRoar and typed a BASIC test: `WIDTH 80`, then `ATTR f,b` across all
   eight foreground and eight background values, with an 80-character ruler to
   confirm the width. The ruler fills the line and the capture holds **eight
@@ -7278,6 +7281,57 @@ only compiler, CMOC, is non-conforming -- it silently miscompiled
 (0,0), and it cannot evaluate the save-record static assert. **Both of those
 were worth the exercise on their own** -- the shift is fixed defensively for
 every port, and the assert now survives four compilers.
+
+#### THE COLOUR HALF IS CONDITIONAL ON AN ADD-ON CARD (2026-09-11)
+
+Jamie: "if it had the SuperSprite FM+ installed, would it then be able to do
+the 16 colours at 80 columns?" **On the arithmetic, yes -- but not as text,
+and it does not revive the target on its own.**
+
+**VERIFIED HERE, with Ample's MAME** (`-listslots coco3`, then
+`coco3 -ext ssfm -listdevices`):
+
+    ssfm    "6x09 SuperSprite FM+"    a coco3 EXTENSION slot option
+              Yamaha V9958 VDP @ 21.47 MHz
+              YM2413 OPLL @ 3.57 MHz
+
+So it is a **V9958** -- the MSX2+ chip, successor to the V9938 -- and this file
+already carries that family's analysis under **MSX2** in the tier list. XRoar
+cannot model the card; MAME can, and Ample's MAME is the instrument of record
+here (see "Port target toolchains").
+
+**What that buys, from the MSX2 entry rather than from a fresh guess:**
+
+  * **TEXT2 (`WIDTH 80`) does NOT help.** 80x24, but the blink attribute buys
+    only a second colour pair -- four colours, the same trap that put the
+    Atari ST out.
+  * **SCREEN 7 (GRAPHIC6) is the route.** 512x212, sixteen colours PER PIXEL,
+    no attribute clash. A six-pixel font puts 85 columns in that 512 -- 80
+    with room over -- and 212 rows holds 25 at eight pixels tall. **That is
+    the Amiga's shape, not the C128's**: a bitmap with a software-drawn font,
+    which this project already has a port of.
+
+**WHAT IS NOT ESTABLISHED, and the MSX2 entry says the same about the same
+mode: anything measured here.** The arithmetic is certain and the mode is
+textbook. An openMSX attempt on a V9938 produced no answer and two traps worth
+not repeating -- MSX BASIC's prompt arrives between 30 and 60 emulated seconds
+so early typing is silently swallowed, and the emulator's screenshot size does
+not indicate the video mode. **MAME with `ssfm` is a cleaner instrument than
+that was.**
+
+**AND THE REAL RISK WAS NEVER THE MODE.** The V9958's VRAM sits behind I/O
+ports rather than in the address space, so every glyph is port writes. The
+question is whether blitting an 80x25 console is affordable on a 1.8MHz 6809 --
+**a benchmark, not a datasheet check**, and the 6809 is slower than the 3.58MHz
+Z80 the same question was asked about for MSX2.
+
+**THE SECOND REASON STANDS UNTOUCHED.** A card does nothing about CMOC: a
+fourth CPU family whose only compiler silently miscompiled `(sec_y + 1) << 8`
+and cannot evaluate the save-record static assert. **So this note narrows the
+drop from "two reasons" to "one reason and an unmeasured cost", and does not
+reopen it.** The VBXE precedent means "CoCo 3 + SuperSprite FM+" is a shape
+this project accepts -- the Atari port requires a card too -- so if it is ever
+revisited, that is the form it would take.
 
 ### Foenix F256 -- out
 

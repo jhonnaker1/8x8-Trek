@@ -207,7 +207,10 @@ of them were settled by measurement in September 2026.
   the palette groups are bound to a pixel's position within a byte. Four
   against fifteen.
 - **The whole Atari ST line** — 640×200 costs all but four colours (Jamie's
-  call). **MSX2** has 80 columns but the colour collapses. The **stock Atari
+  call). **MSX2** has 80 columns but the colour collapses — though its V9938's
+  SCREEN 7 is a bitmap route nobody has benchmarked, and the same applies to a
+  **CoCo 3 with a SuperSprite FM+**, which carries the V9938's successor; see
+  `NOTES.md`. The **stock Atari
   800XL** stops at 40 columns; only VBXE brings it back. The 40-column colour
   machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
   a nine-panel console does not fit in 40 columns.
