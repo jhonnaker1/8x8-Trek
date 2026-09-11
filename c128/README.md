@@ -192,9 +192,12 @@ VICE ships the C128 character ROM, and `make test` reads the bitmaps out of it
 install paths. It is how you find out whether the screen codes the port picked
 actually draw the shapes it thinks they do, rather than trusting a table.
 
-**It skips silently if the ROM is not installed**, printing
-`(no C128 chargen ROM found -- bitmap check skipped)`. A skipped check is not a
-passing one; if you have VICE, make sure it finds it.
+**On success it prints nothing of its own** — it is folded into
+`console panels: all checks passed` — and if the ROM is not installed it prints
+`(no C128 chargen ROM found -- bitmap check skipped)` and carries on. So the
+two outcomes that look most alike from a distance are "ran and passed" and
+"never ran": one of them says so and the other is silent. If you have VICE,
+check that the skip line is absent rather than assuming.
 
 The box-drawing set the console uses is authored here, not lifted from
 Commodore's ROM. Checking it against the ROM is about what the machine *draws*,
