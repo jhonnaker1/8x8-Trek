@@ -1,7 +1,7 @@
 # EGA Trek — Commander X16
 
 Second port, **released in v0.10.0** and shipping in
-[v0.13.1](../../../releases/latest). The modern 8-bit machine: a 65C02, a
+[v0.13.2](../../../releases/latest). The modern 8-bit machine: a 65C02, a
 CBM-compatible KERNAL, and VERA — a video chip with per-cell foreground and
 background colour, so the nine-panel console renders as designed with no
 mapping.
@@ -91,29 +91,36 @@ repeat them anywhere else. **The figures above were 140 and 157 when this
 section was written and are 80 and 155 now** — they moved under it, which is
 the argument for reading `verify` rather than this file.
 
-### THE SOFT STACK IS THE TIGHTEST THING IN THIS PROJECT, AND IT IS UNMEASURED
+### THE SOFT STACK WAS OVERFLOWING ON SAVE -- MEASURED AND FIXED 2026-09-11
 
-**80 bytes.** That line is a warning, not a statistic, and the number has
-halved since it was written.
+    demand on SAVE    86 bytes   measured twice, TREK_STACKPROBE
+    was available     80 bytes   -- six bytes went into .noinit under every save
+    now available    184 bytes   window 3,968 -> 3,888
 
-`c128/trek128.ld` records the C128's own demand, and it was **measured, not
-guessed**: the deepest path — *evaluation, hall of fame* — reached **143
-bytes**, overrunning a 64-byte guard by 79 and landing straight in the overlay
-window. **This port shares `main.c` and `ui.c` with the C128, including that
-exact path**, and has 80 bytes for it.
+`__stack` **is** the overlay window base here, so the stack grows down into the
+gap above `__heap_start` — the only headroom this port has — and an overrun
+lands in `.noinit` rather than in the window. That is the quiet failure of the
+two: no crash and no wrong picture, which is why v0.12.x and v0.13.x shipped it
+and a play session never showed it.
 
-That is not proof of a fault. Codegen differs per target, and the path HAS been
-exercised here since — the `TREK_AUTOPLAY` run drives self-destruct, memo,
-evaluation, total and hall of fame, and Jamie played the port on 2026-09-11 —
-with nothing visibly wrong. But an overrun here goes DOWN into the last
-variables rather than up into the window, which is the quieter failure of the
-two, and **this port's own demand has never been measured.**
+**SAVE is the deep path and nothing else is close.** The rest of the game —
+setup, warp, self-destruct, the loss memo, the evaluation, the hall of fame —
+reaches 59. The serialiser is about 2.5K of code.
 
-The method is in `llvm-mos`'s notes and was used on both other ports: fill
-below the live pointer with a sentinel and read back how far it was disturbed.
-On 2026-09-10 the Atari was found with its soft stack *inside* the overlay
-window, corrupting the running image, so the hazard is not hypothetical on any
-of the three.
+**The size is a ratio, not a round number**: 184 against 86 is 2.14×, where the
+C128 reserves 256 against its measured 143, which is 1.79×. It costs the
+largest overlay 80 of its 155 spare bytes, leaving 75, and `make verify` checks
+both halves.
+
+**And the resource is managed now, not merely reported.** `verify_prg.py`
+carries the measured demand and a floor of 144 and fails below either. The old
+floor was 64 — a number nobody had measured, which the overflowing build
+passed. Proved by putting the window back and watching it fail.
+
+The instrument is kept: `TREK_STACKPROBE` in `src/x16input.c`, with its build
+recipe in the comment. **It does not fit in the hole it measures** — shrink the
+window to make room, which also widens the sentinel region so the answer is not
+clipped.
 
 ## Two bugs this port is where we found
 

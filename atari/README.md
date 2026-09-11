@@ -746,7 +746,7 @@ once with, and the pair says which world this is.
   "Played, and it was silent" below. The POKEY driver has been **heard** now,
   which is what caught the third.
 * ~~It is releasable and not released~~ — **RELEASED 2026-09-11 in
-  [v0.13.1](../../../releases/latest)**, the first release with all five ports
+  [v0.13.2](../../../releases/latest)**, the first release with all five ports
   in it. The artefact is `egatrek-atari.atr` with `egatrek-atari.txt` beside
   it; `make release` builds both.
 
