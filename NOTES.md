@@ -6679,9 +6679,10 @@ group holds four entries; **four is the ceiling for freely-placeable colour.**
 
 The console needs FIFTEEN (counted 2026-09-05; this line used to say eight,
 which understated the case) -- white values, cyan labels, green healthy systems,
-yellow stars, red Mongols, magenta, grey, black. The CoCo 3 has exactly eight
-and qualified. The IIgs has four, which is the Atari ST's number, and the ST
-is out for it. Per-scanline SCB palettes do not rescue it: a text row is eight
+yellow stars, red Mongols, magenta, grey, black. The CoCo 3 has exactly eight,
+which qualified under the OLD count and does not under this one -- it was
+dropped the same day, see "THREE TARGETS DROPPED" below. The IIgs has four,
+which is the Atari ST's number, and the ST is out for it. Per-scanline SCB palettes do not rescue it: a text row is eight
 scanlines so each ROW could have its own four, but the nine panels sit SIDE BY
 SIDE, so panels sharing a row share the four. That is the identical objection.
 
