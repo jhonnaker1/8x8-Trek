@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (10 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (9 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -544,13 +544,20 @@ that is released.**
 
 ### Verification gaps on released ports
 
-18. **THE X16 HAS BEEN HEARD -- Jamie, 2026-09-10: "sounds right".** That is
-    the octave and the timbre confirmed by ear, which no measurement here
-    could do: the port had been a full octave flat since v0.10.0 and the
-    waveform went from a 0.9%-duty spike to a 50% square, and both changes
-    shipped on arithmetic alone. **Still unheard: the MEGA65's beep fix**, and
-    the X16's refusal beep was not separately exercised. Original entry:
-    NOBODY HAS HEARD v0.12.1. Every sound figure in items 1 and 2 came out
+18. ~~**NOBODY HAS HEARD v0.12.1.**~~ **BOTH PORTS HEARD -- Jamie,
+    2026-09-10.** The X16: *"sounds right"* -- the octave and the timbre, after
+    four months a full octave flat and a waveform that was a 0.9%-duty spike
+    where its comment claimed a 50% square. The MEGA65: *"beeps and stops"* --
+    the refusal beep that gated voice 2 on and never gated it off.
+
+    **This is the only item on this list no instrument here could have
+    closed.** The X16's numbers agreed with each other -- 439.9 against 440,
+    49.7% against 50 -- and had agreed with each other for four months while
+    the port played an octave flat, because every measurement was of the thing
+    that was wrong. And the MEGA65 could not be measured acoustically at all:
+    Xemu has no audio-to-file, so the probe could only say `voice_off(V2)` was
+    called zero times. Whether that was AUDIBLE was never establishable by any
+    rig on this project. Every sound figure in items 1 and 2 came out
     of an emulator's audio recording or a driver probe -- never a speaker with
     a person in front of it. **The X16's music moved an octave AND changed
     timbre**, from a 1% pulse to a 50% square: a larger audible change than any
