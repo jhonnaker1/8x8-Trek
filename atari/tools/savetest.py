@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
-"""Save in one run, restore in the next, against the same disk.
+"""Save and then restore, against the same disk, in ONE run.
 
-TWO RUNS AND NOT ONE, because a restore needs a cold start and two cold boots
-in a single script look exactly like a hang from outside -- which is what they
-were mistaken for once. Each half is one boot.
+    savetest.py
 
-    savetest.py save      -- fresh disk, play a little, SAVE, report the entry
-    savetest.py restore   -- boot the same disk and restore it
+~~TWO RUNS AND NOT ONE, because a restore needs a cold start and two cold
+boots in a single script look exactly like a hang from outside.~~ **That is
+what this file used to say and used to do, and it is what made SAVE look
+broken**: a restore in a SEPARATE process reads a disk the save never reached,
+because Altirra's writes are virtual to the emulated drive. One process, two
+cold boots, is the version that works -- see the comment on the second setup().
+
+It still pays for both boots, which is what tools/session.py exists to stop.
+This file is kept as the two-boot reference the harness is measured against.
+
+(It also took an argument it never read: `mode = sys.argv[1]`, a leftover of
+the two-run interface, which made `savetest.py` with no argument die on an
+IndexError rather than run.)
 """
 import pathlib
 import re
@@ -104,7 +113,6 @@ def setup(a, sym, restore):
 
 
 def main():
-    mode = sys.argv[1]
     SHOTS.mkdir(parents=True, exist_ok=True)
     shutil.copy(ATARI / "build" / "egatrek.atr", DISK)
     print("savetest: fresh disk -- %s" % entry())

@@ -609,6 +609,37 @@ Two things it cost to learn:
   returns against this build — the command reaches the server, and the SDK
   blocks on the reply for ever.
 
+## The snapshot harness, and the question it has to answer first
+
+`tools/session.py`. **Every Atari test until 2026-09-10 paid for a cold boot**
+-- mount, cold reset, then poll `far_used` until the game has streamed
+STRINGS.DAT, MUSIC.DAT and OVERLAYS.BIN into VRAM. That is the expensive part,
+it is identical every time, and `savetest.py` paid for it twice in one script
+because a restore needs a fresh start. Eight experiments in an afternoon cost
+sixteen boots, and the third tool call in a row that times out looks exactly
+like a hang -- which is how this rig came to be described as stuck.
+
+AltirraBridge has had `STATE_SAVE`/`STATE_LOAD` the whole time.
+
+    with Session() as s:          # boots once, snapshots as "booted"
+        s.keys("RETURN")
+        s.snap("title")
+        ...
+        s.rewind("title")         # instant
+
+**But the harness cannot be believed until one thing is measured.** Altirra's
+default disk mode is virtual read-write -- the emulated drive accepts writes
+the host `.ATR` never sees, which is exactly what made this port's SAVE look
+broken when it was not. So when a rewind happens, either the disk state is
+inside the snapshot (a rewind un-writes the save file, and every save test
+built on a rewind is measuring nothing) or it is beside it (a rewind keeps the
+file, and the test is real). **Those two answers mean opposite things and the
+harness cannot tell you which without being asked.**
+
+`make run-probe-snapshot` asks, with a discriminator rather than a
+confirmation: the same restore is attempted twice, once without a rewind and
+once with, and the pair says which world this is.
+
 ## What is still open
 
 * **SAVE, above** — unverified rather than broken, and the test that settles it

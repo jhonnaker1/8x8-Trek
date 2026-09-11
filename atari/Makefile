@@ -43,7 +43,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest nolto verify game data atr run clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest run-probe-snapshot nolto verify game data atr run clean
 
 all: early
 
@@ -150,6 +150,13 @@ storetest: src/storetest.c src/vbxevid.c src/ataristorage.c
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/storetest.xex \
 	    src/storetest.c src/vbxevid.c src/ataristorage.c
+
+# THE SNAPSHOT HARNESS PROBE. Before any save test is believed, settle whether
+# rewinding a snapshot also rewinds the emulated DISK -- Altirra's writes are
+# virtual, and the answer decides what every such test means. Two arms, one
+# with a rewind and one without. See tools/probe_snapshot.py.
+run-probe-snapshot: atr
+	python3 tools/probe_snapshot.py
 
 run-storetest: storetest
 	python3 tools/storetest.py "$(DOS_ATR)"
