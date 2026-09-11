@@ -108,12 +108,21 @@ def check_lowram():
 
 
 def check_headroom(window):
-    """THE RESIDENT POOL, reported by name every build.
+    """THE TWO POOLS, reported by name every build.
 
     A resource nobody reports is a resource nobody manages -- the C128's
-    lowram hit 77 bytes free before anyone looked, and this port links with a
-    few hundred. Everything between the last variable and the window is also
-    where the soft stack runs, and llvm-mos does not check it.
+    lowram hit 77 bytes free before anyone looked.
+
+    THERE ARE TWO NOW, and that is the whole point of dropping DOS. Until
+    2026-09-11 the program's code and all of its data shared $3000..$ACFF, so
+    one number described both. With no DOS resident, $0700..$1FFF is free RAM
+    that nothing else wants, and atari.ld puts .rodata, .data, .bss and
+    .noinit down there -- which hands their address space back to CODE, the
+    only pool this port has ever been short of.
+
+    So the figure this used to print -- the end of .noinit against the window
+    -- now describes neither pool. It read $1147 and called 39,865 bytes free
+    on a machine with 32K of program space.
     """
     # READ FROM THE MAP, NOT FROM nm -- the same trap tools/budget.py carries a
     # note about. OUTPUT_FORMAT makes the link emit an XEX rather than an ELF,
@@ -121,15 +130,30 @@ def check_headroom(window):
     # check that trusts it reports a free-space figure computed from zero.
     txt = MAP.read_text()
 
+    # VMA, LMA, size, name -- the map's section rows. .data is the one that
+    # differs: it RUNS at $0A00 and is LOADED high, after .rodata, so it
+    # counts against both pools and in different columns.
+    rows = {}
+    for vma, lma, size, name in re.findall(
+            r"^\s*([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+\d+\s+"
+            r"(\.[A-Za-z_.]+)\s*$", txt, re.M):
+        rows[name] = (int(vma, 16), int(lma, 16), int(size, 16))
+
+    for need in (".text", ".rodata", ".data", ".bss"):  # .noinit may be empty
+        if need not in rows:
+            die("no %s row in the map -- cannot bound the pools" % need)
+
     def sym(name):
         m = re.search(r"^\s+([0-9a-f]+)\s+[0-9a-f]+\s+\d+\s+\d+\s+"
                       + re.escape(name) + r"\s*=", txt, re.M)
         return int(m.group(1), 16) if m else None
 
-    end = sym("__heap_start") or sym("__bss_end")
-    if end is None:
-        die("no __heap_start or __bss_end in build/early.map -- cannot bound "
-            "resident")
+    # ---- the code pool: $3000 up to the window, less the stack's reserve.
+    # THE LOAD ADDRESS, not the run address. .rodata runs AND loads low, so it
+    # is not here at all; .data runs low but is LOADED up here beside the
+    # code, and that byte count is what costs the pool.
+    code_end = max(lma + size for _, lma, size in
+                   (rows[n] for n in (".text", ".data")))
     top = TOP - window
     # THE SOFT STACK'S RESERVE COMES OFF THE FREE SPACE, and reporting the
     # figure without it is how this check would start lying. The stack lives in
@@ -145,9 +169,9 @@ def check_headroom(window):
                   txt, re.M)
     reserve = int(m.group(1), 0) if m else 0
     stack_top = top - reserve
-    free = stack_top - end
-    print("verify: resident $%04X..$%04X, %d bytes free below the stack "
-          "reserve at $%04X" % (BASE, end, free, stack_top))
+    free = stack_top - code_end
+    print("verify: code $%04X..$%04X, %d bytes free below the stack reserve "
+          "at $%04X" % (BASE, code_end, free, stack_top))
     if reserve:
         print("verify: soft stack $%04X..$%04X, %d bytes reserved (MEMTOP is "
               "set to $%04X at load)" % (stack_top, top, reserve, top - 1))
@@ -155,10 +179,31 @@ def check_headroom(window):
         die("no __stack_reserve in the map -- the soft stack starts at "
             "MEMTOP+1 and would grow into the overlay window")
     if free < 0:
-        die("resident has overrun the window by %d bytes" % -free)
+        die("code has overrun the window by %d bytes" % -free)
     if free < 256:
         print("verify: NOTE -- under 256 bytes free, and .ovl_front grows with "
               "the save record")
+
+    # ---- the low pool: where DOS used to be.
+    low_base = ld_number(r"lowdata \(rw\)\s*:\s*ORIGIN\s*=\s*"
+                         r"(0x[0-9a-fA-F]+)")
+    low_len = ld_number(r"lowdata \(rw\)[^\n]*LENGTH\s*=\s*"
+                        r"(0x[0-9a-fA-F]+)\s*-") - low_base
+    low_end = max(vma + size for vma, _, size in
+                  (rows[n] for n in (".rodata", ".data", ".bss", ".noinit")
+                   if n in rows))
+    low_used = low_end - low_base
+    print("verify: low data $%04X..$%04X, %d of %d used, %d free (where DOS "
+          "was)" % (low_base, low_end, low_used, low_len, low_len - low_used))
+    if low_used > low_len:
+        die("low data has overrun $%04X by %d bytes"
+            % (low_base + low_len, low_used - low_len))
+    # THE BOOT RECORD IS STILL LIVE WHILE THESE SEGMENTS LOAD -- see atari.ld.
+    # $0A00 is the first address past its sector buffer, and a pool that
+    # started lower would be loaded over the loader reading it in.
+    if low_base < 0x0A00:
+        die("low data starts at $%04X, below the boot record's buffer at $0900"
+            % low_base)
 
 
 def main():

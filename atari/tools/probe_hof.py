@@ -109,8 +109,8 @@ def main():
     # writes virtually by default, so the file can be perfectly written inside
     # the emulated drive and absent here. Printed only to show the two
     # disagreeing, which is the point.
-    out = subprocess.run([sys.executable, str(ATARI / "tools" / "atr.py"),
-                          "list", str(ATARI / "build" / "hof.atr")],
+    out = subprocess.run([sys.executable, str(ATARI / "tools" / "nodos.py"),
+                          "--list", str(ATARI / "build" / "hof.atr")],
                          capture_output=True, text=True).stdout
     hit = [l for l in out.splitlines() if "TREK" in l.upper()]
     print("\nhof: host .ATR says: %s" % (hit or "NOT PRESENT"))

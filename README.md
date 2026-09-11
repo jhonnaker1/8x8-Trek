@@ -157,7 +157,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.1](../../releases/latest); see [`x16/README.md`](x16/README.md) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Plays 2026-09-10** — boots from a DOS 2.5 disk, saves and restores, fights, docks, lands, writes the hall of fame. Not released, and the reason is a LICENCE rather than a defect: its bootable disk carries Atari's DOS, which is not ours to redistribute. See [`atari/README.md`](atari/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Plays 2026-09-10; self-booting with no DOS since 2026-09-11** — saves and restores, fights, docks, lands, writes the hall of fame. The licence blocker is gone: the disk carries this port's own boot record and directory, not Atari's. Not yet released. See [`atari/README.md`](atari/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
@@ -320,8 +320,9 @@ cd atari && make atr      # build/egatrek.atr
 The X16 is the one port whose default target is not the game: `all: smoke`.
 The Amiga needs bebbo's `m68k-amigaos-gcc` at `$AMIGA_TOOLCHAIN` (default
 `~/amiga-toolchain`); the Atari needs the `mos-atari8-dos` half of llvm-mos.
-**There is no `make release` for the Atari**: its disk needs Atari DOS 2.5,
-which is not ours to redistribute.
+`make -C atari atr` builds the Atari's disk: one self-booting `.ATR` with no
+Atari code on it — this port's own boot record, directory and storage seam. It
+needed Atari DOS 2.5 until 2026-09-11, which is why it had no release artefact.
 
 ## Reference material is not in this repository
 

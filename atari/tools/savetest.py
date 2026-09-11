@@ -79,13 +79,21 @@ def burst(a, keys, settle=180):
     a.frame(settle)
 
 
-def entry():
-    out = subprocess.run([sys.executable, str(HERE.parent / "atr.py"), "list",
-                          str(DISK)], capture_output=True, text=True).stdout
+def entry(name="EGATREK SAV"):
+    """The save's directory entry, read off the disk with no DOS on it.
+
+    It is not there on a fresh image and that is the point: nodos.py lays down
+    unclaimed SLOTS and src/atarisio.c writes the name into one the first time
+    the player saves. So this answers two questions at once -- did the write
+    land, and did it land where a slot was reserved."""
+    out = subprocess.run([sys.executable, str(HERE.parent / "nodos.py"),
+                          "--list", str(DISK)],
+                         capture_output=True, text=True).stdout
     for ln in out.splitlines():
-        if ln.startswith("EGATREK.SAV"):
+        if ln.startswith(name):
             return ln.strip()
-    return "EGATREK.SAV is not in the directory"
+    free = sum(1 for ln in out.splitlines() if "unclaimed" in ln)
+    return "%s is not in the directory (%d slots still unclaimed)" % (name, free)
 
 
 def symbols():
@@ -130,9 +138,8 @@ def main():
             burst(a, "S,A,V,E,RETURN", 240)
             burst(a, "RETURN", 600)
             a.screenshot(path=str(SHOTS / "2-saved.png"))
-            print("savetest: saved -- transfer $%02X close $%02X open_live %d"
-                  % (a.peek(sym["plat_dbg_status"], 1)[0],
-                     a.peek(sym["plat_dbg_close"], 1)[0],
+            print("savetest: saved -- SIO status $%02X, open_live %d"
+                  % (a.peek(sym["sio_dbg_status"], 1)[0],
                      a.peek(sym["open_live"], 1)[0]), flush=True)
 
             # THE SAME SESSION, because Altirra's default disk write mode is

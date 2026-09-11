@@ -10,8 +10,9 @@ before committing: link the whole game early."*
 
 ## Where it is
 
-**It plays.** Fifth port, booting from a DOS 2.5 disk on an Atari 800XL with
-VBXE, driven through setup into the nine-panel console and through a turn.
+**It plays, and there is no DOS on the disk.** Fifth port, self-booting on an
+Atari 800XL with VBXE, driven through setup into the nine-panel console, a
+turn, a SAVE and a restore.
 
 `make run-smoke` boots an XEX on AltirraSDL's headless bridge and comes back
 with a picture: eighty columns, twenty-five rows, all sixteen EGA colours on
@@ -34,9 +35,10 @@ and asks Altirra what frequency each POKEY voice is actually producing. Region,
 both voices, the pitch at each end of the music's range, the tempo and the
 loop — twelve checks, all pass, worst pitch error 0.05%.
 
-`make run-storetest` builds a DOS 2.5 disk, plants files on it, boots it with
-the test as `AUTORUN.SYS`, and checks the seam in both directions — six checks
-on the machine plus one on the host, all passing.
+`make run-nodostest` exercises all five `plat_*` against a disk with no DOS on
+it: a whole-file read, a **streamed** read, and a write read back. Each is
+checked by a rotate-and-add sum of its bytes against the host file, not by its
+length — see "Reading a file is not knowing its length".
 
 `make atr` builds the game disk and `tools/play.py` drives it: title screen,
 briefing declined, a captain named JAMIE typed a letter at a time (J and I
@@ -49,10 +51,11 @@ paged move code**. Both new windows work on the machine, not just in the link.
 
 **`src/stubs.c` is now empty of live code**, so `make early` measures the whole
 thing. The two extra overlays are committed and gated per port — see "The two
-levers that close it" — and the shipping link has **693 bytes free** — see
-"The margin, and where it came from". (This line said 708 for a day after the
-close-status check took 15 of them. The number is quoted twice in this file;
-`make verify` is the only authority for it.)
+levers that close it" — and the shipping link has **about 2,400 bytes free**,
+against 693 while DOS was on the disk — see "The margin, and where it came
+from". `make verify` prints the exact figure and is the only authority for it;
+it now prints **two** pools, because the program's data no longer lives in the
+same address space as its code.
 
 ## The budget, and it moved
 
@@ -153,31 +156,49 @@ command, so this is a window swap on the hot path — which is affordable here
 and ruinous on a 1541, because `ovl_load` is idempotent and because on this
 target the images live in VBXE's 512K of VRAM and arrive as a memory copy.
 
-### +772 with DOS, +2,282 without — MEASURED, AND NO LONGER NEEDED
+### The DOS lever, SPENT — and it paid more than it was costed at
 
-The Atari's `.data`/`.bss`/`.noinit` come out of the same region as its code,
-where the C128's live in a separate `lowram` at `$1300..$1C00` that does not
-compete at all. That difference is about 2,330 bytes and it is the single
-largest structural disadvantage this target has.
+The Atari's `.data`/`.bss`/`.noinit` used to come out of the same region as its
+code, where the C128's live in a separate `lowram` that does not compete at
+all. That difference was the single largest structural disadvantage this
+target had, and the fix was obvious and blocked: point `c_writeable` at
+`$0700..$1FFF`, which is **where Atari DOS lives**.
 
-Pointing `c_writeable` at a `lowram` region of `$0700..$1FFF` takes the
-overflow down by **2,282** — close to the whole of the writable data (`.data`'s
-initialiser image still loads from the code region, which is the difference).
+It was costed at **+2,282 without DOS, +772 with** — a booted DOS 2.5 reports
+`MEMLO = $1CFC`, read straight off the machine, so with DOS resident only
+`$1CFC..$1FFF` is free. And DOS looked unavoidable, because **saves are named
+by the player**: `ui.c` lets them type a filename, and raw sector ranges have
+no names.
 
-**But `$0700..$1FFF` is where Atari DOS lives, and now there is a number for
-it.** A booted DOS 2.5 reports `MEMLO = $1CFC`, read straight off the machine —
-so with DOS resident the region is `$1CFC..$1FFF` and the lever is worth
-**772 bytes, not 2,282.**
+**Both halves of that turned out to be wrong, and in the same direction.**
 
-And the disk seam wants DOS. Not for the data files, which could come off raw
-sectors through the OS's own SIO vector with no DOS at all — but because
-**saves are named by the player**. `ui.c` lets them type a filename, and sector
-ranges have no names, so the no-DOS route needs a filesystem of its own.
+*Names are not a reason to keep DOS.* A directory is sixteen entries of sixteen
+bytes — `tools/nodos.py` writes it, `src/atarisio.c` reads it. What it costs is
+under a sector of disk and no address space at all, because unclaimed **slots**
+carry their extent from the start; nothing here allocates.
 
-**This lever is now held in reserve rather than spent.** The two overlays below
-close the budget without it, so the port can keep DOS, keep player-named saves,
-and ship as an ordinary XEX on the player's own DOS disk. The fork stays
-recorded because it is 2,282 bytes of headroom if this ever gets tight again.
+*And the region is bigger than the writable data.* `.rodata` is 2,161 bytes of
+tables and literals that also never compete for anything but address space, and
+it went down there too.
+
+What was actually measured, in order:
+
+| build | code free |
+|---|---|
+| CIO through `D:`, everything in `$3000` | 693 |
+| SIO, everything in `$3000` | **−1,344** (did not link) |
+| SIO, `.data`/`.bss`/`.noinit` at `$0A00` | 218 |
+| SIO, `.rodata` there as well | **2,379** |
+
+The SIO seam is about 2,000 bytes more expensive than the CIO one — it carries
+a directory, a slot allocator and its own sector buffers, where `D:` had DOS
+doing all three off-budget. Paying for that out of the region DOS was sitting
+on still leaves this port with **three and a half times** the headroom it had,
+and a disk that is ours to give away.
+
+`$0A00`, not `$0700`, and the three pages are not rounding: the boot record
+loads at `$0700` and its sector buffer is at `$0900`, and both are still live
+while the program's own segments are being read in. See `atari.ld`.
 
 ## The two levers that close it
 
@@ -469,112 +490,152 @@ note in each region. It checks the *sequence* of distinct pitches now — 930,
 90, 930 can only happen if the track advanced and the zero pair looped it back,
 and it needs no arithmetic at all.
 
-## The disk seam: CIO, and two statuses that are not errors
+## The disk seam: SIO, and a format of our own
 
-`src/ataristorage.c`, about 500 bytes of driver and 1,394 of seam. `D:` through
-IOCB 1, which is what `core/storage.h` names as this port's answer in its own
-header. The one `jsr` in the file declares the `"p"` clobber; that omission
-cost this project a day on the MEGA65 and was latent in the released C128 and
-X16 builds.
+`src/atarisio.c`. The Device Control Block at `$0300` and `JSR $E459` — no
+handler, no filesystem, no `DOS.SYS`. The one `jsr` in the file declares the
+`"p"` clobber; that omission cost this project a day on the MEGA65 and was
+latent in the released C128 and X16 builds.
 
-`tools/atr.py` reads and writes files inside a DOS 2 disk image, because the
-bridge can mount an ATR but **not** a host directory — so there was no way to
-put a file where the `D:` handler could see it without writing the filesystem.
-`tools/storetest.py` then builds a disk, plants the files the test reads, adds
-the test itself as `AUTORUN.SYS`, boots it, and afterwards extracts the file
-the program *wrote* and checks it on the host.
+The format is `tools/nodos.py`'s and it is the smallest thing that can honour
+`core/storage.h`, which is keyed by **name**:
 
-**That last step is the point.** `atr.py` writing sector chains and then
-reading back its own is self-consistency, not evidence. DOS reading what
-`atr.py` wrote, and `atr.py` reading what DOS wrote, are two independent checks
-that only pass together if the format is right. The chain encoding was checked
-against `DOS.SYS`'s own sectors on the same disk rather than against a manual.
+```
+sector 1..3     the boot record -- src/boot.s
+sector 4..5     the directory: 16 entries of 16 bytes
+sector 6..      file data, each file contiguous
+```
 
-Two faults, and both are the kind that ship:
+Contiguous on purpose: no link byte in every sector, no free map to allocate
+from. **Which leaves the save**, whose name the player types. So the disk is
+built with **slots** — entries whose extent is already assigned and whose name
+is still empty, flagged writable. `dir_claim()` takes one on the first write to
+a name it cannot find. That is the entire allocator; it cannot fragment,
+because nothing is freed and every slot is the same size.
+
+The writable bit does a second job: a write to `STRINGS.DAT` is refused by the
+**format** rather than by nobody having tried it.
+
+### The boot record
+
+Sector 1 of an Atari disk is a descriptor, not a program: the OS takes a sector
+count, a load address and an init vector out of its first six bytes, loads that
+many sectors to that address, and `JSR`s to load address + 6.
+
+What runs there is an **XEX loader**, and that is the choice worth defending. A
+flat loader — read N sectors to `$3000`, jump — is less code. But this link
+emits four segments and three of them are not code: two bytes at `$02E5` that
+lower `MEMTOP` before `_start` reads it (see the soft-stack note in
+`atari.ld`), two at `$02E0` that are the run vector, and `.rodata` down at
+`$0A00`. A flat loader would have to know about all three, and the disk build
+would then diverge from the file exactly where this port has already been
+bitten once. Honouring the segment format means **the same `EGATREK.XEX` boots
+from the disk and loads from a DOS disk**, byte for byte.
+
+It finds the file **by name** in the directory, not at a sector it was told
+about at build time — so nothing has to be patched after assembly and the
+loader cannot go stale against the disk builder. `boot.ld` asserts both bounds
+on its length (three sectors; below its own sector buffer at `$0900`), and
+those asserts were checked by breaking them.
+
+A failed boot paints the background **red** and halts. A machine that hangs on
+the boot's own blue is indistinguishable from one that hung somewhere else,
+and this project has mistaken a silent no-op for a pass more than once.
+
+### Reading a file is not knowing its length
+
+`plat_read` handed back the `len` bytes asked for and then stepped to the next
+sector — so a reader using any chunk but 128 silently lost the tail of every
+sector. `far_load()` streams in **sixty-four**, which made `OVERLAYS.BIN`
+exactly half the file, in alternating chunks.
+
+**The probe passed while this was true.** It compared the byte count, and the
+count came from the *directory*, independently of what was copied: it reported
+the briefing's exact length, 10,557, and that was believed and written up as
+"the streamed path passes". The bug surfaced two changes later as a build-stamp
+mismatch on `OVERLAYS.BIN` — a true statement about a file that was never read.
+
+`src/nodostest.c` sums every byte it receives now, position-sensitively, and
+`tools/probe_nodos.py` compares against the host file. **And the chunk is fifty
+bytes, not sixty-four**: both are smaller than a sector, but 64 divides 128, so
+a reader that mishandles the middle of a sector still lands on a boundary every
+other chunk. 50 never lines up. Reintroducing the bug on purpose makes exactly
+one of the three checks fail, with the length still reading 10,557.
+
+### What the CIO seam taught before it was deleted
+
+Two faults that are worth keeping even though `src/ataristorage.c` is gone:
 
 **A failed OPEN still holds the channel.** The missing-file check passed, and
 then every later operation failed with CIO `$81` — "IOCB already open" —
 because IOCB 1 was still allocated to an open that had never succeeded.
-Nothing says so until the *next* open fails.
 
-**CIO status `$03` is a success, not an error.** There are three successful
-statuses for a read, not two: `$01` (more file follows), `$03` (the last byte
-of the file was read, returned when a read ends *exactly* at the end of the
-file) and `$88` (the read asked for more than was left). This driver accepted
-`$01` and `$88` and called `$03` an error — which is invisible until a file's
-length happens to equal the buffer it is read into. Reading 19 bytes into 128
-gives `$88` and passes; reading 700 into 700 gives `$03` and fails. **The save
-record is a fixed size read into a fixed-size buffer, so that is not an
-unlikely case, it is the normal one.** The test writes a file and reads it back
-at exactly its own length for precisely this reason.
+**CIO status `$03` is a success, not an error.** `$01` (more follows), `$03`
+(the read ended *exactly* at end of file) and `$88` (asked for more than was
+left) are all successes. The driver called `$03` an error, which is invisible
+until a file's length equals the buffer it is read into — and **the save record
+is a fixed size read into a fixed-size buffer, so that is the normal case, not
+an unlikely one.**
 
 ## The margin, and where it came from
 
-The shipping link had **62 bytes** free, which is not a margin. It has about
-700 now, and the whole of the difference is one buffer. Run `make verify` for
-the number -- it moved by 15 the same day, when checking the close's status on
-a write turned out to cost that much.
-
-`io_buf` is 626 bytes, the port's biggest single writable object, and it now
-lives at **`$0480` in the OS spare area** — the only memory on this machine
-that does not compete with code. `core/lowmem.h` carries the annotation and
-expands to nothing unless a port asks, exactly as `OVL_CODE` does; the four
-released ports compile byte-identically.
+Run `make verify`; it is the only authority. It prints **two** pools now,
+because the program's data no longer shares an address space with its code:
 
 ```
-verify: resident $3000..$AB4B, 693 bytes free below the window at $AE00
+verify: code $3000..$A3B5, 2379 bytes free below the stack reserve at $AD00
+verify: low data $0A00..$19BB, 4027 of 5632 used, 1605 free (where DOS was)
 verify: lowram $0480..$06FF, 626 of 640 used, 14 free
 ```
 
-**Measured, not read off a memory map.** Every Atari memory map calls
-`$0480..$06FF` free, and a map is not evidence about a running machine.
-`src/lowprobe.c` fills the region and then does what this program actually does
-— a whole-file read, two hundred streamed reads, and a write that makes DOS
-allocate sectors and rewrite its own VTOC — and counts what came back changed.
-Zero, with DOS 2.5 resident and MEMLO at `$1CFC`.
+The shipping link had **62 bytes** free at its worst and 693 with DOS on the
+disk. Where the rest came from is "The DOS lever, SPENT", above.
 
-**And the buffer's own two uses are checked separately**, because "disk I/O
-does not *clobber* the region" is a different claim from "CIO can *fill* it".
-`storetest` writes a file from `$0480` and reads one back into it: 625 bytes,
-zero wrong. What goes in `.lowbss` is **not zeroed at startup**, so `io_buf`'s
+`io_buf` is 626 bytes, the port's biggest single writable object, and it lives
+at **`$0480` in the OS spare area**. It could move to `lowdata` now and free
+`lowram` entirely — but `lowram` competes with nothing, so there would be no
+point. `core/lowmem.h` carries the annotation and expands to nothing unless a
+port asks, exactly as `OVL_CODE` does; the four released ports compile
+byte-identically.
+
+**Measured, not read off a memory map.** Every Atari memory map calls
+`$0480..$06FF` free, and a map is not evidence about a running machine. It was
+filled and then put through a whole-file read, two hundred streamed reads and a
+write, and counted back unchanged — with DOS 2.5 still resident above it.
+
+What goes in `.lowbss` is **not zeroed at startup**, so `io_buf`'s
 write-before-read property was checked at each of its three use sites.
 
-There is more where that came from if it is ever needed: `hof` is 280 bytes and
-`slot` 256, and `$1CFC..$1FFF` is another 772 with DOS 2.5 — though that one
-depends on which DOS the player boots, where `$0480..$06FF` does not.
+## SAVE works — witnessed, in one session
 
-## OPEN: is SAVE broken? Probably not — and the first answer here was wrong
+This file used to carry an open question here, and before that a claim that
+SAVE was broken. Both are closed.
 
-This section said "SAVE writes a file the game cannot read back". **That claim
-is retracted, before anyone acts on it.**
+`tools/savetest.py` boots the no-DOS disk, plays into the console, saves under
+a player-typed name, cold-boots **in the same emulator session**, restores, and
+screenshots both. The restored console matches the one before the save —
+stardate, energy, shields, quadrant, sector, damaged systems. The disk's
+directory afterwards reads:
 
-What was seen: the game writes `EGATREK.SAV` at the right length, the host image
-shows its directory entry marked `$03` (open-for-output) where every write
-`storetest` does leaves `$42`, and restoring it never came back. Three
-hypotheses were eliminated by discriminator — the buffer address, the record
-ending exactly on a sector boundary, and reading into low RAM — and CIO reported
-`$01` on **both** the transfer and the close, with `open_live` back to 0.
+```
+EGATREK SAV  sector  685     625 bytes  flags 3  (slot, claimed)
+```
 
-**When every discriminator comes back negative, suspect the instrument.**
-Altirra's default disk write mode is *virtual* read-write: the emulated drive
-accepts every write and the host `.ATR` never receives them. That explains all
-of it. Killing the emulator leaves a half-flushed directory sector, which is
-what `$03` was. Ejecting first makes the file **vanish entirely** — which is
-what it did. And the restore ran in a *separate process* against a disk the save
-had never reached, so the game sat at a filename prompt for a file that was not
-there, which from outside looks exactly like a hang.
+625 is `SAVE_HDR + TREK_SAVE_SIZE` exactly, and `flags 3` means a slot that was
+unclaimed when the disk was built.
 
-**Still unconfirmed either way.** The deciding test is save-then-restore in ONE
-session, and it has not completed — because every attempt pays two cold boots
-and the game streams 44,170 bytes into VRAM before it draws anything. The fix
-for that is `state_save`/`state_load`: boot once, snapshot the console, and
-reload in a second.
+**The one session is what matters.** Altirra's default disk write mode is
+*virtual* read-write: the emulated drive accepts every write and the host
+`.ATR` only receives them on a clean shutdown. A restore run in a **separate
+process** was reading a disk the save had never reached, so the game sat at a
+filename prompt for a file that was not there — which from outside looks
+exactly like a hang. Three discriminators came back negative before anyone
+suspected the instrument.
 
-**One real defect did come out of it and is fixed.** `plat_write_all` reported
-the *transfer's* status and discarded the *close's* — and on a write the close
-is where DOS flushes the last sector and rewrites the directory entry, so a
-write that failed to finish could report success. The close's status is checked
-now, and kept in `plat_dbg_close` for when it is not.
+**One real defect came out of that hunt and is fixed.** `plat_write_all`
+reported the *transfer's* status and discarded the *close's* — and the close is
+where the last sector is flushed, so a write that failed to finish could report
+success.
 
 ## The stubs measure the game, not themselves
 
@@ -642,18 +703,21 @@ once with, and the pair says which world this is.
 
 ## What is still open
 
-* **SAVE, above** — unverified rather than broken, and the test that settles it
-  needs the harness to stop paying for a cold boot every time.
-* **Playing it properly.** A turn is not a game: nothing has fought, docked,
-  landed on a planet or reached the hall of fame.
-* **The load time.** `OVERLAYS.BIN` streams through CIO at boot and the packing
-  cut it by 40%, but it has not been timed against a real 1050.
-* A release bundle. What ships is the XEX and the data files for the player's
-  own DOS disk — `tools/atr.py` builds the test disk but a DOS is not ours to
-  redistribute.
-* **The DOS fork above**, which decides whether 2,282 bytes are available.
-* Whether `front` — which grows with the save record and cannot be split —
-  becomes the ceiling once the arithmetic is closed.
+* **Nothing about the disk.** It boots, it plays, it saves, it restores, and
+  the image is ours to redistribute — see "The DOS lever, SPENT" and "SAVE
+  works".
+* **The load time is 112 SECONDS** through a real 1050, for 36,474 bytes.
+  `make run-probe-boottime` times it. The reason nobody noticed is worse than
+  the number: every boot this project had ever timed ran with **Altirra's SIO
+  patch on**, which replaces the serial protocol with an instant transfer —
+  12.7s, and not a 1050 or any other drive. Whether two minutes is acceptable
+  is a judgement, not a measurement, and it is Jamie's.
+* **The link is not deterministic.** `make reproducible` reports it. Two
+  distinct binaries chosen at random, differing by exactly 20 bytes in exactly
+  one function. Characterised, not fixed — item 19 on THE OPEN LIST.
+* **A person has not played it.** Driven through combat, docking, landing, the
+  evaluation and the hall of fame by `tools/probe_*.py`, off real state rather
+  than hope — but driven, not played.
 
-All six are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
-whole project and was re-derived on 2026-09-09.
+These are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
+whole project and was re-derived on 2026-09-11.

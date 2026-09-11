@@ -11,8 +11,8 @@
  *
  * NAMES ARE OPAQUE TOKENS. A caller says "TREK.SCR" and the platform decides
  * what that means: `0:TREK.SCR,S,R` on a 1541, `PROGDIR:trek.scr` on the
- * Amiga, `D:TREK.SCR` through an Atari IOCB, an MCP path on the F256. The
- * core and the UI must never see a path, a device number, a drive letter or a
+ * Amiga, an entry in the Atari port's own directory on a disk with no DOS on
+ * it, an MCP path on the F256. The core and the UI must never see a path, a device number, a drive letter or a
  * logical file number. That rule is what makes this one line of difference
  * per port rather than a rewrite.
  *

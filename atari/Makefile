@@ -22,7 +22,14 @@ OVL_OPT = -DTREK_OVL_ENEMY -DTREK_OVL_MOVE -DTREK_LOWMEM
 
 CFLAGS  = -Wall -Werror -Oz -DTREK_COLOUR_IS_EGA -DTREK_OVERLAYS $(OVL_OPT) \
           -I src -I ../c128/src -I ../core
-LDFLAGS = -T atari.ld -Wl,--no-check-sections
+# -lcopy-data IS NOT OPTIONAL SINCE THE WRITABLE HALF MOVED TO $0A00.
+# .data is laid out `>c_writeable AT>c_readonly`: while those were the same
+# region its VMA and LMA were identical and the XEX loaded it in place, which
+# is why this port never needed the flag and the C128 always did. They are now
+# $0A00 and $AB5E, so without the startup copy every initialised global reads
+# as whatever was in low RAM at boot. See c128/Makefile, which carries the
+# same line for the same reason.
+LDFLAGS = -T atari.ld -Wl,--no-check-sections -lcopy-data
 
 # THE WINDOW SIZE, READ OUT OF atari.ld RATHER THAN COPIED. The X16 keeps the
 # same number in its Makefile and its linker script and relies on nobody
@@ -41,9 +48,9 @@ EARLY_DEFS = -DATARI_HAVE_VIDEO -DATARI_HAVE_INPUT -DATARI_HAVE_FARMEM -DATARI_H
 EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../c128/src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
+            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/atarisio.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest storetest run-storetest run-probe-snapshot run-probe-boottime reproducible nolto verify game data atr run clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest siotest run-siotest nodostest run-nodostest run-probe-snapshot run-probe-boottime reproducible nolto verify game data boot atr run clean
 
 all: early
 
@@ -140,12 +147,6 @@ sndtest: src/sndtest.c src/vbxevid.c src/atarisnd.c src/atarimem.c src/music_dat
 run-sndtest: sndtest
 	python3 tools/sndtest.py
 
-# THE DISK SEAM. Needs a booted DOS for D: to exist at all, so the test runs as
-# AUTORUN.SYS off a DOS 2.5 disk -- which is what a release would do anyway.
-# tools/atr.py plants the files it reads and extracts the file it writes, so
-# each half checks the other's work.
-DOS_ATR ?= $(HOME)/Atari400mini/os/Dos 2.5.atr
-
 # CAN THIS PORT TALK TO THE DISK WITHOUT DOS? SIO is the layer under CIO --
 # no handler, no filesystem, no DOS.SYS. Proves the primitive before anything
 # is built on it. See src/siotest.c.
@@ -156,10 +157,16 @@ siotest: src/siotest.c Makefile
 run-siotest: siotest atr
 	python3 tools/probe_sio.py
 
-storetest: src/storetest.c src/vbxevid.c src/ataristorage.c Makefile
+# THE SEAM ITSELF, on a disk with no DOS on it: a whole-file read, a STREAMED
+# read (the briefing is never held whole, so one cannot stand in for the
+# other) and a write checked by reading it back rather than by its status.
+nodostest: src/nodostest.c src/atarisio.c Makefile
 	@mkdir -p build
-	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/storetest.xex \
-	    src/storetest.c src/vbxevid.c src/ataristorage.c
+	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/nodostest.xex \
+	    src/nodostest.c src/atarisio.c
+
+run-nodostest: nodostest atr
+	python3 tools/probe_nodos.py
 
 # THE SNAPSHOT HARNESS PROBE. Before any save test is believed, settle whether
 # rewinding a snapshot also rewinds the emulated DISK -- Altirra's writes are
@@ -173,9 +180,6 @@ run-probe-boottime: atr
 
 run-probe-snapshot: atr
 	python3 tools/probe_snapshot.py
-
-run-storetest: storetest
-	python3 tools/storetest.py "$(DOS_ATR)"
 
 # OBJECTS WITHOUT LTO, built only so verify can read the call graph AS
 # WRITTEN. LTO inlines a resident function into main(), at which point a call
@@ -201,7 +205,7 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
            src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c \
-           src/atarisnd.c src/ataristorage.c src/music_data.c
+           src/atarisnd.c src/atarisio.c src/music_data.c
 GAME_OUT = build/trekatari.xex
 
 NOLTO = build/nolto
@@ -262,37 +266,44 @@ data: $(GAME_OUT) src/music_data.c
 	@cp ../c128/build/music.dat  $(DATA)/MUSIC.DAT
 	@cp ../c128/src/briefing.txt $(DATA)/BRIEF.TXT
 	@cp build/OVERLAYS.BIN       $(DATA)/OVERLAYS.BIN
+	@# THE PROGRAM IS A FILE ON THE DISK LIKE ANY OTHER. src/boot.s looks it
+	@# up by this name in the directory, so the boot record never has to be
+	@# patched with a sector number after assembly.
+	@cp $(GAME_OUT)              $(DATA)/EGATREK.XEX
 	@ls -l $(DATA) | grep -v total
 
-# THE DISK. A DOS 2.5 image with the game as AUTORUN.SYS, so booting it runs
-# the game -- which is what a player does and what the test harness does.
-# DOS.SYS stays; the utilities go, because the game wants the room.
+# THE BOOT RECORD. Assembled and linked flat at $0700 -- no C runtime, no XEX
+# wrapper -- because sector 1 of an Atari disk is read as raw bytes. See
+# src/boot.s for what runs and boot.ld for the two bounds on its length.
+boot: build/boot.bin
+
+build/boot.o: src/boot.s Makefile
+	@mkdir -p build
+	$(LLVM_MOS)/bin/llvm-mc -triple=mos -filetype=obj -o $@ $<
+
+build/boot.bin: build/boot.o boot.ld
+	@# -e bootrec only to silence "cannot find entry symbol _start" -- there
+	@# is no ELF entry point here, the OS takes control at load address + 6.
+	$(LLVM_MOS)/bin/ld.lld -e bootrec -T boot.ld -o build/boot.elf build/boot.o
+	$(OBJCOPY) -O binary build/boot.elf $@
+	@python3 -c "import os; print('atari: boot record %d bytes of 384' % os.path.getsize('$@'))"
+
+# THE DISK, AND THERE IS NO DOS ON IT. Sector 1 is src/boot.s, which finds
+# EGATREK.XEX in this port's own directory and loads it; the game then reads
+# every other file through src/atarisio.c, which talks to SIO directly. Atari
+# owns DOS.SYS, so a disk carrying it was never ours to redistribute -- and
+# DOS also sat on $0700..$1FFF, which this port wants.
+#
+# THE NAME IS THE OLD ONE ON PURPOSE. play.py, session.py and every probe
+# open build/egatrek.atr; what changed is what is inside it, not where it is.
 GAME_ATR = build/egatrek.atr
 
-atr: data
-	@cp "$(DOS_ATR)" $(GAME_ATR)
-	@for f in DUP.SYS RAMDISK.COM SETUP.COM COPY32.COM DISKFIX.COM; do \
-	    python3 tools/atr.py delete $(GAME_ATR) $$f >/dev/null 2>&1 || true; \
-	done
-	@python3 tools/atr.py add $(GAME_ATR) AUTORUN.SYS $(GAME_OUT)
-	@for f in OVERLAYS.BIN STRINGS.DAT MUSIC.DAT BRIEF.TXT; do \
-	    python3 tools/atr.py add $(GAME_ATR) $$f $(DATA)/$$f || exit 1; \
-	done
-	@python3 tools/atr.py list $(GAME_ATR) | tail -8
+atr: data build/boot.bin
+	@python3 tools/nodos.py $(GAME_ATR) --boot build/boot.bin \
+	    $(DATA)/EGATREK.XEX $(DATA)/OVERLAYS.BIN $(DATA)/STRINGS.DAT \
+	    $(DATA)/MUSIC.DAT $(DATA)/BRIEF.TXT
 
 run: atr
 	python3 tools/run_atari.py --disk $(GAME_ATR) build/run.png 900
 
-# IS LOW RAM FREE WHILE DOS IS RESIDENT? A memory map is not evidence about a
-# running machine, and the buffer this port wants to put down there is 626
-# bytes of the tightest budget in the project.
-lowprobe: src/lowprobe.c src/vbxevid.c src/ataristorage.c Makefile
-	@mkdir -p build
-	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/lowprobe.xex \
-	    src/lowprobe.c src/vbxevid.c src/ataristorage.c
 
-run-lowprobe: lowprobe atr
-	@cp build/egatrek.atr build/lowprobe.atr
-	@python3 tools/atr.py delete build/lowprobe.atr AUTORUN.SYS >/dev/null
-	@python3 tools/atr.py add build/lowprobe.atr AUTORUN.SYS build/lowprobe.xex
-	python3 tools/run_atari.py --disk build/lowprobe.atr build/lowprobe.png 1200

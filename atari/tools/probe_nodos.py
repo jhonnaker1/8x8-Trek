@@ -15,9 +15,19 @@ def syms():
         if len(f) >= 3: out[f[-1]] = int(f[0], 16)
     return out
 
+def tally(data):
+    """The same rotate-and-add src/nodostest.c computes, so a file that came
+    back REORDERED fails -- a plain byte sum could not tell."""
+    s = 0
+    for ch in data:
+        s = ((s << 1 | s >> 15) & 0xFFFF)
+        s = (s + ch) & 0xFFFF
+    return s
+
+
 def main():
     disk = ATARI/"build"/"nodos-run.atr"
-    shutil.copy(ATARI/"build"/"nodos.atr", disk)
+    shutil.copy(ATARI/"build"/"egatrek.atr", disk)
     log = ATARI/"build"/"bridge.log"; fh = open(log,"w")
     p = subprocess.Popen([str(SERVER),"--bridge","--settings=user","--pacing=unlimited"],
                          stdout=subprocess.DEVNULL, stderr=fh)
@@ -39,16 +49,28 @@ def main():
             else: sys.exit("probe_nodos: never finished")
             w = lambda n: a.peek16(S[n])
             b = lambda n: a.peek(S[n],1)[0]
-            print("  whole file  STRINGS.DAT  status %d  %d bytes  head %s"
-                  % (b("t_read_st"), w("t_read_len"),
-                     " ".join("%02x"%x for x in a.peek(S["t_read_head"],4))))
-            print("  streamed    BRIEF.TXT    status %d  %d bytes"
-                  % (b("t_open_st"), w("t_stream_len")))
-            print("  write+read  EGATREK.SAV  w=%d r=%d  %d bytes  head %s"
-                  % (b("t_write_st"), b("t_back_st"), w("t_back_len"),
-                     " ".join("%02x"%x for x in a.peek(S["t_back_head"],8))))
-            exp = " ".join("%02x"%(0x5A^i) for i in range(8))
-            print("  expected                                        head %s" % exp)
+            bad = 0
+            for label, name, st, ln, sm, want in (
+                ("whole file", "MUSIC.DAT", "t_read_st", "t_read_len",
+                 "t_read_sum", (ATARI/"build"/"data"/"MUSIC.DAT").read_bytes()),
+                ("streamed",   "BRIEF.TXT",   "t_open_st", "t_stream_len",
+                 "t_stream_sum", (ATARI/"build"/"data"/"BRIEF.TXT").read_bytes()),
+                ("write+read", "PROBE.DAT",   "t_back_st", "t_back_len",
+                 "t_back_sum", bytes((0x5A ^ (i*7)) & 0xFF for i in range(300))),
+            ):
+                glen, gsum = w(ln), w(sm)
+                elen, esum = len(want), tally(want)
+                ok = b(st) == 0 and glen == elen and gsum == esum
+                bad += not ok
+                print("  %-11s %-12s status %d  %5d bytes (want %5d)  "
+                      "sum %04x (want %04x)  %s"
+                      % (label, name, b(st), glen, elen, gsum, esum,
+                         "ok" if ok else "MISMATCH"))
+            if b("t_write_st"):
+                print("  write status %d -- the slot was not claimed" % b("t_write_st"))
+                bad += 1
+            if bad:
+                sys.exit("probe_nodos: %d of 3 paths wrong" % bad)
     finally:
         p.terminate()
         try: p.wait(timeout=5)

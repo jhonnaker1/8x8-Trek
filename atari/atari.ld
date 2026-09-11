@@ -37,13 +37,30 @@ __stack_reserve = 0x100;
 MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
 
-    /* THE OS SPARE AREA, and the only memory on this machine that does not
-       compete with code. $0480..$06FF is 640 bytes below where DOS loads at
-       $0700 -- MEASURED intact through a whole-file read, two hundred
-       streamed reads and a write that makes DOS rewrite its own VTOC; see
-       src/lowprobe.c. Nothing here is zeroed at startup, so what goes in it
-       must be write-before-read. See core/lowmem.h. */
+    /* THE OS SPARE AREA. $0480..$06FF is 640 bytes that the OS itself does
+       not use -- measured intact across a whole-file read, two hundred
+       streamed reads and a write, back when DOS was still resident above it.
+       Nothing here is zeroed at startup, so what goes in it must be
+       write-before-read. See core/lowmem.h.
+
+       IT IS NO LONGER THE ONLY LOW MEMORY THIS PORT HAS -- see lowdata below
+       -- but it is still the only region under $0700, which is where the
+       boot record loads. io_buf lives here and can stay. */
     lowram (rw) : ORIGIN = 0x0480, LENGTH = 0x0280
+
+    /* WHAT DOS USED TO SIT ON, minus what the boot record needs.
+       $0700..$1FFF is free on this machine the moment no DOS is loaded, and
+       that is 6,400 bytes that were never competing with code -- see
+       tools/nodos.py and src/boot.s. The writable half of the program moves
+       down here and gives every byte of it back to $3000 for CODE, which is
+       the only pool this port has ever been short of.
+
+       IT STARTS AT $0A00, NOT $0700, AND THAT IS NOT ROUNDING. The boot
+       record is loaded to $0700 and its sector buffer sits at $0900; both
+       are still LIVE while the program's segments are being read in. A
+       .data section placed at $0700 would be loaded over the loader that is
+       loading it. $0A00 is the first address past the buffer. */
+    lowdata (rw) : ORIGIN = 0x0A00, LENGTH = 0x2000 - 0x0A00
 
     /* THE SOFT STACK GETS ITS OWN 256 BYTES, AND THIS IS THE C128'S BUG
        ARRIVING ON A SECOND MACHINE.
@@ -97,7 +114,7 @@ MEMORY {
 }
 
 REGION_ALIAS("c_readonly", ram)
-REGION_ALIAS("c_writeable", ram)
+REGION_ALIAS("c_writeable", lowdata)
 
 SECTIONS {
     .lowbss (NOLOAD) : { *(.lowbss) } >lowram
@@ -116,7 +133,24 @@ SECTIONS {
     .ovl_enemy  ORIGIN(window) : { *(.ovl.enemy)  } >window AT>ovlimg11
     .ovl_move   ORIGIN(window) : { *(.ovl.move)   } >window AT>ovlimg12
 
-    INCLUDE c.ld
+    /* c.ld IS EXPANDED HERE rather than included, for one line of it.
+       READ-ONLY DATA GOES LOW TOO. .rodata is 2,161 bytes of tables and
+       literals that never compete for anything except address space, and
+       address space below $2000 is what dropping DOS bought. Moving it out
+       of $3000 is 2,161 more bytes of CODE on the tightest target in the
+       project -- which had 218 free without this.
+
+       It is placed BEFORE .data so it sits at the bottom of the region, and
+       so OUTPUT_FORMAT's second segment can be `$0A00 .. __rodata_end`: the
+       only part of lowdata with contents to load. .bss and .noinit are
+       NOLOAD and .data is loaded at its LMA, up in $3000 with the code. */
+    INCLUDE zp.ld
+    INCLUDE text.ld
+    .rodata : { INCLUDE rodata-sections.ld } >lowdata
+    __rodata_end = .;
+    INCLUDE data.ld
+    INCLUDE bss.ld
+    INCLUDE noinit.ld
 }
 
 __ovl_start = ORIGIN(window);
@@ -137,7 +171,22 @@ OUTPUT_FORMAT {
     SHORT(0x02e0)    /* First byte of Run vector. */
     SHORT(0x02e1)    /* Last byte of Run vector. */
     SHORT(_start)    /* Segment to be loaded to Run vector. */
+    /* THE LOW SEGMENT: read-only data, in the space DOS used to occupy.
+       Loaded before the main one only because that is the order written; the
+       two do not overlap and neither depends on the other. */
+    SHORT(0x0a00)
+    SHORT(__rodata_end - 1)
+    TRIM(lowdata)
+
     SHORT(0x3000)    /* Where the main segment loads -- see the note above. */
-    SHORT(--__data_end - 1)
+
+    /* THE LAST BYTE IS THE END OF .data's LOAD ADDRESS, NOT OF .data.
+       The stock script writes `--__data_end - 1`, which is the end of .data's
+       VMA -- correct only while c_writeable and c_readonly are the same
+       region, as they were here until the writable half moved to $0A00.
+       After that split __data_end is $0A08 and the XEX claimed a segment
+       running DOWNWARD from $3000, which no loader can read and which the
+       link reported as success. LOADADDR is where the bytes actually are. */
+    SHORT(__data_load_start + __data_size - 1)
     TRIM(ram)
 }

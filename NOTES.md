@@ -467,13 +467,17 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (5 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
 asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
+
+The three still open are **10** (no human has played the Amiga), **11** (the
+C128 wants play) and **19** (the Atari link is not deterministic). Two of the
+three want a person, not an instrument.
 
 ### Sound -- found 2026-09-09, both fixed and RELEASED in v0.12.1 on 2026-09-10
 
@@ -541,15 +545,38 @@ that is released.**
    1050 or any other drive. `make run-probe-boottime` times both. **Whether
    two minutes is acceptable is a judgement, not a measurement**, and it is
    Jamie's.
-6. **No release bundle** -- a licence fact rather than a task. What ships is
-   the XEX and the data files for the player's own DOS disk. **And it is the
-   SAME LEVER as item 7**, which nothing had noticed: see "The two Atari DOS
-   questions are one" below.
-7. **The DOS fork is held in reserve**, not spent -- and it turns out to be
-   two things at once, budget AND licence: see "The two Atari DOS questions
-   are one" below. Item 8 gives it a TRIGGER rather than a feeling. It is the lever that relieves `lowram`, and
-   `lowram` has **14 bytes**. So the moment to spend it is the fifteenth byte
-   added to the save record, not whenever the port next feels tight.
+6. ~~**No release bundle** -- a licence fact rather than a task.~~ **CLOSED
+   2026-09-11, by item 7.** `make -C atari atr` builds one self-booting
+   `.ATR` with no Atari code on it at all: this port's boot record, this
+   port's directory, the game and its data files. It is ours to give away.
+7. ~~**The DOS fork is held in reserve**, not spent.~~ **SPENT 2026-09-11 --
+   Jamie's call, "drop atari dos from this port".** Built in four stages, each
+   testable before the next: the SIO primitive (`src/siotest.c`), a directory
+   and the storage seam on it (`tools/nodos.py`, `src/atarisio.c`), a
+   self-booting loader (`src/boot.s`), and then the address space.
+
+   **IT PAID MORE THAN IT WAS COSTED AT, and the costing was wrong in both
+   directions at once.** It had been priced at +2,282 bytes, and blocked on
+   "saves are named by the player, so the no-DOS route needs a filesystem" --
+   which was true and turned out to be cheap: sixteen directory entries of
+   sixteen bytes, plus SLOTS with their extent pre-assigned so nothing
+   allocates. Against that, the region is bigger than the writable data:
+   `.rodata`'s 2,161 bytes of tables and literals also compete for nothing but
+   address space, and went down there too.
+
+       CIO through `D:`, everything in $3000        693 free
+       SIO, everything in $3000                  -1,344   (did not link)
+       SIO, .data/.bss/.noinit at $0A00             218
+       SIO, .rodata there as well                 2,379
+
+   The SIO seam costs about 2,000 bytes more than the CIO one -- it carries a
+   directory, an allocator and its own sector buffers, where `D:` had DOS doing
+   all three off-budget. Paying for that out of DOS's own region still leaves
+   **three and a half times** the headroom, and item 6 with it.
+
+   **`$0A00`, not `$0700`, and the three pages are not rounding**: the boot
+   record loads at `$0700` and its sector buffer is at `$0900`, and both are
+   live while the program's own segments are being read in.
 8. ~~**Whether `.ovl_front` becomes the ceiling.**~~ **ANSWERED 2026-09-10:
    IT IS NOT, AND THIS ITEM WAS WATCHING THE WRONG NUMBER.**
 
@@ -562,6 +589,13 @@ that is released.**
    overflows -- long before front's 719 bytes of code headroom matter. (This
    entry also said "693 bytes resident today"; `verify` says 417, and 417 is
    itself the larger half of item 19's 20-byte wobble.)
+
+   **AND THE CEILING IS GONE, 2026-09-11.** Item 7 opened `$0A00..$1FFF`, of
+   which 1,605 bytes are still free -- so `io_buf` can leave `lowram`
+   altogether whenever the save record needs it to, and the fifteenth byte is
+   no longer a trigger for anything. Nothing has been moved, because `lowram`
+   competes with nothing either; what changed is that running out of it stopped
+   being a wall.
 
 ### Verification gaps on released ports
 
@@ -4096,7 +4130,7 @@ discovering it three times.
 |---|---|---|
 | C128, X16 | KERNAL through cc65's `cbm.h` | device 8, PETSCII, `0:NAME,S,R` |
 | Amiga | AmigaDOS `Open`/`Read`/`Close`, or plain stdio | real paths, `PROGDIR:trek.scr` |
-| Atari + VBXE | CIO and IOCBs | `D:NAME.EXT` |
+| Atari + VBXE | SIO direct, and this port's OWN directory | `EGATREK SAV`, 8+3 in a fixed field |
 | F256 | FoenixMCP calls to the SD card | MCP paths |
 | MEGA65 | C65 DOS / SD | |
 | CoCo 3 | Disk BASIC, or OS-9 | |
