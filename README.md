@@ -157,7 +157,7 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.12.1](../../releases/latest); see [`x16/README.md`](x16/README.md) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.12.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.12.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Plays 2026-09-10; self-booting with no DOS since 2026-09-11** — saves and restores, fights, docks, lands, writes the hall of fame. The licence blocker is gone: the disk carries this port's own boot record and directory, not Atari's. Not yet released. See [`atari/README.md`](atari/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Plays, self-boots with no DOS, and has been played by a person (2026-09-11)** — saves, restores, fights, docks, lands, writes the hall of fame, and makes a noise. The licence blocker is gone: the disk carries this port's own boot record and directory, not Atari's. **It takes about two minutes to load on a stock 1050** and a few seconds on an emulator or a fast-SIO drive — see [`atari/README.md`](atari/README.md). Not yet released. |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except

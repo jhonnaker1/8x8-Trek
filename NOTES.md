@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (4 open of 22 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 22 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,9 +475,15 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-The four still open are **10** (no human has played the Amiga), **11** (the
-C128 wants play), **19** (the Atari link is not deterministic) and **22** (the
-Atari is releasable and not released).
+The three still open are **10** (no human has played the Amiga), **11** (the
+C128 wants play) and **22** (the Atari is releasable and not released).
+
+**Item 19 is documented and parked** by Jamie's call -- the non-deterministic
+Atari link is a property to be aware of, not work to be done, and it reopens
+only if a binary ever has to be reproduced byte-for-byte. **Item 5's judgement
+is made**: 112 seconds on a stock 1050 is a 1050, not a defect, and it is
+documented rather than fixed. **Which leaves item 22 with nothing in front of
+it but the decision to cut a release.**
 
 **Item 21 closed the same day it was raised, and cost two bugs to close.**
 Jamie played the Atari on 2026-09-11 and found that the port was SILENT and
@@ -533,8 +539,18 @@ schedules that.
    **And the hall of fame, with the TREK.SCR WRITE WITNESSED** -- the first
    time on any port. See "The hall-of-fame write" below. Item 4 is closed.
 
-19. **The Atari link is NOT DETERMINISTIC -- PINNED 2026-09-11, STILL NOT
-    FIXED.** Two distinct binaries, 19/11 over thirty links, differing by
+19. ~~**The Atari link is NOT DETERMINISTIC.**~~ **DOCUMENTED AND PARKED --
+    Jamie's call, 2026-09-11: "lets just document it. I'm not interested in
+    taking that any further, unless it causes an issue."** It is not a defect
+    in the game: both binaries are valid and pass every check, and the only
+    thing it has ever cost is one hour of a misread. `make reproducible`
+    reports it, the write-up below says how far it is pinned, and nothing
+    further happens unless it bites. Not filed upstream either -- that was an
+    offer, not a plan. **Reopen it if a binary ever needs to be reproduced
+    byte-for-byte**, which is the "issue" to watch for: verifying a shipped
+    artefact against a rebuild is the one job this makes impossible.
+
+    What it is, as pinned: Two distinct binaries, 19/11 over thirty links, differing by
     exactly 20 bytes in exactly ONE function (`ui_draw_position`, 243 or 263).
     Narrowed from "somewhere in LTO codegen" to: the LTO optimiser is
     exonerated (every bitcode stage is byte-identical; only `*.lto.o` varies),
@@ -561,8 +577,12 @@ schedules that.
     fixed. The report-only mode was a transitional accommodation for a backlog
     somebody had to clear; the backlog is zero, so it is fatal -- a
     report-only check at zero just drifts back up in silence.
-5. ~~**The boot load is untimed against a real 1050.**~~ **TIMED 2026-09-10:
-   112 SECONDS.** Nearly two minutes before the title screen, for 36,474 bytes
+5. ~~**The boot load is untimed against a real 1050.**~~ **TIMED 2026-09-10 at
+   112 SECONDS, AND JUDGED ACCEPTABLE -- Jamie, 2026-09-11.** It is not a
+   defect, it is a 1050; it gets DOCUMENTED rather than fixed, at the top of
+   `atari/README.md` and in the release notes, together with the fact that an
+   emulator or a fast-SIO drive loads the same disk in seconds. The
+   measurement: Nearly two minutes before the title screen, for 36,474 bytes
    through a 1050. The reason nobody noticed is worse than the number: every
    boot this project has ever timed ran with **Altirra's SIO patch on**, which
    replaces the serial protocol with an instant transfer -- 12.7s, and not a
@@ -723,12 +743,14 @@ schedules that.
     the restart. tools/probe_hof.py had typed N at that prompt for a day and
     rewound on the very next line, with a comment saying "back round" -- a
     guess about a screen it never waited to see.
-22. **The Atari is releasable and not released.** The licence blocker went
-    with Atari DOS on 2026-09-11 (items 6 and 7): `make -C atari atr` now
-    builds one self-booting `.ATR` with no Atari code on it. What stands
-    between here and a v0.13.0 is item 21 and one judgement -- **whether a
-    112-second boot through a real 1050 is acceptable**, which is Jamie's and
-    not a measurement. Item 5 measured it; nobody has decided about it.
+22. **The Atari is releasable and not released, and nothing is in front of it
+    any more.** The licence blocker went with Atari DOS on 2026-09-11 (items 6
+    and 7): `make -C atari atr` builds one self-booting `.ATR` with no Atari
+    code on it. Item 21 closed the same day -- Jamie played it, and the three
+    faults he found are fixed. Item 5's judgement is made: the load time gets
+    documented, not fixed. **The release notes must carry the load time**, in
+    the same words the port README uses: about two minutes on a stock 1050, a
+    few seconds on an emulator or a fast-SIO drive.
 
 ### Deliberate scope, listed so they are not mistaken for defects
 

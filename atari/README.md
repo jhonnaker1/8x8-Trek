@@ -1,5 +1,26 @@
 # EGA Trek — Atari 800XL + VBXE
 
+## Be patient with the first screen
+
+**On a stock 1050, this disk takes about two minutes to load.** That is
+measured, not estimated: 112 seconds, for 36,474 bytes of overlays, strings
+and music that all have to be in VBXE's memory before the title screen can be
+drawn. Nothing is wrong; the drive is just a 1050.
+
+**On an emulator, or on an Atari with a fast-SIO drive, it is a few seconds.**
+Altirra with its default SIO patch loads the same disk in 12.7 seconds of
+emulated time and rather less of yours. A Happy/Speedy-class 1050, an XF551 or
+an SD-card drive sits somewhere between; this project has not measured one, so
+no number is claimed for them.
+
+The reason it is worth stating at all is that the slow figure was invisible
+here for months. **Every boot this project had ever timed ran with Altirra's
+SIO patch on**, which replaces the serial protocol with an instant transfer —
+so the 12.7 seconds was the only number anybody had, and it describes no real
+drive. `make run-probe-boottime` times both.
+
+---
+
 Fifth port. **Started 2026-09-06 with a measurement, not a driver**, because
 the scope for this target ends with an instruction: *"Measure it properly
 before committing: link the whole game early."*
@@ -706,30 +727,24 @@ once with, and the pair says which world this is.
 * **Nothing about the disk.** It boots, it plays, it saves, it restores, and
   the image is ours to redistribute — see "The DOS lever, SPENT" and "SAVE
   works".
-* **The load time is 112 SECONDS** through a real 1050, for 36,474 bytes.
-  `make run-probe-boottime` times it. The reason nobody noticed is worse than
-  the number: every boot this project had ever timed ran with **Altirra's SIO
-  patch on**, which replaces the serial protocol with an instant transfer —
-  12.7s, and not a 1050 or any other drive. Whether two minutes is acceptable
-  is a judgement, not a measurement, and it is Jamie's.
-* **The link is not deterministic** — item 19, pinned on 2026-09-11 and still
-  not fixed. Two distinct binaries, 19/11 over thirty links, differing by 20
-  bytes in one function. The LTO optimiser is exonerated (every bitcode stage
-  is byte-identical; only the codegen output varies), everything through
-  register allocation is identical, and the first pass whose output differs is
-  Prologue/Epilogue Insertion — deciding whether one local gets a zero-page
-  slot at `$E5` or a callee-saved register pair that must be saved and
-  restored. **The zero page is exactly saturated, 96 of 96 bytes**, so those
-  slots are contested with no slack. `make reproducible` links **eight** times
-  now: it used to link twice, and two links agree 53% of the time.
-* **A person has not played it** — item 21. Driven through combat, docking,
-  landing, the evaluation and the hall of fame by `tools/probe_*.py`, off real
-  state rather than hope, but driven and not played. **Nor has anyone heard the
-  POKEY driver**, which is verified in both video standards by arithmetic —
-  exactly where the X16 stood for the four months it played an octave flat.
-* **It is releasable and not released** — item 22. The licence blocker went
-  with the DOS. What stands in the way is the bullet above and the load-time
-  judgement.
+* ~~The load time~~ — **judged and documented, not open.** 112 seconds on a
+  stock 1050, a few seconds on an emulator or a fast-SIO drive. See "Be
+  patient with the first screen" at the top of this file; it is a 1050, not a
+  defect.
+* ~~The link is not deterministic~~ — **documented and parked**, Jamie's call
+  2026-09-11: not worth pursuing unless it causes an issue. Both binaries are
+  valid and pass every check. `make reproducible` reports it and "The Atari
+  link" in `NOTES.md` says how far it is pinned. **The issue to watch for is a
+  binary that has to be reproduced byte-for-byte** — verifying a shipped
+  artefact against a rebuild is the one job this makes impossible.
+* ~~A person has not played it~~ — **played 2026-09-11, Jamie: "The game plays
+  great."** It found three bugs in two sittings and all three are fixed: see
+  "Played, and it was silent" below. The POKEY driver has been **heard** now,
+  which is what caught the third.
+* **It is releasable and not released** — item 22, and nothing is in front of
+  it any more. The licence blocker went with the DOS, the port has been
+  played, and the load time is documented rather than fixed. **The release
+  notes must carry the load time**, in the same words as the top of this file.
 
 These are carried on THE OPEN LIST in `NOTES.md`, which is the list for the
 whole project and was re-derived on 2026-09-11 — items 5, 19 and 22.
