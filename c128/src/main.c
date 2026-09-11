@@ -2157,15 +2157,35 @@ int main(void) {
     scr_puts(28, 10, S(S_49), EGA_TO_VDC(EGA_LTGREEN));
     scr_puts(23, 12, S(S_10), EGA_TO_VDC(EGA_LTCYAN));
 
-    /* Drop back to 1MHz first, so the VIC-IIe screen is live again and the
-       machine does not look dead on the other window. */
-    vdc_shutdown();
     snd_off();      /* a SID still gated would howl at BASIC forever */
 
-    /* READ BEFORE RESET. plat_exit() resets this machine, so without a wait
-       the two lines above would flash past and the player would be looking at
-       a boot screen wondering what happened. */
+    /* READ BEFORE ANYTHING IS TORN DOWN. plat_exit() resets this machine, so
+       without a wait the two lines above would flash past and the player would
+       be looking at a boot screen wondering what happened. */
     kb_waitkey();
+
+    /* AND THE TEARDOWN COMES AFTER THE KEY, NOT BEFORE IT. It used to sit
+       above the wait, and on three of the five ports that was invisible only
+       because their vdc_shutdown() does nothing:
+       
+         C128    drops to 1MHz; deliberately does not clear.
+         MEGA65  empty.
+         Atari   empty since 2026-09-11 -- it used to hand ANTIC its playfield
+                 back here, revealing 4K of the last overlay image as text.
+       
+       On the other two it erased the goodbye one line after drawing it:
+       
+         X16     vdc_shutdown() IS scr_clear(). The farewell was wiped and the
+                 player waited for a key on a blank screen.
+         Amiga   it closes the window -- so the message vanished AND
+                 kb_waitkey() returned KB_RETURN immediately, because its "no
+                 window" guard fires. The wait did not happen at all.
+       
+       Jamie found the Atari's on 2026-09-11 by playing it ("it does not exit
+       cleanly") and then asked what was SUPPOSED to happen, which is what
+       turned up the other two. THE ORDER WAS THE BUG; three ports had worked
+       around it by making their teardown do nothing, and that is the tell. */
+    vdc_shutdown();
 
     /* NOTES item 2 -- "returning to BASIC wedges the C128" -- WAS TRUE ALL
      * ALONG, and the note below saying otherwise is kept because how it came

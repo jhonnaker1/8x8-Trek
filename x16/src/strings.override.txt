@@ -7,3 +7,10 @@
 # strings that name the machine differ. See mega65/src/strings.override.txt.
 0	 COMMANDER X16 PORT 
 82	TO THE COMMANDER X16.
+# THE FAREWELL'S SECOND LINE. The shared string is the C128's truth -- "BASIC
+# IS ON THE 40-COLUMN SCREEN." -- because that machine resets and BASIC comes
+# back on the VIC-IIe, in the other window. There is no 40-column screen here;
+# plat_exit() is empty and BASIC resumes on this one. Nobody had ever read
+# this line on this machine, because vdc_shutdown() erased it one line after
+# it was drawn -- see c128/src/main.c on the quit order, fixed 2026-09-11.
+10	HIT A KEY AND BASIC COMES BACK.

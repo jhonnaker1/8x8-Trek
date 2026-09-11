@@ -7,3 +7,9 @@
 # strings that name the machine differ. See mega65/src/strings.override.txt.
 0	 AMIGA PORT 
 82	TO THE AMIGA.
+# As on the X16: the shared line is the C128's, and this machine has no
+# 40-column screen either. vdc_shutdown() closes the window and plat_exit()
+# does nothing, so the process is returned to the shell that started it.
+# Unreadable until 2026-09-11 for the same reason -- worse here, because
+# closing the window also made kb_waitkey() return instantly.
+10	HIT A KEY TO RETURN TO AMIGADOS.

@@ -71,10 +71,20 @@ static const char autoplay[] = {
     's', 13, 'x', 13,       /* SELF DESTRUCT. The password is what the setup
                                screen took above -- 'x' answered the PASSWORD
                                field, not an "accept" that does not exist. */
-    13, 13, 13, 13, 13      /* through the loss memo, the evaluation and the
+    13, 13, 13, 13, 13,     /* through the loss memo, the evaluation and the
                                hall of fame, to the PLAY AGAIN prompt, which
                                is where the machine dropped into the monitor
                                at PC=$9840 -- inside the overlay window. */
+    'n'                     /* NO. NO RETURN AFTER IT: the farewell screen's
+                               own kb_waitkey() would eat it and the program
+                               would exit before the frame could be looked at
+                               -- which is what the first run of this did.
+                               The table runs out here, so kb_waitkey
+                               blocks on the real keyboard -- which is exactly
+                               the state to look at: the farewell has to still
+                               be ON SCREEN while it waits. It was not, until
+                               2026-09-11: vdc_shutdown() IS scr_clear() here,
+                               and main() called it BEFORE the wait. */
 };
 static unsigned char ap_at = 0;
 #endif
