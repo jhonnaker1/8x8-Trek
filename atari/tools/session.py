@@ -78,6 +78,18 @@ class Session:
     # -- lifecycle ---------------------------------------------------------
     def __enter__(self):
         self.shots.mkdir(parents=True, exist_ok=True)
+        # THE DISK AND THE SYMBOLS MUST COME FROM THE SAME LINK. symbols() reads
+        # build/trekatari.xex.elf and the game runs off the .atr; if the ELF is
+        # newer, every peek is at an address from a different build and the boot
+        # poll reads a number that never settles. That is what "far_used stuck
+        # at 20041" was -- not a slow load, a stale disk. `make atr` fixes it,
+        # and saying so beats letting the next person debug the game.
+        elf = ATARI / "build" / "trekatari.xex.elf"
+        if elf.exists() and self.master.exists():
+            if elf.stat().st_mtime > self.master.stat().st_mtime:
+                sys.exit("session: %s is NEWER than %s -- the symbols and the "
+                         "disk are from different links.\n"
+                         "         Run `make atr` first." % (elf.name, self.master.name))
         shutil.copy(self.master, self.disk)
         self.sym = symbols()
         log = ATARI / "build" / "bridge.log"

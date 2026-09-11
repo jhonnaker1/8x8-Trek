@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (9 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (7 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -533,14 +533,32 @@ that is released.**
     fixed. The report-only mode was a transitional accommodation for a backlog
     somebody had to clear; the backlog is zero, so it is fatal -- a
     report-only check at zero just drifts back up in silence.
-5. **The boot load is untimed against a real 1050.** Packing `OVERLAYS.BIN`
-   cut it by 40% and nobody has held a stopwatch to what is left.
+5. ~~**The boot load is untimed against a real 1050.**~~ **TIMED 2026-09-10:
+   112 SECONDS.** Nearly two minutes before the title screen, for 36,474 bytes
+   through a 1050. The reason nobody noticed is worse than the number: every
+   boot this project has ever timed ran with **Altirra's SIO patch on**, which
+   replaces the serial protocol with an instant transfer -- 12.7s, and not a
+   1050 or any other drive. `make run-probe-boottime` times both. **Whether
+   two minutes is acceptable is a judgement, not a measurement**, and it is
+   Jamie's.
 6. **No release bundle** -- a licence fact rather than a task. What ships is
    the XEX and the data files for the player's own DOS disk.
-7. **The DOS fork is held in reserve**, not spent: the lever that decides
-   whether `$0700..$1FFF` is worth 2,282 bytes.
-8. **Whether `.ovl_front` becomes the ceiling.** It grows with the save record
-   and cannot be split. 693 bytes resident today.
+7. **The DOS fork is held in reserve**, not spent -- and item 8 gives it a
+   TRIGGER rather than a feeling. It is the lever that relieves `lowram`, and
+   `lowram` has **14 bytes**. So the moment to spend it is the fifteenth byte
+   added to the save record, not whenever the port next feels tight.
+8. ~~**Whether `.ovl_front` becomes the ceiling.**~~ **ANSWERED 2026-09-10:
+   IT IS NOT, AND THIS ITEM WAS WATCHING THE WRONG NUMBER.**
+
+       .ovl_front   3889 of 4608  ->  719 bytes free
+       .ovl_enemy   4202 of 4608  ->  406 bytes free   (the tighter overlay)
+       io_buf        626 of  640  ->   14 bytes free   (the actual ceiling)
+
+   `io_buf` is `SAVE_HDR 24 + TREK_SAVE_SIZE 601 + 1` = 626 in a 640-byte
+   lowram region. **The save record can grow by fourteen bytes** before lowram
+   overflows -- long before front's 719 bytes of code headroom matter. (This
+   entry also said "693 bytes resident today"; `verify` says 417, and 417 is
+   itself the larger half of item 19's 20-byte wobble.)
 
 ### Verification gaps on released ports
 
@@ -7690,6 +7708,57 @@ random fault cannot be verified by watching it pass.
 A resident figure moved 693 -> 673 between builds, was read as a stale link,
 and **a correct finding was retracted on the strength of it**. A binary you
 cannot reproduce is a bug report you cannot pin.
+
+
+## The three Atari budget questions, answered (2026-09-10)
+
+Items 5, 7 and 8. Two were answerable by measurement and the third turned out
+to be a decision waiting for a trigger, which the other two supplied.
+
+### The boot load takes 112 seconds, and the number we had was fictional
+
+    patched      760 frames   12.68 s
+    accurate    6720 frames  112.15 s      8.8x slower
+
+**Altirra patches SIO by default** -- `siopatch = 'on'`, `accuratedisk =
+False` -- which replaces the serial protocol with an instant transfer. It is
+not a 1050; it is not any drive. Every boot this project has timed, including
+every run of the snapshot harness built today, used it. So "the boot load is
+untimed" was true in a stronger sense than the item meant: the figure everyone
+had was not slow, it was imaginary.
+
+Both are measured now (`make run-probe-boottime`), with frames converted using
+the region the machine reports rather than an assumed 60Hz. **Whether a
+two-minute wait before the title screen is acceptable is a judgement and not a
+measurement.** Packing OVERLAYS.BIN already cut it 40%; without that it would
+be about three minutes.
+
+### The ceiling is `io_buf`, not `.ovl_front`
+
+Item 8 has been watching the wrong resource since it was written:
+
+    .ovl_front   3889 of 4608  ->  719 free
+    .ovl_enemy   4202 of 4608  ->  406 free
+    io_buf        626 of  640  ->   14 free
+
+`io_buf` is `SAVE_HDR 24 + TREK_SAVE_SIZE 601 + 1` = 626 bytes in a 640-byte
+lowram region. **Fourteen bytes.** The save record hits that ceiling long
+before the serialiser's code hits front's.
+
+### Which gives the DOS fork a trigger
+
+Item 7 asks whether `$0700..$1FFF` is worth taking. It is the lever that
+relieves lowram -- so the answer is not a feeling about tightness but a
+condition: **spend it when the save record needs a fifteenth byte.** Until
+then it stays in reserve, which is what it was always for.
+
+### And the harness could run a stale disk against fresh symbols
+
+`session.py` copies `build/egatrek.atr` and reads symbols from
+`build/trekatari.xex.elf`. Nothing checked they came from the same link, and
+when they did not the boot poll read a `far_used` that never settled --
+presenting as "the load stalled at 20041" rather than as a mismatch. It now
+refuses to start when the ELF is newer than the disk, and says `make atr`.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
