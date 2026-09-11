@@ -58,7 +58,7 @@ smoke2: $(SMOKE2_OUT)
 # an ELF that Xemu loads at $457F -- where it is not recognised as BASIC, so it
 # is never auto-run and the screen shows a SYS line instead. An hour went into
 # a "black screen" that was this.
-$(SMOKE2_OUT): $(SMOKE2_SRC) src/m65vid.h mega65.ld
+$(SMOKE2_OUT): $(SMOKE2_SRC) src/m65vid.h mega65.ld Makefile
 	@mkdir -p build
 	$(M65CC) $(CFLAGS) $(LDFLAGS) -o build/smoke2.elf $(SMOKE2_SRC) $(LIBC_A)
 	$(OBJCOPY) -O binary --remove-section=.ovl_* build/smoke2.elf build/smoke2.res
@@ -140,7 +140,7 @@ $(DEBUG_OUT): $(SRC) src/m65vid.h src/m65input.h src/m65snd.h mega65.ld Makefile
 
 smoke: $(SMOKE_OUT)
 
-$(SMOKE_OUT): $(SMOKE_SRC) src/m65vid.h
+$(SMOKE_OUT): $(SMOKE_SRC) src/m65vid.h Makefile
 	@mkdir -p build
 	$(M65CC) -Wall -Os -I $(LIBC_INC) -I ../c128/src -I ../core \
 	    -o $@ $(SMOKE_SRC) $(LIBC_A)
@@ -163,7 +163,7 @@ DISK = build/disk
 # into main(). See tools/overlay_check.py.
 NOLTO = build/nolto
 
-nolto: $(SRC)
+nolto: $(SRC) Makefile
 	@mkdir -p $(NOLTO)
 	@for f in $(SHARED) $(filter %.c,$(PLATFORM)); do \
 	    $(M65CC) -c -fno-lto $(CFLAGS) -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
@@ -278,7 +278,7 @@ PROBECC = $(M65CC) -Wall -Werror -Oz \
           -I $(MEGA65_LIBC)/include -o $@ $< $(LIBC_A)
 CFG ?= 3
 
-build/probe_bank.prg: src/probe_bank.c
+build/probe_bank.prg: src/probe_bank.c Makefile
 	@mkdir -p build
 	$(PROBECC)
 
@@ -286,14 +286,14 @@ probe-bank: build/probe_bank.prg
 	sh tools/run.sh "$(CURDIR)/$<" build/probe1.png 14
 	@echo "read build/probe1.png"
 
-build/probe_dos$(CFG).prg: src/probe_dos.c
+build/probe_dos$(CFG).prg: src/probe_dos.c Makefile
 	@mkdir -p build
 	$(M65CC) -Wall -Werror -Oz -DCFG=$(CFG) -I $(MEGA65_LIBC)/include -o $@ $< $(LIBC_A)
 
 probe-dos: build/probe_dos$(CFG).prg
 	sh tools/run_dos_probe.sh $(CFG)
 
-build/probe_read.prg: src/probe_read.c
+build/probe_read.prg: src/probe_read.c Makefile
 	@mkdir -p build
 	$(PROBECC)
 
@@ -307,7 +307,7 @@ probe-read: build/probe_read.prg build/OVERLAYS.BIN
 	    [c := c ^ b for b in d]; \
 	    print('expect %d bytes, xor \$$%02X' % (len(d), c))"
 
-build/probe_cmd.prg: src/probe_cmd.c
+build/probe_cmd.prg: src/probe_cmd.c Makefile
 	@mkdir -p build
 	$(PROBECC)
 

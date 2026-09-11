@@ -34,7 +34,7 @@ all: smoke
 
 smoke: $(SMOKE_OUT)
 
-$(SMOKE_OUT): $(SMOKE_SRC) src/x16vera.h
+$(SMOKE_OUT): $(SMOKE_SRC) src/x16vera.h Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(SMOKE_SRC)
 	@python3 -c "import os; print('x16: smoke %d bytes' % os.path.getsize('$@'))"
@@ -44,7 +44,7 @@ CHARSET_OUT = build/charset.prg
 
 charset: $(CHARSET_OUT)
 
-$(CHARSET_OUT): $(CHARSET_SRC) src/x16vera.h
+$(CHARSET_OUT): $(CHARSET_SRC) src/x16vera.h Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(CHARSET_SRC)
 
@@ -68,7 +68,7 @@ FULL_OUT = build/full.prg
 
 full: $(FULL_OUT)
 
-$(FULL_OUT): $(FULL_SRC) src/x16vera.h
+$(FULL_OUT): $(FULL_SRC) src/x16vera.h Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(FULL_SRC)
 	@python3 -c "import os; \
@@ -80,7 +80,7 @@ STORE_OUT = build/storetest.prg
 
 storetest: $(STORE_OUT)
 
-$(STORE_OUT): $(STORE_SRC)
+$(STORE_OUT): $(STORE_SRC) Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(STORE_SRC)
 
@@ -93,7 +93,7 @@ SND_OUT = build/sndtest.prg
 
 sndtest: $(SND_OUT)
 
-$(SND_OUT): $(SND_SRC) src/x16snd.c
+$(SND_OUT): $(SND_SRC) src/x16snd.c Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -DTREK_SND_TEST -o $@ $(SND_SRC)
 
@@ -105,7 +105,7 @@ MEM_OUT = build/memtest.prg
 
 memtest: $(MEM_OUT)
 
-$(MEM_OUT): $(MEM_SRC)
+$(MEM_OUT): $(MEM_SRC) Makefile
 	@mkdir -p build
 	$(X16CC) $(CFLAGS) -o $@ $(MEM_SRC)
 
@@ -202,7 +202,7 @@ release: data
 # got out. See tools/overlay_check.py, rule 4.
 NOLTO = build/nolto
 
-nolto: $(GAME_SRC)
+nolto: $(GAME_SRC) Makefile
 	@mkdir -p $(NOLTO)
 	@for f in $(GAME_SRC); do \
 	    $(X16CC) -c -fno-lto $(OVLFLAGS) -o $(NOLTO)/`basename $$f .c`.o $$f \
@@ -220,7 +220,7 @@ verify: $(GAME_OUT) data nolto
 # in hex, for every key pressed. Run it, type, read the screen. This is the
 # instrument that caught the case bug: the header comment in src/x16input.c
 # had REASONED that GETIN speaks PETSCII, and it does not.
-keyprobe: src/keyprobe.c
+keyprobe: src/keyprobe.c Makefile
 	@mkdir -p build
 	$(X16CC) -Wall -Oz -o build/keyprobe.prg src/keyprobe.c
 	@echo "run it, type keys, read the hex off the screen"

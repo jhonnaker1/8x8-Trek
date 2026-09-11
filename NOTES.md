@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (11 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (10 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -525,10 +525,14 @@ that is released.**
     `-Oz` are both mandatory and the variance is inside LTO codegen. Fixing it
     properly means bisecting llvm-mos's passes or taking it upstream.
 
-20. **35 rules compile without depending on their Makefile.** Every game link
-    rule now does; the probe and smoke builds do not. `make check-makefiles`
-    reports them without failing the build, which is a decision to revisit
-    rather than a permanent state.
+20. ~~**35 rules compile without depending on their Makefile.**~~ **CLEARED
+    2026-09-10, and the check FAILS the build now.** Eleven of the 35 were
+    .PHONY -- they have no file, so make runs them every time and a missing
+    prerequisite costs nothing; flagging things that cannot go wrong is how a
+    check gets ignored and then deleted, so those are exempt. The other 24 are
+    fixed. The report-only mode was a transitional accommodation for a backlog
+    somebody had to clear; the backlog is zero, so it is fatal -- a
+    report-only check at zero just drifts back up in silence.
 5. **The boot load is untimed against a real 1050.** Packing `OVERLAYS.BIN`
    cut it by 40% and nobody has held a stopwatch to what is left.
 6. **No release bundle** -- a licence fact rather than a task. What ships is

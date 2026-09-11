@@ -110,12 +110,12 @@ smoke: $(SMOKE_OUT)
 
 storetest: $(STORE_OUT)
 
-$(STORE_OUT): $(STORE_SRC)
+$(STORE_OUT): $(STORE_SRC) Makefile
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ $(STORE_SRC)
 	@ls -l $@
 
-$(SMOKE_OUT): $(SMOKE_SRC) src/../../c128/src/vdc.h
+$(SMOKE_OUT): $(SMOKE_SRC) src/../../c128/src/vdc.h Makefile
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ $(SMOKE_SRC)
 	@ls -l $@

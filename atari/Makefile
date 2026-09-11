@@ -75,7 +75,7 @@ SMOKE_OUT = build/smoke.xex
 
 smoke: $(SMOKE_OUT)
 
-$(SMOKE_OUT): $(SMOKE_SRC) src/vbxevid.h atari.ld
+$(SMOKE_OUT): $(SMOKE_SRC) src/vbxevid.h atari.ld Makefile
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) -I ../c128/src $(LDFLAGS) -o $@ $(SMOKE_SRC)
 	@python3 -c "import os; print('atari: smoke %d bytes' % os.path.getsize('$(SMOKE_OUT)'))"
@@ -270,7 +270,7 @@ run: atr
 # IS LOW RAM FREE WHILE DOS IS RESIDENT? A memory map is not evidence about a
 # running machine, and the buffer this port wants to put down there is 626
 # bytes of the tightest budget in the project.
-lowprobe: src/lowprobe.c src/vbxevid.c src/ataristorage.c
+lowprobe: src/lowprobe.c src/vbxevid.c src/ataristorage.c Makefile
 	@mkdir -p build
 	$(ATARICC) $(CFLAGS) $(LDFLAGS) -o build/lowprobe.xex \
 	    src/lowprobe.c src/vbxevid.c src/ataristorage.c

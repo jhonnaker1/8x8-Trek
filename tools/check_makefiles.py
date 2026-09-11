@@ -92,10 +92,20 @@ def check_relink(path):
             line = line[:-1] + " " + raw[i].strip()
         lines.append(line)
         i += 1
+    # A .PHONY TARGET CANNOT BE STALE -- it has no file, so make runs its
+    # recipe every time and a missing prerequisite costs nothing. Flagging
+    # those was 11 of the first 35 hits, and a check that reports things which
+    # cannot go wrong is how a check gets ignored and then deleted.
+    phony = set()
+    for line in lines:
+        if line.startswith(".PHONY:"):
+            phony.update(line.split(":", 1)[1].split())
+
     bad, target, prereqs, n_at = [], None, "", 0
     for n, line in enumerate(lines, 1):
         if line.startswith("\t"):
-            if target and COMPILES.search(line) and "Makefile" not in prereqs:
+            if (target and target not in phony
+                    and COMPILES.search(line) and "Makefile" not in prereqs):
                 bad.append((n_at, target))
                 target = None            # report each rule once
             continue
@@ -119,20 +129,21 @@ def main():
                   "line, so $(%s) is EMPTY here and" % var)
             print("          the rule does not depend on it. Move the "
                   "definition above line %d." % n)
-    # THE RELINK CHECK REPORTS; IT DOES NOT FAIL THE BUILD. Every game link
-    # rule is fixed, and thirty-odd probe and smoke rules are not -- failing
-    # `all` on those in the middle of other work is how a check gets deleted
-    # rather than obeyed. A wall of warnings is not a report either, so this
-    # prints a COUNT and the shipped rules only. The rest are open list item 19.
-    soft = []
+    # THIS FAILS THE BUILD NOW, and it did not on 2026-09-10 when it was
+    # written: there were 35 pre-existing hits, and failing `all` on a backlog
+    # somebody else has to clear is how a check gets deleted rather than
+    # obeyed. The backlog is zero as of the same day, so the accommodation has
+    # outlived its reason -- and a report-only check at zero just drifts back
+    # up in silence. Phony targets are exempt (see check_relink).
     for f in files:
         rel = os.path.relpath(f, HERE)
-        soft += [(rel, n, t) for n, t in check_relink(rel)]
-    if soft:
-        print("check_makefiles: %d rule(s) compile without depending on their "
-              "Makefile" % len(soft))
-        print("          (probe and smoke builds; every game link rule now "
-              "does -- see open list item 19)")
+        for n, target in check_relink(rel):
+            bad += 1
+            print("%s:%d: `%s` compiles but does not list Makefile as a "
+                  "prerequisite" % (rel, n, target))
+            print("          A flag or source-list change here will NOT "
+                  "relink. That cost a twenty-minute test run against a "
+                  "stale binary on 2026-09-10.")
 
     if bad:
         print("\ncheck_makefiles: %d rule(s) silently depending on nothing"

@@ -181,7 +181,7 @@ HDR = src/vdc.h src/layout.h src/egavdc.h src/ui.h src/input.h \
 
 NOLTO = build/nolto
 
-nolto: $(SRC) $(HDR)
+nolto: $(SRC) $(HDR) Makefile
 	@mkdir -p $(NOLTO)
 	@for f in $(SRC); do \
 	    $(MOSCC) -c -fno-lto -Oz -I src -I ../core -Wall -Werror \
@@ -331,7 +331,7 @@ d64: $(D64)
 
 # THE DATA FILES ARE PREREQUISITES NOW. They were read by the recipe and
 # required by nothing, which is what made a clean `make d64` fail.
-$(D64): $(OUT) build/strings.dat build/music.dat
+$(D64): $(OUT) build/strings.dat build/music.dat Makefile
 	@mkdir -p build
 	@# CUT THE IMAGES AGAIN, HERE. build/ovl*.prg is shared between the
 	@# release and debug builds -- whichever linked last wins -- so a disk
