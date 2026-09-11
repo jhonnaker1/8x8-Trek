@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (2 open of 22 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (4 open of 24 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,8 +475,15 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**TWO still open, and BOTH want a person at a keyboard: 10** (no human has
-played the Amiga) and **11** (the C128 wants play). Nothing else is left.
+**FOUR still open, and ALL FOUR want a person: 10** (no human has played the
+Amiga), **11** (the C128 wants play), **23** (colour per message has never been
+seen on a screen on four of the five ports) and **24** (the Atari's pitch fix
+has not been heard).
+
+**23 and 24 were raised by this re-derivation, minutes after the release that
+shipped both.** Neither is a defect anybody has found; both are changes that
+went out verified by arithmetic alone, which is the bet item 18 lost. Closing
+items creates items, and a release creates the most.
 
 **Item 19 is documented and parked** by Jamie's call -- the non-deterministic
 Atari link is a property to be aware of, not work to be done, and it reopens
@@ -692,6 +699,32 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
 11. **The C128 wants play.** The oldest item here and the only one that has
     paid four times over: whether the game it adds up to is survivable,
     readable and fair is not a question any build check reaches.
+
+### Raised 2026-09-11, by re-deriving after the release rather than reciting
+
+23. **COLOUR PER MESSAGE HAS NEVER BEEN SEEN ON A SCREEN on four of the five
+    ports.** It shipped in v0.13.0 to the C128, MEGA65, X16 and Amiga, and the
+    only verification it has ever had is `c128/test/test_panels.c` -- host-side
+    unit tests, made to fail first, asserting a colour table. No screenshot, no
+    emulator, no machine. The drawing path is shared, but the EGA-to-machine
+    colour MAP is per port, and a wrong map shows up only as wrong colours.
+
+    **This is item 18's shape exactly**, and item 18 is the standing proof that
+    it is not a theoretical worry: the X16's sound numbers agreed with each
+    other for four months while the port played an octave flat, because every
+    measurement was of the thing that was wrong. A visual change checked only
+    by arithmetic is the same bet.
+
+    Jamie has seen it on the ATARI -- he played it on 2026-09-11 with the
+    change in -- which is one port of five and the only reason this is not
+    worse.
+
+24. **THE ATARI'S PITCH FIX HAS NOT BEEN HEARD.** Jamie confirmed the port made
+    sound at all ("the sound works now"), then reported it three octaves sharp,
+    and the AUDCTL fix that followed has only been verified by asking Altirra
+    for a number: 290 Hz where the driver intended 290. **That is precisely the
+    evidence that was worthless on the X16.** It shipped in v0.13.0. Thirty
+    seconds of listening settles it and nothing else can.
 21. ~~**No human has played the ATARI either.**~~ **PLAYED 2026-09-11, Jamie:
     "The game plays great." IT FOUND TWO BUGS IN ONE SITTING, and both were
     invisible to every instrument here.**
