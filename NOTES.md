@@ -542,9 +542,12 @@ that is released.**
    two minutes is acceptable is a judgement, not a measurement**, and it is
    Jamie's.
 6. **No release bundle** -- a licence fact rather than a task. What ships is
-   the XEX and the data files for the player's own DOS disk.
-7. **The DOS fork is held in reserve**, not spent -- and item 8 gives it a
-   TRIGGER rather than a feeling. It is the lever that relieves `lowram`, and
+   the XEX and the data files for the player's own DOS disk. **And it is the
+   SAME LEVER as item 7**, which nothing had noticed: see "The two Atari DOS
+   questions are one" below.
+7. **The DOS fork is held in reserve**, not spent -- and it turns out to be
+   two things at once, budget AND licence: see "The two Atari DOS questions
+   are one" below. Item 8 gives it a TRIGGER rather than a feeling. It is the lever that relieves `lowram`, and
    `lowram` has **14 bytes**. So the moment to spend it is the fifteenth byte
    added to the save record, not whenever the port next feels tight.
 8. ~~**Whether `.ovl_front` becomes the ceiling.**~~ **ANSWERED 2026-09-10:
@@ -7930,6 +7933,66 @@ The new tests cover the override and the case most likely to break -- an
 override travelling with its message when the panel scrolls, since the colour
 array has to shift alongside `panel_slot`. Deleting that one line fails both
 new checks, which is the only reason to believe they work.
+
+
+## The two Atari DOS questions are one lever (2026-09-10)
+
+Items 6 and 7 have sat on the list as separate things -- one a licence fact,
+one a budget lever. They are the same decision seen from two ends, and nothing
+had said so.
+
+### Item 6: why there is no release bundle
+
+`make atr` starts from a real Atari DOS 2.5 image
+(`$(HOME)/Atari400mini/os/Dos 2.5.atr`), deletes the utilities it does not need
+-- DUP.SYS, RAMDISK.COM, SETUP.COM, COPY32.COM, DISKFIX.COM -- and adds
+AUTORUN.SYS and the data files. **The bootable disk therefore contains
+DOS.SYS, which is Atari's code.** This project can distribute its own XEX and
+its own data; it cannot distribute Atari's DOS, the same rule that keeps
+`reference/` out of the repository. So `make release` does not exist here and
+the player supplies their own DOS disk.
+
+### Item 7: what the fork is worth, and what it costs
+
+The Atari's `.data`/`.bss`/`.noinit` come out of the same region as its code,
+where the C128's live in a separate `lowram` that does not compete at all --
+about 2,330 bytes of structural disadvantage, the largest this target has.
+Pointing `c_writeable` at `$0700..$1FFF` reclaims **2,282** of it.
+
+But a booted DOS 2.5 reports `MEMLO = $1CFC`, read off the machine, so with DOS
+resident the free part is `$1CFC..$1FFF` and the lever is worth **772, not
+2,282**. The full amount needs DOS gone.
+
+And the seam wants DOS: not for the data files, which could come off raw
+sectors through the OS's own SIO vector, but because **saves are named by the
+player**. `ui.c` lets them type a filename and sector ranges have no names.
+Six files go through `D:` at runtime -- STRINGS.DAT, MUSIC.DAT, OVERLAYS.BIN,
+BRIEF.TXT, EGATREK.SAV, TREK.SCR.
+
+### The connection
+
+**Dropping DOS does not only buy 1,510 more bytes. It removes the only Atari
+code on the disk** -- and with it the reason item 6 exists. A port that boots
+itself and reads its own sectors could ship a complete, self-booting `.atr`
+with nothing in it that is not ours.
+
+So the fork is not "2,282 bytes if things get tight". It is:
+
+    keep DOS    772 bytes, player-named saves, no redistributable disk
+    drop DOS  2,282 bytes, a filesystem to write, a shippable release
+
+**Neither is obviously right**, and it is Jamie's call, not a measurement. What
+is measured is the price on both sides. The trigger from item 8 still stands
+for the budget half -- the fifteenth byte added to the save record -- but the
+licence half has no trigger at all: it is worth exactly as much as wanting to
+hand someone a disk.
+
+### And a stale line on the front door
+
+The root README still said the Atari was "not released: saving is unverified,
+and the resident margin is 693 bytes". Saving was verified on 2026-09-10, the
+margin is 303, and **the actual reason it is unreleased is the licence** --
+which the table had never said. Fixed.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
