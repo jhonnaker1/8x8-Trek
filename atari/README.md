@@ -814,6 +814,10 @@ because a note that starts before an overlay load and is still sounding after
 it would otherwise stay wrong for its whole length. After the fix: `AUDCTL
 $78`, and Altirra reports 290 Hz for the same divisor.
 
+**Confirmed by ear, 2026-09-11** — Jamie: *"the atari's pitch fix worked. i
+heard it."* Which matters because the same Altirra number was what the port had
+before anyone listened, and it was reporting an 8-bit channel then.
+
 **`make run-sndtest` passed twelve checks on this too, at 0.05% worst error.**
 It links `src/sndtest.c` with no storage seam at all — the rule names five
 sources and not one of them can touch a disk — so SIO never ran, `AUDCTL`

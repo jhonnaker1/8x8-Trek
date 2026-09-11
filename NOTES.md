@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (4 open of 24 raised)
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (3 open of 24 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -475,15 +475,16 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**FOUR still open, and ALL FOUR want a person: 10** (no human has played the
-Amiga), **11** (the C128 wants play), **23** (colour per message has never been
-seen on a screen on four of the five ports) and **24** (the Atari's pitch fix
-has not been heard).
+**THREE still open, and ALL THREE want a person: 10** (no human has played the
+Amiga), **11** (the C128 wants play) and **23** (colour per message has never
+been seen on a screen on four of the five ports).
 
-**23 and 24 were raised by this re-derivation, minutes after the release that
-shipped both.** Neither is a defect anybody has found; both are changes that
-went out verified by arithmetic alone, which is the bet item 18 lost. Closing
-items creates items, and a release creates the most.
+**23 and 24 were both raised by this re-derivation, minutes after the release
+that shipped them, and 24 closed within the hour** -- Jamie listened and the
+pitch was right. Neither was a defect anybody had found; both were changes that
+went out verified by arithmetic alone, which is the bet item 18 lost. **24 is
+the first time that bet came in.** Closing items creates items, and a release
+creates the most.
 
 **Item 19 is documented and parked** by Jamie's call -- the non-deterministic
 Atari link is a property to be aware of, not work to be done, and it reopens
@@ -719,12 +720,18 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
     change in -- which is one port of five and the only reason this is not
     worse.
 
-24. **THE ATARI'S PITCH FIX HAS NOT BEEN HEARD.** Jamie confirmed the port made
-    sound at all ("the sound works now"), then reported it three octaves sharp,
-    and the AUDCTL fix that followed has only been verified by asking Altirra
-    for a number: 290 Hz where the driver intended 290. **That is precisely the
-    evidence that was worthless on the X16.** It shipped in v0.13.0. Thirty
-    seconds of listening settles it and nothing else can.
+24. ~~**THE ATARI'S PITCH FIX HAS NOT BEEN HEARD.**~~ **HEARD AND CONFIRMED --
+    Jamie, 2026-09-11: "the atari's pitch fix worked. i heard it."** Raised and
+    closed the same hour.
+
+    **This one is the counter-example, and it is worth keeping for that.** The
+    measurement said 290 Hz where the driver intended 290, and the ears agreed.
+    Every other time these two have been put side by side on this project the
+    measurement lost -- the X16's octave, the Atari's silence, the Atari's
+    three octaves sharp. So the lesson is not that arithmetic is worthless; it
+    is that arithmetic is not SUFFICIENT, and you cannot tell which kind of day
+    you are having without asking a person. Here it was right, and there was no
+    way to know that in advance.
 21. ~~**No human has played the ATARI either.**~~ **PLAYED 2026-09-11, Jamie:
     "The game plays great." IT FOUND TWO BUGS IN ONE SITTING, and both were
     invisible to every instrument here.**
