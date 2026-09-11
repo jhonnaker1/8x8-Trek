@@ -527,15 +527,25 @@ schedules that.
    **And the hall of fame, with the TREK.SCR WRITE WITNESSED** -- the first
    time on any port. See "The hall-of-fame write" below. Item 4 is closed.
 
-19. **The Atari link is NOT DETERMINISTIC -- CHARACTERISED 2026-09-10, NOT
-    FIXED.** `make reproducible` reports it now; the detail is in "The Atari
-    link" below. Two distinct binaries chosen at RANDOM, ~50/50 over twelve
-    links, differing by exactly 20 bytes in exactly ONE function
-    (`ui_draw_position`, 243 or 263). Every other symbol identical. Not the
-    data pipeline, not `--threads=1`, not `--lto-partitions=1`, not the
-    machine outliner, and neither `-Os` nor `-fno-lto` even fits -- so LTO and
-    `-Oz` are both mandatory and the variance is inside LTO codegen. Fixing it
-    properly means bisecting llvm-mos's passes or taking it upstream.
+19. **The Atari link is NOT DETERMINISTIC -- PINNED 2026-09-11, STILL NOT
+    FIXED.** Two distinct binaries, 19/11 over thirty links, differing by
+    exactly 20 bytes in exactly ONE function (`ui_draw_position`, 243 or 263).
+    Narrowed from "somewhere in LTO codegen" to: the LTO optimiser is
+    exonerated (every bitcode stage is byte-identical; only `*.lto.o` varies),
+    everything through register allocation is byte-identical, and the first
+    pass whose output differs is **Prologue/Epilogue Insertion** -- deciding
+    whether one local gets a zero-page static-stack slot at `$E5` or
+    callee-saved `__rc24`/`__rc25` with the save/restore that costs the 20
+    bytes. **The zero page is exactly saturated, 96 of 96 bytes**, so those
+    slots are contested with no slack.
+
+    **`make reproducible` linked TWICE, and two links agree 53% of the time**
+    -- it reported success more often than not about a build that never is,
+    and every "X does not help" from 2026-09-10 rested on two or four samples.
+    Eight links now, and each candidate re-run at twelve. A three-stage build
+    IS reproducible 10/10 and is rejected: it loses llvm-mos's zero-page
+    allocation entirely, 96 bytes of zero page unused and ~950 bytes of code.
+    Full account under "The Atari link" below.
 
 20. ~~**35 rules compile without depending on their Makefile.**~~ **CLEARED
     2026-09-10, and the check FAILS the build now.** Eleven of the 35 were
@@ -7732,58 +7742,97 @@ writes DO reach the host image, at least on a clean shutdown.** The original
 reading was taken under different conditions and was generalised too far.
 
 
-## The Atari link: characterised, bounded, and NOT fixed (2026-09-10)
+## The Atari link: pinned to one pass and one contested resource (2026-09-11)
 
-Item 19. Asked to fix it; what I can deliver is a precise account and a check,
-and saying which is which matters more than the work.
+Item 19, reopened on Jamie's "see what you can do to figure it out or fix it".
+It is not fixed. It is narrowed from "somewhere in LTO codegen" to a single
+pass, a single decision and a single saturated resource -- and the check that
+reports it was itself wrong.
 
-### What it is, measured
+### The check could not see the thing it was checking
 
-Twelve identical links of the same sources gave **two** distinct binaries,
-chosen at **random** -- seven of one, five of the other, in no pattern. Not
-alternating, as the first reading of it said. The maps differ in exactly one
-place:
+`make reproducible` linked **twice**. The split is 19/11 over thirty links, so
+**two links agree about 53% of the time** -- the check reported "reproducible
+THIS TIME" more often than not, about a build that never is. A test that
+samples twice cannot see a coin.
 
-    ui_draw_position    243 bytes   or   263 bytes    (+/- 20)
+It poisoned the other direction harder. Every "I tried X and it did not help"
+from 2026-09-10 was a two- or four-link verdict, and four links agreeing by
+chance is 18%. So each candidate was re-run at **twelve** links here before
+being believed. They all survived -- `--threads=1`, `--lto-partitions=1`,
+`-enable-ipra=false` -- but they survived on evidence, which they had not
+before. It now links eight times: a false all-agree is about 2.5%.
 
-Every other function, symbol for symbol, is identical, and `.text` moves by
-exactly that 20. **The other four ports are reproducible** -- four clean links
-of the C128 give one md5, and the X16, MEGA65 and Amiga each matched the
-v0.12.1 tag when it was cut. This is Atari-only.
+### Where it is
 
-### What it is not
+  * **NOT the LTO optimiser.** With `-Wl,--save-temps`, every bitcode stage --
+    preopt, internalize, opt, precodegen -- is byte-identical across runs.
+    Only `*.lto.o`, the codegen output, differs. One experiment, and it
+    exonerates half the pipeline.
+  * **NOT register allocation.** Dumping `ui_draw_position` after all 148
+    machine passes, everything through regalloc is byte-identical. The FIRST
+    pass whose output differs is **Prologue/Epilogue Insertion**.
+  * **What differs is where one local lives.** A zero-page static-stack slot
+    at `$E5`, or callee-saved `__rc24`/`__rc25` -- which PEI must then save and
+    restore, and that pair is the 20 bytes:
 
-  * **Not the data pipeline.** These links regenerate nothing.
-  * **Not linker parallelism.** `--threads=1` and `--lto-partitions=1` both
-    still vary.
-  * **Not the machine outliner** -- `ui_draw_position` is four `put_num` calls
-    and two `scr_put`s, which is exactly what an outliner feeds on, so it was
-    the obvious suspect. Disabling it changes nothing.
-  * **Not something to dodge by rebuilding differently.** `-Os` does not fit.
-    `-fno-lto` does not fit. `-Oz` with LTO is the only configuration this
-    port has.
+        $x = frame-setup COPY $rc24
+        frame-setup STAbs killed $x, target-index(mos-static-stack)
 
-What is left is non-determinism inside LTO codegen. On LLVM that usually means
-a pass iterating a pointer-keyed container, which is decided per process -- and
-per-process is exactly the random half-and-half seen here.
+  * **The zero page is EXACTLY SATURATED**, and this is the part that explains
+    the rest:
 
-### What was delivered instead
+        .zp.data     3
+        .zp.bss     66
+        .zp         27
+        --------------
+                    96  in a 96-byte region, $A0..$FF
 
-`make reproducible` links twice and compares, and when they differ it names the
-function and the byte delta from the two maps. It does NOT fail the build:
-both binaries are valid and pass every check, so this reports a known property
-rather than breaking on it.
+    Taking **four** bytes off it fails the link. The zero-page slots are
+    contested with no slack at all, so which function wins one is a decision
+    with a loser -- and it is not made the same way twice.
+  * **It happens only inside lld.** The same module, codegenned by a
+    standalone `clang -c -fno-lto -x ir`, is identical 12 runs out of 12.
 
-**Proved by catching one**: run two of four produced
-`THE TWO LINKS DISAGREE -- ui_draw_position 263 vs 243 (-20)`. A check for a
-random fault cannot be verified by watching it pass.
+### What does not help, at twelve links each
 
-### Why it was worth an hour
+`--threads=1`, `--lto-partitions=1`, `--lto-O0`/`O1`/`O3`, `--lto-CGO1`/`CGO3`,
+`-enable-ipra=false` (a no-op here -- the same two hashes as baseline; IPRA is
+already off and the custom call regmasks come from elsewhere). The machine
+outliner stays ruled out. **`-enable-shrink-wrap=false` makes it WORSE**: four
+distinct binaries instead of two, which says the underlying variance is
+broader than two outcomes and shrink wrapping was collapsing some of it.
 
-A resident figure moved 693 -> 673 between builds, was read as a stale link,
-and **a correct finding was retracted on the strength of it**. A binary you
-cannot reproduce is a bug report you cannot pin.
+### The thing that works and is still not a fix
 
+Split the build in three -- `--lto-emit-llvm` to combined bitcode
+(deterministic, 8/8), `clang -c -fno-lto -x ir` to an object (deterministic,
+12/12), then a plain link. **Reproducible 10 runs out of 10.**
+
+It costs about 950 bytes, and the reason is not overhead. Compiling the
+post-LTO module as an ordinary translation unit loses llvm-mos's zero-page
+allocation **entirely**: `.zp.data`, `.zp.bss` and `.zp` all go to zero, 96
+bytes of zero page unused, and the growth is spread across every function that
+was using it -- `read_field` +117, `walk_path` +114, `put_signed` +109. That
+is not a reproducible build of this program. It is a worse compiler, and 40%
+of the port's margin. **Rejected, with the number.**
+
+### One thing I got wrong here, worth keeping
+
+Midway I reported "codegen alone is deterministic, 12 of 12" from a
+`clang -c ... -o file.o` run. **That test never ran codegen.** `mos-*-clang -c`
+defaults to LTO, so the `.o` was bitcode, and the run measured bitcode in,
+bitcode out. `file` said so and I did not read it. The real test needs
+`-fno-lto` -- and it does come out deterministic, so the conclusion survived
+its evidence being wrong, which is the least comfortable way to be right.
+
+### Where it would go from here
+
+The remaining step is reading llvm-mos's zero-page/static-stack allocation and
+finding the container whose iteration order is not stable -- or handing the
+above to llvm-mos upstream, which is now a report with a pass name, a
+resource, a reproducer and a list of eliminated candidates rather than "the
+link wobbles".
 
 ## The three Atari budget questions, answered (2026-09-10)
 

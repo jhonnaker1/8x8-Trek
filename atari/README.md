@@ -712,9 +712,16 @@ once with, and the pair says which world this is.
   patch on**, which replaces the serial protocol with an instant transfer —
   12.7s, and not a 1050 or any other drive. Whether two minutes is acceptable
   is a judgement, not a measurement, and it is Jamie's.
-* **The link is not deterministic.** `make reproducible` reports it. Two
-  distinct binaries chosen at random, differing by exactly 20 bytes in exactly
-  one function. Characterised, not fixed — item 19 on THE OPEN LIST.
+* **The link is not deterministic** — item 19, pinned on 2026-09-11 and still
+  not fixed. Two distinct binaries, 19/11 over thirty links, differing by 20
+  bytes in one function. The LTO optimiser is exonerated (every bitcode stage
+  is byte-identical; only the codegen output varies), everything through
+  register allocation is identical, and the first pass whose output differs is
+  Prologue/Epilogue Insertion — deciding whether one local gets a zero-page
+  slot at `$E5` or a callee-saved register pair that must be saved and
+  restored. **The zero page is exactly saturated, 96 of 96 bytes**, so those
+  slots are contested with no slack. `make reproducible` links **eight** times
+  now: it used to link twice, and two links agree 53% of the time.
 * **A person has not played it** — item 21. Driven through combat, docking,
   landing, the evaluation and the hall of fame by `tools/probe_*.py`, off real
   state rather than hope, but driven and not played. **Nor has anyone heard the
