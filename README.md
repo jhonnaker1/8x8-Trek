@@ -9,8 +9,11 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
 > **Status: four ports released, a fifth playable.** The **Commodore 128**,
 > **Commander X16**, **Amiga** and **MEGA65** ports are feature complete and
-> released as [v0.12.0](../../releases/latest) — the MEGA65 joined on
-> 2026-09-08 with saving, and everything it reads or writes lives on one D81.
+> released as [v0.12.1](../../releases/latest) — a sound-only point release on
+> 2026-09-10 that fixes a refusal beep which never stopped on the MEGA65 and
+> three separate faults on the X16, the largest of which had it **playing every
+> note an octave flat since v0.10.0**. The C128 and Amiga binaries are
+> byte-identical to v0.12.0.
 > The **Atari 800XL + VBXE** port boots, draws the console and runs turns as of
 > 2026-09-09, and is **not released**: saving is unverified and the resident
 > margin is under 700 bytes. See [`atari/README.md`](atari/README.md).
