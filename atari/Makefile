@@ -43,7 +43,7 @@ EARLY_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
             src/vbxevid.c src/atariinput.c src/atarimem.c src/atariovl.c src/atarisnd.c src/ataristorage.c src/music_data.c src/stubs.c
 
-.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest run-probe-snapshot nolto verify game data atr run clean
+.PHONY: all early smoke run-smoke keyprobe keytable keyecho run-keyecho memtest run-memtest sndprobe pokey sndtest run-sndtest storetest run-storetest run-probe-snapshot reproducible nolto verify game data atr run clean
 
 all: early
 
@@ -196,6 +196,13 @@ nolto: $(GAME_SRC) src/music_data.h
 	    $(ATARICC) -c -fno-lto $(CFLAGS) -DOVL_WINDOW=$(OVL_WINDOW) \
 	        -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
 	done
+
+# IS THE LINK REPRODUCIBLE? It is not, reliably -- two distinct binaries, 20
+# bytes apart in one function, chosen at random per process. This reports it
+# rather than letting a moved number be mistaken for a stale build, which cost
+# an hour on 2026-09-10. See tools/reproducible.py.
+reproducible:
+	@python3 tools/reproducible.py
 
 verify: $(GAME_OUT) nolto
 	python3 tools/verify_xex.py

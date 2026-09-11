@@ -515,12 +515,15 @@ that is released.**
    **And the hall of fame, with the TREK.SCR WRITE WITNESSED** -- the first
    time on any port. See "The hall-of-fame write" below. Item 4 is closed.
 
-19. **The Atari link is NOT DETERMINISTIC.** Two clean builds from identical
-    sources alternate between binaries 20 bytes apart. The other four ports
-    are reproducible -- three clean links each, matching the v0.12.1 tag -- so
-    this is Atari-only, and it cost an hour: a resident figure that moved was
-    read as a stale build, the finding was retracted, and the retraction was
-    wrong. A binary you cannot reproduce is a bug report you cannot pin.
+19. **The Atari link is NOT DETERMINISTIC -- CHARACTERISED 2026-09-10, NOT
+    FIXED.** `make reproducible` reports it now; the detail is in "The Atari
+    link" below. Two distinct binaries chosen at RANDOM, ~50/50 over twelve
+    links, differing by exactly 20 bytes in exactly ONE function
+    (`ui_draw_position`, 243 or 263). Every other symbol identical. Not the
+    data pipeline, not `--threads=1`, not `--lto-partitions=1`, not the
+    machine outliner, and neither `-Os` nor `-fno-lto` even fits -- so LTO and
+    `-Oz` are both mandatory and the variance is inside LTO codegen. Fixing it
+    properly means bisecting llvm-mos's passes or taking it upstream.
 
 20. **35 rules compile without depending on their Makefile.** Every game link
     rule now does; the probe and smoke builds do not. `make check-makefiles`
@@ -7613,6 +7616,59 @@ fresh disk carries no TREK.SCR (the Makefile plants none), and after this run
 the host image holds one, three sectors, with the right bytes in it. **So
 writes DO reach the host image, at least on a clean shutdown.** The original
 reading was taken under different conditions and was generalised too far.
+
+
+## The Atari link: characterised, bounded, and NOT fixed (2026-09-10)
+
+Item 19. Asked to fix it; what I can deliver is a precise account and a check,
+and saying which is which matters more than the work.
+
+### What it is, measured
+
+Twelve identical links of the same sources gave **two** distinct binaries,
+chosen at **random** -- seven of one, five of the other, in no pattern. Not
+alternating, as the first reading of it said. The maps differ in exactly one
+place:
+
+    ui_draw_position    243 bytes   or   263 bytes    (+/- 20)
+
+Every other function, symbol for symbol, is identical, and `.text` moves by
+exactly that 20. **The other four ports are reproducible** -- four clean links
+of the C128 give one md5, and the X16, MEGA65 and Amiga each matched the
+v0.12.1 tag when it was cut. This is Atari-only.
+
+### What it is not
+
+  * **Not the data pipeline.** These links regenerate nothing.
+  * **Not linker parallelism.** `--threads=1` and `--lto-partitions=1` both
+    still vary.
+  * **Not the machine outliner** -- `ui_draw_position` is four `put_num` calls
+    and two `scr_put`s, which is exactly what an outliner feeds on, so it was
+    the obvious suspect. Disabling it changes nothing.
+  * **Not something to dodge by rebuilding differently.** `-Os` does not fit.
+    `-fno-lto` does not fit. `-Oz` with LTO is the only configuration this
+    port has.
+
+What is left is non-determinism inside LTO codegen. On LLVM that usually means
+a pass iterating a pointer-keyed container, which is decided per process -- and
+per-process is exactly the random half-and-half seen here.
+
+### What was delivered instead
+
+`make reproducible` links twice and compares, and when they differ it names the
+function and the byte delta from the two maps. It does NOT fail the build:
+both binaries are valid and pass every check, so this reports a known property
+rather than breaking on it.
+
+**Proved by catching one**: run two of four produced
+`THE TWO LINKS DISAGREE -- ui_draw_position 263 vs 243 (-20)`. A check for a
+random fault cannot be verified by watching it pass.
+
+### Why it was worth an hour
+
+A resident figure moved 693 -> 673 between builds, was read as a stale link,
+and **a correct finding was retracted on the strength of it**. A binary you
+cannot reproduce is a bug report you cannot pin.
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
