@@ -467,7 +467,7 @@ checklist of *which situations need a message*, not as text to copy.
   other way round, which is easy to misread. The write/read pair needs `SEI`/
   `CLI` because the KERNAL's 60Hz IRQ does its own strobe.
 
-## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (7 open of 20 raised)
+## THE OPEN LIST, re-derived 2026-09-09, again 2026-09-10 (6 open of 20 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -605,7 +605,14 @@ that is released.**
 
 ### Deliberate scope, listed so they are not mistaken for defects
 
-12. **The MAIN VIEWER's other nine instrument pages** -- deferred to roomier
+12. ~~**The MAIN VIEWER's other nine instrument pages.**~~ **NOT ON THE ATARI
+    EITHER -- Jamie's call, 2026-09-10**, which closes the question this port
+    raised. It was the one deferral that survived measurement: two pages are
+    wider than the 17-column viewer panel, and the Atari shares
+    `c128/src/layout.c`, so `panels[P_VIEWER] = { 21, 11, 19, 7 }` binds
+    identically -- with a quarter of the C128's resident space besides. Still
+    deferred, not dropped, for a genuinely roomier target. Original entry:
+    deferred to roomier
     targets, Jamie 2026-08-29. What cycles them is read; the RESIDENT cost is
     the blocker, not the data.
 13. **A colour per message** -- deferred, Jamie 2026-09-02. **MEASURED on the
@@ -7813,6 +7820,56 @@ needs the colours themselves: MEASURED.md records ten distinct colours across
 the original's 145 sites and four read so far (NAVIGATION cyan, COMMUNICATIONS
 light gray, SCIENCE brown, DAMAGE brown). **That is a reading job against the
 binary, not a budget question**, and the budget question is now answered.
+
+
+## Message colour is department-DEFAULT with per-event exceptions (2026-09-10)
+
+`tools/msg_colours.py`. MEASURED.md read the MECHANISM on 2026-09-02 -- each
+site calls `SetColor` then the message routine, which bumps 10 to 15 -- and
+recorded that attributing 145 sites gives ten distinct colours. **The table
+itself was never written down**, only the count and four worked examples, so
+"per site, ten colours" was all anyone had to design against.
+
+With the table partly recovered, the shape is more useful than the count:
+
+    NAVIGATION      3   (cyan)     14 sites
+    ENGINEERING     6   (brown)    16 sites
+    SCIENCE         6   (brown)
+    COMMUNICATIONS  7   (lt gray)   3 sites
+
+and then the exceptions, which are EVENTS rather than departments:
+
+    13  NAVIGATION: The ship has entered a black hole...
+    13  This crystal is defective!
+    14  Crystal loaded...it appears good!
+    15  energium successfully mined.
+
+**So it is not arbitrary per site.** Most messages take their department's
+colour and a handful of dramatic moments break out of it -- which is a much
+cheaper thing to reproduce than 74 independent constants, and changes what the
+feature should probably be.
+
+### Coverage, and what is not evidence
+
+72 call sites found (145 recorded), 47 attributed to a `SetColor`, 42 with text
+recovered. The rest are unclaimed rather than guessed. Some recovered strings
+are still adjacent data rather than the message -- `ILLOGICAL`, ` greets us.`
+-- and are ignored, not interpreted.
+
+### The check that makes any of it evidence
+
+The first version solved each site's segment base independently, taking
+whichever candidate put the string nearest the code. **It disagreed with the
+one site whose answer is written down**: MEASURED.md records `$0E315` as
+"NAVIGATION: Not adjacent to planet." and proximity gave "Planet settlers
+found...". An offset passes for a length-prefixed Pascal string at many bases,
+so a per-site test cannot separate them.
+
+MEASURED.md's own method is to solve a base from DISJOINT SPANS -- a real
+segment base explains MANY sites, a coincidence explains one. Counting how many
+sites each candidate base can serve, and giving each site the best-supported
+one, makes `$0E315` read correctly. **The tool prints that check on every run
+and says outright that nothing is evidence if it fails.**
 
 ## The refusal beep diverges on TWO of the five ports (found 2026-09-09)
 
