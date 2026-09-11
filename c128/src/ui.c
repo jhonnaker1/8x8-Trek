@@ -656,12 +656,20 @@ void ui_draw_viewer(void) {
        So the viewer is a paged instrument display and STANDARD ORBIT is the
        page it shows while orbiting. This port draws that one page.
 
-       THE OTHER EIGHT ARE DEFERRED, NOT DECORATION -- Jamie's call
+       THE OTHER NINE ARE DEFERRED, NOT DECORATION -- Jamie's call
        2026-08-29, and the earlier wording here was wrong to imply otherwise.
+       NINE, NOT EIGHT: this said eight until 2026-09-11, counting the titles
+       listed above, and the correction that there are TEN pages was appended
+       SIX LINES BELOW without the number above it being changed. One drawn
+       plus eight deferred is nine, and the same comment said ten. A
+       correction that does not reach the sentence it corrects -- in the same
+       comment, in the file every port compiles.
+
        They carry live data: POWER DISTRIB 509 arrives with its own layout,
        the three energy pools at their maxima. What rules them out is this
-       machine's resident budget and a twenty-column panel, and neither binds
-       on a roomier target.
+       machine's resident budget and a SEVENTEEN-column interior -- the panel
+       is `{ 21, 11, 19, 7 }`, nineteen wide counting both borders -- and
+       neither binds on a roomier target.
 
        WHAT CYCLES THEM IS READ NOW (2026-09-02, tools/dis16.py; MEASURED.md,
        "The MAIN VIEWER, read end to end"). It is RANDOM: fn 0x023FD2 picks

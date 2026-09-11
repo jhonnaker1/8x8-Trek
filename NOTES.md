@@ -510,7 +510,48 @@ WORK.** `gh release edit --notes-file` updates the body; the tag annotation
 keeps the original, which is the honest split -- the tag is what was said at
 the time, the release page is what is true now. Do not re-tag to tidy history.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 24 raised -- EMPTY)
+## THE X16'S SOFT STACK IS 80 BYTES, AND ITS DEMAND HAS NEVER BEEN MEASURED
+## (found 2026-09-11 by sweeping for load-bearing claims)
+
+**Raised as open list item 25.**
+
+    x16     80 bytes   low RAM ends $8F30, __stack $8F80
+    c128   143 bytes   MEASURED demand, deepest path: evaluation, hall of fame
+
+**The two ports share `main.c` and `ui.c`, including that path.** The C128
+reached 143 bytes on it and overran a 64-byte guard by 79, straight into the
+overlay window -- that is what `c128/trek128.ld` records, measured rather than
+guessed.
+
+**It is not proof of a fault.** Codegen differs per target, and the path has
+been exercised here since: `TREK_AUTOPLAY` drives self-destruct, memo,
+evaluation, total and hall of fame, and Jamie played the port on 2026-09-11,
+with nothing visibly wrong. But an overrun on this port goes DOWN into the last
+variables rather than UP into the window, which is the quieter of the two
+failures, and **this port's demand has never been measured.**
+
+**HOW IT WENT UNNOTICED IS THE REUSABLE PART.** `x16/tools/verify_prg.py`
+prints the number as *"80 bytes for the soft stack"* -- framed as a stack
+allowance, not as a margin. It is both: the ram region runs $0801..$8F7F and
+the program fills it to $8F30, so those 80 bytes are simultaneously the whole
+remaining headroom AND the entire stack. The C128 spent four days with a
+resident figure drifting because its verify did not print one; this port prints
+its number and the FRAMING hides what the number is.
+
+It has also halved without comment -- `x16/README.md` said 140 bytes and 157
+overlay spare, and the live figures are 80 and 155.
+
+**And it corrects a load-bearing claim.** "The Atari is the tightest target in
+the project" is quoted in the root README, `atari/Makefile` and NOTES. On
+address space the Atari's code region is still smallest, but on HEADROOM it
+stopped being true the day Atari DOS was dropped:
+
+    x16       80 free      (and it is the soft stack too)
+    c128   1,459 free  + 132 lowram
+    atari  1,932 free  + 1,577 low data + 14 lowram
+    mega65 4,997 free
+
+## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (1 open of 25 raised)
 
 **Re-derived from the five ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -518,9 +559,11 @@ asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**THE LIST IS EMPTY. Nothing is open.** Twenty-four items raised, twenty-four
-closed or decided, and the last of them -- "no human has played the Amiga" --
-closed on 2026-09-11.
+**ONE OPEN: 25 -- the X16's soft stack is 80 bytes and its demand has never
+been measured.** Raised 2026-09-11 by sweeping for load-bearing claims, hours
+after the list first reached empty. Twenty-four had been raised and all
+twenty-four closed or decided; this is the twenty-fifth, and it is the only one
+that was found by looking rather than by playing.
 
 **All five ports have now been played by a person**, each reported in the same
 four words: the Atari, the C128, the MEGA65, the X16 and the Amiga all "look,
@@ -775,6 +818,15 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
     It also closed the Amiga's share of item 23 properly. That item had been
     closed on the strength of a DRIVEN screenshot here, which the entry said
     plainly was the weaker evidence; a person has now looked at it.
+25. **THE X16'S SOFT STACK IS 80 BYTES AND ITS DEMAND HAS NEVER BEEN
+    MEASURED.** The C128 measured 143 on the deepest path -- evaluation, hall
+    of fame -- and the two ports share the code that walks it. Not proof of a
+    fault: the path has been driven and played here with nothing visibly
+    wrong, and codegen differs per target. But an overrun here goes DOWN into
+    variables, which is the quiet failure, and v0.13.1 ships it. Full write-up
+    above. **Measure it with a sentinel fill below the live pointer**, the way
+    both other ports were measured.
+
 11. ~~**The C128 wants play.**~~ **PLAYED AND CLOSED 2026-09-11, Jamie:
     "looks, sounds, and plays great."** The oldest item on this list -- raised
     when the port was released as v0.9.0 -- and the one that paid four times
@@ -2350,8 +2402,10 @@ falling through to page 6 when there is nothing to show. Retracted in
 Because the two readings we have contradict each other and neither is worth
 guessing at. The binary says PLANET LIST needs TWO viewer pages. The capture
 in this file shows THREE COLUMNS of entries per row -- and this port's MAIN
-VIEWER is twenty columns wide, because that is what the 640x350 measurement
-gives it. Three columns of `6-4N Cygnus-6` is sixty characters.
+VIEWER is SEVENTEEN columns inside its border (`{ 21, 11, 19, 7 }`, nineteen
+wide counting both), because that is what the 640x350 measurement gives it.
+Three columns of `6-4N Cygnus-6` is sixty characters, so the conclusion holds
+either way; the "twenty columns" this line used to claim was simply wrong.
 
 So one of those is wrong about something, and a full-width report in the
 shape of STATE OF REPAIR holds all ten planets either way. The FORMAT is the

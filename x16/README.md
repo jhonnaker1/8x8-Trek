@@ -82,20 +82,38 @@ files for the emulator's or a real machine's filesystem.
 ## Live figures
 
     verify: window 3968 bytes, linker script and Makefile agree
-    verify: low RAM ends $8EF4, __stack $8F80 -- 140 bytes for the soft stack
-    verify: largest overlay msgs 3809 + 2 stamp of 3968, 157 spare
+    verify: low RAM ends $8F30, __stack $8F80 -- 80 bytes for the soft stack
+    verify: largest overlay msgs 3811 + 2 stamp of 3968, 155 spare
     verify: 11 overlay images, each byte-identical to its ELF section -- ok
 
 `make verify` prints them on every build; this file deliberately does not
-repeat them anywhere else.
+repeat them anywhere else. **The figures above were 140 and 157 when this
+section was written and are 80 and 155 now** — they moved under it, which is
+the argument for reading `verify` rather than this file.
 
-**The soft stack line is a warning, not a statistic.** `c128/trek128.ld`
-records that the C128 shipped v0.9.0 with a 64-byte guard that a measured path
-overran by 79 bytes, straight into the overlay window, and it names this port
-as carrying the same hazard in the same shape. 140 bytes is what is left here.
-On 2026-09-10 the Atari was found doing exactly that — its soft stack started
-inside the overlay window and corrupted the running image — so the hazard is
-not hypothetical on any of the three.
+### THE SOFT STACK IS THE TIGHTEST THING IN THIS PROJECT, AND IT IS UNMEASURED
+
+**80 bytes.** That line is a warning, not a statistic, and the number has
+halved since it was written.
+
+`c128/trek128.ld` records the C128's own demand, and it was **measured, not
+guessed**: the deepest path — *evaluation, hall of fame* — reached **143
+bytes**, overrunning a 64-byte guard by 79 and landing straight in the overlay
+window. **This port shares `main.c` and `ui.c` with the C128, including that
+exact path**, and has 80 bytes for it.
+
+That is not proof of a fault. Codegen differs per target, and the path HAS been
+exercised here since — the `TREK_AUTOPLAY` run drives self-destruct, memo,
+evaluation, total and hall of fame, and Jamie played the port on 2026-09-11 —
+with nothing visibly wrong. But an overrun here goes DOWN into the last
+variables rather than up into the window, which is the quieter failure of the
+two, and **this port's own demand has never been measured.**
+
+The method is in `llvm-mos`'s notes and was used on both other ports: fill
+below the live pointer with a sentinel and read back how far it was disturbed.
+On 2026-09-10 the Atari was found with its soft stack *inside* the overlay
+window, corrupting the running image, so the hazard is not hypothetical on any
+of the three.
 
 ## Two bugs this port is where we found
 
