@@ -208,8 +208,10 @@ of them were settled by measurement in September 2026.
   against fifteen.
 - **The whole Atari ST line** — 640×200 costs all but four colours (Jamie's
   call). The **TT030 and Falcon030 do qualify** — 640×480 in 16 colours, and
-  68030 means `core/` already compiles for them — but the verdict was never
-  about capability: almost nobody owns one. Not re-opened; see `NOTES.md`. **MSX2** has 80 columns but the colour collapses — though its V9938's
+  68030 means `core/` already compiles for them; one binary would serve both,
+  with a machine check in `vdc_init()` because VIDEL is not TT-compatible, and
+  it would be **Falcon-first**. But the verdict was never about capability:
+  almost nobody owns either. Not re-opened; see `NOTES.md`. **MSX2** has 80 columns but the colour collapses — though its V9938's
   SCREEN 7 is a bitmap route nobody has benchmarked, and the same applies to a
   **CoCo 3 with a SuperSprite FM+**, which carries the V9938's successor; see
   `NOTES.md`. The **stock Atari

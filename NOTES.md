@@ -3030,11 +3030,40 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   **What is still NOT established is the video** -- the modes are documented,
   not measured here, exactly as with MSX2's SCREEN 7 below.
 
+  **ONE BINARY WOULD RUN ON BOTH, with one branch.** Asked 2026-09-11. Both
+  are 68030, so the compiled code is compatible and the whole 68k toolchain the
+  Amiga port uses carries over untouched. What does NOT carry is the video: TT
+  Medium is a TT SHIFTER mode, the Falcon's VIDEL is a different chip that is
+  not register-compatible, and the Falcon offers ST compatibility modes and its
+  own, never the TT's. So a build that programs TT video registers directly
+  comes up blank on a Falcon.
+
+  The escape is to set the mode through the OS instead: read `_MCH` from the
+  cookie jar, then `Setscreen()` with a TT mode code or `VsetMode()` with a
+  VIDEL mode word. **After that branch the drawing is shared** -- both lay
+  4-plane 16-colour screens out in the same word-interleaved planar format,
+  which is the compatibility that lets ST bitmaps work on both. In this
+  project's shape that is a machine check inside `vdc_init()` and nothing
+  downstream: one function, not a driver.
+
+  **AND IT WOULD BE FALCON-FIRST, NOT TT-FIRST.** The Falcon outsold the TT --
+  the TT was an expensive workstation for DTP, CAD and professional MIDI, sold
+  mostly into Germany; the Falcon was aimed at consumers and musicians, and
+  **C-Lab kept producing it after Atari stopped**, which is evidence of demand
+  the TT never had. The surviving community follows the same split: the
+  Falcon has a live demoscene, a music scene and a run of accelerators
+  (CT60/CT63, the FireBee), and the TT has nothing comparable. So the machine
+  to target is the Falcon and the TT is the branch, not the other way round.
+  **No unit figures are recorded here on purpose** -- there are numbers in
+  circulation for both and nothing on this machine to check them against.
+
   **NONE OF THAT CHANGES THE VERDICT, because the verdict was never about
   capability**: the machines that could show the console are the ones nobody
   has, and the ones people own cannot show it. Targeting TT and Falcon alone
-  would be a port with almost no installed base. **Do not re-open this** --
-  Jamie's call, and an instrument being available is not a reason to.
+  would be a port with almost no installed base -- less brutally so for the
+  Falcon than the TT, which is a difference of degree and not of kind. **Do not
+  re-open this** -- Jamie's call, and an instrument being available is not a
+  reason to.
 - **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
   buys only a second colour pair -- four colours, same trap as the ST.
 
