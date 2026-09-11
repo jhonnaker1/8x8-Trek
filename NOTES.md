@@ -504,10 +504,16 @@ that is released.**
    `sector[]`, not just on screen. A self-destruct then ran `.ovl_cmds`,
    `.ovl_eval` and the DETAILED EVALUATION for the first time on this machine,
    totalling **-930**, the same figure the MEGA65's driven self-destruct gives.
-   **Still not done: DOCKED and LANDED** -- neither the start quadrant nor the
-   combat one put the ship next to the base, and no planet has been visited.
-   The hall of fame itself is one RETURN past the evaluation and was not
-   captured.
+   **DOCKED and LANDED followed the same day** with
+   `tools/probe_dockland.py`, which reads `gal_base[64]` and `planets[19]` out
+   of the core's state and NAVIGATES rather than hoping. Docked at a
+   `BASE_RESEARCH` in quadrant 1,2: **"HELM: DOCKED. NO STORES HERE."** -- the
+   right answer for a research base rather than a supply one, so the command
+   read the type and did not merely succeed. Orbited and landed at the planet
+   in 1,6: `STANDARD ORBIT`, then the LANDING PARTY dialog offering shuttle,
+   transporter or abort -- `.ovl_planet` executing for the first time here.
+   **The hall of fame screen itself is one RETURN past the evaluation and was
+   not captured**; everything else on this item is done.
 
 19. **The Atari link is NOT DETERMINISTIC.** Two clean builds from identical
     sources alternate between binaries 20 bytes apart. The other four ports
