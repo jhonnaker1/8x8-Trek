@@ -107,9 +107,15 @@ static void vdp_read_at(unsigned int addr)
     *VDP_ADDR = (unsigned char)((addr >> 8) & 0x3F);
 }
 
+/* The machine is taken at program_start, not here -- see place_stack() in
+   coco3/tools/build_ovl.py. Doing it in this function was too late by a whole
+   interrupt: the CoCo's 60Hz IRQ vectors through Disk BASIC, whose handler
+   resets S to BASIC's stack inside this port's code, and that happened 20ms
+   in while main() was still on its way here. */
 void vdc_init(void)
 {
     unsigned int i;
+
 
     /* GRAPHIC6. R#0 bit1=M3 and bit3=M5 give $0A; R#1 bit6 enables the
        display; R#9 bit7 selects 212 lines instead of 192. */

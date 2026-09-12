@@ -51,6 +51,21 @@
 #define ENT_SIZE     32
 #define ENT_PER_SEC   8
 
+/* THE MULTIPAK SLOT REGISTER. This port's hardware is three pieces -- a CoCo 3,
+   a SuperSprite FM+ and a disk controller -- so they live in a multipak, and
+   $FF7F decides which slot sees the $FF40-$FF5F I/O range the WD1773 answers
+   in. Bits 1-0 select it for I/O, bits 5-4 for ROM; slots 1-4 are 0-3.
+   The card sits at $FF78-$FF7B, outside that range, so the two do not have to
+   take turns -- but the slot has to be RIGHT, and nothing here was setting it.
+   UNPROVEN. This was added while chasing the game's boot, on the reasoning
+   that the isolated ovltest works and never touches the video card. It
+   CHANGED the failure and did not fix it, and the seam passed both with and
+   without it -- so it is kept as the correct thing to do rather than as a fix
+   that was demonstrated. Do not cite it as one. */
+#define MPI_SLOT  ((unsigned char *)0xFF7F)
+#define MPI_FDC   0x33                          /* slot 4, for I/O and ROM */
+
+
 static unsigned char fat[NUM_GRAN];
 static unsigned char secbuf[SEC_SIZE];
 static unsigned char ready;                     /* dskcon_init has run */
@@ -78,6 +93,7 @@ static void gran_loc(unsigned char g, unsigned char *trk, unsigned char *sec)
 /* One sector into secbuf. Non-zero on success. */
 static unsigned char read_sec(unsigned char trk, unsigned char sec)
 {
+    *MPI_SLOT = MPI_FDC;
     DCOPC = 2;
     DCDRV = 0;
     DCTRK = trk;
@@ -91,6 +107,7 @@ static unsigned char disk_ready(void)
 {
     if (ready) return 1;
     asm { orcc #$50 }                           /* init wants interrupts masked */
+    *MPI_SLOT = MPI_FDC;
     dsk_handle = dskcon_init(dskcon_nmiService);
     if (!read_sec(DIR_TRACK, FAT_SECTOR)) return 0;
     {   unsigned char i;

@@ -191,10 +191,62 @@ one port inventing a partition the shared design does not have.
 calling into it, and three resident helpers in `ui.c` reaching it with nothing
 loaded. It is resident now, as it is everywhere else.
 
-**THE IMAGES HAVE NEVER BEEN RUN.** `make overlays` links, cuts eleven images
-and passes every rule; `make` still builds the all-resident binary, and nothing
-has loaded a `.OVL` off a disk on the machine. Until that happens this is
-arithmetic, not a working overlay scheme.
+## The images DO load on the machine -- and the game still does not boot
+
+```sh
+make disk       # write a Disk BASIC diskette and round-trip every file back
+make ovlcheck   # the SEAM on the machine: 3 of 3   <- passes
+make ovlrun     # the WHOLE GAME on the machine     <- does not pass yet
+```
+
+**`make ovlcheck` passes.** A 6809 finds `HOF.OVL` in the directory, walks the
+FAT chain through the standalone WD1773 driver and lands all 1,709 bytes at
+`$C300` matching the file; then `TITLE.OVL` over the top of it, proving the
+window is really rewritten; then a name that is not on the disk comes back
+`STOR_NOTFOUND`, so the two successes mean something. **The overlay seam
+works on the hardware.**
+
+There is no ToolShed on this machine, so `tools/mkdisk.py` writes the Disk
+BASIC filesystem and `tools/checkdisk.py` reads it back with
+`src/coco3storage.c`'s OWN algorithm and compares byte for byte. That caught
+the writer immediately: assigning a 256-byte value into a shorter bytearray
+slice GROWS the array instead of padding, which shifted every sector, moved
+the directory track and left ten of eleven files unfindable -- while the
+eleventh read back perfectly.
+
+## Taking the machine, which is four things in one order
+
+Chasing `make ovlrun` turned up a bootstrap this port had never had, and every
+step of it was found on the hardware rather than reasoned out:
+
+1. **`vdc_init()` must live below `$8000`.** It landed at `$A2D8`, inside
+   Color BASIC ROM, so `main()` called into ROM trying to reach it and the
+   6809 was last seen at `$A03F`. Link order places it, so `src/coco3vid.c` is
+   first in `RES_SRC` and `build_ovl.py` **asserts** the address rather than
+   trusting the comment.
+2. **Mask interrupts first.** The CoCo's 60Hz IRQ vectors through Disk BASIC,
+   whose handler resets `S` to BASIC's own stack -- around `$3400`, inside
+   this port's code. Traced: 20ms in, `S` had gone from `$FE00` to `$34F4`.
+3. **Then place the stack.** cmoc's CoCo runtime positions it from Disk
+   BASIC's memory pointers, and this port takes the machine away from BASIC.
+   Measured before the fix: `S` ranged over `$0002..$AE0A` against an image
+   occupying `$1200..$B82B`, so every push was overwriting the program.
+4. **Then all-RAM mode.** The machine boots with ROM over `$8000-$FEFF`, so
+   most of the program and all of the window are underneath it: writes pass
+   through to the RAM below, reads come back from ROM. **It must be a CPU
+   write** -- `$FFDE`/`$FFDF` are write-only address latches and poking them
+   from MAME's debugger does nothing, which made a correct diagnosis look
+   wrong for two runs.
+
+All four are injected at `program_start` by `build_ovl.place_stack()`, before
+`INILIB` and before `main()`.
+
+**`make ovlrun` STILL DOES NOT PASS.** The game's first `ovl_load` fails,
+`dskcon_processSector` spinning on a read that never completes -- and because
+`ovl_load()` returns `void`, the failure is SILENT: `main()` calls into a
+window that was never filled and executes whatever was there. The seam works
+in isolation and does not work from inside the game, and the difference has
+not been found. It is item 32.
 
 ## The GIME MMU is proven and abandoned
 

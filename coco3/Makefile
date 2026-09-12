@@ -38,10 +38,13 @@ CFLAGS = --coco --org=1200 -O2 -fomit-frame-pointer --intdir=build \
 # No -DTREK_OVERLAYS yet, and that is deliberate: the staging rule is to link
 # the whole game RESIDENT first and read the overflow. src/coco3ovl.c supplies
 # the empty ovl_load core/overlay.h asks for.
-GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
-           ../c128/src/strpool.c \
+# src/coco3vid.c FIRST here too -- see the note above RES_SRC. vdc_init()
+# takes the machine out of ROM mode and has to be reachable while ROM is still
+# mapped, which means below $8000.
+GAME_SRC = src/coco3vid.c ../c128/src/main.c ../c128/src/ui.c \
+           ../c128/src/layout.c ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
-           src/coco3vid.c src/coco3input.c src/coco3storage.c \
+           src/coco3input.c src/coco3storage.c \
            src/coco3farmem.c src/coco3snd.c src/coco3ovl.c \
            src/music_data.c
 GAME_OUT = build/egatrek.bin
@@ -88,9 +91,22 @@ OVL_WINDOW ?= E100
 # shared design does not have -- which is exactly what overlay_check caught,
 # as resident helpers in ui.c calling trek_state_load/save unguarded.
 OVL_SRC = 1:../core/hof.c
-RES_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
-          ../c128/src/strpool.c ../core/trek.c ../core/planet.c ../core/serial.c \
-          src/coco3vid.c src/coco3input.c src/coco3storage.c \
+# src/coco3vid.c IS DELIBERATELY FIRST, and this is not cosmetic.
+#
+# vdc_init() takes the machine out of ROM/RAM mode ($FFDF, all RAM) and every
+# other line of this port depends on that having happened: the CoCo 3 boots
+# with ROM over $8000-$FEFF, and this image reaches $B82B resident with its
+# overlay window above that. So the SWITCH ITSELF has to live below $8000, or
+# main() calls into Color BASIC ROM trying to reach it and the 6809 never
+# comes back. It did exactly that: _vdc_init landed at $A2D8 and the program
+# wandered off into ROM at $A03F.
+#
+# Link order is what places it, so the order is load-bearing and tools/
+# binsize.py asserts it rather than trusting this comment.
+RES_SRC = src/coco3vid.c ../c128/src/main.c ../c128/src/ui.c \
+          ../c128/src/layout.c ../c128/src/strpool.c \
+          ../core/trek.c ../core/planet.c ../core/serial.c \
+          src/coco3input.c src/coco3storage.c \
           src/coco3farmem.c src/coco3snd.c src/coco3ovl.c src/music_data.c
 
 # NOT YET THE DEFAULT BUILD. The images build and the link resolves both ways,
@@ -128,7 +144,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck ovltest ovlcheck data disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -158,11 +174,75 @@ $(GAME_OUT): $(GAME_SRC) build/img/ovlmap.h Makefile
 VID_SRC = src/vidtest.c src/coco3vid.c
 VID_OUT = build/VIDTEST.BIN
 
+# THE OVERLAY SEAM ON ITS OWN: take the machine, read one image off the
+# diskette into the window, report what landed. The full game reaches ovl_load
+# through a title screen and a stubbed keyboard, so a failure there could be
+# any of a dozen things.
+OVLT_SRC = src/ovltest.c src/coco3ovl.c src/coco3storage.c
+OVLT_OUT = build/OVLTEST.BIN
+
+ovltest: $(OVLT_OUT)
+
+$(OVLT_OUT): $(OVLT_SRC) build/img/ovlmap.h Makefile
+	@mkdir -p build
+	$(CMOC) $(CFLAGS) -o $@ $(OVLT_SRC)
+	@ls -l $@
+
 vidtest: $(VID_OUT)
 
 # THE VIDEO GATE. Runs VIDTEST on the card under MAME and checks the bytes it
 # read back out of VRAM. Skips itself with a note if MAME is not installed, so
 # a fresh clone stays green -- the same rule tools/check_ports.py follows.
+# THE DATA FILES the game reads at startup. gen_strings.py owns the numbering,
+# so every port builds the same strdata.h and the same STR_COUNT; only the
+# strings that name the machine differ, and those live in
+# src/strings.override.txt.
+#
+# THE MUSIC IS THIS PORT'S OWN COMPOSITION, from tools/make_music.py -- never
+# the note data tools/gen_music.py extracts from EGATREK.EXE, which is
+# Anderson's creative work and can never ship.
+data: build/STRINGS.DAT build/BRIEF.TXT build/MUSIC.DAT
+
+build/STRINGS.DAT: ../c128/src/strings.txt src/strings.override.txt
+	@mkdir -p build
+	cd .. && python3 tools/gen_strings.py >/dev/null
+	cd .. && python3 tools/gen_strings.py --override coco3/src/strings.override.txt \
+	    coco3/build/STRINGS.DAT
+	@ls -l $@
+
+build/BRIEF.TXT: ../c128/src/briefing.txt
+	@mkdir -p build
+	cp $< $@
+
+build/MUSIC.DAT: src/music_data.c
+	@mkdir -p build
+	cd .. && python3 tools/make_music.py >/dev/null
+	cp ../c128/build/music.dat $@
+	@ls -l $@
+
+# THE DISKETTE, and the round-trip that proves it. mkdisk.py writes the Disk
+# BASIC filesystem (ToolShed is not installed here); checkdisk.py reads it back
+# with src/coco3storage.c's OWN algorithm and compares byte for byte, because a
+# writer checked only by the thing that wrote it checks nothing. It caught the
+# first version immediately.
+disk: overlays data
+	python3 tools/mkdisk.py build/trek.dsk build/img/*.OVL \
+	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
+	python3 tools/checkdisk.py build/trek.dsk build/img/*.OVL \
+	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
+
+# THE OVERLAY BUILD, ON THE MACHINE. Everything else about overlays here is
+# arithmetic about files; this boots the resident image with the images on a
+# real diskette and watches which ones get paged in.
+# THE SEAM, ON THE MACHINE: two images loaded off a real diskette into the
+# window and compared against the files. This is the one that passes.
+ovlcheck: ovltest disk
+	@python3 tools/ovlcheck.py
+
+# THE WHOLE GAME, on the machine. DOES NOT PASS YET -- see "What is open".
+ovlrun: disk
+	@python3 tools/ovlrun.py
+
 vidcheck: $(VID_OUT)
 	@python3 tools/vidcheck.py
 

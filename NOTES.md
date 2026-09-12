@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and three times on 2026-09-12 (6 open of 35 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and four times on 2026-09-12 (7 open of 36 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1618,10 +1618,22 @@ are the CoCo 3**, which is started and not released:
       unexplained. Routed around by not using the MMU; see below. **Less
       urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
       it, which was the problem the MMU was for.
-  32. **The overlay build has never been RUN.** `make overlays` links, cuts
-      eleven images and passes every rule, but `make` still builds the
-      all-resident binary and nothing has loaded a `.OVL` off a disk on the
-      machine. The images are arithmetic until something boots them.
+  32. **THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.** `make ovlcheck`
+      passes 3 of 3 (2026-09-12): a 6809 finds HOF.OVL in a real Disk BASIC
+      directory, walks the FAT through the standalone WD1773 driver, lands
+      1,709 bytes at $C300 matching the file, overwrites it with TITLE.OVL,
+      and an absent name returns STOR_NOTFOUND. **`make ovlrun`, the whole
+      game, still fails**: its first ovl_load fails with
+      dskcon_processSector spinning on a read that never completes, and
+      because ovl_load() returns void THE FAILURE IS SILENT -- main() calls
+      into a window that was never filled. Four bootstrap bugs were found and
+      fixed on the way (vdc_init below $8000; mask interrupts; place the
+      stack; all-RAM mode) and none of them was the last one.
+  33. **ovl_load's failure is SILENT on every port.** It returns void, so a
+      failed image leaves the caller to jump into whatever the window holds.
+      On the C128 a KERNAL LOAD failing is rare enough that nobody noticed;
+      here it is the difference between a hang and a diagnosis. Raised
+      2026-09-12 by watching it happen.
   31. **Nobody has played it** -- and on this project that is the item that
       finds what the instruments cannot.
 
