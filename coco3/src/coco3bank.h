@@ -15,14 +15,28 @@
  * register: the image is already in RAM, in a block nothing else is using.
  * The Atari pays a 1541-class seek; this pays a store instruction.
  *
- * STATUS 2026-09-12: THE MECHANISM IS PROVEN, THIS WRAPPER IS NOT.
- * `tools/coco3/mmu3.c` -- the same operations written inline -- gives
- * 11 / 22 / 11 / 33 and restores the original block, at 128K and at 512K.
- * Going through these functions, `bank_map` and `bank_get` round-trip
- * correctly (the register reads back what was written) but reads through the
- * window come back $FF. **I have not explained that discrepancy**, so do not
- * trust this file until it reproduces the raw probe's result. The difference
- * is function calls versus inline stores and nothing else I can see.
+ * STATUS 2026-09-12: THE HARDWARE IS PROVEN. WRITES THROUGH THIS FILE WORK.
+ * READS THROUGH IT DO NOT, AND I HAVE NOT EXPLAINED WHY.
+ *
+ * What is established, by paging blocks in FROM THE HOST and looking at the
+ * physical RAM rather than trusting the 6809's own readback:
+ *   - `bank_init` + `bank_map` + `bank_poke` put 0x11 into block $30 and
+ *     0x22 into block $31, exactly as asked. The mapping and the writes are
+ *     correct.
+ *   - `bank_peek` returns $FF for every offset, even after filling the whole
+ *     first page of the block with 0x11. Reads and writes to the same address
+ *     in the same translation unit are reaching different places.
+ *
+ * Things ruled out, each by testing rather than reasoning: dead-store
+ * elimination (the writes land); a cached load in the caller (moving the
+ * accessors into this file changed nothing); a bad offset (filling the page
+ * changed nothing); a read-modify-write on $FF90 (fixed, and it was not the
+ * cause); and the stack in the window (that was a real crash, fixed with an
+ * explicit LDS, and it is a separate bug).
+ *
+ * NEXT ATTEMPT STARTS AT THE GENERATED ASSEMBLY -- `cmoc -i` keeps it. Do not
+ * build the overlay scheme on this until a read round-trips, because far
+ * memory is nothing but reads.
  *
  * AT BOOT THE MMU IS OFF. INIT0 ($FF90) reads $1B -- bit 6 clear -- and the
  * GIME maps the top 64K flat, which is exactly what task 0 already contains.
@@ -36,6 +50,7 @@
 #define BANK_SLOTS      8           /* 8K each, $0000,$2000,...,$E000 */
 #define BANK_FIRST_FREE 0x30        /* the eight blocks the address space */
 #define BANK_FREE_COUNT 8           /* does not use, on a stock 128K machine */
+#define BANK_WINDOW     3           /* slot 3 = $6000..$7FFF is the window */
 
 /* THE STACK MUST NOT LIVE IN THE WINDOW, and this cost a crashed machine to
    learn: cmoc left S inside $6000-$7FFF, so the first bank_map() paged away
@@ -53,6 +68,16 @@ void bank_init(void);
    rule core/overlay.h states for every other port, and the reason this takes
    a slot number rather than an address. */
 void bank_map(unsigned char slot, unsigned char blk);
+
+/* READ AND WRITE THE WINDOW THROUGH THESE, NEVER THROUGH A POINTER IN THE
+   CALLER. cmoc has no `volatile`, and it will hoist a load from a literal
+   address out of a sequence and cache it in a register: three reads of the
+   paged window came back as the same stale $FF while the writes were landing
+   correctly in blocks $30 and $31 -- proven by paging those blocks in from
+   the host and finding 11 and 22 there. Because these live in their own
+   translation unit, a caller cannot cache across them. */
+unsigned char bank_peek(unsigned int off);
+void          bank_poke(unsigned int off, unsigned char v);
 
 /* What is currently mapped there. The GIME's MMU registers read back, which
    not every machine's do. */
