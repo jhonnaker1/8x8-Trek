@@ -14,9 +14,19 @@ written against what they establish.
                writes, pages away and back, and finds them intact -- at 128K
                and at 512K alike. Results at $2F00, OUTSIDE the window.
     run.lua    The emu.wait() rig: load a .bin, set PC, read results back.
+    twofiles.c Reads two files with the MMU OFF -- the control that showed the
+               disk was fine and the rig was not.
+    bracket.c  Shows that bank_off() does NOT restore the disk: once the MMU
+               has been enabled, sector reads return NOT FOUND permanently.
     sectest.c  Reads track 17 sector 3 with STANDALONE DSKCON -- no Disk
                BASIC ROM -- and leaves the sector at $3000 and DCSTA at
                $3100 for the host to check.
+
+**GIVE THE MACHINE TWELVE SECONDS TO BOOT BEFORE SLAMMING IN A PROGRAM.**
+`emu.wait(3)` is not enough: Disk BASIC has not finished coming up, and the
+first disk call then HANGS FOREVER. That looked like a driver bug for hours
+and it was the rig. The debugger rig never showed it because `gtime 3000` is
+hex -- 12,288 ms -- and happened to be generous enough.
 
 **THE RIG IS `emu.wait()`, NOT THE FRAME NOTIFIER AND NOT THE DEBUGGER.**
 `run.lua` is the pattern: an autoboot script that calls `emu.wait(3)`, pokes a

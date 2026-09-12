@@ -1048,25 +1048,40 @@ driven directly** with `coco3/tools/ovl.link`:
 the shape every real overlay would take, and it is the ONLY shape available
 here because **cmoc has no per-function section placement.**
 
-**AND THEN IT STOPPED, ON SOMETHING WORTH KNOWING: ENABLING THE MMU BREAKS THE
-DISK.** With `bank_init()` called, `plat_read_all` never returns -- it hangs
-inside standalone DSKCON. Isolated properly: it hangs **even with the window
-never paged and the destination buffer resident**, so it is not the window and
-not the buffer. The same read works perfectly with the MMU off (the filesystem
-tests all pass that way). **Banking and disk I/O do not currently coexist.**
+**AND THEN IT STOPPED -- BUT NOT WHERE I FIRST SAID.**
 
-Suspicion, untested: the NMI path DSKCON waits on. The WD1773 signals sector
-completion by NMI, and the CoCo 3's vectors come from `$FExx` under INIT0's
-MC3 bit. `bank_init` preserves MC3 and maps slot 7 to block `$3F`, which is
-what the flat map already had -- so the obvious explanation is already ruled
-out and the real one is not found.
+**RETRACTED: "enabling the MMU makes plat_read_all HANG."** That was drawn
+from changing two variables at once -- the MMU-off case was tested with
+`STRINGS.DAT` under the DEBUGGER rig, the MMU-on case with `OVLDEMO.BIN`
+under the LUA rig. **The hang was the rig**: `emu.wait(3)` does not give Disk
+BASIC time to finish booting, and the first disk call then never returns.
+With twelve seconds, reads of BOTH files succeed with the MMU off --
+`STRINGS.DAT` 7,284 bytes and `OVLDEMO.BIN` 5 bytes with first byte `E6`,
+the overlay image's own `LDB` opcode. `tools/coco3/twofiles.c` is that
+control.
 
-**THE WORKAROUND IS A DESIGN, NOT A HACK, AND IT IS UNTESTED:** the boot map
-IS the MMU-off map, so disk access can be bracketed -- restore the flat map,
-do the I/O, re-enable. Better still, the port can **load every overlay image
-and data file BEFORE enabling the MMU** and never touch the disk during play,
-which is what a swap-is-a-register-write design wants anyway. SAVE is the one
-thing that needs the disk later, and it can pay the bracket.
+**WHAT IS ACTUALLY WRONG, ISOLATED PROPERLY:** with the MMU enabled, a
+directory read comes back **STOR_NOTFOUND** -- not a hang, and not an I/O
+error. Same code, same resident buffers, the only difference being
+`bank_init()`. And **`bank_off()` does NOT undo it**: once the MMU has been
+enabled, sector reads stay broken even with MMUEN cleared again, while
+`bank_map`/`bank_get` keep working perfectly. So it is not the MMU's STATE
+during the read; enabling it once changes something permanently.
+`tools/coco3/bracket.c` shows exactly that.
+
+**Ruled out:** the window (untouched in these runs), the destination buffer
+(resident), the file, the rig, and the ordering (initialising the disk first
+does not help the second read).
+
+**Still suspected and untested:** `bank_init` clears TR in INIT1, and
+`bank_off` does not restore it -- the one thing it changes that is never put
+back. BASIC boots with task 1 selected. That is the next experiment.
+
+**WHAT THIS DOES AND DOES NOT BLOCK.** The port can still load everything at
+startup with the MMU off and enable it afterwards -- but the image has to
+reach a SPARE BLOCK, and paging one in requires the MMU, so a resident
+staging buffer or a chunked copy is needed. SAVE is the other casualty, and
+it is already unimplemented, so nothing that works today regresses.
 
 **Two more sightings of the SAME rule** while getting here, and it is the
 rule of this whole target: `main()`'s frame pointer U is established at entry,

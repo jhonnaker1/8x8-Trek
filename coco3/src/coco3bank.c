@@ -48,4 +48,12 @@ void bank_init(void)
     started = 1;
 }
 
+void bank_off(void)
+{
+    INIT0 = (unsigned char)(INIT0 & (unsigned char)~INIT0_MMUEN);
+}
 
+void bank_on(void)
+{
+    INIT0 = (unsigned char)(INIT0 | INIT0_MMUEN);
+}

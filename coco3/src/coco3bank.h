@@ -70,6 +70,16 @@
    states the same rule for every other target -- it is just louder here,
    because the swap is instant and the corruption is immediate. */
 
+/* Turns the MMU OFF, restoring the flat top-64K map the machine boots with.
+   THE DISK NEEDS THIS: sector reads work with the MMU off and fail with it on
+   (a directory read comes back NOT FOUND), which is isolated but not yet
+   explained. So disk access is BRACKETED -- bank_off, do the I/O, bank_on --
+   and the port loads everything it can before enabling the MMU at all. */
+void bank_off(void);
+
+/* Turns the MMU back on, with the map already in the task registers. */
+void bank_on(void);
+
 /* Turns the MMU on without moving anything. Call once, with interrupts
    masked. Safe to call twice. */
 void bank_init(void);
