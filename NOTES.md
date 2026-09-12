@@ -799,6 +799,135 @@ Same staging as the Atari: **link the whole game against stubbed seams and
 read the overflow FIRST.** Then video, then far memory into the card's VRAM,
 then the rest. The `make early` pattern exists and transfers.
 
+## SCOPE: the ATARI FALCON (written 2026-09-11)
+
+**Scoped at Jamie's request. It does NOT re-open the target** -- the ST tier
+entry's verdict stands and it was never about capability. This is the
+measurement, done before anyone writes `falconvid.c`. The tier entry says
+plainly that "what is still NOT established is the video"; **this closes that,
+on the machine.**
+
+### The machine
+
+A **Falcon030** -- 16MHz 68030, VIDEL, a YM2149 for compatibility, 8-bit
+stereo DMA sound, a 56001 DSP, and 1/4/14MB of RAM. Hatari is the instrument
+(`--machine falcon --monitor vga`); the emulated default is 14MB.
+
+**THE TT IS THE BRANCH, NOT THE TARGET** -- settled earlier on installed base
+and on the fact that one binary serves both with a `VsetMode`/`Setscreen`
+branch inside `vdc_init()`.
+
+### MEASURED TODAY, on an emulated Falcon, not recalled
+
+**THE TOOLCHAIN IS ALREADY INSTALLED AND IT ALREADY WORKS.** `~/vbcc` is
+configured for **Atari TOS** -- `config/tos`, `targets/m68k-atari`, with
+`vc +tos` driving vbccm68k/vasmm68k_mot/vlink. **All four `core/` files compile
+for TOS today**, warnings only (`(void)ev;` "statement has no effect", the
+informational kind). This was not known; the ST entry assumed the 68k
+toolchain question was answered by the Amiga's gcc, and it is answered twice
+over.
+
+**vbcc COSTS 16% MORE CODE THAN gcc**, same source, `-O2` both, measured from
+the a.out headers:
+
+                gcc (Amiga)   vbcc (TOS)   ratio
+    trek.c           17,748       21,400    1.21
+    planet.c          2,092        2,088    1.00
+    hof.c             1,404        1,384    0.99
+    serial.c          2,660        2,752    1.03
+    TOTAL            23,904       27,624    1.16
+
+The whole excess is in `trek.c`. **On a machine with megabytes it does not
+matter** -- which is the point: the budget arithmetic that dominates every
+6502 port simply does not exist here.
+
+**THE VIDEO MODE THE CONSOLE WANTS IS THE MODE THE MACHINE BOOTS INTO.** A
+probe calling `VgetSize()` over every VIDEL mode word reported
+`current mode word = $001a` on a VGA monitor, and `VgetSize($001a) = 153,600`
+-- `VGA|COL80|BPS4`, which is **640x480 in sixteen colours**. Not a mode to
+negotiate; the default.
+
+**AND THAT GEOMETRY WAS CONFIRMED BY DRAWING, not inferred from the byte
+count.** 153,600 bytes at 4bpp is 640x480 *or* 320x960, and a size alone
+cannot separate them. So a program set `$001a`, wrote an 8-row band at the
+top, an 8-row band at rows 472..479 and a 16-pixel column down the left edge,
+assuming a 320-byte stride. It drew a clean bracket -- any other geometry
+skews it into diagonals -- and Hatari's screenshot is **640x480** to the pixel.
+
+**THE PLANES ARE WORD-INTERLEAVED, AND THIS IS THE THING THAT DOES NOT CARRY
+FROM THE AMIGA.** The same program wrote four consecutive words per group of
+sixteen pixels, one per plane, and the colours came out right. The Amiga's
+four bitplanes are separate contiguous regions; the Falcon's are interleaved
+word by word within each row. **Same planar 4-plane 16-colour idea, different
+memory layout**, so the Amiga's glyph blitter is the model and not the code.
+
+**BLIT COST IS A NON-ISSUE, and here is the number**: a full 640x480x16
+screen clear, written as plain C long-stores with no blitter and no assembly,
+**19 ms** (50 reps in 193 ticks of the 200Hz timer). Set beside the CoCo 3's
+measured 287 ms for the same job, the Falcon is about fifteen times faster
+before anyone optimises anything. The framebuffer is ordinary RAM -- there is
+no I/O-port bottleneck of the kind that made the CoCo 3 question interesting
+at all.
+
+**EmuTOS 1.3.0 BOOTS IT AND ATARI'S TOS 4.04 DID NOT.** `~/hatari/rom/etos512us.img`
+runs a Falcon cleanly. `MacAranym/.../TOS404.img` **double bus-errors** under
+`--machine falcon --monitor vga`, and Hatari says why in as many words:
+*"Please use 512k EmuTOS instead of TOS v4 for proper extended VDI resolutions
+support on Falcon."* The tier entry's claim that "a Falcon boots too, on
+TOS404.img" is **too strong as written** -- it does not boot in this
+configuration. That matters less than it looks, because EmuTOS is the one we
+would ship anyway.
+
+### The seams, and most of them are not there
+
+    video      NEW, and SMALL: one VsetMode($001a), then Physbase() is a
+               plain 640x480x4 planar framebuffer. A machine check for the
+               TT branch lives in vdc_init() and nothing downstream.
+    far memory NOT NEEDED. 14MB. `core/farmem.h` already has the Amiga's
+               "plain array" shape and it applies unchanged.
+    overlays   NOT NEEDED. DELETED, exactly as on the Amiga -- no window,
+               no staging region, no ovl_load, no budget arithmetic.
+    storage    EASIEST OF ANY PORT. GEMDOS Fopen/Fread/Fwrite, a real
+               filesystem, no device numbers and no logical file numbers.
+    input      NEW but small: GEMDOS/BIOS console input.
+    sound      NEW, and NOT MEASURED. A YM2149 is present for ST
+               compatibility -- the closest analogue to what the 8-bit ports
+               already drive -- and the DMA CODEC is richer than anything
+               this project has used. Neither has been touched here.
+
+### The font question, which is real and cheap
+
+The Amiga is 640x200 with 8x8 cells: 80x25 with nothing left over. **The
+Falcon's 640x480 with the same 8x8 font is 80x60** -- more than twice the rows
+the console has. So either an 8x16 font, or each 8x8 row doubled vertically,
+which is free and reuses the glyph set's shape. TOS and EmuTOS both carry 8x8
+and 8x16 system fonts in ROM, and **this project already has the pattern for
+using one without shipping it**: the Atari 8-bit port copies the OS ROM font
+at runtime and never puts a glyph in a data file. The thirteen box-drawing
+glyphs would be authored here as they are on every other port.
+
+### The risks, in order
+
+  1. **INSTALLED BASE.** The only real one, unchanged, and it is why the
+     target is closed. Every technical risk this scope set out to test came
+     back green.
+  2. **SOUND IS UNMEASURED** -- the one seam nobody here has touched.
+  3. vbcc is a weaker optimiser than gcc, measured at +16%, and irrelevant at
+     this memory size.
+
+### What it would look like
+
+**The cheapest port in the project, cheaper than the Amiga.** The Amiga was
+already the cheapest because it deletes the overlay machinery; the Falcon
+deletes that *and* gets a real filesystem for the storage seam, *and* lands in
+its target video mode without asking. **EmuTOS is free software**, so a
+bootable floppy image would be ours to redistribute -- the same lever that
+removed Atari DOS from the 8-bit port.
+
+Staging would be the usual one: link the whole game against stubbed seams and
+read the size first. On this target that measurement is a formality rather
+than a verdict, which is not true of any other port here.
+
 ## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 25 raised -- EMPTY)
 
 **Re-derived from the five ports, not recited from the version below** -- that
@@ -3223,7 +3352,11 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   1.3.0**, and it boots a TT -- Hatari's own status bar reads
   `32MHz/030(CED)/68882 14MB TT, EmuTOS 1.3.0, VDI`. There are bus-error
   WARNINGS during hardware probing and the machine runs straight through them.
-  A Falcon boots too, on `MacAranym/Aranym_files/system/TOS404.img`. So the
+  ~~A Falcon boots too, on `MacAranym/Aranym_files/system/TOS404.img`.~~
+  **TOO STRONG -- corrected 2026-09-11: it does NOT.** Under
+  `--machine falcon --monitor vga` that image double bus-errors, and Hatari
+  says to use 512k EmuTOS instead for a Falcon. `etos512us.img` boots one
+  cleanly, which is the image we would ship anyway. So the
   instrument was there all along and a negative about our own environment kept
   it shut -- the usual shape, in the usual place.
 
@@ -3238,8 +3371,12 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   redistribute, where one built on Atari's TOS would not. See "The two Atari
   DOS questions are one lever".
 
-  **What is still NOT established is the video** -- the modes are documented,
-  not measured here, exactly as with MSX2's SCREEN 7 below.
+  ~~**What is still NOT established is the video**~~ -- **ESTABLISHED
+  2026-09-11 on an emulated Falcon**: the VGA boot mode is `$001a` =
+  `VGA|COL80|BPS4`, `VgetSize` returns 153,600, and a drawn bracket confirms
+  640x480 to the pixel with a 320-byte stride and word-interleaved planes. A
+  full-screen clear costs 19 ms in plain C. See "SCOPE: the ATARI FALCON"
+  above. (MSX2's SCREEN 7 below is still unmeasured -- that one stands.)
 
   **ONE BINARY WOULD RUN ON BOTH, with one branch.** Asked 2026-09-11. Both
   are 68030, so the compiled code is compatible and the whole 68k toolchain the
