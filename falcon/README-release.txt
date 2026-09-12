@@ -1,5 +1,5 @@
-EGA Trek for the Amiga
-======================
+EGA Trek for the Atari Falcon030
+================================
 
 A remake of EGA Trek, written by Nels Anderson and released as shareware
 between 1988 and 1992. The original is his; this is a port of it to a
@@ -11,20 +11,24 @@ enjoy that, register it. That was always the deal.
 
 RUNNING IT
 
-OCS or ECS, Kickstart 2.0 or later, and about 200K free. Copy the whole drawer
-anywhere and run it from a shell:
+A Falcon030 with a VGA MONITOR, and about 150K free.
 
-    egatrek
+The VGA monitor is not a preference. The game sets 640x480 in sixteen colours
+-- the mode a Falcon on VGA already boots into -- and that mode does not exist
+on an RGB monitor or a television. It has been run on VGA and nowhere else.
 
-It opens its own 640x200 screen in sixteen colours and gives the machine back
-when you quit: answering NO to "Play Again?" shows a farewell, waits for a key,
-then closes the screen and returns you to the shell. The files it needs are found through PROGDIR:, which means the
-program's own drawer -- so it does not matter what directory you run it from,
-and it works from Workbench.
+Copy the whole folder anywhere and run EGATREK.PRG from the desktop. It sets
+the screen mode at startup and PUTS THE OLD ONE BACK when you quit, so you get
+your desktop returned as you left it.
+
+RUN IT FROM ITS OWN FOLDER. The four files are opened by bare name through
+GEMDOS, so they are looked for in the current directory -- double-clicking
+EGATREK.PRG from the folder it lives in is what you want. (The Amiga port
+finds its files through PROGDIR: and does not care; this one does.)
 
 FOUR FILES, and the game reads them at startup:
 
-    egatrek        the program
+    EGATREK.PRG    the program
     STRINGS.DAT    every word on screen
     MUSIC.DAT      the music
     BRIEF.TXT      the twelve-page briefing, streamed a page at a time
@@ -39,11 +43,12 @@ Answer Y to the briefing at startup; it is twelve pages and explains the whole
 game. Type HELP at the command line for the order list.
 
 Commands are typed at CMD: in the COMMAND panel and are not case sensitive.
-The arrow keys raise and lower shields, which is what the original's own help
+The setup prompts are line editors -- type the answer and press RETURN. The
+arrow keys raise and lower shields, which is what the original's own help
 screen lists first.
 
-SAVE writes EGATREK.SAV into the program's drawer and the setup screen offers
-to restore it. The hall of fame is TREK.SCR and is created on first use.
+SAVE writes EGATREK.SAV into the same folder and the setup screen offers to
+restore it. The hall of fame is TREK.SCR and is created on first use.
 
 
 WHAT IS IN IT
@@ -63,9 +68,12 @@ deferred on every port. Room is not what stops them: what SELECTS the other
 nine was never measured. Orbit selects the one you see, and that is the only
 selector any of these ports knows.
 
-Sound is Paula on two channels -- a square wave, because the original is one
-square wave out of a PC speaker. Music on one channel and effects on the
+Sound is the YM2149 on two channels -- a square wave, because the original is
+one square wave out of a PC speaker. Music on one channel and effects on the
 other, so a laser does not cut the music off.
+
+The text is the machine's own 8x16 system font, read out of ROM at startup.
+The seventeen box-drawing and badge glyphs are this port's own artwork.
 
 
 THIS IS NOT NELS ANDERSON'S CODE

@@ -65,7 +65,9 @@ Messages are coloured by the department that speaks them, as the original's
 are.
 
 The MAIN VIEWER shows one page. The original cycles ten; the other nine are
-deferred on every port.
+deferred on every port. Room is not what stops them: what SELECTS the other
+nine was never measured. Orbit selects the one you see, and that is the only
+selector any of these ports knows.
 
 One colour is inexact. The VDC's palette is fixed, and its dark yellow stands
 in for EGA's brown -- fifteen of the sixteen land exactly.

@@ -1569,15 +1569,40 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 25 raised -- EMPTY)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and 2026-09-12 (5 open of 30 raised)
 
-**Re-derived from the five ports, not recited from the version below** -- that
+**Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
 asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
 
-**THE LIST IS EMPTY AGAIN.** Twenty-five raised, twenty-five closed or decided.
+### THE HEADER SAID "EMPTY" FOR A DAY WHILE TWO PORTS CARRIED WORK (2026-09-12)
+
+The count above read `0 open of 25` while the Falcon was unreleased and the
+CoCo 3 had three stubbed seams. **Both were true statements about the LIST and
+false statements about the PROJECT**: the new work had never been filed,
+because closing item 22 ("cut a release") had felt like the end of something.
+**A count only goes stale downward, and a count with no ports in its scope goes
+stale invisibly.** Re-deriving now means walking `*/README.md` as well.
+
+**Item 26 closed the day it was raised: the Falcon is RELEASED as v0.14.0**
+(2026-09-12) -- sixth port, `egatrek-falcon.zip`. Five remain, and **all five
+are the CoCo 3**, which is started and not released:
+
+  27. **Video, sound and input are stubs.** The font is authored and the mode
+      is established; nothing draws the console yet.
+  28. **`plat_write_all` returns `STOR_ERROR`** -- the filesystem reads and
+      cannot write, so SAVE cannot work.
+  29. **The overlay set is too small to pay.** `make overlays` correctly
+      refuses itself: the image overruns `$FF00` by 1,260 bytes. The next step
+      is CANDIDATES, not mechanism.
+  30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
+      unexplained. Routed around by not using the MMU; see below.
+  31. **Nobody has played it** -- and on this project that is the item that
+      finds what the instruments cannot.
+
+**Twenty-five raised, twenty-five closed or decided** as of 2026-09-11.
 
 Item 25 was raised and closed the same day: the X16's soft stack overflowed on
 SAVE, measured at 86 bytes against 80, fixed in v0.13.2. **It is the only item
@@ -1585,10 +1610,12 @@ of the twenty-five found by LOOKING rather than by playing** -- a sweep for
 load-bearing claims, hours after the list first reached empty -- and it was a
 live defect in a port that had been played, driven and released twice.
 
-**All five ports have now been played by a person**, each reported in the same
-four words: the Atari, the C128, the MEGA65, the X16 and the Amiga all "look,
-sound, and play great". Four of those five sittings happened on one day, and
-the first of them found three bugs no instrument here could see.
+**All six RELEASED ports have now been played by a person.** Five were
+reported in the same four words -- the Atari, the C128, the MEGA65, the X16 and
+the Amiga all "look, sound, and play great" -- and the Falcon in nearly the
+same ones, "it looks and sounds and plays good". Four of those six sittings
+happened on one day; the first found three bugs no instrument here could see,
+and the Falcon's found two more. **The CoCo 3 has never been played.**
 
 **TEN items moved on 2026-09-11**, and the arithmetic is worth getting right
 rather than rounding: **eight closed** -- 6, 7, 10, 11, 21, 22, 23, 24 -- and

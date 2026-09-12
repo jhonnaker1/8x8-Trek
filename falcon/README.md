@@ -1,7 +1,8 @@
 # EGA Trek — Atari Falcon030
 
-Sixth port, **started 2026-09-11** and not yet released. It draws the console
-and plays; sound is a stub and nobody has sat down with it.
+Sixth port, **started 2026-09-11 and released 2026-09-12 as v0.14.0**. It
+draws the console, plays the YM2149, saves and restores, and Jamie has played
+it. Every seam is built; nothing here is stubbed.
 
 ```sh
 make early     # link the whole game against stubbed seams and read the size
@@ -199,6 +200,13 @@ fail.**
 4. ~~**Nobody has played it.**~~ **Played 2026-09-11** — *"it looks and sounds
    and plays good"* — **and it found two bugs in one sitting.**
 
-**So all four are closed, and ONE THING IS LEFT: this port is not released.**
-It draws, plays, sounds right, saves and restores, and has a gate. What it
-does not have is a tag, a release artefact or a README-release.txt.
+5. ~~**Not released.**~~ **RELEASED 2026-09-12 in v0.14.0** -- `make release`
+   builds `build/egatrek-falcon.zip`, a folder like the Amiga's and the X16's
+   because GEMDOS opens the four data files by bare name and wants them beside
+   the .PRG. `README-release.txt` ships inside it.
+
+**All five are closed and the list is empty.** The one thing this port has
+never had is a second pair of hands: it has been played once, by Jamie, on an
+emulated Falcon under Hatari. Nobody has run it on real hardware, and the VGA
+mode it sets is the only one it knows -- an RGB monitor or a TV is untested
+and expected to be wrong.

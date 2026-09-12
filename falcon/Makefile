@@ -54,7 +54,7 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            src/music_data.c
 GAME_OUT = build/EGATREK.PRG
 
-.PHONY: all game early verify storetest data music clean run
+.PHONY: all game early verify storetest data music release clean run
 
 all: game data
 
@@ -131,6 +131,31 @@ music src/music_data.c src/music_data.h:
 build/MUSIC.DAT: src/music_data.c
 	@mkdir -p build
 	cp ../c128/build/music.dat $@
+
+# THE RELEASE ARTEFACT. A ZIP OF A FOLDER, like the Amiga and the X16 and for
+# the same reason: this machine wants a filesystem, not a disk image. GEMDOS
+# opens the four data files by BARE NAME, so they have to sit beside the .PRG
+# in whatever directory it is run from -- a folder is the artefact, and zipping
+# it is just how a folder travels.
+#
+# No floppy image on purpose. An .ST would have to carry a TOS-bootable
+# filesystem and would cap the port at 720K for no gain; the Falcon has a hard
+# disk and Hatari mounts a host directory.
+#
+# ALWAYS REBUILT, never taken from build/: `release` depends on `game` and
+# `data`, and cutting a release means deleting build/ first. See
+# NOTES.md -- a stale build/ once nearly shipped the exact bug the commit
+# before it had gone and found.
+REL = build/release
+
+release: game data verify
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-falcon
+	@cp $(GAME_OUT) build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT \
+	    $(REL)/egatrek-falcon/
+	@cp README-release.txt $(REL)/egatrek-falcon/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-falcon.zip egatrek-falcon
+	@echo "release: build/egatrek-falcon.zip"
+	@unzip -l build/egatrek-falcon.zip | tail -n +4
 
 # Hatari, with the build directory mounted as GEMDOS drive C: -- so there is no
 # floppy image to make and nothing to copy, exactly as Amiberry mounts a host

@@ -63,7 +63,9 @@ Messages are coloured by the department that speaks them, as the original's
 are.
 
 The MAIN VIEWER shows one page. The original cycles ten; the other nine are
-deferred to a machine with more room for resident code.
+deferred on every port. Room is not what stops them: what SELECTS the other
+nine was never measured. Orbit selects the one you see, and that is the only
+selector any of these ports knows.
 
 SAVE writes EGATREK.SAV onto the disk and the setup screen offers to restore
 it. The hall of fame is TREK.SCR and is created on first use. Both go through

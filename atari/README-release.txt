@@ -83,7 +83,9 @@ Messages are coloured by the department that speaks them, as the original's
 are.
 
 The MAIN VIEWER shows one page. The original cycles ten; the other nine are
-deferred -- this machine has the least room of the five ports.
+deferred on every port. Room is not what stops them: what SELECTS the other
+nine was never measured. Orbit selects the one you see, and that is the only
+selector any of these ports knows.
 
 Music and effects play on POKEY, two voices in 16-bit mode: the tune on
 channels 1+2 and effects on 3+4, so a hit during the title track does not

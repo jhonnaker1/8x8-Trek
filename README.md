@@ -7,20 +7,21 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: five ports released.** The **Commodore 128**, **Commander X16**,
-> **Amiga**, **MEGA65** and now the **Atari 800XL + VBXE** are feature complete
-> and released as [v0.13.2](../../releases/latest), 2026-09-11 — a point
-> release over v0.13.0 that fixed the quit on the X16 and the Amiga; v0.13.2
-> fixes an X16 soft-stack overflow on SAVE.
-> The Atari is the new one: a **self-booting disk with no Atari DOS on it** —
-> its own boot record, its own directory, SIO underneath — which is what makes
-> the image ours to give away. **It takes about two minutes to load on a stock
-> 1050** and a few seconds on an emulator or a fast-SIO drive; see
-> [`atari/README.md`](atari/README.md).
-> All five ports also gain **colour per message**: the console colours each
-> line by the department that speaks it, as the original does.
-> **All five have now been played by a person** (2026-09-11) and the project's
-> open list is empty — twenty-four items raised, twenty-four closed or decided.
+> **Status: six ports released.** The **Commodore 128**, **Commander X16**,
+> **Amiga**, **MEGA65**, the **Atari 800XL + VBXE** and now the **Atari
+> Falcon030** are feature complete and released as
+> [v0.14.0](../../releases/latest), 2026-09-12.
+> The Falcon is the new one, and it is the cheapest port here: it **boots into
+> the mode the console wants** (640×480 in sixteen colours on VGA), takes its
+> 8×16 font out of the machine's own ROM, and has **no overlays, no far-memory
+> banking and no hand-rolled filesystem** — three seams that dominate the four
+> 6502 ports simply do not exist on it. Sound is the YM2149, with the chip's
+> 2 MHz clock **measured rather than looked up**. See
+> [`falcon/README.md`](falcon/README.md).
+> Every port colours each message line by the department that speaks it, as the
+> original does.
+> **All six have been played by a person**, and the Falcon's sitting found two
+> bugs in one afternoon that no automated check here saw or could have seen.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
@@ -129,7 +130,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all five ports. EGA
+**Colour per message is built** (2026-09-10) and ships on all six released ports. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -171,11 +172,13 @@ per-cell colour; anything that can hold that runs the game as designed.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
-| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.13.2](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.13.2](../../releases/latest); see [`x16/README.md`](x16/README.md) |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.13.2](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
-| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.13.2](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.13.2](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.14.0](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.14.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.14.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.14.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.14.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
+| **Atari Falcon030** (VGA) | 640×480 bitmap, 16 colours — the boot mode | 68030 | **Released** — [v0.14.0](../../releases/latest). The cheapest port here: **no overlays, no banking, no filesystem of our own**, an 8×16 font out of ROM and GEMDOS for storage. **Needs a VGA monitor.** See [`falcon/README.md`](falcon/README.md) |
+| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Started, not released** — links and fits; storage, font and overlay machinery are real, video/sound/input are stubs. See [`coco3/README.md`](coco3/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
@@ -210,11 +213,16 @@ of them were settled by measurement in September 2026.
   call). The **TT030 and Falcon030 do qualify** — 640×480 in 16 colours, and
   68030 means `core/` already compiles for them; one binary would serve both,
   with a machine check in `vdc_init()` because VIDEL is not TT-compatible, and
-  it would be **Falcon-first**. But the verdict was never about capability:
-  almost nobody owns either. Not re-opened; see `NOTES.md`. **MSX2** has 80 columns but the colour collapses — though its V9938's
-  SCREEN 7 is a bitmap route nobody has benchmarked, and the same applies to a
-  **CoCo 3 with a SuperSprite FM+**, which carries the V9938's successor; see
-  `NOTES.md`. The **stock Atari
+  it would be **Falcon-first**. The verdict was never about capability — almost
+  nobody owns either — but **Jamie re-opened the Falcon on 2026-09-11 and it is
+  now a released port**; the installed-base argument still stands and is still
+  the argument against, and it was his call to make anyway. The TT remains a
+  branch nobody has built. **MSX2** has 80 columns but the colour collapses —
+  though its V9938's SCREEN 7 is a bitmap route nobody has benchmarked. A
+  **CoCo 3 with a SuperSprite FM+** carries the V9938's successor and **has
+  been benchmarked** (10.625 cycles a byte to the V9958; a full repaint is
+  0.287 s, so a dirty-cell scheme is the design and not an optimisation) —
+  **that port is started but not released**; see [`coco3/README.md`](coco3/README.md). The **stock Atari
   800XL** stops at 40 columns; only VBXE brings it back. The 40-column colour
   machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
   a nine-panel console does not fit in 40 columns.
@@ -305,11 +313,12 @@ make all                # the native tests, the audits, and `ports`
 ```
 
 **`make ports` skips what it cannot build.** It runs each port's real gate --
-`make verify`, or `make` on the Amiga, which has no overlays for a verify to
-check -- and a port whose cross compiler is not installed is reported as a skip
-rather than a failure, naming the variable and path it looked for. So a fresh
-clone with no toolchains still gets a green `make all`; a machine with all five
-gets five real verifies in about ten seconds. `make ports P=atari` for one.
+`make verify`, or `make` on the Amiga and the CoCo 3, which have no overlay
+budget for a verify to check -- and a port whose cross compiler is not
+installed is reported as a skip rather than a failure, naming the variable and
+path it looked for. So a fresh clone with no toolchains still gets a green
+`make all`; a machine with all seven toolchains gets **seven real gates in
+about ten seconds**. `make ports P=atari` for one.
 
 **Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
 music, the eleven code overlays and the twelve-page briefing all load from the
