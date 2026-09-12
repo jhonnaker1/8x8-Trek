@@ -1050,9 +1050,31 @@ at a time separated them.
      the save file listed `build/` from the REPOSITORY ROOT rather than
      `falcon/build/`, and reported NO SAVE FILE over a file that was there.
      The shell had reset the working directory between commands.
-  4. **Nobody has played it.** Four screenshots are not a person at the
-     keyboard, and on this project that distinction has found bugs no
-     instrument could -- three on the Atari alone.
+  4. ~~**Nobody has played it.**~~ **PLAYED 2026-09-11** -- "it looks and
+     sounds and plays good" -- **AND IT FOUND TWO BUGS IN ONE SITTING, from
+     ONE FALSE CLAIM I WROTE MYSELF.**
+
+     The message panel drew empty boxes and MSGS showed three entries of
+     "STARDATE: 0.0". One cause: **`vdc_set_address`, `vdc_data_write` and
+     `vdc_data_read` were still stubs**, and the stub carried a comment saying
+     *"Nothing outside the C128's own driver calls these"*. **`ui.c` calls all
+     three, every time it files a message** -- the scrollback is 32 slots of
+     64 bytes kept OUTSIDE ui.c's variables because on the C128 it lives in
+     spare VDC video RAM. So every message went into a black hole and read
+     back as zeros.
+
+     **A NEGATIVE CLAIM ABOUT OUR OWN PORT, WRITTEN BESIDE THE CODE THAT
+     DISPROVES IT** -- the oldest shape in this file. It was invented while
+     writing the stub, never checked, and it shipped in the first build that
+     drew anything. Two `grep`s would have caught it.
+
+     **NO INSTRUMENT HERE SAW IT** and none would have: the console was
+     otherwise perfect, `make verify` checks geometry and glyph coverage, and
+     every screenshot I took looked right. It took a person playing.
+
+     Fixed as a plain array (the Amiga's shape), and `make storetest` now
+     round-trips the log store in three checks -- **verified by restoring the
+     stub and watching all three fail.**
 
 ### AGAINST THE COCO 3, THE OTHER SCOPED-BUT-CLOSED TARGET (asked 2026-09-11)
 

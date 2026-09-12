@@ -106,6 +106,33 @@ int main(void) {
         plat_open("STORTEST.DAT") == STOR_OK);
     plat_close();
 
+    /* THE MESSAGE LOG'S BACKING STORE, which is part of the video seam and
+       not of storage.h -- tested here because this is the port's one place
+       that exercises a seam on the machine, and because leaving it untested
+       is exactly how it shipped broken. ui.c streams a 64-byte record through
+       vdc_set_address/vdc_data_write and reads it back the same way; all
+       three were stubs until Jamie played the port and found the message
+       panel drawing empty boxes. */
+    for (i = 0; i < 64; i++) out[i] = (unsigned char)(0xA5 ^ i);
+    vdc_set_address(0x1000);
+    for (i = 0; i < 64; i++) vdc_data_write(out[i]);
+    vdc_set_address(0x1000);
+    for (i = 0; i < 64 && vdc_data_read() == out[i]; i++) { }
+    say("the message log stores and returns a record", i == 64);
+
+    /* A SECOND SLOT, because a store that ignores the address would pass the
+       check above and still lose every message but one. */
+    for (i = 0; i < 64; i++) out[i] = (unsigned char)(i * 3 + 1);
+    vdc_set_address(0x1000 + 64);
+    for (i = 0; i < 64; i++) vdc_data_write(out[i]);
+    vdc_set_address(0x1000);
+    n = 0;
+    for (i = 0; i < 64; i++) if (vdc_data_read() != (unsigned char)(0xA5 ^ i)) n = 1;
+    say("a second slot does not overwrite the first", n == 0);
+    vdc_set_address(0x1000 + 64);
+    for (i = 0; i < 64 && vdc_data_read() == out[i]; i++) { }
+    say("the second slot reads back its own record", i == 64);
+
     row++;
     num("failures", (uint16_t)failures);
     scr_puts(2, row, failures ? "SOME CHECKS FAILED" : "ALL CHECKS PASSED",

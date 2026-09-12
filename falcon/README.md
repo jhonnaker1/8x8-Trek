@@ -166,6 +166,28 @@ round-tripped, not that two games happened to look alike.
 (625 bytes is 24 of header plus the 601-byte save record, which is what the
 shared serialiser says it should be.)
 
+## What playing it found, from one false claim
+
+The message panel drew empty boxes and `MSGS` showed three entries of
+"STARDATE: 0.0". **One cause, and it was a comment I invented.**
+`vdc_set_address`, `vdc_data_write` and `vdc_data_read` were still stubs,
+under a note reading *"Nothing outside the C128's own driver calls these."*
+
+**`ui.c` calls all three, every time it files a message.** The scrollback is
+32 slots of 64 bytes kept outside `ui.c`'s own variables, because on the C128
+it lives in spare VDC video RAM that the 8502 cannot address. Every message
+went into a black hole and read back as zeros.
+
+A negative claim about our own port, written beside the code that disproves
+it — the oldest failure shape in `NOTES.md`, invented while writing a stub and
+never checked. **No instrument here saw it, and none would have**: the console
+was otherwise perfect, `make verify` checks geometry and glyph coverage, and
+every screenshot looked right. It took a person playing.
+
+It is a plain array now, and `make storetest` round-trips the log store in
+three checks — **verified by putting the stub back and watching all three
+fail.**
+
 ## What is open
 
 1. ~~**Sound.**~~ **DONE** -- see below.
@@ -173,5 +195,5 @@ shared serialiser says it should be.)
    port has one; this is currently the only port whose breakage nothing
    catches.
 3. ~~**SAVE and restore, unexercised.**~~ **WITNESSED** -- see below.
-4. **Nobody has played it.** Screenshots are not a person at the keyboard, and
-   on this project that distinction has found bugs no instrument could.
+4. ~~**Nobody has played it.**~~ **Played 2026-09-11** — *"it looks and sounds
+   and plays good"* — **and it found two bugs in one sitting.**

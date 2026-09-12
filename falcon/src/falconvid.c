@@ -342,11 +342,58 @@ void scr_vline(unsigned char x, unsigned char y, unsigned char h,
         scr_put(x, (unsigned char)(y + i), ch, color);
 }
 
-/* The four raw VDC register accessors. Nothing outside the C128's own driver
-   calls these -- they are in the seam because that machine's driver is its
-   origin, and every other port defines them away. */
+/* THE MESSAGE LOG'S BACKING STORE, and on this machine it is just an array.
+ *
+ * ui.c keeps the scrollback -- 32 entries of a date, a department and a line
+ * of text -- OUTSIDE its own variables, reached through vdc_set_address /
+ * vdc_data_write / vdc_data_read. That is not an abstraction for its own
+ * sake: on the C128 it lives in spare VDC video RAM, which the 8502 cannot
+ * address at all, because 2K of scrollback will not fit in a machine whose
+ * writable data has a hundred bytes left. The X16 puts it in VERA's VRAM for
+ * the same reason. Here there is no shortage, so it is a plain array.
+ *
+ * THESE THREE WERE STUBS UNTIL JAMIE PLAYED THE PORT, and the stub carried a
+ * comment claiming "nothing outside the C128's own driver calls these" --
+ * WHICH I INVENTED AND NEVER CHECKED. ui.c calls all three, every time it
+ * files a message. So every message went into a black hole and read back as
+ * zeros: the message panel drew empty boxes and MSGS showed three entries of
+ * "STARDATE: 0.0". Two bugs, one false claim, and no instrument here saw it
+ * because the screen was otherwise perfect. A NEGATIVE CLAIM ABOUT OUR OWN
+ * PORT, WRITTEN BESIDE THE CODE THAT DISPROVES IT -- the oldest shape in
+ * NOTES.md, and it shipped in the first build that drew anything.
+ *
+ * Only vdc_reg_read/vdc_reg_write are genuinely C128-only.
+ *
+ * SIZED FROM ui.c's OWN CONSTANTS: LOG_BASE is 0x1000 and 32 slots of 64
+ * bytes follow it. Written out rather than rounded up, so a bigger log is a
+ * bounds failure here rather than a quiet corruption of whatever follows. */
+#define LOG_ORIGIN  0x1000
+#define LOG_BYTES   (32 * 64)
+
+static unsigned char logstore[LOG_BYTES];
+static unsigned int  log_cursor;
+
+void vdc_set_address(unsigned int addr)
+{
+    log_cursor = (addr >= LOG_ORIGIN) ? (addr - LOG_ORIGIN) : 0;
+}
+
+/* Write-and-advance: ui.c sets an address once and streams a whole record
+   through it, so the cursor is a file static exactly as on the X16. */
+void vdc_data_write(unsigned char value)
+{
+    if (log_cursor < LOG_BYTES) logstore[log_cursor] = value;
+    log_cursor++;
+}
+
+unsigned char vdc_data_read(void)
+{
+    unsigned char v = (log_cursor < LOG_BYTES) ? logstore[log_cursor] : 0;
+    log_cursor++;
+    return v;
+}
+
+/* These two ARE C128-only: they drive that machine's CRTC registers, and
+   every other port defines them away. */
 unsigned char vdc_reg_read(unsigned char reg) { (void)reg; return 0; }
 void vdc_reg_write(unsigned char reg, unsigned char value) { (void)reg; (void)value; }
-void vdc_set_address(unsigned int addr) { (void)addr; }
-void vdc_data_write(unsigned char value) { (void)value; }
-unsigned char vdc_data_read(void) { return 0; }
