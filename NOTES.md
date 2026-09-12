@@ -904,6 +904,45 @@ that way before the pattern showed. `-debug -debugscript` is reliable and is
 what the blit benchmark already used; `nm` lies about 6809 archives too,
 reporting no disk symbols in libraries that link fine.
 
+#### THE FILESYSTEM LAYER IS BUILT AND VERIFIED (2026-09-12)
+
+`coco3/src/coco3storage.c` walks the Disk BASIC directory and FAT on top of
+standalone DSKCON. **The format was read off a real image rather than
+recalled** -- the granule chain 0->1->2->3 with 3 = `$C2`, and the length it
+computes came to 7,284, matching the host file exactly.
+
+**Every promise in `core/storage.h` is met, verified on the machine** with
+`tools/coco3/fstest.c` (results dumped from `$7000`, because this port has no
+video to report on yet):
+
+    whole-file read      STOR_OK, 7,284 bytes, CHECKSUM MATCHES THE HOST
+    longer than max      STOR_ERROR -- refused, not truncated
+    missing file         STOR_NOTFOUND
+    streaming path       byte-identical to the whole-file read
+    plat_open twice      fine
+
+**Writing is NOT implemented.** `plat_write_all` returns `STOR_ERROR`, so SAVE
+says "COULD NOT SAVE." rather than pretending -- the honesty the Falcon's
+sound stub kept. DSKCON writes sectors happily (`DCOPC = 3`); what is missing
+is granule allocation and writing the FAT and directory back.
+
+**ALLOW REAL FLOPPY TIME.** The first run of the test stopped part way and the
+half-filled result struct read exactly like a hang in the missing-file case.
+It was nine directory sectors at floppy speed. `gtime 9000` (hex, ~37s) is
+enough; `2000` is not.
+
+#### AND NOW THE BUDGET IS THE PROBLEM, MEASURED
+
+    whole game, seams stubbed          55,399    5,273 free below $FF00
+    + the filesystem layer             58,079    2,593 free
+
+**The storage seam alone cost 2,680 bytes and took half the headroom.** Video
+is the expensive seam and has not started; sound, input, the stack and the
+direct page are all still to come out of what is left. **So overlays or GIME
+banking are no longer "probably needed" -- they are needed, and the number
+says so.** The GIME's 8K pages over 128K or 512K are where the room is, and
+that scheme now gets designed against a real overflow instead of a guess.
+
 #### FOUR cmoc non-conformances, and the scope knew about two
 
 The drop entry said "CMOC is non-conforming" and named two faults, both since
