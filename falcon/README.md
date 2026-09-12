@@ -191,9 +191,14 @@ fail.**
 ## What is open
 
 1. ~~**Sound.**~~ **DONE** -- see below.
-2. **`make verify` and a place in the root `make ports` gate.** Every other
-   port has one; this is currently the only port whose breakage nothing
-   catches.
+2. ~~**`make verify` and a place in the root `make ports` gate.**~~ **DONE** --
+   `make verify` checks console geometry and glyph coverage, and the root gate
+   runs it. **This line said "open" for a day after it was built**, and was
+   caught by re-deriving rather than reciting when Jamie asked what was left.
 3. ~~**SAVE and restore, unexercised.**~~ **WITNESSED** -- see below.
 4. ~~**Nobody has played it.**~~ **Played 2026-09-11** — *"it looks and sounds
    and plays good"* — **and it found two bugs in one sitting.**
+
+**So all four are closed, and ONE THING IS LEFT: this port is not released.**
+It draws, plays, sounds right, saves and restores, and has a gate. What it
+does not have is a tag, a release artefact or a README-release.txt.
