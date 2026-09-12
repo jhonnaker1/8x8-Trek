@@ -158,6 +158,14 @@ static unsigned long file_len(unsigned char gran, unsigned int lastbytes)
     return 0;
 }
 
+/* Forces the next call to re-run dskcon_init and re-read the FAT. Enabling
+   the GIME's MMU appears to disturb something the disk driver set up, and
+   because disk_ready() latches, nothing would ever re-establish it. */
+void plat_disk_reset(void)
+{
+    ready = 0;
+}
+
 uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
 {
     unsigned char *dst = (unsigned char *)buf;

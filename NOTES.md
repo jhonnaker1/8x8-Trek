@@ -1060,22 +1060,45 @@ With twelve seconds, reads of BOTH files succeed with the MMU off --
 the overlay image's own `LDB` opcode. `tools/coco3/twofiles.c` is that
 control.
 
-**WHAT IS ACTUALLY WRONG, ISOLATED PROPERLY:** with the MMU enabled, a
-directory read comes back **STOR_NOTFOUND** -- not a hang, and not an I/O
-error. Same code, same resident buffers, the only difference being
-`bank_init()`. And **`bank_off()` does NOT undo it**: once the MMU has been
-enabled, sector reads stay broken even with MMUEN cleared again, while
-`bank_map`/`bank_get` keep working perfectly. So it is not the MMU's STATE
-during the read; enabling it once changes something permanently.
-`tools/coco3/bracket.c` shows exactly that.
+**WHAT IS ACTUALLY WRONG, AND IT IS NOW ONE BIT.** `tools/coco3/bits.c` walks
+the enable sequence one step at a time, reading a file after each:
 
-**Ruled out:** the window (untouched in these runs), the destination buffer
-(resident), the file, the rig, and the ordering (initialising the disk first
-does not help the second read).
+    baseline read (nothing touched)     STOR_OK
+    + write the task-0 map $38..$3F     STOR_OK
+    + clear TR in INIT1                 STOR_OK
+    + set MMUEN in INIT0                STOR_NOTFOUND
 
-**Still suspected and untested:** `bank_init` clears TR in INIT1, and
-`bank_off` does not restore it -- the one thing it changes that is never put
-back. BASIC boots with task 1 selected. That is the next experiment.
+**So it is MMUEN alone.** The map writes are innocent (they are the values the
+registers already held) and the task select is innocent. Setting bit 6 of
+INIT0 breaks standalone DSKCON, with the active map supposedly identical
+either way.
+
+**RESTORING TR DOES NOT HELP** (Jamie's suggestion, tested): `bank_off` now
+puts BOTH control registers back to their boot values and the disk stays
+broken. Neither does re-running `dskcon_init` -- `plat_disk_reset()` changes
+the failure from NOT FOUND to STOR_ERROR, which means a fresh init cannot read
+the FAT either. Three independent ways of undoing it, none works.
+
+**AND THE CONTROL REGISTERS DO NOT READ BACK WHAT WAS WRITTEN.** `$FF90` reads
+`$1B` before AND after MMUEN is set, and `$FF91` reads `$1B` too -- the same
+value, which is itself a tell. Banking demonstrably works at that point, so
+the write took effect and the read simply does not show it. **My retraction of
+2026-09-12 was wrong and is itself retracted**: the register reference says
+readable, this machine says otherwise, and the machine wins. Never
+read-modify-write these; keep a RAM shadow.
+
+**THE WAY ROUND IT IS TO NOT USE THE MMU, AND THE ORIGINAL SCOPE ALREADY SAID
+SO.** Everything the MMU was for has another home on this target:
+
+  * **Overlays** become disk-loaded images in a fixed window, exactly the
+    C128's design. A swap costs a seek instead of a store -- worse, but it is
+    the shape four ports here already ship.
+  * **Far memory** goes in the CARD'S 128K OF VRAM, which is what the scope
+    proposed before I reached for the GIME at all. VRAM is behind the V9958's
+    I/O ports and has nothing to do with the MMU.
+
+The MMU was my addition, not the plan. It remains the better design if the
+MMUEN interaction is ever understood, and `coco3bank.c` works and is kept.
 
 **WHAT THIS DOES AND DOES NOT BLOCK.** The port can still load everything at
 startup with the MMU off and enable it afterwards -- but the image has to

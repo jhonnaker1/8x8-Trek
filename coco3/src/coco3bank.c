@@ -9,6 +9,10 @@
 #define INIT1_TR    0x01            /* in INIT1 ($FF91): 0 = task 0 = $FFA0-$FFA7 */
 
 static unsigned char started;
+/* The boot values of both control registers, so bank_off can put the machine
+   back exactly as it found it. Restoring MMUEN alone is NOT enough: bank_init
+   also clears TR in INIT1 to select task 0, and BASIC boots with task 1. */
+static unsigned char saved_init0, saved_init1, saved_valid;
 
 /* cmoc HAS NO `volatile`, and it says so: "the `volatile' keyword is not
    supported by this compiler". Hardware accesses therefore have to be written
@@ -23,6 +27,10 @@ void bank_init(void)
     unsigned char i;
 
     if (started) return;
+
+    saved_init0 = INIT0;
+    saved_init1 = INIT1;
+    saved_valid = 1;
 
     /* Write the map the machine is ALREADY using, then enable -- see the
        header. Enabling first would swap in whatever task 0 happened to hold. */
@@ -48,12 +56,22 @@ void bank_init(void)
     started = 1;
 }
 
+/* PUT BOTH REGISTERS BACK, not just MMUEN. bank_init clears TR in INIT1 to
+   select task 0 and BASIC boots with task 1 selected, so clearing MMUEN alone
+   leaves the machine in a state it was never in. Jamie's suggestion after the
+   bracket test showed disk reads stayed broken with MMUEN cleared. */
 void bank_off(void)
 {
-    INIT0 = (unsigned char)(INIT0 & (unsigned char)~INIT0_MMUEN);
+    if (saved_valid) {
+        INIT0 = saved_init0;
+        INIT1 = saved_init1;
+    } else {
+        INIT0 = (unsigned char)(INIT0 & (unsigned char)~INIT0_MMUEN);
+    }
 }
 
 void bank_on(void)
 {
+    INIT1 = (unsigned char)(INIT1 & (unsigned char)~INIT1_TR);
     INIT0 = (unsigned char)(INIT0 | INIT0_MMUEN);
 }
