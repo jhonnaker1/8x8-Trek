@@ -675,51 +675,119 @@ is the whole question -- **an unknown, not a blocker.**
   1. **BLIT COST.** The V9958's VRAM is behind I/O ports, so every glyph is
      port writes, and the console is 2,000 cells. At 1.79MHz on a GIME'd CoCo
      3 this is the question the whole port turns on. **A benchmark, not a
-     datasheet check.** Attempted 2026-09-11 -- see below.
+     datasheet check.** MEASURED 2026-09-11 -- 10.625 cycles/byte linear,
+     257 cycles a cell drawn scanline-wise, a full repaint 0.287 s. See
+     below; it is no longer the risk it was.
 
-### The blit benchmark: the machine boots, the benchmark did NOT happen (2026-09-11)
+### THE BLIT BENCHMARK: MEASURED (2026-09-11)
 
-**WHAT WORKS NOW, and it is new: MAME boots a CoCo 3 with a SuperSprite FM+.**
+**It is done, and the number is real.** 6809 code, assembled with `lwasm`,
+loaded into a running CoCo 3 + SuperSprite FM+ under MAME, timed with the
+debugger's `totalcycles`. Source: [`tools/coco3_blit_bench.asm`](tools/coco3_blit_bench.asm).
 
-    mame64 coco3 -rompath "$HOME/Library/Application Support/Ample/roms" \
-                 -ext ssfm -video none -seconds_to_run 3 -nothrottle
+    mame coco3 -rompath "$HOME/Library/Application Support/Ample/roms" \
+         -ext ssfm -video none -debug -debugscript <f> -debuglog -nothrottle
 
 **Ample already has the CoCo romsets** -- `coco3` verifies GOOD on its own
-rompath, `coco_fdc` included, and `ym2413.zip` is there for the card's OPLL.
-A romset hand-built from XRoar's `coco3.rom` was unnecessary; it does match
-MAME's CRC and SHA1, but Ample's is complete and the FDC roms are the ones the
-hand-built set lacked.
+rompath (it is a `coco` clone and takes `coco.zip`), and `ym2413.zip` is there
+for the card's OPLL. A romset hand-built from XRoar's `coco3.rom` was
+unnecessary.
 
-**WHERE IT STOPPED: the V9958's I/O addresses, as the 6809 sees them.** The
-whole `$FF40..$FF7F` range maps to `coco3_state::ff40_read`/`ff60_read`, the
-CoCo 3's generic slot dispatcher, so the card's own decode is invisible to
-`map`. Without the ports there is no program to time.
+#### The V9958 is at $FF78/$FF79, and that was CONFIRMED, not inferred
 
-**AND THE PROBE THAT LOOKED LIKE AN ANSWER WAS BROKEN.** Writing `0x5A` to
-each candidate address with a watchpoint on the VDP's VRAM produced no hits at
-all -- which reads as "none of these is the data port" and is nothing of the
-kind. `wpset :ext:ssfm:v9958,0,0x20000,w` had failed with **"Error in
-expression: stack underflow"**, so THE WATCHPOINT WAS NEVER SET and sixteen
-addresses were probed against a check that could not fire. Caught by reading
-the log rather than trusting the null. **A check that cannot fire proves
-nothing** -- the oldest rule in this file, and it still got a whole probe.
+`$FF78` data, `$FF79` address/status, `$FF7A` palette, `$FF7B` register
+indirect -- the MSX `$98/$99/$9A/$9B` layout moved into the CoCo's slot window.
 
-**HOW TO CAPTURE DEBUGGER OUTPUT HEADLESSLY, which took three attempts:**
-`-debug -debugscript <file> -debuglog` writes the console to `debug.log` in
-the working directory. `-video none` alone gives nothing; the debugger console
-is not stdout.
+Found by reading back all of `$FF40..$FF7F` with the machine idle: everything
+is `00` (below `$FF60`) or `1B` (floating bus above it) except `$FF79`, which
+reads `80` -- a status register with the vblank flag set and never cleared --
+and `$FF7A`/`$FF7B`, which read `FF` because they are write-only.
 
-**NEXT ATTEMPT starts here**: get `wpset`'s device-space syntax right (or find
-the addresses another way -- tracing the card's own ROM if it has one), then a
-6809 loop timed with MAME's cycle count.
+**But a read-back pattern is an inference.** The confirmation was to drive it:
+set the VRAM write address through `$FF79`, push `DE AD BE EF` through
+`$FF78`, set the read address back, and read the four bytes out again. They
+came back. That is the VDP, on the machine, doing VDP things.
 
-**AN ARITHMETIC ESTIMATE EXISTS AND IS NOT THE BENCHMARK.** A tight 6809 fill
-loop is about 19 cycles a byte; a 6x8 cell at 4bpp is 24 bytes, so roughly 460
-cycles a character plus address setup, and a full 80x25 repaint is around
-48,000 bytes -- about half a second at 1.79MHz. That suggests incremental panel
-updates are comfortable and full repaints are not, which is a plausible shape
-for this console. **It is arithmetic. The scope called for a benchmark
-precisely because arithmetic is what everyone already has.**
+#### The measurements
+
+CoCo 3 in GIME fast mode -- **confirmed at 1.78977 MHz** by counting cycles
+across a known interval, not assumed. DP is `$FF`, so every port access is
+4-cycle direct addressing, the fastest the 6809 has. All figures are 6809
+E-cycles.
+
+| what | cycles | per byte | at 1.79 MHz |
+|---|---|---|---|
+| linear fill, 240 bytes (one 480-px scanline) | 2,550 | **10.625** | 1.43 ms |
+| one 6x8 cell, 8 rows of 3 bytes, address set per row | 512 | 21.33 | 0.286 ms |
+
+Derived from those two, for a 480x200 console in SCREEN 7 (4bpp, 1 byte = 2
+pixels, 48,000 bytes a screen) -- **arithmetic on top of measured rates, and
+labelled as such**:
+
+  * one 80-column text line, drawn scanline-wise: **11.5 ms** (257 cycles/cell)
+  * a 24x3 console panel: **10.5 ms**
+  * a full 80x25 repaint: **0.287 s** (0.573 s if the GIME is left slow)
+
+**THE LAYOUT DECIDES A FACTOR OF TWO.** Blitting cell-at-a-time costs 512
+cycles a cell; walking scanlines across a whole text line costs 257. The
+per-row VRAM address setup is the entire difference, and it is paid 8 times a
+cell or 8 times a line depending on which loop you write.
+
+**The shape this gives the port**: incremental panel updates are comfortable
+(10 ms), a status line is comfortable (11 ms), and a full repaint is a
+visible third of a second -- so a dirty-cell scheme is not an optimisation
+here, it is the design.
+
+#### What MAME CANNOT tell us, established by a test built to fail
+
+The V9938/V9958 needs recovery time between consecutive VRAM accesses through
+the data port. So the benchmark included a discriminator: 64 writes **6 cycles
+apart** (3.35 us in fast mode), then read all 64 back.
+
+**Every byte survived.** So MAME does not model VDP write recovery at all, and
+**every figure above is a lower bound that real hardware may not reach.** The
+loop writes a byte every 5.94 us; if the real part needs ~8 us between
+accesses -- the figure usually quoted for MSX graphics modes, **recalled here,
+not measured** -- the loop needs padding to ~14.3 cycles/byte and a full
+repaint becomes ~0.384 s. Note the sting: **at 0.89 MHz the loop is already
+slow enough to be safe, so part of what fast mode buys is given straight back.**
+
+Settling that needs the datasheet or the real card, and neither is here. It
+does not change the port's shape: the incremental figures stay comfortable
+under either number.
+
+**Not measured: the V9958's own command engine.** It has a blitter (LMMM and
+friends) that could scroll and fill without the 6809 touching a port. That is
+the obvious next measurement if this target is ever reopened.
+
+#### Three traps, all of which produced confident wrong answers first
+
+**THE ORIGINAL PROBE WAS NOT FIXABLE.** The idea was a watchpoint on the VDP's
+VRAM while writing candidate ports; `wpset :ext:ssfm:v9958,0,0x20000,w` had
+failed with "Error in expression: stack underflow", so sixteen addresses were
+once probed against a check that could not fire. The syntax was indeed wrong --
+it is `wpset <address>[:<space>],<length>,<type>`, address FIRST, the device
+tag after a colon -- but spelling it correctly only produces the real answer:
+**"Device Yamaha V9958 VDP is not a CPU"**, and `wplist` says `No watchpoints
+currently installed`. **MAME watchpoints attach to CPUs only.** The experiment
+was impossible, not mistyped. Naming an experiment is not checking it can be
+performed -- the same lesson the SID beep taught.
+
+**MAME'S DEBUGGER PARSES NUMBERS AS HEX.** `gtime 1000` is 4,096 ms, not
+1,000. A scan generated with decimal offsets from `seq` read `$FF40+0x10`
+where it meant `$FF40+10`, quietly skipping addresses and running past the end
+of the window to `$FF99`. The scan looked complete and was not.
+
+**AND `echo` IN zsh INTERPRETS `\n`.** A `wpset` line built with `echo`
+containing a `printf "...\n"` action was split across two lines before MAME
+ever saw it -- "unbalanced quotes", watchpoint not set, a second null result
+that meant nothing. **The fix is `wplist` after every `wpset`**: confirm the
+instrument is armed before believing what it does not report.
+
+**HOW TO CAPTURE DEBUGGER OUTPUT HEADLESSLY:** `-debug -debugscript <file>
+-debuglog` writes the console to `debug.log` in the working directory.
+`-video none` alone gives nothing; the debugger console is not stdout.
+
   2. **Does it fit?** Unknown until the whole game links. Every port here
      opened with that measurement (`make early` on the Atari) and it is the
      right first move again.
@@ -3234,6 +3302,14 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   V9938's hardware blitter. That needs a cartridge built with SDCC, which the
   Uno msx2 port already has a working toolchain for, not another afternoon of
   poking BASIC. Until then MSX2 stays here rather than in Tier 1.
+
+  **A NEIGHBOURING MEASUREMENT EXISTS SINCE 2026-09-11.** The same question was
+  answered for a 1.79MHz 6809 driving a V9958 -- 10.625 cycles a byte, a full
+  repaint 0.287 s (see the CoCo 3 scope). It does not transfer directly: the
+  Z80 is twice the clock with different addressing, and `OUTI` has no 6809
+  equivalent. But it establishes the shape -- incremental updates comfortable,
+  full repaints not -- and an MSX2 benchmark now has a method to copy rather
+  than invent.
 
 ### Out
 
@@ -7521,6 +7597,13 @@ question is whether blitting an 80x25 console is affordable on a 1.8MHz 6809 --
 **a benchmark, not a datasheet check**, and the 6809 is slower than the 3.58MHz
 Z80 the same question was asked about for MSX2.
 
+**MEASURED 2026-09-11, and the answer is yes**: 10.625 cycles a byte in a
+linear fill, 257 cycles a cell drawn scanline-wise, a 24x3 panel in 10.5 ms
+and a full 80x25 repaint in 0.287 s. See "THE BLIT BENCHMARK: MEASURED" under
+the scope section above. It is a lower bound -- MAME does not model the
+V9958's VRAM write recovery -- but the incremental figures survive either
+number, and incremental is what this console does.
+
 #### WHICH MACHINES COULD ACTUALLY RUN IT, AND THE VBXE PRECEDENT (2026-09-11)
 
 **COCO 3 ONLY, AND ON RAM RATHER THAN ON VIDEO.** MAME offers `ssfm` on `coco`
@@ -7539,8 +7622,11 @@ resident half that is 37,612 bytes on the C128 BEFORE overlays. The card's 128K
 of VRAM could carry the far memory -- exactly what the Atari does with VBXE's
 VRAM -- but that moves the DATA, not the resident code, and there is no banking
 on a CoCo 1/2 to help it. Speed is the second problem: only the CoCo 3's GIME
-doubles the clock, so the unmeasured blit cost through the V9958's I/O ports
-would be paid at half speed.
+doubles the clock, so the blit cost through the V9958's I/O ports would be
+paid at half speed -- **now a measured half**: a full repaint is 0.287 s at
+1.79 MHz and 0.573 s at 0.89 MHz. (With the sting that at 0.89 MHz the loop is
+already slow enough to respect the VDP's recovery time, so some of what fast
+mode buys is given back as padding.)
 
 **POPULARITY, AND IT DOES NOT SETTLE WHAT IT LOOKS LIKE IT SETTLES.** The CoCo
 line outsold the Falcon by a wide margin -- a decade in Radio Shack's retail
@@ -7567,8 +7653,9 @@ every port at zero cost, and the static assert was rebuilt as a negative
 bit-field that all four compilers reject properly. **`core/` compiles for 6809
 today** -- re-measured 2026-09-11, all four files, warnings only. So the
 toolchain risk is an unknown budget, not a core that will not build. **So this note narrows the
-drop from "two reasons" to "one reason and an unmeasured cost", and does not
-reopen it.** The VBXE precedent means "CoCo 3 + SuperSprite FM+" is a shape
+drop from "two reasons" to "one reason", and does not reopen it** -- the cost
+that was unmeasured when this was written was measured the same day, and it
+came back affordable. The VBXE precedent means "CoCo 3 + SuperSprite FM+" is a shape
 this project accepts -- the Atari port requires a card too -- so if it is ever
 revisited, that is the form it would take.
 
