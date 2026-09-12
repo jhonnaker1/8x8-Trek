@@ -868,6 +868,42 @@ would fit in any case. So roughly 96 ASCII glyphs have to be authored at 6x8,
 on top of the 17 box and badge glyphs every port already draws for itself.
 **Ask before estimating that** -- the same rule the briefing carries.
 
+#### STORAGE: it works WITHOUT the Disk BASIC ROM, and that decides the memory map
+
+**The whole three-piece stack runs in MAME** --
+`-ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc -flop1 <disk>` gives a
+CoCo 3, a Multi-Pak, the SuperSprite FM+ (V9958 *and* YM2413) and a WD1773
+with a drive. The scope's "three pieces of hardware" is all modelled.
+
+cmoc ships TWO disk layers and the difference is the whole question:
+
+  * **`disk.h`**, a Disk BASIC filesystem (`openfile`/`read`/`seek`/`close`),
+    is **READ-ONLY** -- writes need a `decbfile` library that is not installed
+    -- and it goes through the ROM's DSKCON, so it needs ROM at `$C000`.
+  * **`dskcon-standalone.h`** drives the WD1773 directly and needs **no ROM**.
+    `DCOPC` 2 reads and 3 writes, so writing is reachable.
+
+**VERIFIED ON THE MACHINE**: `tools/coco3/sectest.c` read track 17 sector 3
+with `DCSTA = 0`, and the bytes match the host's disk image exactly and decode
+as the `STRINGS DAT` entry `writecocofile` put there. The whole program is
+**999 bytes including the C runtime.**
+
+**THAT SETTLES THE MEMORY MAP.** The port's 55,399 bytes span `$1200..$EA66`,
+which is where ROM would be, so it must run in all-RAM mode and therefore
+cannot call Disk BASIC. Standalone DSKCON is the answer, and **the filesystem
+layer on top -- the directory walk and the FAT -- is ours to write**, exactly
+as the Atari port wrote its own directory after dropping DOS. `tools/coco3/`
+carries the probes and `coco3/tools/mkdisk.py` makes a blank image.
+
+**AND THE RIG LESSON: USE THE DEBUGGER, NOT LUA.**
+`emu.add_machine_frame_notifier` in this MAME stops firing after the first
+callback that does real work -- setting PC, or a run of VDP writes -- so a
+script that pokes a program in and waits for it never sees the result **and it
+looks exactly like the program hanging**. Three separate probes were mis-read
+that way before the pattern showed. `-debug -debugscript` is reliable and is
+what the blit benchmark already used; `nm` lies about 6809 archives too,
+reporting no disk symbols in libraries that link fine.
+
 #### FOUR cmoc non-conformances, and the scope knew about two
 
 The drop entry said "CMOC is non-conforming" and named two faults, both since

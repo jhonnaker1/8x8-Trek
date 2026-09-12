@@ -10,8 +10,25 @@ written against what they establish.
                vram.bin for the host to reconstruct. This is the verification
                path for the video driver -- see below.
     rom.lua    Dumps $8000..$FEFF, the BASIC ROMs.
+    sectest.c  Reads track 17 sector 3 with STANDALONE DSKCON -- no Disk
+               BASIC ROM -- and leaves the sector at $3000 and DCSTA at
+               $3100 for the host to check.
 
-Run one with:
+**USE THE DEBUGGER, NOT LUA, TO DRIVE A LOADED PROGRAM.**
+`emu.add_machine_frame_notifier` in this build stops firing after the first
+callback that does substantial work -- setting PC, or a run of VDP writes --
+so a script that pokes a program in and then waits for it never sees the
+result. It looks exactly like the program hanging. `-debug -debugscript` is
+reliable and is what the blit benchmark already used:
+
+    gtime 3000
+    load prog.raw,3800          ; strip the 5-byte DECB header first
+    pc=3800
+    gtime 800
+    printf "%04X %02X\n",pc,b@3100
+    dump out.txt,3000,100,1,0   ; NOTE: lengths are HEX
+
+Run a Lua probe with:
 
     mame coco3 -rompath "$HOME/Library/Application Support/Ample/roms" \
          -ext ssfm -autoboot_script <f>.lua -seconds_to_run 8 \
@@ -33,6 +50,40 @@ the right bytes in VRAM; whether MAME paints them is MAME's problem.
 that is a stronger check than a screenshot anyway -- it is the same move as
 confirming the Falcon's geometry by drawing a figure rather than trusting a
 byte count.
+
+## The whole three-piece stack runs
+
+    -ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc -flop1 <disk>.dsk
+
+CoCo 3 + Multi-Pak + SuperSprite FM+ (V9958 **and** YM2413) + a WD1773 and a
+drive. The scope's "three pieces of hardware" is all modelled.
+
+## STORAGE WORKS WITHOUT THE DISK BASIC ROM, and that is what makes 55K fit
+
+cmoc ships two disk layers and the difference decides the memory map:
+
+  * **`disk.h`** is a Disk BASIC filesystem -- `openfile`, `read`, `seek`,
+    `close` -- and it is **READ-ONLY** ("to do both read and write
+    operations, see the decbfile library", which is not installed here). It
+    goes through the ROM's DSKCON, so it needs ROM mapped at `$C000`.
+  * **`dskcon-standalone.h`** drives the WD1773 directly: `dskcon_init`,
+    `dskcon_processSector`, `dskcon_nmiService`. **No ROM.** `DCOPC` 2 reads
+    and 3 writes, so writing is reachable too.
+
+**VERIFIED ON THE MACHINE**: `sectest.c` read track 17 sector 3 with `DCSTA =
+0`, and the 64 bytes dumped match the host's disk image exactly and decode as
+the `STRINGS DAT` directory entry that `writecocofile` put there. A whole
+program doing this is **999 bytes** including the C runtime.
+
+That settles the memory map. The port needs all-RAM mode for its 55,399 bytes
+at `$1200..$EA66`, which overlaps where ROM would be -- so it cannot call Disk
+BASIC, and standalone DSKCON is the answer. The Atari port reached the same
+place by writing its own SIO seam after dropping DOS; **the filesystem layer
+on top -- the directory walk and the FAT -- is ours to write here too**, since
+the library's own filesystem needs the ROM the port cannot keep.
+
+`tools/mkdisk.py` makes a blank 161,280-byte image and `~/cmoc/bin/writecocofile
+-b image.dsk FILE` puts a file on it.
 
 ## What is established
 
