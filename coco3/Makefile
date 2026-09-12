@@ -124,7 +124,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -147,6 +147,26 @@ $(GAME_OUT): $(GAME_SRC) build/img/ovlmap.h Makefile
 # THE FIRST MEASUREMENT AND THE ONE THAT DECIDES THIS PORT. Link the whole
 # game against stubbed seams and read what is left below the I/O page at
 # $FF00. Every 6502 port here opened exactly this way.
+# THE VIDEO DRIVER, CHECKED ON THE CARD. MAME renders this card's screen black
+# whatever the VDP is doing, so `vidtest` draws a known pattern, reads VRAM
+# back THROUGH the card and leaves the answers in CPU RAM for a Lua dump.
+# Looking is not a check here; reading back is.
+VID_SRC = src/vidtest.c src/coco3vid.c
+VID_OUT = build/VIDTEST.BIN
+
+vidtest: $(VID_OUT)
+
+# THE VIDEO GATE. Runs VIDTEST on the card under MAME and checks the bytes it
+# read back out of VRAM. Skips itself with a note if MAME is not installed, so
+# a fresh clone stays green -- the same rule tools/check_ports.py follows.
+vidcheck: $(VID_OUT)
+	@python3 tools/vidcheck.py
+
+$(VID_OUT): $(VID_SRC) src/font6x8.h Makefile
+	@mkdir -p build
+	$(CMOC) $(CFLAGS) -o $@ $(VID_SRC)
+	@ls -l $@
+
 early: $(GAME_OUT)
 	@echo ""
 	@echo "  EARLY SIZE -- whole game resident, seams stubbed, no overlays"

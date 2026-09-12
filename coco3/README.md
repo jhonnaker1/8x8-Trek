@@ -1,15 +1,18 @@
 # EGA Trek — CoCo 3 + SuperSprite FM+
 
 Seventh port, **started 2026-09-12** and **not released**. It links, it fits,
-and its storage, font and overlay machinery are real. **Video, sound and input
-are stubs, and nobody has played it** — so nothing below is a claim that the
-game works on this machine. It does not yet.
+and its storage, font, overlay machinery **and video driver** are real —
+`make vidcheck` proves the console reaches VRAM on the card. **Sound and input
+are still stubs, and nobody has played it**, so nothing below is a claim that
+the game is playable on this machine. It is not yet.
 
 ```sh
 make           # build/egatrek.bin -- the whole game, resident
 make early     # link it and read the overflow: the question this port turns on
 make font      # regenerate src/font6x8.h from the authored pictures
 make overlays  # cut the overlay images (currently REFUSES ITSELF -- see below)
+make vidtest   # build the VRAM-readback program
+make vidcheck  # run it on the card under MAME and check what it read back
 ```
 
 The root `make ports` gate runs `make` here, because there is no overlay budget
@@ -67,20 +70,56 @@ Ours, like every other port's box glyphs.
 
 **The overlay machinery**, below.
 
+## The video driver, and how it is checked
+
+`src/coco3vid.c` draws the console into GRAPHIC6 and **11 of 11 checks pass on
+the card** (`make vidcheck`). A cell is 6 pixels wide because at four bits a
+pixel **six is three whole bytes** — no cell ever shares a byte with its
+neighbour, so there is no odd-column special case.
+
+**MAME RENDERS THIS CARD BLACK WHATEVER THE VDP IS DOING**, so the check draws
+a known pattern and READS VRAM BACK through the card. **The instrument was
+checked before the driver was**: write two values at two addresses and read the
+first back — a latch returns the second, VRAM returns the first. It returns the
+first. Without that, every assertion could have been confirming a write buffer.
+The checks were then verified by breaking the thing they protect: with the
+reverse-video rule deleted, that check goes red.
+
+**Two bugs it found, and both were mine.**
+
+**A register write goes to `$FF79`, not `$FF7B`.** `$FF7B` is register-*indirect*
+access through R#17 — the stub's own comment said so and I read it as "register
+write". Sending register writes there set a *sequence* of registers from R#17's
+default of zero, which by luck produced something screen-shaped, so the display
+looked plausible while R#14 (VRAM A16-A14) took garbage and reads landed in the
+wrong 16K bank. The symptom was identical reads giving different answers.
+
+**There must be no 32-bit arithmetic in this file.** The first version held VRAM
+addresses in `unsigned long`, and `scr_clear` took over **twelve seconds** of
+emulated time — the program was still inside it when the test gave up, which
+reads exactly like a hang. Every address this driver touches (54,272 of display
+and 2K of log at `$E000`) is under 65,536, so `unsigned int` covers all of it
+and R#14 is just bits 14-15. Removing the `long` took **2,000 bytes** off the
+test binary as well.
+
+The message log now lives in the card's VRAM rather than in the 6809's address
+space, which is what the stub always said should happen — **2,048 bytes bought
+back** on a machine that had 2,468 free.
+
 ## What is a stub
 
-`src/coco3vid.c`, `src/coco3snd.c` and `src/coco3input.c` say so in their first
-line. Two consequences worth stating: the input stub never advances the entropy
-source, **so a stubbed build plays the same game every time**; and
+`src/coco3snd.c` and `src/coco3input.c` say so in their first line. Two
+consequences worth stating: the input stub never advances the entropy source,
+**so a stubbed build plays the same game every time**; and
 `plat_write_all` returns `STOR_ERROR`, so **SAVE reports "COULD NOT SAVE."
 rather than pretending.**
 
-**The message log's backing store is NOT one of those stubs.** `ui.c` calls
+**The message log's backing store never was one of those stubs.** `ui.c` calls
 `vdc_set_address` / `vdc_data_write` / `vdc_data_read` every time it files a
 message — on the C128 the scrollback lives in spare VDC video RAM — and
 stubbing them is exactly how the Falcon shipped a broken message panel under a
-comment I had invented. They are a plain array here until the VDP driver is
-real.
+comment I had invented. It is in the card's VRAM now, round-tripped by three of
+the eleven checks, including one proving it survives a screen clear.
 
 ## Overlays: one link, a fixed window, and two checks that were blind
 
@@ -113,8 +152,12 @@ build_ovl: the image overruns the I/O page at $FF00 by 1260
 
 That is the check working. **The next step is not mechanism, it is
 candidates** — more phase-boundary code has to move before the window pays for
-itself. `make` stays all-resident and green in the meantime: 58,204 bytes
-spanning `$1200..$F55B`, with 2,468 left below the I/O page.
+itself. `make` stays all-resident and green in the meantime: **60,097 bytes spanning
+`$1200..$FCC0`, with 575 left below the I/O page** — the video driver cost
+about 4,400 bytes of address space and handed 2,048 back by moving the message
+log to VRAM. **575 bytes is the whole remaining budget for sound and input**,
+which is why the overlay candidates below stopped being a tidy-up and became
+the thing that decides whether this port finishes.
 
 ## The GIME MMU is proven and abandoned
 
@@ -176,7 +219,7 @@ short wait looks exactly like the disk hardware failing.
 See THE OPEN LIST in [`NOTES.md`](../NOTES.md) — items 27 through 31, and all
 five of them are this port:
 
-1. **Video, sound and input are stubs.**
+1. ~~Video~~ **BUILT and checked on the card** — sound and input are still stubs.
 2. **`plat_write_all` is unimplemented**, so SAVE cannot work.
 3. **The overlay set is too small to pay**, and needs candidates.
 4. **MMUEN breaks DSKCON**, unexplained and parked.

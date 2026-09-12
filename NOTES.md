@@ -1590,13 +1590,26 @@ stale invisibly.** Re-deriving now means walking `*/README.md` as well.
 (2026-09-12) -- sixth port, `egatrek-falcon.zip`. Five remain, and **all five
 are the CoCo 3**, which is started and not released:
 
-  27. **Video, sound and input are stubs.** The font is authored and the mode
-      is established; nothing draws the console yet.
+  27. ~~Video, sound and input are stubs.~~ **VIDEO IS BUILT AND CHECKED ON
+      THE CARD 2026-09-12** -- `make vidcheck`, 11 of 11, and the checks were
+      verified by breaking what they protect. **Sound and input remain stubs.**
+      Two bugs found, both mine: a register write goes to `$FF79` and I was
+      sending them to `$FF7B` (register-*indirect* via R#17, which the stub's
+      own comment named correctly), so R#14 took garbage and reads landed in
+      the wrong 16K bank; and holding VRAM addresses in `unsigned long` made
+      `scr_clear` take **twelve seconds** of emulated time, which read exactly
+      like a hang. Every address fits in 16 bits and none of that was needed.
+      **The instrument was checked before the driver**: write two values, read
+      the first back -- a latch returns the second. It returned the first.
   28. **`plat_write_all` returns `STOR_ERROR`** -- the filesystem reads and
       cannot write, so SAVE cannot work.
   29. **The overlay set is too small to pay.** `make overlays` correctly
       refuses itself: the image overruns `$FF00` by 1,260 bytes. The next step
-      is CANDIDATES, not mechanism.
+      is CANDIDATES, not mechanism. **This stopped being a tidy-up on
+      2026-09-12**: with the video driver real the resident build has **575
+      bytes left below the I/O page**, and that is the entire budget for sound
+      and input. The overlay window is now what decides whether the port
+      finishes.
   30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained. Routed around by not using the MMU; see below.
   31. **Nobody has played it** -- and on this project that is the item that
