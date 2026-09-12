@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and 2026-09-12 (5 open of 30 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and twice on 2026-09-12 (6 open of 34 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1601,6 +1601,33 @@ are the CoCo 3**, which is started and not released:
       unexplained. Routed around by not using the MMU; see below.
   31. **Nobody has played it** -- and on this project that is the item that
       finds what the instruments cannot.
+
+**THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
+the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the
+ports rather than reciting the list above found:
+
+  32. ~~**The root README links to `coco3/README.md` twice and the file does
+      not exist.**~~ **CLOSED 2026-09-12** -- written. **I broke this MYSELF in
+      the v0.14.0 commit**, an hour earlier, by adding a port table row for a
+      port with no README. Every other port link resolved, which is why it
+      looked fine. *A release creates the most items*, and this one was created
+      by the release that closed item 26.
+  33. **THE FALCON'S RGB / TV PATH IS UNTESTED AND EXPECTED TO BE WRONG.**
+      `vdc_init()` sets `VGA|COL80|BPS4` unconditionally; that mode does not
+      exist on an RGB monitor or a television. It is written up as a caveat in
+      `falcon/README.md` and `falcon/README-release.txt` and **had never been
+      filed as an item** -- a known-bad configuration in a SHIPPED release,
+      living only in prose. The port has also been played exactly once, by
+      Jamie, under Hatari; **no real hardware.** OPEN: the fix is a VIDEL mode
+      check and nobody here has the machine to check it on.
+  34. ~~**Five per-port READMEs still said "all five ports"**~~, one in the
+      present tense (the X16's "ships on all five ports"). **CLOSED
+      2026-09-12.** Two of them also RECITED the list's count -- and both said
+      "twenty-four" when it had already reached twenty-five, so they were stale
+      before today. Those two now carry no count at all and point at this file.
+      **This is the same rot fixed in the six shipped `README-release.txt`
+      files that morning**: I swept the files players read and not the ones
+      developers read. Sweep the SHAPE, not the subject.
 
 **Twenty-five raised, twenty-five closed or decided** as of 2026-09-11.
 

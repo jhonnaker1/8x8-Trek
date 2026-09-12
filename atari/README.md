@@ -750,9 +750,10 @@ once with, and the pair says which world this is.
   in it. The artefact is `egatrek-atari.atr` with `egatrek-atari.txt` beside
   it; `make release` builds both.
 
-**Nothing on THE OPEN LIST touches this port any more -- and as of 2026-09-11
-THE LIST IS EMPTY**, all twenty-four items closed or decided, all five ports
-played by a person.
+**Nothing on THE OPEN LIST touches this port any more.** The list lives in
+`NOTES.md`; **this file deliberately does not carry its count**, because the
+figure it used to quote ("twenty-four") was stale before the ink dried and a
+count only goes stale downward. Re-derive it there.
 
 ## Played, and it was silent
 

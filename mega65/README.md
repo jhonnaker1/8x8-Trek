@@ -320,9 +320,11 @@ resident space left for it.
 
 **Nothing on THE OPEN LIST touches this port any more.** Colour per message was
 looked at here on 2026-09-11 -- *"the mega65 looks, sounds, and plays great"* --
-which closed this port's share of item 23; that item is now closed on all five.
-**THE OPEN LIST IS EMPTY** as of 2026-09-11 -- all twenty-four items closed or
-decided, and all five ports played by a person. It is in `NOTES.md`.
+which closed this port's share of item 23; that item is closed on every port
+that was released at the time. **The list itself lives in `NOTES.md` and this
+file does not carry its count** -- the two copies here said "twenty-four" after
+it had reached twenty-five, and a count only ever goes stale downward.
+Re-derive it there.
 
 ## Saving works, and the SD card is gone
 

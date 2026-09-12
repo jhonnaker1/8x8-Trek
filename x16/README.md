@@ -193,7 +193,7 @@ noticing, because every measurement was of the thing that was wrong.
 ## What is open
 
 **Nothing specific to this port, and nothing on THE OPEN LIST touches it any
-more.** Colour per message is built (2026-09-10), ships on all five ports, and
+more.** Colour per message is built (2026-09-10), ships on every released port, and
 was **looked at here on 2026-09-11** -- Jamie: *"the x16 port looks, sounds and
 plays great"* -- which closed this port's share of item 23. Only the MAIN
 VIEWER's other nine instrument pages stay deferred, everywhere.

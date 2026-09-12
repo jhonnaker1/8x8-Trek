@@ -123,7 +123,7 @@ while writing this one. It matters most where the machine **queues**
 keystrokes: the game is started by typing `work:egatrek` at a shell, and the
 RETURN that launches it is still in Intuition's message port when the title
 screen asks for a key, so the title dismisses itself. It is declared, called
-once before the title, and implemented on all five ports now — the C128's is
+once before the title, and implemented on every port now — the C128's is
 an empty function with a comment saying why (it scans CIA1's matrix; there is
 no queue to drain).
 
