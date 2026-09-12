@@ -1024,8 +1024,32 @@ at a time separated them.
      failure tail showed the end of STDERR and hid the reason. Every port had
      it; the Falcon merely exposed it, because vbcc warns freely. Now
      `stderr=STDOUT`, and the tail ends on the actual message.
-  3. **SAVE and restore**, unexercised. The seam is written and GEMDOS makes
-     it the easiest on the project, but easiest is not witnessed.
+  3. ~~**SAVE and restore**, unexercised.~~ **WITNESSED 2026-09-11.**
+
+     **THE STORAGE TEST FOUND A REAL BUG ON ITS FIRST RUN.** GEMDOS made this
+     seam so easy -- Fopen, Fread, Fclose, no channels, no device numbers, no
+     sector buffer -- that it was written straight through and looked
+     obviously right. `Fread(h, max, buf)` reads UP TO max bytes and reports
+     how many, so a file LONGER than the buffer came back STOR_OK with a
+     silent truncation: the one behaviour storage.h names as forbidden
+     ("silently reading half a save is worse than refusing"). It measures the
+     file with Fseek now and refuses. **The easiest seam on the project was
+     the one that skipped its own contract**, and only running the test on the
+     machine said so.
+
+     **THE ROUND TRIP IS END TO END**: a game driven to the console, SAVE to
+     EGATREK.SAV, then A FRESH BOOT OF A NEW PROCESS answering Y at "RESTORE A
+     SAVED GAME". Short-range scan, status panel and galaxy chart come back
+     PIXEL-IDENTICAL. That is the check worth making, because the galaxy is
+     generated per game from keyboard entropy -- reproducing the same star
+     field and chart values means the 625-byte record round-tripped rather
+     than two games happening to look alike. (625 = 24 header + the 601-byte
+     save record.)
+
+     **One thing that looked like a failure was mine**: the first check for
+     the save file listed `build/` from the REPOSITORY ROOT rather than
+     `falcon/build/`, and reported NO SAVE FILE over a file that was there.
+     The shell had reset the working directory between commands.
   4. **Nobody has played it.** Four screenshots are not a person at the
      keyboard, and on this project that distinction has found bugs no
      instrument could -- three on the Atari alone.

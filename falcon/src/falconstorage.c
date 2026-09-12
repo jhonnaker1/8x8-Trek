@@ -39,22 +39,47 @@ static uint8_t map_err(long e)
     return STOR_ERROR;
 }
 
+/* MEASURE THE FILE BEFORE READING IT. storage.h: "A file longer than `max`
+   is an error, not a truncation -- silently reading half a save is worse than
+   refusing."
+
+   The first draft just called `Fread(h, max, buf)`, which reads UP TO max
+   bytes and reports how many -- so an oversized file came back STOR_OK with a
+   silent truncation, the one behaviour the contract names as forbidden.
+   src/storetest.c caught it on its first run. GEMDOS makes this seam so easy
+   that it was written straight through and looked obviously right; the easiest
+   seam on the project turned out to be the one that skipped its own contract. */
 uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
 {
-    long h, n;
+    long h, n, size;
 
     if (got)
         *got = 0;
     h = Fopen((char *)name, 0);         /* 0 = read only; GEMDOS takes char* */
     if (h < 0)
         return map_err(h);
-    n = Fread((int)h, (long)max, buf);
+
+    size = Fseek(0L, (int)h, 2);        /* 2 = from the end, so this IS the size */
+    if (size < 0) {
+        Fclose((int)h);
+        return map_err(size);
+    }
+    if (size > (long)max) {
+        Fclose((int)h);
+        return STOR_ERROR;
+    }
+    if (Fseek(0L, (int)h, 0) < 0) {     /* 0 = from the start */
+        Fclose((int)h);
+        return STOR_ERROR;
+    }
+
+    n = Fread((int)h, size, buf);
     Fclose((int)h);
     if (n < 0)
         return map_err(n);
     if (got)
         *got = (uint16_t)n;
-    return STOR_OK;
+    return (n == size) ? STOR_OK : STOR_ERROR;
 }
 
 uint8_t plat_write_all(const char *name, const void *buf, uint16_t len)

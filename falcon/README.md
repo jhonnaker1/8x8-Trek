@@ -140,13 +140,38 @@ the printer strobe — so bit 7 must stay 1 or the drive stops answering.
 Writing `0x00` there to "turn everything off" is the classic way to lose the
 floppy.
 
+## SAVE and restore, witnessed
+
+`make storetest` builds `STORTEST.PRG`, which exercises the eleven promises in
+`core/storage.h` on the machine and prints PASS or FAIL for each. **It found a
+real bug on its first run.**
+
+GEMDOS made this seam so easy — `Fopen`, `Fread`, `Fclose`, no channels, no
+device numbers, no sector buffer — that it was written straight through and
+looked obviously right. It was not. `Fread(h, max, buf)` reads *up to* `max`
+bytes and reports how many, so a file **longer** than the buffer came back
+`STOR_OK` with a silent truncation — the one behaviour `storage.h` names as
+forbidden: *"silently reading half a save is worse than refusing."* It now
+measures the file with `Fseek` to the end and refuses an oversized one. **The
+easiest seam on the project was the one that skipped its own contract.**
+
+Then the round trip itself, end to end: a game driven to the console, `SAVE`
+to the default `EGATREK.SAV`, then **a fresh boot of a new process** answering
+Y at "RESTORE A SAVED GAME". The short-range scan, the status panel and the
+galaxy chart come back **pixel-identical**. That is the check worth making,
+because the galaxy is generated per game from keyboard entropy — reproducing
+the same star field and the same chart values means the 625-byte record
+round-tripped, not that two games happened to look alike.
+
+(625 bytes is 24 of header plus the 601-byte save record, which is what the
+shared serialiser says it should be.)
+
 ## What is open
 
 1. ~~**Sound.**~~ **DONE** -- see below.
 2. **`make verify` and a place in the root `make ports` gate.** Every other
    port has one; this is currently the only port whose breakage nothing
    catches.
-3. **SAVE and restore, unexercised.** The seam is written and GEMDOS makes it
-   the easiest on the project. Easiest is not witnessed.
+3. ~~**SAVE and restore, unexercised.**~~ **WITNESSED** -- see below.
 4. **Nobody has played it.** Screenshots are not a person at the keyboard, and
    on this project that distinction has found bugs no instrument could.

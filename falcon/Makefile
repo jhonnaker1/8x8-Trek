@@ -54,7 +54,7 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            src/music_data.c
 GAME_OUT = build/EGATREK.PRG
 
-.PHONY: all game early verify data music clean run
+.PHONY: all game early verify storetest data music clean run
 
 all: game data
 
@@ -87,6 +87,20 @@ early: $(GAME_OUT)
 	@echo ""
 	@echo "  EARLY SIZE -- whole game, seams stubbed"
 	@python3 tools/prgsize.py $(GAME_OUT)
+
+# THE STORAGE SEAM, exercised on the machine rather than reasoned about. It
+# found a silent truncation in plat_read_all the first time it ran.
+STORE_SRC = src/storetest.c src/falconvid.c src/falconinput.c \
+            src/falconstorage.c src/falconsnd.c src/falconfarmem.c \
+            src/music_data.c
+STORE_OUT = build/STORTEST.PRG
+
+storetest: $(STORE_OUT)
+
+$(STORE_OUT): $(STORE_SRC) Makefile
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $(STORE_SRC)
+	@ls -l $@
 
 data: build/STRINGS.DAT build/BRIEF.TXT build/MUSIC.DAT
 
