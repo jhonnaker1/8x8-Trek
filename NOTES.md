@@ -964,38 +964,33 @@ paging costs a seek.
      read between them are dead-store-eliminated, **and that reads exactly
      like the hardware not working.**
 
-**WHAT IS NOT DONE, STATED PLAINLY: WRITES WORK, READS DO NOT.** Narrowed on
-2026-09-12 by paging blocks in FROM THE HOST rather than trusting the 6809's
-own readback -- `bank_init` + `bank_map` + `bank_poke` put `0x11` into block
-`$30` and `0x22` into `$31`, exactly as asked, so **the mapping and the writes
-are correct**. `bank_peek` returns `$FF` for every offset, even after the whole
-first page of the block is filled with `0x11`. Reads and writes to the same
-address in the same file are reaching different places and **I have not
-explained it.**
+**TWO REAL BUGS FOUND BY READING THE GIME REFERENCE (2026-09-12), at Jamie's
+suggestion to look online rather than keep guessing:**
 
-Ruled out, each by testing rather than reasoning: dead-store elimination (the
-writes land); a cached load in the caller (moving the accessors into their own
-translation unit changed nothing); a wrong offset (filling the page changed
-nothing); a read-modify-write on `$FF90` (real hazard, fixed, not the cause).
+  1. **TR IS IN $FF91, NOT $FF90.** INIT0's bit 6 is MMUEN, but its bits 1-0
+     are MC1/MC0, the **ROM MAP CONTROL**. Clearing INIT0 bit 0 to "select
+     task 0" actually switched the machine from 32K external ROM to 32K
+     internal, and never selected a task at all. TR is bit 0 of INIT1.
+  2. **RETRACTED: "the GIME's control registers are write-only and MAME's
+     debugger shows an internal latch."** I invented that here yesterday and
+     it is wrong -- INIT0 and INIT1 are both readable. The MMU registers read
+     back too, though their top two bits can return bus noise.
 
-**THE OVERLAY IMAGE BUILD IS THEREFORE NOT STARTED.** It rests entirely on
-reading through the window, and far memory is nothing but reads. Next attempt
-starts at cmoc's generated assembly for `bank_peek` (`cmoc -i` keeps it).
+**STILL BROKEN, AND NARROWED.** `bank_get(3)` returns `$3B` correctly after
+`bank_init`; immediately after `bank_map(3, 0x30)` the same call returns `$FF`
+-- so **`bank_map` is not writing the register it is asked to**. The
+ONE-parameter function works and the TWO-parameter ones (`bank_map`,
+`bank_peek`, `bank_poke`) all misbehave. `bank_peek0`, with no parameters,
+compiles to a correct `LDB $6000` and still reads the wrong block, because the
+mapping never happened.
 
-**A THIRD GIME TRAP, found on the way:** its control registers are WRITE-ONLY
-from the CPU, so `INIT0 = (INIT0 | MMUEN) & ~TR` computes from floating bus --
-`$FF` gives `$FE`, and bit 7 of INIT0 is the CoCo 1/2 COMPATIBILITY bit, which
-silently changes the memory map. **MAME's debugger reads `$FF90` as `$1B`**,
-the internal latch, not what the 6809 sees -- so the instrument agreed with the
-wrong model. Write literals and keep a shadow in RAM.
+Next attempt is cmoc's generated code for `bank_map` (`cmoc -i` keeps it): it
+loads one parameter, `PSHS B`, then loads the other at an offset adjusted for
+that push. Either that adjustment is wrong or my reading of it is. If the
+calling convention cannot be trusted, write the accessors in inline assembly.
 
-**AND THE SCHEME CANNOT BE FINISHED WITHOUT THE OVERLAY BUILD.** A window is a
-whole 8K slot, and the resident image spans `$1200..$F4DE` -- every slot. So
-no window exists until roughly 6.6K of code moves out, and **cmoc has no
-per-function section placement** (only `--org`/`--data`). Overlays here must
-therefore be SEPARATELY LINKED IMAGES at the window address, loaded into spare
-blocks at startup, reached through a jump table -- the C128's shape, but with
-the disk read replaced by a register write.
+**THE OVERLAY IMAGE BUILD IS THEREFORE STILL NOT STARTED.** It rests on
+reading through the window, and far memory is nothing but reads.
 
 #### THE RIG: emu.wait(), not the frame notifier and not the debugger
 

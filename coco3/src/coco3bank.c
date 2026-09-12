@@ -2,13 +2,13 @@
 #include "coco3bank.h"
 
 #define INIT0  (*(unsigned char *)0xFF90)
+#define INIT1  (*(unsigned char *)0xFF91)
 #define MMU0   ((unsigned char *)0xFFA0)
 
 #define INIT0_MMUEN 0x40
-#define INIT0_TR    0x01            /* 0 selects task 0, which is what we use */
+#define INIT1_TR    0x01            /* in INIT1 ($FF91): 0 = task 0 = $FFA0-$FFA7 */
 
 static unsigned char started;
-static unsigned char init0_shadow;   /* $FF90 is write-only: keep our own copy */
 
 /* cmoc HAS NO `volatile`, and it says so: "the `volatile' keyword is not
    supported by this compiler". Hardware accesses therefore have to be written
@@ -29,25 +29,22 @@ void bank_init(void)
     for (i = 0; i < BANK_SLOTS; i++)
         MMU0[i] = (unsigned char)(0x38 + i);
 
-    /* WRITE A LITERAL. NEVER READ-MODIFY-WRITE $FF90.
+    /* THE TASK SELECT IS IN $FF91, NOT $FF90 -- and getting that wrong is
+     * what cost a day. INIT0 ($FF90) bit 6 is MMUEN; its bits 1-0 are MC1/MC0,
+     * the ROM MAP CONTROL. The first version of this cleared bit 0 of INIT0
+     * believing it was the task select, which actually switched the machine
+     * from 32K external ROM ($1B = MC1:MC0 = 11) to 32K internal (10) -- and
+     * never selected task 0 at all.
      *
-     * The GIME's control registers are WRITE-ONLY from the CPU: reading
-     * $FF90 returns floating bus, not the value last written. The first
-     * version of this said `INIT0 = (INIT0 | MMUEN) & ~TR`, which with a
-     * floating $FF computes $FE -- and bit 7 of INIT0 is the CoCo 1/2
-     * COMPATIBILITY bit, so that one line quietly threw the machine into a
-     * different memory map. Every read through the paged window then came
-     * back $FF and it looked exactly like the banking not working.
+     * TR is bit 0 of INIT1 ($FF91): 0 selects $FFA0-$FFA7, 1 selects
+     * $FFA8-$FFAF. At boot BASIC is using task 1.
      *
-     * MAME's DEBUGGER READS $FF90 AS $1B, because it shows the internal
-     * latch rather than what the 6809 would see -- which is how the wrong
-     * model survived: the instrument agreed with it.
-     *
-     * So: a literal, and a shadow in RAM for anything that needs to change
-     * one bit later. $5A = MMUEN on, task 0, FEN, MC3, MC1:MC0 = 10, which
-     * is the boot value $1B with MMUEN added and TR cleared. */
-    init0_shadow = 0x5A;
-    INIT0 = init0_shadow;
+     * So: preserve INIT0's low bits, OR IN MMUEN ONLY, and clear TR in INIT1.
+     * (INIT0 and INIT1 are both READABLE -- an earlier note here claimed they
+     * were write-only and that MAME's debugger was showing an internal latch.
+     * That was invented and it was wrong.) */
+    INIT1 = (unsigned char)(INIT1 & (unsigned char)~INIT1_TR);   /* task 0 */
+    INIT0 = (unsigned char)(INIT0 | INIT0_MMUEN);                /* MMU on */
     started = 1;
 }
 
@@ -73,3 +70,9 @@ unsigned char bank_get(unsigned char slot)
 {
     return MMU0[slot & 7];
 }
+
+/* Parameterless probes, used to isolate a suspected parameter-passing bug in
+   bank_peek/bank_poke. If these work where the parameterised versions do not,
+   the address arithmetic was never the problem. */
+unsigned char bank_peek0(void)   { return *((unsigned char *)0x6000); }
+void bank_poke0(unsigned char v) { *((unsigned char *)0x6000) = v; }

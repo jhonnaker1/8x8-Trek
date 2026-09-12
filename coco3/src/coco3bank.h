@@ -15,28 +15,31 @@
  * register: the image is already in RAM, in a block nothing else is using.
  * The Atari pays a 1541-class seek; this pays a store instruction.
  *
- * STATUS 2026-09-12: THE HARDWARE IS PROVEN. WRITES THROUGH THIS FILE WORK.
- * READS THROUGH IT DO NOT, AND I HAVE NOT EXPLAINED WHY.
+ * STATUS 2026-09-12: THE HARDWARE IS PROVEN. TWO REAL BUGS FIXED. ONE LEFT,
+ * AND IT IS NARROWED TO TWO-PARAMETER FUNCTIONS.
  *
- * What is established, by paging blocks in FROM THE HOST and looking at the
- * physical RAM rather than trusting the 6809's own readback:
- *   - `bank_init` + `bank_map` + `bank_poke` put 0x11 into block $30 and
- *     0x22 into block $31, exactly as asked. The mapping and the writes are
- *     correct.
- *   - `bank_peek` returns $FF for every offset, even after filling the whole
- *     first page of the block with 0x11. Reads and writes to the same address
- *     in the same translation unit are reaching different places.
+ * FIXED, both found by reading the GIME register reference rather than by
+ * more guessing:
+ *   - **TR IS IN $FF91, NOT $FF90.** INIT0 bit 6 is MMUEN, but its bits 1-0
+ *     are MC1/MC0, the ROM MAP CONTROL. Clearing INIT0 bit 0 to "select task
+ *     0" actually switched the machine from 32K external ROM to 32K internal
+ *     and never selected a task at all. TR is bit 0 of INIT1 ($FF91).
+ *   - An earlier note here claimed INIT0/INIT1 are WRITE-ONLY and that MAME's
+ *     debugger was showing an internal latch. **That was invented and it is
+ *     wrong: both registers are readable.** Retracted.
  *
- * Things ruled out, each by testing rather than reasoning: dead-store
- * elimination (the writes land); a cached load in the caller (moving the
- * accessors into this file changed nothing); a bad offset (filling the page
- * changed nothing); a read-modify-write on $FF90 (fixed, and it was not the
- * cause); and the stack in the window (that was a real crash, fixed with an
- * explicit LDS, and it is a separate bug).
+ * STILL BROKEN, and here is the shape of it. `bank_get(3)` returns $3B
+ * correctly after `bank_init`. Immediately after `bank_map(3, 0x30)`, the
+ * SAME call returns $FF -- so **bank_map is not writing the register it is
+ * asked to.** The one-parameter function works; the two-parameter ones
+ * (bank_map, bank_peek, bank_poke) all misbehave, and bank_peek0 with no
+ * parameters compiles to a correct `LDB $6000` yet reads the wrong block
+ * because the mapping never happened.
  *
- * NEXT ATTEMPT STARTS AT THE GENERATED ASSEMBLY -- `cmoc -i` keeps it. Do not
- * build the overlay scheme on this until a read round-trips, because far
- * memory is nothing but reads.
+ * NEXT ATTEMPT: cmoc's generated code for bank_map (kept by `cmoc -i`). It
+ * loads one parameter, PSHS B, then loads the other at an offset adjusted for
+ * that push -- suspect either that adjustment or my reading of it. Write the
+ * accessors in inline assembly if the calling convention cannot be trusted.
  *
  * AT BOOT THE MMU IS OFF. INIT0 ($FF90) reads $1B -- bit 6 clear -- and the
  * GIME maps the top 64K flat, which is exactly what task 0 already contains.
@@ -78,6 +81,8 @@ void bank_map(unsigned char slot, unsigned char blk);
    translation unit, a caller cannot cache across them. */
 unsigned char bank_peek(unsigned int off);
 void          bank_poke(unsigned int off, unsigned char v);
+unsigned char bank_peek0(void);
+void          bank_poke0(unsigned char v);
 
 /* What is currently mapped there. The GIME's MMU registers read back, which
    not every machine's do. */
