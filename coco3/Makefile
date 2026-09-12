@@ -48,6 +48,44 @@ GAME_OUT = build/egatrek.bin
 # driven directly with tools/ovl.link.
 LWLINK ?= lwlink
 
+# ---------------------------------------------------------------- overlays
+#
+# THE C128'S DESIGN, NOT THE GIME'S: a window in ordinary RAM with images read
+# into it from disk. Paging an 8K block would make a swap one store instead of
+# a seek, but enabling MMUEN breaks standalone DSKCON on this machine -- see
+# NOTES.md -- so the port does not enable the MMU at all.
+#
+# ONE LINK, NOT SEPARATE ONES. tools/build_ovl.py renames an overlay source's
+# `code` section and places it at the window, so the linker resolves calls IN
+# BOTH DIRECTIONS and an overlay is ordinary C rather than a jump-table
+# dialect. It cuts each overlay out as a .OVL image and generates ovlmap.h.
+#
+# THE WINDOW ADDRESS IS FIXED AND CHECKED, not derived -- the C128's sits at
+# $AF00 for the same reason. build_ovl.py refuses a window that would land
+# inside the resident image, which it did on the first attempt here.
+OVL_WINDOW ?= E100
+
+# WHOLE FILES, because cmoc has no per-function section placement. These three
+# are the natural candidates: the hall of fame runs after the game ends, and
+# the planet and save code are used at points the console is not drawing.
+OVL_SRC = ../core/hof.c ../core/planet.c ../core/serial.c
+RES_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
+          ../c128/src/strpool.c ../core/trek.c \
+          src/coco3vid.c src/coco3input.c src/coco3storage.c \
+          src/coco3farmem.c src/coco3snd.c src/coco3ovl.c src/music_data.c
+
+# NOT YET THE DEFAULT BUILD. The images build and the link resolves both ways,
+# but nothing yet calls ovl_load before entering the window -- core/overlay.h's
+# rule 4 is the remaining work, and until it is done this binary would jump
+# into whatever the window happens to hold. `make game` stays all-resident.
+overlays:
+	@mkdir -p build/img build/int
+	python3 tools/build_ovl.py --org 1200 --window $(OVL_WINDOW) \
+	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
+	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
+	    --resident $(RES_SRC) --overlay $(OVL_SRC)
+
+
 # THE FONT IS THIS PORT'S OWN ARTWORK, and it has to be: the CoCo 3 is the one
 # target with no glyphs to borrow -- the GIME's character generator is internal
 # silicon, not a table the CPU can read. Authored as pictures in
@@ -69,7 +107,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: all game early ovl font data music clean
+.PHONY: all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 

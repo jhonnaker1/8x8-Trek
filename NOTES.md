@@ -1113,6 +1113,51 @@ and passing `&got` to the disk code handed it a pointer into the window. **The
 rule is not "move the stack". It is NO AUTOMATIC STORAGE AT ALL in code that
 pages.**
 
+#### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
+
+**The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window
+in ordinary RAM with images read into it. `make -C coco3 overlays`.
+
+**ONE LINK, NOT SEPARATE ONES -- this is the part that matters.** cmoc has no
+per-function section placement, so the obvious route is to link each overlay
+separately at the window address; that leaves the halves unable to call each
+other and would mean writing overlay code against a hand-built jump table.
+Instead `tools/build_ovl.py` renames an overlay source's `code` SECTION in its
+generated assembly and the link script places that section at the window --
+**so everything is linked together and the linker resolves calls IN BOTH
+DIRECTIONS.** Proven on the machine before the tool existed: a resident
+`main()` calling an overlay function that calls back into a resident helper
+returned `0xB4`, with the overlay's symbols at `$6000` and the resident's at
+`$20xx`. **An overlay is ordinary C.**
+
+lwlink emits each section as its own DECB block, so cutting the images out
+afterwards is just reading the block list.
+
+**MEASURED ON THE REAL GAME**, with `hof.c`, `planet.c` and `serial.c` moved:
+
+    all resident          58,079 bytes, $1200..$F4DE, 2,593 free
+    three overlays        52,845 bytes, $1200..$E06C, 5,140 free
+                          window $E100, images 1,146 / 1,671 / 2,540
+
+**AND THE FIRST OVERLAY CANNOT PAY -- the C128 said so and it is true here.**
+One overlay saved nothing: the window costs what the largest image costs. The
+gain is (sum of the images) minus (the largest), so it arrives with the
+second and third.
+
+**THE WINDOW ADDRESS IS FIXED AND CHECKED, NOT DERIVED.** Deriving it from the
+link created a chicken and egg -- the runtime needs the address to compile and
+the link needs the runtime compiled. It is a build parameter, as the C128's
+`$AF00` is, and `build_ovl.py` REFUSES a window that would land inside the
+resident image. **It refused on the first attempt**, because the real
+`ovl_load` pushed the resident 0x6D bytes past `$E000`.
+
+**WHAT IS NOT DONE: RULE 4.** Nothing yet calls `ovl_load` before entering the
+window, so this binary would jump into whatever the window happens to hold.
+`make game` stays all-resident and working; `make overlays` is the machinery
+proven and measured. Wiring the call sites is the next piece, and it is the
+same discipline `core/overlay.h` states for every port -- only resident code
+may call into a window, and a function inside one cannot `ovl_load`.
+
 #### THE RIG: emu.wait(), not the frame notifier and not the debugger
 
 `tools/coco3/run.lua`. An autoboot script that calls `emu.wait(3)`, pokes a
