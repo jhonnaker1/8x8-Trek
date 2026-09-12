@@ -24,12 +24,21 @@ CC = $(VBCC)/bin/vc
 # registers are loaded with EGA's own values in EGA's own order, so a colour
 # name IS its index. Same trick as the MEGA65, the X16 and the Amiga.
 #
-# No -Werror: vbcc's warning set is not gcc's, and the informational
-# "statement has no effect" on core/'s (void) casts is not a defect. The root
-# `make ports` gate checks the exit status, which is the thing that matters.
+# No -Werror: vbcc's warning set is not gcc's. The root `make ports` gate
+# checks the exit status, which is the thing that matters.
+#
+# -dontwarn=153 silences ONE warning, named here so the silencing is arguable
+# rather than invisible: 153 is "statement has no effect", which vbcc emits for
+# every `(void)unused;` in core/ and in this port's stubs. That idiom IS the
+# suppression of another compiler's unused-parameter warning, so the two cancel
+# out. It was drowning the build in over a hundred lines, and a gate whose
+# failure output is buried in warnings is a gate nobody reads. (vbcc spells it
+# -dontwarn; -nowarn is the ASSEMBLER's flag, and vc passes it through to be
+# rejected by the compiler.)
+#
 # -I TAKES NO SPACE. `vc -I src` silently drops the path and passes a bare
 # -I to the compiler; the include then fails much later and blames the header.
-CFLAGS = +tos -O2 -DTREK_COLOUR_IS_EGA -Isrc -I../c128/src -I../core
+CFLAGS = +tos -O2 -dontwarn=153 -DTREK_COLOUR_IS_EGA -Isrc -I../c128/src -I../core
 
 HATARI ?= hatari
 TOSIMG ?= $(HOME)/hatari/rom/etos512us.img
@@ -45,9 +54,22 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            src/music_data.c
 GAME_OUT = build/EGATREK.PRG
 
-.PHONY: all game early data music clean run
+.PHONY: all game early verify data music clean run
 
 all: game data
+
+# THE GATE. The root `make ports` runs this and checks its exit status; see
+# tools/check_ports.py for why that is a command and not a habit.
+#
+# This port has none of the pools the 6502 ports run out of, so it checks the
+# two things that fail SILENTLY here instead: that the console still fits the
+# screen, and that every glyph the shared UI can put on screen has something
+# to draw. Each check was verified BY BREAKING THE THING IT PROTECTS -- and
+# the glyph sweep failed that test on its first version, passing happily with
+# G_CROSS deleted, because the box junctions live in a data table rather than
+# in a call argument.
+verify: $(GAME_OUT)
+	python3 tools/verify_prg.py
 
 game: $(GAME_OUT)
 

@@ -45,7 +45,7 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
 
     if (got)
         *got = 0;
-    h = Fopen(name, 0);                 /* 0 = read only */
+    h = Fopen((char *)name, 0);         /* 0 = read only; GEMDOS takes char* */
     if (h < 0)
         return map_err(h);
     n = Fread((int)h, (long)max, buf);
@@ -63,7 +63,7 @@ uint8_t plat_write_all(const char *name, const void *buf, uint16_t len)
 
     /* Fcreate with attribute 0 truncates an existing file, which is what
        every other port's save does. */
-    h = Fcreate(name, 0);
+    h = Fcreate((char *)name, 0);
     if (h < 0)
         return map_err(h);
     n = Fwrite((int)h, (long)len, (void *)buf);   /* GEMDOS takes void*, not const */
@@ -77,7 +77,7 @@ uint8_t plat_open(const char *name)
 {
     if (fh >= 0)                        /* never two at once -- see below */
         plat_close();
-    fh = Fopen(name, 0);
+    fh = Fopen((char *)name, 0);
     if (fh < 0) {
         uint8_t e = map_err(fh);
         fh = -1L;

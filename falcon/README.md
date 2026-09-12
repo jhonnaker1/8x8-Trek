@@ -6,8 +6,33 @@ and plays; sound is a stub and nobody has sat down with it.
 ```sh
 make early     # link the whole game against stubbed seams and read the size
 make           # build/EGATREK.PRG plus the data files
+make verify    # geometry and glyph coverage -- the root `make ports` runs it
 make run       # boot it in Hatari with build/ mounted as drive C:
 ```
+
+## What `make verify` checks, and why those two things
+
+This port has none of the pools the 6502 ports run out of, so the checks they
+need have nothing to bite on. It checks the two things that fail **silently**
+here instead:
+
+**Geometry.** 80×25 cells of 8×16 inside 640×480. Change the cell height, the
+row count or the margin and nothing complains — the bottom rows just leave the
+screen, where on a 6502 port the same mistake is a linker error.
+
+**Glyph coverage**, and this is the one worth having. A screen code with no
+`box[]` entry and no ASCII mapping draws the missing-glyph marker, which is
+only loud if somebody happens to be looking at that panel. The Amiga found its
+glyph set by sweeping the shared UI **by hand**, and that sweep turned up
+fifteen where an eyeball count gives eleven. A hand sweep goes stale the next
+time someone adds a panel; this one runs every build.
+
+**Each check was verified by breaking the thing it protects** — and the glyph
+sweep *failed that test on its first version*. It passed happily with `G_CROSS`
+deleted from the driver, because the box junctions never appear as call
+arguments: they live in `junctions[]` in layout.c and reach the screen through
+an array subscript. The sweep now reads glyph constants out of data tables too.
+A check that cannot fail reports coverage it does not have.
 
 ## What this machine gives the port, and what it takes away
 

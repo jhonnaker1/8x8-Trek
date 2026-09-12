@@ -984,9 +984,24 @@ at a time separated them.
 
   1. **SOUND.** The only stubbed seam. YM2149 or the DMA CODEC; neither
      measured.
-  2. **`make verify`**, and a place in the root `make ports` gate. Every other
-     port has one and this one does not yet, which makes it the only port
-     whose breakage nothing would catch.
+  2. ~~**`make verify`** and a place in the root `make ports` gate.~~ **DONE
+     2026-09-11 -- the gate is now 6 of 6.** It checks the two things that fail
+     SILENTLY on a bitmap target rather than the pools a 6502 port runs out of:
+     that 25 rows of cells still fit 640x480, and that every glyph the shared
+     UI can draw has something to draw it with.
+
+     **THE GLYPH SWEEP FAILED ITS OWN DISCRIMINATOR FIRST.** Written to check
+     call arguments, it passed with `G_CROSS` deleted from the driver -- because
+     the box junctions are never call arguments, they live in `junctions[]` in
+     layout.c and reach the screen through an array subscript. It reads glyph
+     constants out of data tables now. Verified by deleting three different
+     glyphs and by pointing the sweep at nothing; all four fail.
+
+     **AND IT FOUND A FLAW IN THE GATE ITSELF.** `check_ports.py` captured
+     `p.stdout + p.stderr`, which appends rather than interleaves -- so the
+     failure tail showed the end of STDERR and hid the reason. Every port had
+     it; the Falcon merely exposed it, because vbcc warns freely. Now
+     `stderr=STDOUT`, and the tail ends on the actual message.
   3. **SAVE and restore**, unexercised. The seam is written and GEMDOS makes
      it the easiest on the project, but easiest is not witnessed.
   4. **Nobody has played it.** Four screenshots are not a person at the
