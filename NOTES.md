@@ -805,8 +805,10 @@ then the rest. The `make early` pattern exists and transfers.
 
 ## SCOPE: the ATARI FALCON (written 2026-09-11)
 
-**Scoped at Jamie's request. It does NOT re-open the target** -- the ST tier
-entry's verdict stands and it was never about capability. This is the
+**~~Scoped at Jamie's request. It does NOT re-open the target.~~ THE TARGET
+WAS RE-OPENED THE SAME DAY -- Jamie's call, 2026-09-11: "start the falcon
+port".** The scope below is what it was built from, and it held. See "THE
+FALCON PORT IS STARTED" at the end of this section. This is the
 measurement, done before anyone writes `falconvid.c`. The tier entry says
 plainly that "what is still NOT established is the video"; **this closes that,
 on the machine.**
@@ -931,6 +933,65 @@ removed Atari DOS from the 8-bit port.
 Staging would be the usual one: link the whole game against stubbed seams and
 read the size first. On this target that measurement is a formality rather
 than a verdict, which is not true of any other port here.
+
+### THE FALCON PORT IS STARTED, AND IT DRAWS (2026-09-11)
+
+**Jamie's call the same day the scope was written: "start the falcon port".**
+
+`falcon/` exists. `make early` was taken first, exactly as the staging above
+says, and the whole game linked against stubbed seams at **67,320 text + 88
+data + 35,030 bss = 102,438 resident** -- against a C128 that needs 37,612 and
+overlays to reach it, on a machine with 1 to 14MB. **The question that
+dominates every 6502 port was answered by the first link and never came back.**
+
+Built after that, in this order: storage (GEMDOS, and it is the easiest seam
+on the project), far memory (the Amiga's plain array, unchanged), the empty
+`ovl_load`, then video, then input. **Sound is still a stub** -- the one seam
+the scope did not measure, and it is honest about it: `snd_enabled()` returns
+0 rather than claiming a driver that is not there.
+
+**IT BOOTS INTO THE NINE-PANEL CONSOLE.** Title screen, setup dialogs, short
+range scan, status, the galaxy chart with per-quadrant colour, laser bars,
+systems status and the badge -- all drawn, all in the right colours, from the
+first build that had a video driver at all.
+
+**THE FONT IS THE ROM'S AND THE BOX GLYPHS ARE OURS.** Line-A hands back three
+system font headers; this port reads them and takes the one that is 8x16 by
+MEASURING `form_height`, not by taking index 2. EmuTOS 1.3.0 offers 6x6, 8x8
+and 8x16, all covering 0..255 with `form_width` 256, so a glyph row is
+`dat_table[r * 256 + c]`. The seventeen box-drawing and badge glyphs are drawn
+here at 8x16 -- **restated for the taller cell rather than doubled from the
+Amiga's 8x8**, because doubling gives a four-pixel horizontal rule against a
+two-pixel vertical one and the corners stop meeting.
+
+**THE FIRST BUG WAS FOUND BY LOOKING AT THE SCREEN**, which is this project's
+oldest lesson arriving on a sixth machine. "WILL YOU REQUIRE A BRIEFING" drew
+its Q as the ship's saucer: `scr_put` takes a C128 SCREEN CODE, ASCII 'Q' is
+81 and SCREEN CODE 81 is the saucer, and the first draft handed raw codes
+straight to the font in both directions. The fix is the conversion every other
+port already has -- `scr_puts` maps ASCII to screen codes, `glyph_rows` maps
+screen codes back to ASCII for the ROM lookup -- plus the missing-glyph marker,
+which is deliberately loud because a blank cell hides exactly this.
+
+**AND ONE THING THAT LOOKED LIKE A BUG WAS THE HARNESS.** Answers echoed as
+"NN" and "2" in the setup dialogs, which read as an input fault. Screenshotting
+after every single keypress showed both N's going into ONE field: **the
+prompts are line editors and want RETURN**, not single-key answers. The port
+was right and the script was wrong -- and only stepping the instrument one key
+at a time separated them.
+
+#### Still open on this port
+
+  1. **SOUND.** The only stubbed seam. YM2149 or the DMA CODEC; neither
+     measured.
+  2. **`make verify`**, and a place in the root `make ports` gate. Every other
+     port has one and this one does not yet, which makes it the only port
+     whose breakage nothing would catch.
+  3. **SAVE and restore**, unexercised. The seam is written and GEMDOS makes
+     it the easiest on the project, but easiest is not witnessed.
+  4. **Nobody has played it.** Four screenshots are not a person at the
+     keyboard, and on this project that distinction has found bugs no
+     instrument could -- three on the Atari alone.
 
 ### AGAINST THE COCO 3, THE OTHER SCOPED-BUT-CLOSED TARGET (asked 2026-09-11)
 
@@ -3465,9 +3526,13 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   capability**: the machines that could show the console are the ones nobody
   has, and the ones people own cannot show it. Targeting TT and Falcon alone
   would be a port with almost no installed base -- less brutally so for the
-  Falcon than the TT, which is a difference of degree and not of kind. **Do not
-  re-open this** -- Jamie's call, and an instrument being available is not a
-  reason to.
+  Falcon than the TT, which is a difference of degree and not of kind.
+  ~~**Do not re-open this** -- Jamie's call, and an instrument being available
+  is not a reason to.~~ **SUPERSEDED 2026-09-11: Jamie re-opened the FALCON and
+  it is BUILT AND RUNNING** -- see "SCOPE: the ATARI FALCON". The reasoning
+  above is left standing because it is still true and still the argument
+  against; what changed is the decision, which was always his to make. **The TT
+  remains a branch nobody has built.**
 - **MSX2.** TEXT2 (`SCREEN 0: WIDTH 80`) gives 80x24 but its blink attribute
   buys only a second colour pair -- four colours, same trap as the ST.
 

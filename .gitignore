@@ -33,6 +33,8 @@ amiga/src/music_data.h
 amiga/src/music_data.c
 atari/src/music_data.h
 atari/src/music_data.c
+falcon/src/music_data.h
+falcon/src/music_data.c
 
 # Build output
 build/

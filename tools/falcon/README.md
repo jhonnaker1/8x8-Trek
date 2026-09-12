@@ -1,8 +1,9 @@
 # Falcon scope probes
 
-The Atari Falcon target is **not open** -- see `NOTES.md`, "SCOPE: the ATARI
-FALCON". These three programs are the measurements that scope rests on, kept
-so the numbers can be re-derived rather than recited.
+**The Atari Falcon target was re-opened on 2026-09-11 and `falcon/` is now a
+working port** -- see `NOTES.md`, "SCOPE: the ATARI FALCON". These programs are
+the measurements the port was built from, kept so the numbers can be
+re-derived rather than recited.
 
     vidprobe.c   VgetSize() over every VIDEL mode word -- finds that the VGA
                  boot mode $001A is 640x480 in 16 colours (153,600 bytes).
@@ -10,6 +11,11 @@ so the numbers can be re-derived rather than recited.
                  640x480 and word-interleaved planes. A byte count alone
                  cannot tell 640x480 from 320x960; this can.
     bench.c      Full-screen clear timed on the 200Hz tick: 19 ms.
+    fontprobe.c  Line-A's three ROM font headers. Finds 6x6, 8x8 and 8x16 on
+                 EmuTOS 1.3.0, all covering codes 0..255 with form_width 256 --
+                 which is why falcon/src/falconvid.c can treat a glyph row as
+                 dat_table[r * 256 + c]. It picks its font by measuring
+                 form_height, not by taking index 2.
 
 Build with the vbcc TOS target, which is already installed:
 
