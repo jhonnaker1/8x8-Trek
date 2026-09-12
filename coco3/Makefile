@@ -41,7 +41,22 @@ GAME_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
            src/music_data.c
 GAME_OUT = build/egatrek.bin
 
-.PHONY: all game early data music clean
+# AN OVERLAY IMAGE is linked SEPARATELY at the window address and loaded into
+# a spare RAM block at startup -- cmoc has no per-function section placement,
+# so this is the only shape available. cmoc's own linker step cannot be used
+# (its C runtime wants a main() and program_start/program_end), so lwlink is
+# driven directly with tools/ovl.link.
+LWLINK ?= lwlink
+
+build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
+	@mkdir -p build
+	$(CMOC) --coco -O2 -fomit-frame-pointer --intdir=build -c -o build/ovldemo.o src/ovldemo.c
+	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
+	@ls -l $@
+
+.PHONY: all game early ovl data music clean
+
+ovl: build/OVLDEMO.BIN
 
 all: game
 

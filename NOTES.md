@@ -1008,6 +1008,48 @@ and it is wrong -- INIT0 and INIT1 are both readable.
 **THE OVERLAY IMAGE BUILD IS NOW UNBLOCKED**: reads through the window work,
 so far memory can live in spare blocks and `ovl_load` can be a register write.
 
+#### THE OVERLAY IMAGE BUILD: the image works, LOADING it is blocked
+
+**THE IMAGE HALF IS DONE.** `make -C coco3 ovl` builds a separately-linked
+overlay at the window address. cmoc's own link step cannot be used -- its C
+runtime wants a `main()` and `program_start`/`program_end` -- so **lwlink is
+driven directly** with `coco3/tools/ovl.link`:
+
+    section code load 0x6000
+    entry _ovl_entry
+
+`src/ovldemo.c` comes out as five bytes at `$6000`: `E6 63` (LDB 3,S),
+`C8 A5` (EORB #$A5), `39` (RTS), with `_ovl_entry = $6000` in the map. That is
+the shape every real overlay would take, and it is the ONLY shape available
+here because **cmoc has no per-function section placement.**
+
+**AND THEN IT STOPPED, ON SOMETHING WORTH KNOWING: ENABLING THE MMU BREAKS THE
+DISK.** With `bank_init()` called, `plat_read_all` never returns -- it hangs
+inside standalone DSKCON. Isolated properly: it hangs **even with the window
+never paged and the destination buffer resident**, so it is not the window and
+not the buffer. The same read works perfectly with the MMU off (the filesystem
+tests all pass that way). **Banking and disk I/O do not currently coexist.**
+
+Suspicion, untested: the NMI path DSKCON waits on. The WD1773 signals sector
+completion by NMI, and the CoCo 3's vectors come from `$FExx` under INIT0's
+MC3 bit. `bank_init` preserves MC3 and maps slot 7 to block `$3F`, which is
+what the flat map already had -- so the obvious explanation is already ruled
+out and the real one is not found.
+
+**THE WORKAROUND IS A DESIGN, NOT A HACK, AND IT IS UNTESTED:** the boot map
+IS the MMU-off map, so disk access can be bracketed -- restore the flat map,
+do the I/O, re-enable. Better still, the port can **load every overlay image
+and data file BEFORE enabling the MMU** and never touch the disk during play,
+which is what a swap-is-a-register-write design wants anyway. SAVE is the one
+thing that needs the disk later, and it can pay the bracket.
+
+**Two more sightings of the SAME rule** while getting here, and it is the
+rule of this whole target: `main()`'s frame pointer U is established at entry,
+BEFORE any `lds` moves S -- so `main`'s locals stay wherever the stack was,
+and passing `&got` to the disk code handed it a pointer into the window. **The
+rule is not "move the stack". It is NO AUTOMATIC STORAGE AT ALL in code that
+pages.**
+
 #### THE RIG: emu.wait(), not the frame notifier and not the debugger
 
 `tools/coco3/run.lua`. An autoboot script that calls `emu.wait(3)`, pokes a
