@@ -795,6 +795,10 @@ instrument is armed before believing what it does not report.
 
 ### If it were ever built
 
+**And it is the HARDER of the two scoped targets** -- see "AGAINST THE COCO 3"
+under the Falcon scope below, which compares them line by line on measured
+numbers. Short version: the Falcon deletes three seams this one has to build.
+
 Same staging as the Atari: **link the whole game against stubbed seams and
 read the overflow FIRST.** Then video, then far memory into the card's VRAM,
 then the rest. The `make early` pattern exists and transfers.
@@ -927,6 +931,58 @@ removed Atari DOS from the 8-bit port.
 Staging would be the usual one: link the whole game against stubbed seams and
 read the size first. On this target that measurement is a formality rather
 than a verdict, which is not true of any other port here.
+
+### AGAINST THE COCO 3, THE OTHER SCOPED-BUT-CLOSED TARGET (asked 2026-09-11)
+
+Jamie asked which of the two would be easier to build. **The Falcon, by a wide
+margin, and both sides of this are measured rather than guessed** -- the two
+scopes were done days apart with the same discipline, which is the only reason
+the comparison is worth anything.
+
+                            CoCo 3 + SuperSprite FM+      Falcon
+    video                   V9958 behind I/O ports,       boots into
+                            registers from scratch        640x480x16; one
+                                                          VsetMode
+    full repaint            287 ms (measured)             19 ms (measured)
+    dirty-cell scheme       MANDATORY -- it IS the        optional
+                            design
+    overlay machinery       probably needed, at GIME's    DELETED
+                            coarse 8K granularity
+    far memory              card's 128K VRAM, a new seam  DELETED, plain arrays
+    storage                 Disk BASIC or OS-9 through    GEMDOS Fopen/Fread/
+                            a Multi-Pak                   Fwrite
+    "does it fit?"          A GENUINE UNKNOWN -- cmoc,    a formality at 14MB
+                            no LTO, 64K
+    hardware to own         three pieces                  one machine
+    toolchain               cmoc 0.1.86, core compiles    vbcc +tos, core
+                                                          compiles, +16% and
+                                                          irrelevant
+
+**THE STRUCTURAL POINT: the Falcon DELETES work rather than adding it.** Three
+of the seams every 6502 port here had to build -- overlays, far memory, and a
+hand-rolled storage layer -- do not exist on it. The Amiga was already the
+cheapest port for deleting the overlay machinery alone; the Falcon deletes
+that *and* gets a filesystem *and* wakes up in the right video mode. It is
+close to "the Amiga port again with a different pixel layout", and that port
+exists and works.
+
+**The CoCo 3 is a full 8-bit port** and everything that makes those expensive
+is present: a code budget that decides the design, an overlay scheme, a
+banking granularity coarser than anything used so far, and a video seam where
+every glyph is port writes. Its blit number came back affordable -- that was
+the risk that could have killed it -- but affordable still means the
+dirty-cell scheme is the design rather than an optimisation.
+
+**WHERE THEY ARE EVEN:** sound is unmeasured on both, and the CoCo's YM2413
+OPLL is the richer chip. That is the one axis where the CoCo 3 is ahead on the
+merits.
+
+**AND THE AXIS THAT MATTERS MOST GOES THE OTHER WAY.** The CoCo 3 is a machine
+people own; the Falcon is not. **Easier to build and worth building are
+different questions**, and installed base is why both are closed -- which this
+comparison does not change. If either ever reopened, the honest ordering is
+that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
+port.
 
 ## THE OPEN LIST, re-derived 2026-09-09, 2026-09-10 and 2026-09-11 (0 open of 25 raised -- EMPTY)
 
