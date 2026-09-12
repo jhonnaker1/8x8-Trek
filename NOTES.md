@@ -830,6 +830,44 @@ Two things that do NOT cost address space, and they are why it fits at all:
 the **screen lives in the card's VRAM**, and so does **far memory** -- the
 stub allocates nothing precisely so this number is not a lie.
 
+#### THE VIDEO SEAM IS STARTED: the mode is established, the font is not
+
+**GRAPHIC6 IS SET AND VERIFIED (2026-09-12).** R#0=$0A, R#1=$40, R#9=$80,
+R#8=$08 gives 512x212 in sixteen colours, 256 bytes a line, 54,272 bytes a
+screen. A bracket drawn into VRAM and read back reconstructs exactly -- no
+skew, right stride, right height.
+
+**THE VRAM ADDRESS COUNTER CARRIES PAST THE 16K BOUNDARY ON ITS OWN.** All
+54,272 bytes went in after ONE address set and came back intact, so the driver
+never touches R#14 mid-blit. The obvious defensive code for that would have
+been pure cost.
+
+**MAME WILL NOT SHOW THE CARD'S SCREEN, AND THE VDP IS FINE.** `:ext:ssfm:screen`
+exists at 544x466/50.16Hz and renders black whatever is done to it -- including
+with the BACKDROP forced to white, which rules out both the bitmap and the
+palette. The chip is provably alive: VRAM round-trips, and reading the status
+register twice gives `80` then `00`, the vblank flag set and cleared by the
+read. `-view "Screen 1 Pixel Aspect"` does not select it either.
+
+**So the driver is verified by READING VRAM BACK, not by looking** --
+`tools/coco3/dump.lua` plus a host-side reconstruction. That is a stronger
+check than a screenshot: it tests what the driver actually produces rather
+than what an emulator chooses to paint, and it is the same move as confirming
+the Falcon's geometry by drawing a figure instead of trusting a byte count.
+
+**THE FONT IS THE BLOCKER, AND IT IS A CONTENT TASK.** There is no ROM font on
+this machine: `$8000..$FEFF` rendered as a bitmap is all code, and a font
+announces itself as regular columnar shapes. The GIME's character generator is
+internal silicon, not a table the CPU can read.
+
+**Every other port borrows the machine's own glyphs at runtime** -- topaz on
+the Amiga, Line-A's 8x16 on the Falcon, the OS ROM font on the Atari 8-bit,
+the chargen ROM on the Commodore three. **This target has nothing to borrow**,
+and 80 columns in 512 pixels needs SIX-pixel cells, which no stock 8-wide font
+would fit in any case. So roughly 96 ASCII glyphs have to be authored at 6x8,
+on top of the 17 box and badge glyphs every port already draws for itself.
+**Ask before estimating that** -- the same rule the briefing carries.
+
 #### FOUR cmoc non-conformances, and the scope knew about two
 
 The drop entry said "CMOC is non-conforming" and named two faults, both since
