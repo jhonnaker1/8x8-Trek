@@ -141,23 +141,60 @@ sites — four of them `core/trek.c` calling `core/planet.c` **during play**,
 not at a phase boundary. planet.c went back resident. *The call graph decides a
 split, not its size.*
 
-**With the set correct, the arithmetic refuses it:**
+**It works per FUNCTION now, and had to**: one `ui.s` spans resident code and
+six different overlays, so a file-level answer is wrong in both directions. All
+four of its rules were verified by breaking them — delete the reviewed `PAIRED`
+line and rule 4 reports; claim a windowed function belongs to a different
+overlay and rule 2 reports it twice; claim a function was split that the linker
+never placed and the map/assembly cross-check reports that.
+
+**And it produced one false FAIL, which is the dangerous direction.**
+`c128/src/main.c` and `core/serial.c` each define a `static put_quad`, and cmoc
+emits `_put_quad` for both — file-local in each object, so the linker is right
+and never complains. The checker keyed on the bare name, read `serial.s` after
+`main.s`, and reported main.c's resident `put_quad` as living in an overlay. It
+keys on (function, file) now and resolves a callee file-locally first. **A
+false FAIL is the one that gets a real check deleted.**
+
+## The candidates, and where they came from
+
+The window could not pay while this port paged whole **translation units** —
+two of them, against the C128's eleven overlays. **The shared sources have
+carried `OVL_CODE("name")` on 33 functions since the C128**; on llvm-mos that
+is `__attribute__((section(...)))` and the compiler does the work. **cmoc has
+no per-function section placement**, so the partition existed and this port
+could not reach it.
+
+**So the split happens one stage later, in the generated assembly.** cmoc
+brackets every function with `_NAME EQU *` and `funcsize_NAME`, so a span is
+exact rather than guessed, and `tools/build_ovl.py --split` lifts each marked
+function out of `SECTION code` into its overlay's section. **The partition is
+not invented here** — the names come from the shared markers and the numbering
+from `core/overlay.h`, so `main()`'s existing `load_msgs()` / `load_cmds()` /
+`load_planet()` calls already sit in the right places.
 
 ```
-  window       $FA00, largest image 2540 bytes
-  resident     54518 bytes, $1200..$E6F5
-  free below $FF00: -1260
-build_ovl: the image overruns the I/O page at $FF00 by 1260
+  eleven overlays, 40 functions
+  resident     42,531 bytes, $1200..$B822
+  window       $C300, largest image 2,500 bytes (MSGS)
+  free below $FF00:  12,860
 ```
 
-That is the check working. **The next step is not mechanism, it is
-candidates** — more phase-boundary code has to move before the window pays for
-itself. `make` stays all-resident and green in the meantime: **60,097 bytes spanning
-`$1200..$FCC0`, with 575 left below the I/O page** — the video driver cost
-about 4,400 bytes of address space and handed 2,048 back by moving the message
-log to VRAM. **575 bytes is the whole remaining budget for sound and input**,
-which is why the overlay candidates below stopped being a tidy-up and became
-the thing that decides whether this port finishes.
+**575 free bytes became 12,860** — the budget for sound, input and
+`plat_write_all`.
+
+**`core/serial.c` IS NOT AN OVERLAY, and finding out why was the point of the
+checker.** This port had been paging it as a whole file, but it carries no
+`OVL_CODE` marker at all: it is resident on the C128, and paging it here was
+one port inventing a partition the shared design does not have.
+`overlay_check` found it as four separate faults — `report_rare_event` in MSGS
+calling into it, and three resident helpers in `ui.c` reaching it with nothing
+loaded. It is resident now, as it is everywhere else.
+
+**THE IMAGES HAVE NEVER BEEN RUN.** `make overlays` links, cuts eleven images
+and passes every rule; `make` still builds the all-resident binary, and nothing
+has loaded a `.OVL` off a disk on the machine. Until that happens this is
+arithmetic, not a working overlay scheme.
 
 ## The GIME MMU is proven and abandoned
 

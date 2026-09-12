@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and twice on 2026-09-12 (6 open of 34 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and three times on 2026-09-12 (6 open of 35 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1603,15 +1603,25 @@ are the CoCo 3**, which is started and not released:
       the first back -- a latch returns the second. It returned the first.
   28. **`plat_write_all` returns `STOR_ERROR`** -- the filesystem reads and
       cannot write, so SAVE cannot work.
-  29. **The overlay set is too small to pay.** `make overlays` correctly
-      refuses itself: the image overruns `$FF00` by 1,260 bytes. The next step
-      is CANDIDATES, not mechanism. **This stopped being a tidy-up on
-      2026-09-12**: with the video driver real the resident build has **575
-      bytes left below the I/O page**, and that is the entire budget for sound
-      and input. The overlay window is now what decides whether the port
-      finishes.
+  29. ~~The overlay set is too small to pay.~~ **CLOSED 2026-09-12: ELEVEN
+      OVERLAYS, AND 575 FREE BYTES BECAME 12,860.** The candidates were never
+      missing -- the shared sources have carried `OVL_CODE("name")` on 33
+      functions since the C128. cmoc has no per-function section placement, so
+      this port could only page whole translation units and had two overlays
+      against the C128's eleven. **The split now happens in the generated
+      assembly**, where cmoc brackets every function exactly, and the partition
+      and numbering are both read out of the shared tree rather than invented.
+      `core/serial.c` stopped being an overlay in the process: it carries no
+      marker, so it is resident everywhere else, and `overlay_check` found four
+      separate faults caused by paging it here.
   30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
-      unexplained. Routed around by not using the MMU; see below.
+      unexplained. Routed around by not using the MMU; see below. **Less
+      urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
+      it, which was the problem the MMU was for.
+  32. **The overlay build has never been RUN.** `make overlays` links, cuts
+      eleven images and passes every rule, but `make` still builds the
+      all-resident binary and nothing has loaded a `.OVL` off a disk on the
+      machine. The images are arithmetic until something boots them.
   31. **Nobody has played it** -- and on this project that is the item that
       finds what the instruments cannot.
 

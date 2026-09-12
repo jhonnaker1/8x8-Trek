@@ -80,6 +80,90 @@ def rename_section(spath, newname):
     open(spath, "w").write(out)
 
 
+# ---------------------------------------------------------------------------
+# PER-FUNCTION OVERLAYS, and why this port has to do it the hard way.
+#
+# The shared sources have carried OVL_CODE("name") on 33 functions since the
+# C128, and eleven overlays built from those markers have shipped there for
+# weeks. On llvm-mos OVL_CODE is __attribute__((section(...))) and the
+# compiler does the work. CMOC HAS NO PER-FUNCTION SECTION PLACEMENT, so this
+# port could only page whole TRANSLATION UNITS -- which is why it had two
+# overlays (core/hof.c, core/serial.c) against the C128's eleven, and why the
+# window could not pay for itself.
+#
+# What cmoc does give is an assembly listing with unambiguous function
+# boundaries. So the split happens one stage later, in the .s: each marked
+# function is lifted out of `SECTION code` into its own overlay section. The
+# PARTITION IS NOT INVENTED HERE -- it is read out of the shared markers, and
+# the index of each overlay is the shared OVL_* constant, so main()'s existing
+# load_msgs() / load_cmds() / load_planet() calls already sit in the right
+# places. Rule 4 is satisfied by a discipline that is written down and has
+# been reviewed on five machines, not by a second one invented beside it.
+
+
+def ovl_indices(overlay_h):
+    """name -> index, straight out of core/overlay.h. Parsed rather than
+    copied: two lists of the same eleven numbers is one list too many."""
+    idx = {}
+    for m in re.finditer(r'^#define\s+OVL_([A-Z]+)\s+(\d+)', open(overlay_h).read(), re.M):
+        idx[m.group(1).lower()] = int(m.group(2))
+    for k in ("base", "code", "n"):
+        idx.pop(k, None)
+    return idx
+
+
+def ovl_functions(sources):
+    """function -> overlay name, from the OVL_CODE("x") markers in the shared
+    C. The marker sits immediately before the definition, sometimes on the
+    same line and sometimes on its own."""
+    fn = {}
+    pat  = re.compile(r'OVL_CODE\("([a-z]+)"\)\s*(.*?)\{', re.S)
+    name = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*\([^()]*\)\s*$', re.S)
+    for src in sources:
+        for m in pat.finditer(open(src).read()):
+            decl = m.group(2).split(";")[-1].strip()
+            nm = name.search(decl)
+            if nm:
+                fn[nm.group(1)] = m.group(1)
+    return fn
+
+
+def split_functions(spath, fnmap, sect_for):
+    """Lift each marked function out of `SECTION code` into its overlay's
+    section, in the generated assembly.
+
+    cmoc brackets every function with `_NAME EQU *` and a closing
+    `funcsize_NAME EQU funcend_NAME-_NAME`, so the span is exact and does not
+    have to be guessed from indentation or blank lines. Only whole functions
+    move; anything the compiler emitted between them stays where it is.
+
+    Returns the names actually moved, so the caller can fail loudly on a
+    marker that matched nothing -- a silently-unmoved function would stay
+    resident and the only symptom would be a window that does not pay."""
+    lines = open(spath).read().split("\n")
+    out, moved, i = [], [], 0
+    while i < len(lines):
+        m = re.match(r'^_([A-Za-z_][A-Za-z0-9_]*)\s+EQU\s+\*\s*$', lines[i])
+        ov = fnmap.get(m.group(1)) if m else None
+        if not ov:
+            out.append(lines[i]); i += 1; continue
+        fn = m.group(1)
+        end = i
+        while end < len(lines) and not re.match(r'^funcsize_%s\s+EQU' % re.escape(fn), lines[end]):
+            end += 1
+        if end >= len(lines):
+            sys.exit("build_ovl: no funcsize_%s -- cannot bound the function" % fn)
+        out.append("\tENDSECTION")
+        out.append("\tSECTION\t%s" % sect_for[ov])
+        out.extend(lines[i:end + 1])
+        out.append("\tENDSECTION")
+        out.append("\tSECTION\tcode")
+        moved.append(fn)
+        i = end + 1
+    open(spath, "w").write("\n".join(out))
+    return moved
+
+
 def assemble(spath, obj):
     run([LWASM, "-fobj", "--pragma=forwardrefmax", "-D_COCO_BASIC_",
          "--output=" + obj, spath])
@@ -152,6 +236,12 @@ def main():
     ap.add_argument("--cflags", default="")
     ap.add_argument("--resident", nargs="+", required=True)
     ap.add_argument("--overlay", nargs="*", default=[])
+    # PER-FUNCTION OVERLAYS: every OVL_CODE("x") marker in the shared sources
+    # becomes part of overlay OVL_X. No list of names here on purpose -- the
+    # markers are the list.
+    ap.add_argument("--overlay-h", default="../core/overlay.h")
+    ap.add_argument("--split", action="store_true",
+                    help="lift OVL_CODE-marked functions out of the resident sources")
     a = ap.parse_args()
 
     org, win = int(a.org, 16), int(a.window, 16)
@@ -179,16 +269,58 @@ def main():
     slots = max(index) + 1 if index else 1
     write_map(a.imgdir, win, names, idx_label, slots)
 
-    objs = []
-    for src in a.resident:
-        _, obj = compile_to_s(src, a.intdir, cflags)
-        objs.append(obj)
+    # The marked functions, and which section each belongs in. Both come out
+    # of the shared tree: the names from the OVL_CODE markers, the numbering
+    # from core/overlay.h.
+    fnmap, sect_for, want = {}, {}, set()
+    if a.split:
+        idx = ovl_indices(a.overlay_h)
+        fnmap = ovl_functions(a.resident + a.overlay)
+        for ov in set(fnmap.values()):
+            if ov not in idx:
+                sys.exit('build_ovl: OVL_CODE("%s") has no OVL_%s in %s'
+                         % (ov, ov.upper(), a.overlay_h))
+            sect_for[ov] = "ovl%d" % idx[ov]
+        want = set(fnmap)
+        slots = max(slots, max(idx[o] for o in sect_for) + 1)
+        for ov in sorted(sect_for, key=lambda o: idx[o]):
+            nm = ("ovl%d" % idx[ov], ov.upper()[:8])
+            if nm[0] not in [n for n, _ in names]:
+                names.append(nm)
+                idx_label.append((idx[ov], nm[1]))
+        write_map(a.imgdir, win, names, idx_label, slots)
 
-    for (sect, _), src in zip(names, a.overlay):
-        spath, obj = compile_to_s(src, a.intdir, cflags)
-        rename_section(spath, sect)
-        assemble(spath, obj)
-        objs.append(obj)
+    # ONE COMPILE PATH, CALLED TWICE. There used to be two copies of this loop
+    # -- one here and one in the window-moving pass below -- and when the
+    # per-function split was added to the first copy only, pass two quietly
+    # rebuilt everything RESIDENT. The symptom was the tool contradicting
+    # itself: it reported bss ending at $B862, moved the window above that,
+    # then refused its own placement because resident now reached $F91F. A
+    # duplicated build step is a place for exactly this bug, so there is one.
+    def build_objs():
+        objs, got = [], set()
+        for src in a.resident:
+            spath, obj = compile_to_s(src, a.intdir, cflags)
+            if a.split:
+                got.update(split_functions(spath, fnmap, sect_for))
+                assemble(spath, obj)
+            objs.append(obj)
+        for (sect, _), src in zip(names, a.overlay):
+            spath, obj = compile_to_s(src, a.intdir, cflags)
+            rename_section(spath, sect)
+            if a.split:
+                got.update(split_functions(spath, fnmap, sect_for))
+            assemble(spath, obj)
+            objs.append(obj)
+        # A MARKER THAT MATCHED NOTHING IS A SILENT FAILURE: the function
+        # stays resident, every rule still passes, and the only symptom is a
+        # window that does not pay for itself. Fail here instead.
+        if a.split and want - got:
+            sys.exit("build_ovl: %d OVL_CODE function(s) never found in the "
+                     "assembly: %s" % (len(want - got), ", ".join(sorted(want - got))))
+        return objs
+
+    objs = build_objs()
 
     # TWO PASSES, because the window must not land on resident code. The
     # resident extent does not depend on where the window is -- the overlay
@@ -218,23 +350,15 @@ def main():
     if names:
         link(0xFE00)
         top = map_top(a.out + ".map", sectnames)
-        want = (top + 0xFF) & ~0xFF
-        if want != win:
+        placed = (top + 0xFF) & ~0xFF
+        if placed != win:
             print("  window       $%04X is below the top of bss ($%04X); "
-                  "moving it to $%04X" % (win, top, want))
-            win = want
+                  "moving it to $%04X" % (win, top, placed))
+            win = placed
             write_map(a.imgdir, win, names, idx_label, slots)
             # only the file that includes ovlmap.h needs recompiling, but
             # rebuilding all of it is cheap and cannot go stale
-            objs = []
-            for src in a.resident:
-                _, obj = compile_to_s(src, a.intdir, cflags)
-                objs.append(obj)
-            for (sect, _), src in zip(names, a.overlay):
-                spath, obj = compile_to_s(src, a.intdir, cflags)
-                rename_section(spath, sect)
-                assemble(spath, obj)
-                objs.append(obj)
+            objs = build_objs()
     link(win)
 
     top = map_top(a.out + ".map", sectnames)

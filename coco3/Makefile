@@ -83,9 +83,13 @@ OVL_WINDOW ?= E100
 # core/trek.c during play, not at a phase boundary, so it can never be paged
 # out safely. tools/overlay_check.py found that by reading the call graph,
 # which is the same way the C128 chooses its splits.
-OVL_SRC = 1:../core/hof.c 2:../core/serial.c
+# core/serial.c is NOT here: it carries no OVL_CODE marker, so it is resident
+# on the C128 and paging it whole was this port inventing a partition the
+# shared design does not have -- which is exactly what overlay_check caught,
+# as resident helpers in ui.c calling trek_state_load/save unguarded.
+OVL_SRC = 1:../core/hof.c
 RES_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
-          ../c128/src/strpool.c ../core/trek.c ../core/planet.c \
+          ../c128/src/strpool.c ../core/trek.c ../core/planet.c ../core/serial.c \
           src/coco3vid.c src/coco3input.c src/coco3storage.c \
           src/coco3farmem.c src/coco3snd.c src/coco3ovl.c src/music_data.c
 
@@ -98,7 +102,7 @@ overlays:
 	python3 tools/build_ovl.py --org 1200 --window $(OVL_WINDOW) \
 	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
 	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
-	    --resident $(RES_SRC) --overlay $(OVL_SRC)
+	    --resident $(RES_SRC) --overlay $(OVL_SRC) --split
 	python3 tools/overlay_check.py build/egatrek-ovl.bin.map build/int \
 	    ../core/hof.c ../core/serial.c
 
