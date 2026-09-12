@@ -11,6 +11,11 @@
 # resolves to the HOST's, and the build dies fifty lines into Xcode's libc++
 # complaining about __BYTE_ORDER__ and an unsupported architecture, never once
 # mentioning cmoc.
+# `overlays` is defined before `all` below, and make takes the FIRST rule as
+# its default -- which silently made `make` mean `make overlays`, and the
+# ports gate went red on a target that is not the build.
+.DEFAULT_GOAL := all
+
 CMOC       ?= $(HOME)/cmoc/bin/cmoc
 PKGDATADIR ?= $(HOME)/cmoc/share/cmoc
 export PKGDATADIR
@@ -28,7 +33,7 @@ export PKGDATADIR
 # there with the same name, which is exactly how four generated .s files got
 # committed to the root during scoping and deleted again by the next run.
 CFLAGS = --coco --org=1200 -O2 -fomit-frame-pointer --intdir=build \
-         -DTREK_COLOUR_IS_EGA -Isrc -I../core -I../c128/src
+         -DTREK_COLOUR_IS_EGA -Isrc -Ibuild/img -I../core -I../c128/src
 
 # No -DTREK_OVERLAYS yet, and that is deliberate: the staging rule is to link
 # the whole game RESIDENT first and read the overflow. src/coco3ovl.c supplies
@@ -68,9 +73,19 @@ OVL_WINDOW ?= E100
 # WHOLE FILES, because cmoc has no per-function section placement. These three
 # are the natural candidates: the hall of fame runs after the game ends, and
 # the planet and save code are used at points the console is not drawing.
-OVL_SRC = ../core/hof.c ../core/planet.c ../core/serial.c
+# INDEX:SOURCE, where the index is the SHARED OVL_* constant from
+# core/overlay.h. OVL_HOF is 1 and OVL_FRONT is 2, and main() has called
+# load_hof() and load_front() before those screens since the C128 -- so
+# matching the numbering means rule 4 is already satisfied by machinery that
+# is written down and reviewed.
+#
+# core/planet.c IS NOT HERE, and the checker is why: it is called from
+# core/trek.c during play, not at a phase boundary, so it can never be paged
+# out safely. tools/overlay_check.py found that by reading the call graph,
+# which is the same way the C128 chooses its splits.
+OVL_SRC = 1:../core/hof.c 2:../core/serial.c
 RES_SRC = ../c128/src/main.c ../c128/src/ui.c ../c128/src/layout.c \
-          ../c128/src/strpool.c ../core/trek.c \
+          ../c128/src/strpool.c ../core/trek.c ../core/planet.c \
           src/coco3vid.c src/coco3input.c src/coco3storage.c \
           src/coco3farmem.c src/coco3snd.c src/coco3ovl.c src/music_data.c
 
@@ -84,6 +99,8 @@ overlays:
 	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
 	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
 	    --resident $(RES_SRC) --overlay $(OVL_SRC)
+	python3 tools/overlay_check.py build/egatrek-ovl.bin.map build/int \
+	    ../core/hof.c ../core/serial.c
 
 
 # THE FONT IS THIS PORT'S OWN ARTWORK, and it has to be: the CoCo 3 is the one
@@ -115,7 +132,14 @@ all: game
 
 game: $(GAME_OUT)
 
-$(GAME_OUT): $(GAME_SRC) Makefile
+# THE ALL-RESIDENT BUILD still compiles src/coco3ovl.c, which includes the
+# GENERATED ovlmap.h -- so it needs one saying "no images", which is exactly
+# what an all-resident build means: ovl_load finds nothing and returns.
+build/img/ovlmap.h:
+	@mkdir -p build/img
+	@printf '/* GENERATED: the all-resident build has no overlay images. */\n#ifndef COCO3_OVLMAP_H\n#define COCO3_OVLMAP_H\n#define OVL_WINDOW 0x0000\n#define OVL_SIZE   0\n#define OVL_IMAGES 1\nstatic const char * const ovl_name[OVL_IMAGES] = { 0 };\n#endif\n' > $@
+
+$(GAME_OUT): $(GAME_SRC) build/img/ovlmap.h Makefile
 	@mkdir -p build
 	$(CMOC) $(CFLAGS) -o $@ $(GAME_SRC)
 	@ls -l $@

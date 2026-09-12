@@ -85,6 +85,26 @@ def assemble(spath, obj):
          "--output=" + obj, spath])
 
 
+def map_top(mappath, ovl_sections):
+    """The top of everything RESIDENT, taken from the link map -- which is the
+    only place that sees BSS.
+
+    THIS IS THE CHECK THAT WAS MISSING. The first version compared the window
+    against the DECB blocks, and BSS is not in a DECB file because it is
+    uninitialised. So a window placed at $E100 sat in the MIDDLE of a
+    4,633-byte bss and would have loaded an overlay straight over the message
+    log, the sector buffer, the FAT and the whole game state -- and the check
+    said it was fine. A check that cannot see the thing it is checking is
+    worse than no check."""
+    top = 0
+    for line in open(mappath):
+        m = re.match(r'Section: (\S+) \(([^)]*)\) load at ([0-9A-Fa-f]+), '
+                     r'length ([0-9A-Fa-f]+)', line.strip())
+        if m and m.group(1) not in ovl_sections:
+            top = max(top, int(m.group(3), 16) + int(m.group(4), 16))
+    return top
+
+
 def blocks(path):
     """The (addr, bytes) blocks of a DECB binary."""
     d = open(path, "rb").read()
@@ -98,7 +118,7 @@ def blocks(path):
     return out
 
 
-def write_map(imgdir, win, names):
+def write_map(imgdir, win, names, idx_label=(), slots=1):
     """OVL_WINDOW, the window's capacity, and the image names. GENERATED,
     because a window address written down twice is one that drifts."""
     os.makedirs(imgdir, exist_ok=True)
@@ -108,13 +128,16 @@ def write_map(imgdir, win, names):
         f.write("#define OVL_WINDOW  0x%04X\n" % win)
         f.write("#define OVL_SIZE    %d   /* to the I/O page at $FF00 */\n"
                 % (0xFF00 - win))
-        f.write("#define OVL_COUNT   %d\n\n" % len(names))
-        f.write("static const char * const ovl_name[%d] = {\n"
-                % max(1, len(names)))
-        for _, label in names:
-            f.write('    "%s.OVL",\n' % label)
-        if not names:
-            f.write("    0,\n")
+        f.write("#define OVL_IMAGES  %d\n\n" % slots)
+        f.write("/* Indexed by the SHARED OVL_* constants, so ovl_load(OVL_HOF)\n"
+                "   from main() finds this port's image without the shared code\n"
+                "   knowing anything about it. A hole is an overlay this port\n"
+                "   does not split out; ovl_load returns for those. */\n")
+        f.write("static const char * const ovl_name[OVL_IMAGES] = {\n")
+        for i in range(slots):
+            lbl = dict(idx_label).get(i)
+            f.write('    %-14s /* %d */\n'
+                    % (('"%s.OVL",' % lbl) if lbl else "0,", i))
         f.write("};\n\n#endif\n")
 
 
@@ -140,10 +163,21 @@ def main():
     # sits at a fixed $AF00 for the same reason. Deriving it from the link
     # created a chicken and egg: the runtime needs the address to compile, and
     # the link needs the runtime compiled. Fixed and CHECKED beats clever.
-    names = []
-    for n, src in enumerate(a.overlay):
-        names.append(("ovl%d" % n, os.path.basename(src)[:-2].upper()[:8]))
-    write_map(a.imgdir, win, names)
+    # AN OVERLAY IS DECLARED AS INDEX:SOURCE, and the index is the SHARED
+    # OVL_* constant from core/overlay.h -- OVL_HOF is 1, OVL_FRONT is 2.
+    # That is what makes rule 4 already satisfied: main() has called
+    # load_hof() and load_front() before the relevant screens since the C128,
+    # so matching the numbering reuses a discipline that is written down and
+    # reviewed, instead of inventing a second one beside it.
+    names, index = [], []
+    for src in a.overlay:
+        idx, _, path = src.partition(":")
+        index.append(int(idx))
+        names.append(("ovl%s" % idx, os.path.basename(path)[:-2].upper()[:8]))
+    a.overlay = [s.partition(":")[2] for s in a.overlay]
+    idx_label = list(zip(index, [l for _, l in names]))
+    slots = max(index) + 1 if index else 1
+    write_map(a.imgdir, win, names, idx_label, slots)
 
     objs = []
     for src in a.resident:
@@ -176,7 +210,37 @@ def main():
              "-lcmoc-crt-ecb", "-lcmoc-std-ecb",
              os.path.join(LIBDIR, "float-ctor.ecb_o"), "-lcmoc-float-ecb"] + objs)
 
+    # TWO PASSES. The window address is a compile-time constant, so changing
+    # it does not change any section's SIZE -- one probe link is enough to
+    # learn where everything resident ends, bss included, and the real window
+    # goes above that. Pass two is then self-consistent, and asserted to be.
+    sectnames = set(sect for sect, _ in names)
+    if names:
+        link(0xFE00)
+        top = map_top(a.out + ".map", sectnames)
+        want = (top + 0xFF) & ~0xFF
+        if want != win:
+            print("  window       $%04X is below the top of bss ($%04X); "
+                  "moving it to $%04X" % (win, top, want))
+            win = want
+            write_map(a.imgdir, win, names, idx_label, slots)
+            # only the file that includes ovlmap.h needs recompiling, but
+            # rebuilding all of it is cheap and cannot go stale
+            objs = []
+            for src in a.resident:
+                _, obj = compile_to_s(src, a.intdir, cflags)
+                objs.append(obj)
+            for (sect, _), src in zip(names, a.overlay):
+                spath, obj = compile_to_s(src, a.intdir, cflags)
+                rename_section(spath, sect)
+                assemble(spath, obj)
+                objs.append(obj)
     link(win)
+
+    top = map_top(a.out + ".map", sectnames)
+    if names and win < top:
+        sys.exit("build_ovl: THE WINDOW AT $%04X IS BELOW THE TOP OF RESIDENT "
+                 "MEMORY ($%04X) -- an image would load over bss" % (win, top))
 
     # Cut the overlay blocks out. lwlink emits each section as its own DECB
     # block, so a block loading at the window IS an overlay image.
@@ -199,10 +263,6 @@ def main():
               % (win, max(len(d) for _, d in images)))
     top = max(hi, (win + max((len(d) for _, d in images), default=0)))
     print("  free below $FF00: %d" % (0xFF00 - top))
-    if images and win < hi:
-        sys.exit("build_ovl: THE WINDOW AT $%04X IS INSIDE THE RESIDENT IMAGE "
-                 "($%04X..$%04X) -- it would load on top of running code"
-                 % (win, lo, hi - 1))
     if top > 0xFF00:
         sys.exit("build_ovl: the image overruns the I/O page at $FF00 by %d"
                  % (top - 0xFF00))

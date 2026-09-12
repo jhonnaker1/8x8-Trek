@@ -33,7 +33,10 @@ void ovl_load(uint8_t which)
 {
     uint16_t got;
 
-    if (which >= OVL_COUNT || which == resident_image)
+    /* A hole in the table is an overlay this port does not split out -- the
+       shared code still calls ovl_load for it and there is simply nothing to
+       fetch. Returning is correct, not a silent failure. */
+    if (which >= OVL_IMAGES || ovl_name[which] == 0 || which == resident_image)
         return;
 
     /* A failed load leaves the window holding the WRONG image, so the cache

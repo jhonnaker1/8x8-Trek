@@ -1151,12 +1151,51 @@ the link needs the runtime compiled. It is a build parameter, as the C128's
 resident image. **It refused on the first attempt**, because the real
 `ovl_load` pushed the resident 0x6D bytes past `$E000`.
 
-**WHAT IS NOT DONE: RULE 4.** Nothing yet calls `ovl_load` before entering the
-window, so this binary would jump into whatever the window happens to hold.
-`make game` stays all-resident and working; `make overlays` is the machinery
-proven and measured. Wiring the call sites is the next piece, and it is the
-same discipline `core/overlay.h` states for every port -- only resident code
-may call into a window, and a function inside one cannot `ovl_load`.
+#### RULE 4 IS WIRED, AND THE CHECKER REWROTE THE DESIGN TWICE
+
+`coco3/tools/overlay_check.py` reads the LINK MAP (which symbols ended in the
+window) and the GENERATED ASSEMBLY (who calls them), so a `JSR _hof_offer` is
+a fact about the built code rather than a guess about source text. It enforces
+rule 2 (an overlay may not call another), the corollary (an overlay may not
+call `ovl_load`), and the checkable half of rule 4: nothing reaches into a
+window except declared pairs.
+
+**IT FOUND THAT MY OVERLAY SET WAS WRONG ON ITS FIRST RUN.** Eighteen
+undeclared call sites -- and four of them were `core/trek.c` calling
+`core/planet.c`, **during play rather than at a phase boundary.** planet.c can
+never be paged out safely, and the call graph said so in seconds. It is back
+in the resident set.
+
+**AND IT SENT ME TO THE DISCIPLINE THAT ALREADY EXISTED.** The shared code has
+carried `OVL_CODE("hof")`, `OVL_HOF`, and `main()`'s `load_hof()` /
+`load_front()` since the C128. Inventing a second scheme beside it was the
+mistake; **the overlay INDEX is now the shared `OVL_*` constant**, so
+`ovl_load(OVL_HOF)` in main() finds this port's `HOF.OVL` with the shared code
+knowing nothing about it. Rule 4 is satisfied by machinery that is already
+written down and already reviewed.
+
+**A SECOND, WORSE BUG THE MAP EXPOSED: THE WINDOW WAS SITTING IN BSS.** The
+first collision check compared the window against the DECB blocks -- and BSS
+is not in a DECB file, because it is uninitialised. So a window at `$E100` sat
+in the middle of a 4,633-byte bss and would have loaded an image straight over
+the message log, the sector buffer, the FAT and the whole game state, **and
+the check said it was fine.** It reads the map now, which is the only thing
+that sees bss.
+
+**AND THE ARITHMETIC NOW SAYS THE SET IS TOO SMALL.** With planet.c correctly
+resident, bss reaches `$F90F`, the window must go above it, and 1,280 bytes
+are left against a 2,540-byte image. **`make overlays` refuses itself**, which
+is the check doing its job:
+
+    build_ovl: the image overruns the I/O page at $FF00 by 1260
+
+So the next step is not mechanism, it is CANDIDATES: more phase-boundary code
+has to move before the window pays for itself. `make game` stays all-resident
+and working, and the gate is 7 of 7.
+
+**One trap on the way:** defining `overlays:` above `all:` made it make's
+DEFAULT GOAL, so `make` meant `make overlays` and the ports gate went red on a
+target that is not the build. `.DEFAULT_GOAL := all`.
 
 #### THE RIG: emu.wait(), not the frame notifier and not the debugger
 
