@@ -105,11 +105,44 @@ here, and Hatari says so in as many words. EmuTOS is also free software, so a
 bootable image would be ours to redistribute — the lever that removed Atari DOS
 from the 8-bit port.
 
+## Sound: the YM2149, and the clock was measured
+
+The PSG is the closest thing to a SID since the C128, and the easiest sound
+seam here as a result. The original made one square wave out of a PC speaker;
+a PSG tone channel *is* that, with no sample buffer to allocate, no waveform
+table and no duty cycle to get wrong. Channel A is music, channel B effects,
+so a laser does not cut the music off. The machine's 8-bit stereo DMA audio is
+the better instrument for *sampled* sound, which this game does not have.
+
+**The 2 MHz clock was measured, not looked up.** Four tones at periods
+spanning what the music actually uses — 90–930 Hz, not round numbers — came
+back 2,000,160 / 2,008,460 / 2,005,520 / 2,004,640 Hz, every point inside
+0.42%. Four points, because one cannot tell a wrong scale from a wrong
+intercept: the X16's beep was an octave flat *and* had a free first tick, and
+a single sample would have "confirmed" either story.
+
+**Then the driver was checked against the track it plays.** Thirteen seconds
+of the title screen, recorded and matched note-for-note to a contiguous run of
+the title track starting at note 24 — **pitch +0.43% against a semitone of
+5.95%, tempo −0.77%.** (Two of the thirteen are instrument artifacts: the
+first note was truncated by when recording started, and two adjacent
+same-frequency notes merged in the grouper.)
+
+**Timing comes from the clock, not the call count.** `_hz_200` at `$4BA`,
+read through `Supexec`. Ticking once per `snd_poll()` would be easy and wrong:
+the key loop calls it about sixty times a second but other callers run at no
+fixed rate, so the tempo would wander with whatever the game was doing. The
+C128 and MEGA65 both lost time to a tempo bug.
+
+**Two mixer bits are not the mixer.** Bits 6 and 7 of R7 are the PSG's port
+direction, and on this machine port A drives floppy select, side select and
+the printer strobe — so bit 7 must stay 1 or the drive stops answering.
+Writing `0x00` there to "turn everything off" is the classic way to lose the
+floppy.
+
 ## What is open
 
-1. **Sound.** The only stubbed seam, and the only one the scope never
-   measured. `snd_enabled()` returns 0 rather than claim a driver that is not
-   there.
+1. ~~**Sound.**~~ **DONE** -- see below.
 2. **`make verify` and a place in the root `make ports` gate.** Every other
    port has one; this is currently the only port whose breakage nothing
    catches.

@@ -982,8 +982,30 @@ at a time separated them.
 
 #### Still open on this port
 
-  1. **SOUND.** The only stubbed seam. YM2149 or the DMA CODEC; neither
-     measured.
+  1. ~~**SOUND.** The only stubbed seam.~~ **BUILT 2026-09-11 on the YM2149**,
+     and Jamie heard it -- "sounds good to me".
+
+     **THE 2MHz PSG CLOCK WAS MEASURED, NOT LOOKED UP.** Four tones at periods
+     spanning what the music actually uses (90-930Hz, not round numbers), held
+     two seconds each and recorded out of Hatari: 2,000,160 / 2,008,460 /
+     2,005,520 / 2,004,640 Hz, every point inside 0.42%. Four points because
+     ONE CANNOT TELL A WRONG SCALE FROM A WRONG INTERCEPT.
+
+     **THEN THE DRIVER WAS CHECKED AGAINST THE TRACK IT PLAYS** -- thirteen
+     seconds of the title screen matched note-for-note to a contiguous run of
+     the title track from note 24: pitch +0.43% against a semitone of 5.95%,
+     tempo -0.77%.
+
+     **THE FIRST ANALYSIS WAS A BROKEN INSTRUMENT AND LOOKED LIKE A BUG.** A
+     25ms window counting zero crossings has 40Hz resolution BY
+     CONSTRUCTION, so every note came out a multiple of 40 and none matched
+     the expected 150/220/290/350. The frequencies were an artifact of the
+     window length. Measuring per-CYCLE instead -- the interval between
+     successive rising crossings -- resolves to one sample and the notes
+     landed exactly.
+
+     Not used: the 8-bit stereo DMA CODEC, which is the better instrument for
+     SAMPLED sound this game does not have.
   2. ~~**`make verify`** and a place in the root `make ports` gate.~~ **DONE
      2026-09-11 -- the gate is now 6 of 6.** It checks the two things that fail
      SILENTLY on a bitmap target rather than the pools a 6502 port runs out of:

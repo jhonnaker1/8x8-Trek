@@ -11,6 +11,12 @@ re-derived rather than recited.
                  640x480 and word-interleaved planes. A byte count alone
                  cannot tell 640x480 from 320x960; this can.
     bench.c      Full-screen clear timed on the 200Hz tick: 19 ms.
+    psgcal.c     Four YM2149 tone periods spanning the range the MUSIC uses
+                 (90-930Hz, not round numbers), held two seconds each so the
+                 host can record and measure them. The clock came back
+                 2,000,160 / 2,008,460 / 2,005,520 / 2,004,640 Hz -- 2 MHz,
+                 every point inside 0.42%. FOUR points because one cannot
+                 tell a wrong scale from a wrong intercept.
     fontprobe.c  Line-A's three ROM font headers. Finds 6x6, 8x8 and 8x16 on
                  EmuTOS 1.3.0, all covering codes 0..255 with form_width 256 --
                  which is why falcon/src/falconvid.c can treat a glyph row as
