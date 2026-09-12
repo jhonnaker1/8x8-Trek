@@ -931,6 +931,60 @@ half-filled result struct read exactly like a hang in the missing-file case.
 It was nine directory sectors at floppy speed. `gtime 9000` (hex, ~37s) is
 enough; `2000` is not.
 
+#### GIME BANKING: the mechanism is PROVEN, and a stock 128K is enough
+
+**NO RAM UPGRADE NEEDED.** The GIME pages 8K blocks: `$FFA0..$FFA7` hold the
+physical block for each of the eight address-space slots under task 0. A 128K
+machine has sixteen blocks, `$30..$3F`; the address space uses the top eight,
+leaving **EIGHT SPARE -- 64K of RAM the CPU cannot otherwise reach.** Verified
+on the machine (`tools/coco3/mmu3.c`): distinct signatures written into blocks
+`$30`, `$31` and `$37`, paged away, paged back, and found intact -- and the
+original block restored with ITS contents intact. **Identical at 512K**, so the
+upgrade Jamie offered is not required.
+
+**AT BOOT THE MMU IS OFF** -- `INIT0` reads `$1B` and the GIME maps the top 64K
+flat, which is exactly what task 0 already contains. So the safe order is to
+write `$38..$3F` into task 0 FIRST and only then set bit 6: the map does not
+change at the moment it takes effect. The other way round the machine moves
+under its own feet.
+
+**AN OVERLAY SWAP HERE IS ONE STORE, NOT A DISK READ.** That is the largest
+single advantage this target has over the C128, MEGA65, X16 and Atari, where
+paging costs a seek.
+
+**TWO CONSTRAINTS, ONE OF THEM PAID FOR WITH A CRASHED MACHINE:**
+
+  1. **THE STACK MUST NOT LIVE IN THE WINDOW.** cmoc left `S` inside
+     `$6000-$7FFF`, so the first `bank_map()` paged away its own return
+     address and the 6809 died on the `RTS`. The port must place its stack
+     deliberately. `core/overlay.h` states the same rule for every target; it
+     is just louder here, because the swap is instant.
+  2. **cmoc HAS NO `volatile`** and says so. Hardware access must be written
+     so an optimiser cannot fold it: repeated stores to one address with no
+     read between them are dead-store-eliminated, **and that reads exactly
+     like the hardware not working.**
+
+**WHAT IS NOT DONE, STATED PLAINLY.** `coco3/src/coco3bank.c` wraps this and
+**does not yet reproduce the raw probe's result** -- `bank_map`/`bank_get`
+round-trip correctly but window reads come back `$FF`, and I have not explained
+why. The file says so in its own header. The mechanism is proven; the wrapper
+is not, and it should not be trusted until it matches `mmu3.c`.
+
+**AND THE SCHEME CANNOT BE FINISHED WITHOUT THE OVERLAY BUILD.** A window is a
+whole 8K slot, and the resident image spans `$1200..$F4DE` -- every slot. So
+no window exists until roughly 6.6K of code moves out, and **cmoc has no
+per-function section placement** (only `--org`/`--data`). Overlays here must
+therefore be SEPARATELY LINKED IMAGES at the window address, loaded into spare
+blocks at startup, reached through a jump table -- the C128's shape, but with
+the disk read replaced by a register write.
+
+#### THE RIG: emu.wait(), not the frame notifier and not the debugger
+
+`tools/coco3/run.lua`. An autoboot script that calls `emu.wait(3)`, pokes a
+DECB `.bin` in, sets PC, waits and reads results back. Sequential, reliable,
+and **no debugger window -- which is what makes MAME freeze until the mouse
+moves**, as Jamie had to point out. `-window` always.
+
 #### AND NOW THE BUDGET IS THE PROBLEM, MEASURED
 
     whole game, seams stubbed          55,399    5,273 free below $FF00

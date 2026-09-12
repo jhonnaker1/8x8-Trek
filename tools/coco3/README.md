@@ -10,9 +10,27 @@ written against what they establish.
                vram.bin for the host to reconstruct. This is the verification
                path for the video driver -- see below.
     rom.lua    Dumps $8000..$FEFF, the BASIC ROMs.
+    mmu3.c     THE GIME BANKING PROOF. Pages blocks $30/$31/$37 into slot 3,
+               writes, pages away and back, and finds them intact -- at 128K
+               and at 512K alike. Results at $2F00, OUTSIDE the window.
+    run.lua    The emu.wait() rig: load a .bin, set PC, read results back.
     sectest.c  Reads track 17 sector 3 with STANDALONE DSKCON -- no Disk
                BASIC ROM -- and leaves the sector at $3000 and DCSTA at
                $3100 for the host to check.
+
+**THE RIG IS `emu.wait()`, NOT THE FRAME NOTIFIER AND NOT THE DEBUGGER.**
+`run.lua` is the pattern: an autoboot script that calls `emu.wait(3)`, pokes a
+DECB `.bin` into RAM, sets PC, waits again and reads the result out. Sequential
+and readable, no debugger window -- **and the debugger window is what makes
+MAME freeze until the mouse is moved**, which Jamie had to point out. Always
+pass `-window`.
+
+    mame coco3 -rompath ... -ramsize 128K -ext multi \
+         -ext:multi:slot1 ssfm -ext:multi:slot4 fdc \
+         -autoboot_script run.lua -seconds_to_run 8 -nothrottle -video none -window
+
+The older advice below is kept because the debugger still works and floppy
+tests need its long `gtime` waits:
 
 **USE THE DEBUGGER, NOT LUA, TO DRIVE A LOADED PROGRAM.**
 `emu.add_machine_frame_notifier` in this build stops firing after the first
