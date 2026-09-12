@@ -48,13 +48,28 @@ GAME_OUT = build/egatrek.bin
 # driven directly with tools/ovl.link.
 LWLINK ?= lwlink
 
+# THE FONT IS THIS PORT'S OWN ARTWORK, and it has to be: the CoCo 3 is the one
+# target with no glyphs to borrow -- the GIME's character generator is internal
+# silicon, not a table the CPU can read. Authored as pictures in
+# tools/gen_font.py, which also renders proof sheets:
+#
+#     python3 tools/gen_font.py --sheet text.png
+#     python3 tools/gen_font.py --box-sheet box.png
+#
+# Regenerate rather than editing src/font6x8.h.
+src/font6x8.h: tools/gen_font.py
+	python3 tools/gen_font.py > $@
+	@ls -l $@
+
+font: src/font6x8.h
+
 build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	@mkdir -p build
 	$(CMOC) --coco -O2 -fomit-frame-pointer --intdir=build -c -o build/ovldemo.o src/ovldemo.c
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: all game early ovl data music clean
+.PHONY: all game early ovl font data music clean
 
 ovl: build/OVLDEMO.BIN
 

@@ -855,7 +855,32 @@ check than a screenshot: it tests what the driver actually produces rather
 than what an emulator chooses to paint, and it is the same move as confirming
 the Falcon's geometry by drawing a figure instead of trusting a byte count.
 
-**THE FONT IS THE BLOCKER, AND IT IS A CONTENT TASK.** There is no ROM font on
+**THE FONT IS AUTHORED (2026-09-12, Jamie's call to draw it rather than drop
+to 64 columns).** `coco3/tools/gen_font.py` holds the glyphs as PICTURES,
+because that is the only form in which artwork can be reviewed, and renders
+proof sheets (`--sheet`, `--box-sheet`) that were looked at before any of it
+was trusted. `make -C coco3 font` regenerates `src/font6x8.h`.
+
+**5x7 IN A 6x8 CELL** -- five columns of glyph plus one of spacing, seven rows
+plus one of leading. That is the classic 8-bit font size, the CoCo's own text
+mode included, so legibility was never the risk; the labour was.
+
+**SIXTY-ONE GLYPHS, NOT NINETY-SIX, AND THAT IS WHY:** the table is indexed by
+SCREEN CODE, and `scr_puts` folds lowercase onto the same codes as upper case,
+so **no lowercase glyph is ever drawn.** Codes 0..63 cover `@`, `A`-`Z`, the
+two brackets the play-again box needs, the two arrows, and ASCII 32..63.
+
+**THE SEVENTEEN BOX AND BADGE GLYPHS ARE SIX WIDE AND EIGHT TALL -- THE FULL
+CELL**, unlike the 5x7 text glyphs, because a rule has to reach the cell edges
+or neighbours will not join. The SET is the Amiga's, whose hand sweep of the
+shared UI found fifteen where an eyeball count gives eleven; the BITMAPS
+cannot be, since these cells are two pixels narrower. Restated for 6x8: a line
+sits on rows 3-4 and columns 2-3.
+
+**COST: 665 bytes** (512 text + 153 box) of the 2,593 free -- a quarter of the
+remaining headroom, and an early candidate for banked RAM.
+
+~~**THE FONT IS THE BLOCKER, AND IT IS A CONTENT TASK.**~~ There is no ROM font on
 this machine: `$8000..$FEFF` rendered as a bitmap is all code, and a font
 announces itself as regular columnar shapes. The GIME's character generator is
 internal silicon, not a table the CPU can read.
