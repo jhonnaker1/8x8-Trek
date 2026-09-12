@@ -48,31 +48,4 @@ void bank_init(void)
     started = 1;
 }
 
-void bank_map(unsigned char slot, unsigned char blk)
-{
-    MMU0[slot & 7] = blk;
-}
 
-/* The window is slot 3, $6000..$7FFF -- see BANK_WINDOW in the header. These
-   are deliberately in this file and not inlined anywhere: that is what stops
-   a caller caching the load. */
-unsigned char bank_peek(unsigned int off)
-{
-    return *((unsigned char *)(0x6000 + (off & 0x1FFF)));
-}
-
-void bank_poke(unsigned int off, unsigned char v)
-{
-    *((unsigned char *)(0x6000 + (off & 0x1FFF))) = v;
-}
-
-unsigned char bank_get(unsigned char slot)
-{
-    return MMU0[slot & 7];
-}
-
-/* Parameterless probes, used to isolate a suspected parameter-passing bug in
-   bank_peek/bank_poke. If these work where the parameterised versions do not,
-   the address arithmetic was never the problem. */
-unsigned char bank_peek0(void)   { return *((unsigned char *)0x6000); }
-void bank_poke0(unsigned char v) { *((unsigned char *)0x6000) = v; }

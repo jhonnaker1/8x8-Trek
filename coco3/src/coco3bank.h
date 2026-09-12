@@ -15,31 +15,39 @@
  * register: the image is already in RAM, in a block nothing else is using.
  * The Atari pays a 1541-class seek; this pays a store instruction.
  *
- * STATUS 2026-09-12: THE HARDWARE IS PROVEN. TWO REAL BUGS FIXED. ONE LEFT,
- * AND IT IS NARROWED TO TWO-PARAMETER FUNCTIONS.
+ * STATUS 2026-09-12: WORKING. Verified on the machine -- map a block, write,
+ * page it away, page it back, read the value intact, restore the original
+ * block and find IT intact. `bank_get` reports the right block throughout.
  *
- * FIXED, both found by reading the GIME register reference rather than by
- * more guessing:
- *   - **TR IS IN $FF91, NOT $FF90.** INIT0 bit 6 is MMUEN, but its bits 1-0
- *     are MC1/MC0, the ROM MAP CONTROL. Clearing INIT0 bit 0 to "select task
- *     0" actually switched the machine from 32K external ROM to 32K internal
- *     and never selected a task at all. TR is bit 0 of INIT1 ($FF91).
- *   - An earlier note here claimed INIT0/INIT1 are WRITE-ONLY and that MAME's
- *     debugger was showing an internal latch. **That was invented and it is
- *     wrong: both registers are readable.** Retracted.
+ * THE RULE THIS COST A DAY TO LEARN, AND IT IS BIGGER THAN THE STACK:
  *
- * STILL BROKEN, and here is the shape of it. `bank_get(3)` returns $3B
- * correctly after `bank_init`. Immediately after `bank_map(3, 0x30)`, the
- * SAME call returns $FF -- so **bank_map is not writing the register it is
- * asked to.** The one-parameter function works; the two-parameter ones
- * (bank_map, bank_peek, bank_poke) all misbehave, and bank_peek0 with no
- * parameters compiles to a correct `LDB $6000` yet reads the wrong block
- * because the mapping never happened.
+ *     NOTHING THE CODE TOUCHES MAY LIVE IN THE WINDOW -- and in C that
+ *     includes EVERY LOCAL VARIABLE, because locals live in the stack frame
+ *     and cmoc reloads a pointer local with `LDX -2,U` before every store
+ *     through it.
  *
- * NEXT ATTEMPT: cmoc's generated code for bank_map (kept by `cmoc -i`). It
- * loads one parameter, PSHS B, then loads the other at an offset adjusted for
- * that push -- suspect either that adjustment or my reading of it. Write the
- * accessors in inline assembly if the calling convention cannot be trusted.
+ * The first symptom was a crash: cmoc left S inside $6000-$7FFF, so the first
+ * bank_map() paged away its own return address and the 6809 died on the RTS.
+ * Moving S with `lds` fixed the crash and hid the rest of the problem -- **U
+ * is the frame pointer and it was still in the window.** Every store through
+ * a local pointer then went wherever the reloaded garbage pointed, which
+ * looked for hours like reads failing while writes worked. They were not:
+ * nothing was landing where I thought, including the results.
+ *
+ * So the port must place S *and* U outside whatever slot it pages, and any
+ * variable a paging routine touches has to be static or absolute rather than
+ * automatic. core/overlay.h's rule 4 says the same thing about calling into a
+ * window; this is the data half of it.
+ *
+ * Two other real bugs, found by reading the GIME register reference:
+ *   - **TR IS IN $FF91, NOT $FF90.** INIT0 bit 6 is MMUEN; its bits 1-0 are
+ *     MC1/MC0, the ROM MAP CONTROL. Clearing INIT0 bit 0 to "select task 0"
+ *     switched the machine from 32K external ROM to 32K internal and selected
+ *     nothing.
+ *   - The MMU registers DO read back, but **mask the top two bits** -- they
+ *     return bus bleedover, documented, sometimes zero and sometimes one.
+ *     (An earlier note here claimed these registers were write-only and that
+ *     MAME was showing an internal latch. That was invented and is retracted.)
  *
  * AT BOOT THE MMU IS OFF. INIT0 ($FF90) reads $1B -- bit 6 clear -- and the
  * GIME maps the top 64K flat, which is exactly what task 0 already contains.
@@ -69,8 +77,14 @@ void bank_init(void);
 /* Maps physical block `blk` into address-space slot `slot` (0..7). The caller
    is responsible for not paging away the ground it is standing on -- the same
    rule core/overlay.h states for every other port, and the reason this takes
-   a slot number rather than an address. */
-void bank_map(unsigned char slot, unsigned char blk);
+   a slot number rather than an address.
+
+   A MACRO, NOT A FUNCTION, and deliberately: as a two-parameter function it
+   did not write the register it was asked to, while the one-parameter
+   bank_get worked. A macro compiles to a single store and leaves no calling
+   convention to be wrong. */
+#define bank_map(slot, blk) \
+    (*((unsigned char *)(0xFFA0 + ((slot) & 7))) = (unsigned char)(blk))
 
 /* READ AND WRITE THE WINDOW THROUGH THESE, NEVER THROUGH A POINTER IN THE
    CALLER. cmoc has no `volatile`, and it will hoist a load from a literal
@@ -79,13 +93,13 @@ void bank_map(unsigned char slot, unsigned char blk);
    correctly in blocks $30 and $31 -- proven by paging those blocks in from
    the host and finding 11 and 22 there. Because these live in their own
    translation unit, a caller cannot cache across them. */
-unsigned char bank_peek(unsigned int off);
-void          bank_poke(unsigned int off, unsigned char v);
-unsigned char bank_peek0(void);
-void          bank_poke0(unsigned char v);
+#define bank_peek(off)      (*((unsigned char *)(0x6000 + ((off) & 0x1FFF))))
+#define bank_poke(off, v)   (*((unsigned char *)(0x6000 + ((off) & 0x1FFF))) = (unsigned char)(v))
 
-/* What is currently mapped there. The GIME's MMU registers read back, which
-   not every machine's do. */
-unsigned char bank_get(unsigned char slot);
+/* What is currently mapped there. The GIME's MMU registers DO read back --
+   but MASK THE TOP TWO BITS: they return bus bleedover, sometimes zero and
+   sometimes one, which is documented and is why a raw read can look like
+   nonsense. */
+#define bank_get(slot)      ((unsigned char)(*((unsigned char *)(0xFFA0 + ((slot) & 7))) & 0x3F))
 
 #endif

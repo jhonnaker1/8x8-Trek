@@ -964,33 +964,49 @@ paging costs a seek.
      read between them are dead-store-eliminated, **and that reads exactly
      like the hardware not working.**
 
-**TWO REAL BUGS FOUND BY READING THE GIME REFERENCE (2026-09-12), at Jamie's
-suggestion to look online rather than keep guessing:**
+**IT WORKS (2026-09-12).** Map a block, write, page it away, page it back,
+read the value intact, restore the original block and find IT intact --
+`A5 3B 30 22 11 3B 5A`, every value right, on a stock 128K machine.
 
-  1. **TR IS IN $FF91, NOT $FF90.** INIT0's bit 6 is MMUEN, but its bits 1-0
-     are MC1/MC0, the **ROM MAP CONTROL**. Clearing INIT0 bit 0 to "select
-     task 0" actually switched the machine from 32K external ROM to 32K
-     internal, and never selected a task at all. TR is bit 0 of INIT1.
-  2. **RETRACTED: "the GIME's control registers are write-only and MAME's
-     debugger shows an internal latch."** I invented that here yesterday and
-     it is wrong -- INIT0 and INIT1 are both readable. The MMU registers read
-     back too, though their top two bits can return bus noise.
+**THE RULE THIS COST A DAY, AND IT IS BIGGER THAN "THE STACK":**
 
-**STILL BROKEN, AND NARROWED.** `bank_get(3)` returns `$3B` correctly after
-`bank_init`; immediately after `bank_map(3, 0x30)` the same call returns `$FF`
--- so **`bank_map` is not writing the register it is asked to**. The
-ONE-parameter function works and the TWO-parameter ones (`bank_map`,
-`bank_peek`, `bank_poke`) all misbehave. `bank_peek0`, with no parameters,
-compiles to a correct `LDB $6000` and still reads the wrong block, because the
-mapping never happened.
+    NOTHING THE CODE TOUCHES MAY LIVE IN THE WINDOW -- and in C that
+    includes EVERY LOCAL VARIABLE, because locals live in the stack frame
+    and cmoc reloads a pointer local with `LDX -2,U` before every store
+    through it.
 
-Next attempt is cmoc's generated code for `bank_map` (`cmoc -i` keeps it): it
-loads one parameter, `PSHS B`, then loads the other at an offset adjusted for
-that push. Either that adjustment is wrong or my reading of it is. If the
-calling convention cannot be trusted, write the accessors in inline assembly.
+The first symptom was a crash: cmoc left S inside `$6000-$7FFF`, so the first
+`bank_map()` paged away its own return address and the 6809 died on the RTS.
+**Moving S with `lds` fixed the crash and HID THE REST OF THE PROBLEM** -- U is
+the frame pointer and it was still in the window. Every store through a local
+pointer then went wherever the reloaded garbage pointed, which looked for
+hours like *reads failing while writes worked*. They were not: **nothing was
+landing where I thought, including the results**, and the `$FF` I chased all
+afternoon was uninitialised RAM rather than a read. Painting the result area
+with `$00` before the run is what finally said so -- **a "wrong value" and a
+"never written" are indistinguishable until you pre-paint.**
 
-**THE OVERLAY IMAGE BUILD IS THEREFORE STILL NOT STARTED.** It rests on
-reading through the window, and far memory is nothing but reads.
+So the port must place S *and* U outside whatever slot it pages, and any
+variable a paging routine touches must be static or absolute, not automatic.
+`core/overlay.h`'s rule 4 says this about calling into a window; **this is the
+data half of the same rule.**
+
+**TWO OTHER REAL BUGS, from the GIME register reference** (Jamie's suggestion
+to look online rather than keep guessing, and it paid twice):
+
+  1. **TR IS IN $FF91, NOT $FF90.** INIT0 bit 6 is MMUEN, but its bits 1-0 are
+     MC1/MC0, the **ROM MAP CONTROL**. Clearing INIT0 bit 0 to "select task 0"
+     switched the machine from 32K external ROM to 32K internal and selected
+     no task at all.
+  2. The MMU registers **do** read back, but **mask the top two bits** -- they
+     return documented bus bleedover.
+
+**RETRACTED:** "the GIME's control registers are write-only and MAME's
+debugger shows an internal latch." I invented that here to explain a symptom
+and it is wrong -- INIT0 and INIT1 are both readable.
+
+**THE OVERLAY IMAGE BUILD IS NOW UNBLOCKED**: reads through the window work,
+so far memory can live in spare blocks and `ovl_load` can be a register write.
 
 #### THE RIG: emu.wait(), not the frame notifier and not the debugger
 
