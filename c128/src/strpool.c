@@ -73,9 +73,24 @@ uint8_t str_load(void) {
    below so the next ceiling is a build failure, not a wrong word on screen. */
 /* THE NEXT CEILING IS A BUILD FAILURE, not a wrong word on screen. If StrId
    is ever narrowed, or the pool outgrows it, the round trip stops being the
-   identity and this array gets a negative size. */
-typedef char str_id_holds_the_pool[
-    ((STR_COUNT - 1) == (int)(StrId)(STR_COUNT - 1)) ? 1 : -1];
+   identity and this fails to compile.
+
+   A NEGATIVE BIT-FIELD WIDTH, NOT A NEGATIVE ARRAY SIZE, and core/serial.c
+   explains why at length: cmoc -- the 6809 compiler -- rejects
+   `typedef char x[(c) ? 1 : -1]` outright, TRUE OR FALSE, so the array form
+   does not compile on that target in either state. Worse, cmoc accepts both
+   `typedef char x[-1]` and `enum { x = 1/0 }` quietly, so the obvious
+   rewrites give a guard that CANNOT FAIL on the one target that needed it.
+
+   serial.c was converted on 2026-09-05 and THIS COPY WAS MISSED -- the same
+   assertion, the same shape, one file away. A fix that does not reach every
+   copy has not been made, which is the rule this project keeps relearning
+   about claims and has now relearned about code. The message rides in the
+   FIELD NAME, because that is what the compiler prints. */
+struct str_id_width_check {
+    int str_id_is_too_narrow_for_the_pool :
+        1 - 2 * !((STR_COUNT - 1) == (int)(StrId)(STR_COUNT - 1));
+};
 
 const char *S(StrId id) {
     char *dst = slot[next_slot];

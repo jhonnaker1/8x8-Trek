@@ -1583,6 +1583,17 @@ static uint8_t turn_sfx;
 static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
     TrekEvent ev[12];
     uint8_t n, i, k;
+    /* `emit` replaces three `continue` statements inside the switch below.
+       THAT IS NOT A STYLE CHOICE: cmoc, the 6809 compiler the CoCo 3 port
+       needs, rejects `continue` inside a switch outright -- "continue
+       statement is not supported in a switch" -- though it is ordinary C and
+       every other compiler here takes it. Same shape as the `(sec_y + 1) << 8`
+       miscompile cmoc found in core/: a non-conforming compiler pointing at
+       shared code, fixed once for everybody rather than worked around in one
+       port. The flag is explicit rather than reusing `k == 0` as the signal,
+       because "wrote nothing" and "do not print" are two different ideas that
+       happen to coincide today. */
+    uint8_t emit;
 
     turn_sfx = 0xFF;
 
@@ -1608,6 +1619,7 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
 
     for (i = 0; i < n; i++) {
         k = 0;
+        emit = 1;
         switch (ev[i].kind) {
             case EV_SHIELD_HOLD:
                 k  = put_u16(linebuf, ev[i].amount);
@@ -1635,18 +1647,23 @@ static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
                 k += put_sector(linebuf + k, ev[i].y, ev[i].x);
                 linebuf[k] = 0;
                 ui_message(S(S_176), linebuf);
-                continue;
+                emit = 0;
+                break;
             /* EV_NONE first: it should never reach here, and if it did the
                default would spend a DISK LOAD on nothing. */
             case EV_NONE:
-                continue;
+                emit = 0;
+                break;
             default:
                 load_msgs();
                 report_rare_event(&ev[i], &turn_sfx);
-                continue;
+                emit = 0;
+                break;
         }
-        linebuf[k] = 0;
-        ui_message(S(S_167), linebuf);
+        if (emit) {
+            linebuf[k] = 0;
+            ui_message(S(S_167), linebuf);
+        }
     }
 
     if (turn_sfx != 0xFF) snd_effect(turn_sfx);

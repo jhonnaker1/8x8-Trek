@@ -35,6 +35,20 @@ atari/src/music_data.h
 atari/src/music_data.c
 falcon/src/music_data.h
 falcon/src/music_data.c
+coco3/src/music_data.h
+coco3/src/music_data.c
+
+# cmoc's intermediate 6809 assembly. It writes <basename>.s beside its output
+# and removes it on success, so a run from the repository ROOT clobbers
+# anything there with the same name -- which is how trek.s, planet.s, hof.s
+# and serial.s came to be COMMITTED by the CoCo 3 scoping run (8f066e7) and
+# then deleted by the next one. coco3/Makefile passes --intdir=build so they
+# never land here again; these patterns are the belt to that braces.
+/trek.s
+/planet.s
+/hof.s
+/serial.s
+/shift.s
 
 # Build output
 build/

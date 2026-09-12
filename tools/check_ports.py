@@ -46,6 +46,12 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The Amiga takes its ASCII from a ROM font and its box glyphs from a table it
 # swept BY HAND -- which is the thing this check exists to stop going stale.
 #
+# THE COCO 3 HAS NO VERIFY YET because it has no drivers yet -- every seam is a
+# stub and the only real number is `make early`. Its build is its gate for now,
+# which is still worth having: it is the one port whose shared-code changes
+# (cmoc is non-conforming in ways the other five compilers are not) can break
+# a build nobody would otherwise run.
+#
 # The third field is what lets this run from `all` on a machine with none of
 # the cross compilers. It is a VARIABLE NAME, not a path, because the path
 # is the port's business and differs per port -- ask the repo, not the
@@ -57,6 +63,7 @@ PORTS = (
     ("atari",  "verify", "ATARICC"),
     ("amiga",  None,     "CC"),
     ("falcon", "verify",  "CC"),
+    ("coco3",  None,      "CMOC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

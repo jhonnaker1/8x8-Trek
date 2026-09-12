@@ -1764,7 +1764,16 @@ void ui_messages_view(void) {
  * SAVE_BYTES long, so passing a SAVE_BYTES buffer made every restore fail
  * with NO SAVED GAME FOUND while the file sat on the disk, correctly written
  * and correctly closed. */
-#define IO_BUF_SIZE (((SAVE_BYTES + 1) > HOF_BUF) ? (SAVE_BYTES + 1) : HOF_BUF)
+/* A PREPROCESSOR #if RATHER THAN A TERNARY, and that is not a style choice
+   either: cmoc cannot evaluate a ternary in an array dimension -- "invalid
+   size expression for dimension 1 of array `io_buf'" -- though both operands
+   are plain #defines and every other compiler here folds it. Resolving it
+   before the compiler sees it works everywhere and reads no worse. */
+#if (SAVE_BYTES + 1) > HOF_BUF
+#define IO_BUF_SIZE  (SAVE_BYTES + 1)
+#else
+#define IO_BUF_SIZE  HOF_BUF
+#endif
 /* THE PORT'S BIGGEST SINGLE BUFFER, 626 bytes, and on a target where writable
    data competes with code that is worth moving out of the way -- see
    core/lowmem.h. It is WRITE-BEFORE-READ everywhere it is used, which is what

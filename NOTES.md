@@ -590,8 +590,12 @@ stopped being true the day Atari DOS was dropped:
 
 ## SCOPE: the CoCo 3 + SuperSprite FM+ (written 2026-09-11)
 
-**Scoped at Jamie's request. It does NOT re-open the target** -- that call was
-made on installed base and stands. This is the measurement a scope is for, done
+**~~Scoped at Jamie's request. It does NOT re-open the target.~~ THE TARGET WAS
+RE-OPENED 2026-09-11 -- Jamie's call: "start the coco 3 with supersprite fm+
+port".** The scope below is what it was built from. The installed-base
+argument that closed it is still true and still the argument against; what
+changed is the decision, which was always his. See "THE COCO 3 PORT IS
+STARTED" at the end of this section. This is the measurement a scope is for, done
 before anyone writes `cocovid.c`, so the answer exists if it is ever asked
 again.
 
@@ -800,7 +804,58 @@ under the Falcon scope below, which compares them line by line on measured
 numbers. Short version: the Falcon deletes three seams this one has to build.
 
 Same staging as the Atari: **link the whole game against stubbed seams and
-read the overflow FIRST.** Then video, then far memory into the card's VRAM,
+read the overflow FIRST.**
+
+### THE COCO 3 PORT IS STARTED, AND `make early` ANSWERED THE QUESTION (2026-09-11)
+
+`coco3/` exists, every seam is a stub, and the measurement the scope called
+for is taken. **The whole game, resident, with no overlays:**
+
+    55,399 bytes, $1200..$EA66, 5,273 bytes left below the I/O page at $FF00
+
+**SO IT FITS -- BARELY, AND ONLY IF THE PORT OWNS THE MACHINE.** cmoc's
+default `--coco` load address of $2800 leaves room for Disk BASIC and puts the
+end at $1029D, past the top of the address space: **it does not fit under Disk
+BASIC at all.** Loading at $1200 the way the Atari port owns its machine, it
+does. `-fomit-frame-pointer` is worth 566 measured bytes and is not optional
+here.
+
+**5,273 bytes is what the four real drivers have to come out of**, plus stack
+and direct page -- against a Falcon whose equivalent number was "the machine's,
+1MB at worst". Video is the expensive one (a V9958 setup and a glyph blitter).
+**So the scope's "overlays probably needed" is now measured rather than
+expected**, and the GIME's 8K pages over 128K or 512K are where the room is.
+
+Two things that do NOT cost address space, and they are why it fits at all:
+the **screen lives in the card's VRAM**, and so does **far memory** -- the
+stub allocates nothing precisely so this number is not a lie.
+
+#### FOUR cmoc non-conformances, and the scope knew about two
+
+The drop entry said "CMOC is non-conforming" and named two faults, both since
+fixed. Getting it to link found two more, and both were in SHARED code:
+
+  1. **`continue` inside a `switch` is rejected outright** -- "continue
+     statement is not supported in a switch" -- though it is ordinary C and
+     means "continue the enclosing loop". Three sites in `run_turn`. Replaced
+     with an explicit `emit` flag; **cost ZERO bytes on the C128**, whose
+     resident free is 1,459 before and after.
+  2. **A ternary cannot size an array**: `io_buf[(A > B) ? A : B]` is "invalid
+     size expression". Resolved with a preprocessor `#if`, which every
+     compiler folds and reads no worse.
+
+**AND A THIRD THING WAS A FIX THAT NEVER REACHED ITS SECOND COPY.**
+`core/serial.c` was converted from a negative-array-size static assertion to a
+negative bit-field on 2026-09-05, with a long comment explaining that cmoc
+rejects the array form TRUE OR FALSE and silently accepts the obvious
+rewrites. **`c128/src/strpool.c` had the identical assertion, one file away,
+and was missed.** A fix that does not reach every copy has not been made --
+the rule this project keeps relearning about stale claims, relearned here
+about code.
+
+All three changes are in shared sources and all seven ports still build.
+
+ Then video, then far memory into the card's VRAM,
 then the rest. The `make early` pattern exists and transfers.
 
 ## SCOPE: the ATARI FALCON (written 2026-09-11)
