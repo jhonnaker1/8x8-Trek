@@ -116,6 +116,70 @@ static unsigned char read_sec(unsigned char trk, unsigned char sec)
     return (unsigned char)(DCSTA == 0);
 }
 
+/* THE VECTOR TABLE, MEASURED ON THE MACHINE RATHER THAN RECALLED -- and it is
+   not the order this port assumed. $FFF2..$FFFF hold FE EE / FE F1 / FE F4 /
+   FE F7 / FE FA / FE FD, and each of those is an LBRA whose 16-bit wrap lands
+   in the low table:
+
+       $FEEE SWI3 -> $0100   $FEF1 SWI2 -> $0103   $FEF4 FIRQ -> $010F
+       $FEF7 IRQ  -> $010C   $FEFA SWI  -> $0106   $FEFD NMI  -> $0109
+
+   As BASIC leaves them: $0100/$0103 are RTI, $0106 is three zero bytes,
+   $0109 is JMP $D8A1, $010C is JMP $D8AF, $010F is JMP $A0F6. THE LAST THREE
+   ALL POINT INTO ROM THIS PORT PAGES AWAY, so once $FFDF is written every one
+   of them jumps into whatever the image happens to hold there.
+
+   ORCC #$50 DOES NOT COVER THIS, and that was the load-bearing mistake. The
+   DSKCON library unmasks the interrupts itself -- ANDCC #$AF sits inside its
+   own wait loop and there is a CWAI #$3A further on -- so masking them before
+   calling it buys nothing past the first sector. <dskcon-standalone.h> says so
+   in as many words: "The IRQ service routine must be coded so that it invokes
+   dskcon_irqService()." Nothing in this port did. */
+#define VECSLOT(a, fn)                                                       \
+    do {                                                                     \
+        *((unsigned char *)(a)) = 0x7E;              /* JMP */               \
+        *((void **)((a) + 1)) = (void *)(fn);                                \
+    } while (0)
+
+/* The service the library asks for. The PIA read IS the acknowledgement, and
+   it is inline asm because CMOC HAS NO volatile: a C read whose value is
+   thrown away is free to vanish, and this one must not -- the same trap that
+   deleted the loader's first report. */
+#ifdef STOR_TRACE
+/* COUNT THEM. A ~1000x slowdown is an interrupt RATE claim, and a rate claim
+   should be measured rather than reasoned about from which bit is set. */
+#define IRQCNT ((unsigned int *)0x2020)
+#endif
+
+interrupt void trek_irq(void)
+{
+    asm { lda $FF02 }                   /* ack PIA0 port B, the 60Hz tick */
+#ifdef STOR_TRACE
+    IRQCNT[0] = (unsigned int)(IRQCNT[0] + 1);
+#endif
+    dskcon_irqService();                /* the motor timer is its business */
+}
+
+/* FIRQ HAS TO BE ACKNOWLEDGED, NOT JUST RETURNED FROM. PIA1's $FF23 reads $37
+   on this machine -- bit 0 set, so CB1 (the cartridge line) can raise a FIRQ --
+   and a PIA interrupt is a LEVEL, not an edge: returning without reading the
+   data register leaves the line asserted and the 6809 comes straight back in.
+   "A bare RTI makes a stray interrupt harmless" is FALSE HERE; it makes it
+   permanent. That belief is what the game's bootstrap was written on. */
+interrupt void trek_firq(void)
+{
+    asm { lda $FF22 }                   /* ack PIA1 port B, the CART line */
+#ifdef STOR_TRACE
+    IRQCNT[1] = (unsigned int)(IRQCNT[1] + 1);
+#endif
+}
+
+/* SWI is an INSTRUCTION, not a line -- there is nothing to acknowledge, so
+   here a bare RTI really is harmless. */
+interrupt void trek_stray(void)
+{
+}
+
 static unsigned char disk_ready(void)
 {
     if (ready) return 1;
@@ -137,6 +201,21 @@ static unsigned char disk_ready(void)
        the ROM handler would have called anyway. */
     *((unsigned char *)0xFEFD) = 0x7E;                  /* JMP */
     *((void **)0xFEFE) = (void *)dskcon_nmiService;
+
+    /* AND THE OTHER THREE, before the first sector rather than never.
+       Measured: the loader read 97 data sectors, then took an interrupt that
+       vectored to $D8AF -- Disk BASIC's IRQ handler, in ROM that is no longer
+       there -- and the CPU was caught executing $D8B7, eight bytes past it.
+       It ended up at $A7D5, BASIC's keyboard poll, which is not a hang and
+       not a slow floppy: both of those were read off the same run and both
+       were wrong. */
+#ifdef STOR_TRACE
+    IRQCNT[0] = 0;                      /* RAM reads $FF; start from zero */
+    IRQCNT[1] = 0;
+#endif
+    VECSLOT(0x010C, trek_irq);                          /* IRQ  */
+    VECSLOT(0x010F, trek_firq);                         /* FIRQ */
+    VECSLOT(0x0106, trek_stray);                        /* SWI  */
     if (!read_sec(DIR_TRACK, FAT_SECTOR)) return 0;
     {   unsigned char i;
         for (i = 0; i < NUM_GRAN; i++) fat[i] = secbuf[i];

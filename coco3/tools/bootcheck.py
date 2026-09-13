@@ -35,17 +35,32 @@ emu.wait(3)
 kbd:post_coded('LOADM"TREKLDR"{ENTER}')
 emu.wait(10)
 kbd:post_coded("EXEC{ENTER}")
--- 42K IS 167 SECTORS AND A REAL FLOPPY IS SLOW. The first version allowed 90
--- seconds, got 99 sectors -- every one successful -- and reported a HANG. It
--- was still loading. Jamie said "it looked like it was loading, maybe wait a
--- bit", which is the whole of it: a timeout dressed up as a diagnosis.
--- 167 SECTORS OFF A REAL FLOPPY. Ninety seconds got 99 of them, every one
--- successful, and the tool called it a hang. Jamie said twice that it was
--- still loading. Allow far more than the job can need.
-emu.wait(900)
 
 local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
+
+-- ONE SAMPLE CANNOT TELL A STALL FROM A SLOW FLOPPY. That is not a guess about
+-- this instrument, it is its history: the first version waited 90 seconds, saw
+-- 99 sectors, and printed HANG. Jamie said twice it was still loading, and he
+-- was right both times. So poll the breadcrumbs and keep a timeline -- a count
+-- still climbing at the end is a short timeout, a count flat for ten minutes is
+-- a stall, and the tool no longer has to guess which.
+local tl, last = {}, nil
+for i = 1, 180 do
+    emu.wait(5)
+    local line = string.format("%4ds att=%-3d done=%-3d trk=%-2d sec=%-2d stage=%02X copied=%-6d PC=%04X",
+        i*5, prog:read_u8(0x2012), prog:read_u8(0x2015),
+        prog:read_u8(0x2010), prog:read_u8(0x2011), prog:read_u8(0x2013),
+        prog:read_u8(0x2016)*256 + prog:read_u8(0x2017),
+        cpu.state["PC"].value)
+    local key = string.sub(line, 6)          -- everything but the timestamp
+    if key ~= last then tl[#tl+1] = line; last = key end
+    if prog:read_u8(0x200B) == 0x5A then
+        tl[#tl+1] = string.format("%4ds plat_read_all RETURNED", i*5)
+        break
+    end
+end
+
 local t = {}
 for i = 0, 11 do t[#t+1] = string.format("%02X", prog:read_u8(0x2000 + i)) end
 for i = 0, 19 do t[#t+1] = string.format("%02X", prog:read_u8(0x2010 + i)) end
@@ -53,6 +68,7 @@ local o = io.open(os.getenv("OUTF"), "w")
 o:write(table.concat(t, "") .. "\n")
 
 o:write(string.format("%04X\n", cpu.state["PC"].value))
+o:write(table.concat(tl, "\n") .. "\n")
 o:close()
 '''
 
@@ -91,9 +107,15 @@ def main():
     lines = open(outf).read().strip().split("\n")
     b  = bytes.fromhex(lines[0])
     pc = lines[1]
+    timeline = [l for l in lines[2:] if l.strip()]
     img = open(raw, "rb").read()
 
     print("bootcheck: PC halted at $%s" % pc)
+    if timeline:
+        print("  --- what the read did over 900 emulated seconds ---")
+        for l in timeline:
+            print("    %s" % l)
+        print("  ---------------------------------------------------")
     stage = ("entered main" if b[0] == 0xA1 else None,
              "reached plat_read_all" if b[1] == 0xA2 else None)
     print("  entered main()        : %s" % (b[0] == 0xA1))
@@ -102,7 +124,13 @@ def main():
         print("  -> THE LOADER NEVER RAN. Nothing below is a measurement.")
         return 1
     print("  last sector asked for : track %d sector %d" % (b[12], b[13]))
-    print("  sectors attempted     : %d   completed: %d" % (b[14], b[17]))
+    # TWO OF THE ATTEMPTS ARE NOT DATA: read_sec is also how the FAT (track 17
+    # sector 2) and the directory (sector 3, where EGATREK.RAW is entry 1) are
+    # read. 99 attempts is 97 data sectors, and 97 x 256 is exactly the 24,832
+    # bytes copied. THERE WAS NEVER A TWO-SECTOR GAP, and the hunt for an `n`
+    # that had gone to zero was chasing arithmetic that was always correct.
+    print("  sectors attempted     : %d   completed: %d   (%d of them data, "
+          "after the FAT and directory)" % (b[14], b[17], b[14] - 2))
     print("  DSKCON stage          : %s   last status %02X"
           % ({0xB1: "called, NOT returned", 0xB2: "returned"}.get(b[15], "%02X" % b[15]), b[16]))
     cop = b[18] * 256 + b[19]

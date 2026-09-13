@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and nine times on 2026-09-12 (7 open of 40 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and twice on 2026-09-13 (6 open of 41 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1654,6 +1654,17 @@ are the CoCo 3**, which is started and not released:
       the bounds match the final link exactly, and the loop DOES NOT EXECUTE
       -- pre-painting the range with $EE shows 5 to 14 bytes of 2,587 ever
       change. Skipped, not failing part way. That is the next thing to chase.
+      **A SECOND CAUSE FOUND 2026-09-13, AND IT IS A TYPO WITH TEETH.**
+      place_stack() wrote `$0109` calling it IRQ and `$0106` calling it FIRQ.
+      Per the dump in item 37, **$0109 is NMI and $0106 is SWI** -- so the
+      bootstrap CLAIMED THE NMI SLOT, the one vector its own comment swore it
+      was leaving alone ("claiming it here is the one change between ovltest
+      working and the game's first ovl_load failing" -- it was claiming it),
+      and left the real IRQ and FIRQ pointing at $D8AF and $A0F6 inside ROM
+      that is gone by then. That is both halves of this item in one error:
+      DSKCON loses the NMI it needs, AND a 60Hz tick jumps into the image.
+      Corrected to $010C and $010F; NMI is now taken at $FEFD from C, in
+      coco3storage.c, for the loader and the game alike.
   35. ~~**THE LOADING ARCHITECTURE IS WRONG.**~~ **REWRITTEN 2026-09-12 the
       way a CoCo does it, and it works** -- CLEAR/LOADM/EXEC, a first-stage
       loader, the org moved to $2800. What remains is item 37, which is a
@@ -1701,7 +1712,14 @@ are the CoCo 3**, which is started and not released:
       experiment showed from the other side, since putting the FDC in slot 1
       leaves the machine unable to boot Disk BASIC at all.
       **The check is kept in vidtest** rather than written down and forgotten.
-  37. **plat_read_all STOPS DEAD AT 99 SECTORS.** Measured 2026-09-12 with a
+  37. ~~**plat_read_all STOPS DEAD AT 99 SECTORS.**~~ **CLOSED 2026-09-13:
+      the whole 42,676-byte image now reads, STOR_OK, 168 sectors in thirty
+      emulated seconds, with $2800/$6000/$8000/$A000/$C000 all matching the
+      file.** The cause was never in the filesystem, the copy or the FAT --
+      it was interrupts taken with the ROM paged away. Kept in full below
+      because four separate readings of this fault were wrong, and the
+      corrections are the useful part.
+      ORIGINAL: Measured 2026-09-12 with a
       loader built `-DBOOT_HALT` -- it reads and then STOPS, so the machine
       stays in all-RAM mode and nothing cold-starts BASIC over the answer.
       Staged markers say exactly how far it gets: entered main YES, reached
@@ -1739,11 +1757,40 @@ are the CoCo 3**, which is started and not released:
       five sectors). Every sector read returns status 00. The FAT walk, the
       directory entry and the length arithmetic are all correct.
       **IT STOPS AT A FIXED ADDRESS, NOT A FIXED GRANULE**: `copied` reaches
-      **24,832** and `dst` reaches **$8900**, every run. 24,832 is 97 sectors'
-      worth against 99 read -- a two-sector gap, which is what `n` going to
-      zero looks like. Granule 12 is simply where $8900 happens to fall.
-      So the remaining question is about the COPY, not the read: what stops
-      `dst[copied + k] = secbuf[k]` at $8900. Not isolated.
+      **24,832** and `dst` reaches **$8900**, every run.
+      **ROOT CAUSE FOUND 2026-09-13, AND THREE CLAIMS ABOVE ARE FALSE.** Each
+      was read off a real run and each was wrong, so they are corrected here
+      rather than deleted:
+        * *"a two-sector gap ... what `n` going to zero looks like"* -- THERE
+          IS NO GAP. `read_sec` is also how the FAT (track 17 sector 2) and
+          the directory (sector 3, where EGATREK.RAW is entry 1) are read. 99
+          attempts is 97 DATA sectors, and 97 x 256 is exactly 24,832. The
+          arithmetic was correct the whole time.
+        * *"identical across 90, 300 and 900 seconds, so it is STUCK, not
+          slow"* -- it is NEITHER. Polling the breadcrumbs instead of sampling
+          once at the end shows 97 sectors in UNDER TWENTY SECONDS. The other
+          880 seconds were spent watching an idle BASIC prompt.
+        * *"the remaining question is about the COPY"* -- it is about neither
+          the copy nor the read. **The loader CRASHES.**
+      **WHAT ACTUALLY HAPPENS.** `ORCC #$50` masks IRQ and FIRQ, and the
+      DSKCON library UNMASKS THEM ITSELF: `ANDCC #$AF` sits inside its own
+      wait loop (at $E869 in the loader image, one of the addresses the CPU
+      was caught spinning on) and there is a `CWAI #$3A` further on. So from
+      the first sector onward interrupts are live, with the ROM paged away.
+      The vector tables, DUMPED OFF THE MACHINE rather than recalled:
+        $FFF2..$FFFF hold FE EE / FE F1 / FE F4 / FE F7 / FE FA / FE FD, and
+        each of those is an LBRA whose 16-bit wrap lands in the low table:
+          $0100 SWI3 (RTI)   $0103 SWI2 (RTI)   $0106 SWI  ($00 $00 $00)
+          $0109 NMI (JMP $D8A1)  $010C IRQ (JMP $D8AF)  $010F FIRQ (JMP $A0F6)
+      The last three all point into ROM this port pages away. A 60Hz tick
+      jumps to $D8AF -- and the CPU was caught executing **$D8B7**, eight
+      bytes past it -- then wanders the image and ends at $A7D5.
+      **THE FIX**: point $010C at an IRQ service that acknowledges PIA0 port B
+      and calls `dskcon_irqService()` -- the routine <dskcon-standalone.h>
+      says in as many words the host must provide -- and $010F at a FIRQ
+      service that acknowledges PIA1 port B. NMI is taken at $FEFD directly.
+      All three are installed from C in coco3storage.c, so the loader and the
+      game get the same ones.
   40. ~~**The stack climbs into the I/O page.**~~ **CLOSED 2026-09-12 -- IT
       WAS THE HARNESS.** S reached $FFFC and pushes landed on the GIME's
       palette and video registers at $FFB0-$FFDF, which Jamie saw as "weird
@@ -1766,6 +1813,40 @@ are the CoCo 3**, which is started and not released:
       2026-09-12 by watching it happen.
   31. **Nobody has played it** -- and on this project that is the item that
       finds what the instruments cannot.
+  41. ~~**THE VECTOR FIX AS WRITTEN IS WRONG: IT STORMS.**~~ **CLOSED
+      2026-09-13, AND THE ANSWER IS WORTH MORE THAN THE BUG.**
+      **A BARE RTI DOES NOT MAKE A STRAY PIA INTERRUPT HARMLESS -- IT MAKES
+      IT PERMANENT.** A PIA interrupt is a LEVEL, not an edge: returning
+      without reading the data register leaves the line asserted and the 6809
+      comes straight back in. The FIRQ handler was a bare RTI and `$FF23`
+      reads `$37` on this machine -- bit 0 set, so PIA1 CB1 can raise one.
+      That was the nine hours.
+      **MEASURED RATHER THAN REASONED ABOUT**, by counting interrupts in the
+      handlers themselves: with `LDA $FF22` added, 26 emulated seconds carry
+      **1,348 IRQs (52/sec, the 60Hz tick) and 3,781 FIRQs, and the read
+      finishes.** The 63.5us source was ruled out first and cheaply -- `$FF01`
+      reads `$34`, bit 0 clear, so it is disabled and `$FF02` is the only ack
+      the IRQ needs. Two register reads answered what nine hours of waiting
+      had not.
+      **THIS INVALIDATES THE GAME BOOTSTRAP'S PREMISE TOO**, not just the
+      loader's: place_stack()'s comment said "a bare RTI makes a stray
+      interrupt harmless" and built both handlers on it.
+      ORIGINAL: Raised 2026-09-13 by
+      the verification run it was supposed to pass. coco3storage.c points the
+      IRQ slot at `trek_irq`, which acks PIA0 port B (`LDA $FF02`, inline asm
+      because cmoc has no `volatile`) and calls `dskcon_irqService()` -- the
+      service <dskcon-standalone.h> explicitly requires. The run that took
+      **33 seconds** of wall clock before the change had not finished after
+      **nine hours**, and was killed. A ~1000x slowdown with `-nothrottle` is
+      not emulator overhead, it is interrupt rate: either the 63.5us source is
+      live and this handler never acks it (the library's own example has the
+      same hole -- it tests `$FF03` bit 7 and RETURNS without clearing port A),
+      or `dskcon_irqService` is turning the motor off underneath its own
+      transfer. **The safe alternative is a bare RTI on all three**, which is
+      what the game's bootstrap already intended; the evidence that DSKCON
+      tolerates it is that 97 sectors read cleanly while every interrupt was
+      vectoring into garbage. NOT YET MEASURED EITHER WAY -- and the root
+      cause in item 37 stands regardless of which handler is right.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the

@@ -207,15 +207,27 @@ def place_stack(spath):
     #    CoCo vectors those through a JMP table in low RAM that still points
     #    at Disk BASIC -- code which no longer exists once $FFDF is written,
     #    so the 6809 jumps into whatever this port happens to have loaded at
-    #    that address and executes it. Traced: PC at $010F, the NMI slot, with
-    #    S reset to $34F4 inside the port's own code. A bare RTI makes a stray
-    #    interrupt harmless.
+    #    that address and executes it. Traced: PC at $010F with S reset to
+    #    $34F4 inside the port's own code. A bare RTI makes a stray interrupt
+    #    harmless.
     #
-    #    NMI IS DELIBERATELY NOT TOUCHED. The disk controller raises one on
-    #    every completed operation and the DSKCON driver owns that vector --
-    #    the isolated ovltest loaded two images off a real diskette with the
-    #    NMI slot exactly as BASIC left it, and claiming it here is the one
-    #    change between that working and the game's first ovl_load failing.
+    #    THE SLOT NUMBERS WERE WRONG, AND WRONG IN THE WORST WAY. This wrote
+    #    $0109 calling it IRQ and $0106 calling it FIRQ. Dumped off the
+    #    machine, $FFF2..$FFFF hold FE EE / FE F1 / FE F4 / FE F7 / FE FA /
+    #    FE FD, each an LBRA that wraps into the low table:
+    #        $0100 SWI3   $0103 SWI2   $0106 SWI
+    #        $0109 NMI    $010C IRQ    $010F FIRQ
+    #    So it claimed the NMI slot -- the one thing the comment below swore
+    #    it was leaving alone -- and left the real IRQ and FIRQ pointing at
+    #    $D8AF and $A0F6, inside ROM that is gone by then. That is both halves
+    #    of the mystery in one typo: DSKCON lost the NMI it needs, and a 60Hz
+    #    tick jumped into the image. See coco3storage.c, which now installs
+    #    these from C for the loader and the game alike.
+    #
+    #    NMI IS DELIBERATELY NOT TOUCHED HERE. The disk controller raises one
+    #    on every completed operation and the DSKCON driver owns that vector;
+    #    coco3storage.c points $FEFD straight at dskcon_nmiService, which
+    #    bypasses $0109 altogether.
     # 5. ZERO BSS. cmoc's own crt clears one contiguous bss range; THIS BUILD
     #    LINKS WITH ITS OWN lwlink SCRIPT and gets fifteen per-object
     #    bss_start/bss_end pairs instead, so nothing cleared it and every
@@ -242,8 +254,8 @@ def place_stack(spath):
            "\tSTA\t$FFDF\t\tall RAM: the ADDRESS is the latch\n"
            "\tLDA\t#$7E\t\tJMP opcode\n"
            "\tLDX\t#trek_safe_int\n"
-           "\tSTA\t$0109\n\tSTX\t$010A\t\tIRQ  -> RTI\n"
-           "\tSTA\t$0106\n\tSTX\t$0107\t\tFIRQ -> RTI\n"
+           "\tSTA\t$010C\n\tSTX\t$010D\t\tIRQ  -> RTI\n"
+           "\tSTA\t$010F\n\tSTX\t$0110\t\tFIRQ -> RTI\n"
            "\tBRA\ttrek_int_done\n"
            "trek_safe_int\tRTI\n"
            "trek_int_done\tEQU\t*\n"
