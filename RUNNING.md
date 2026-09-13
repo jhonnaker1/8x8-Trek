@@ -63,9 +63,22 @@ directory and SIO seam.
 
 **VBXE is required.** The nine-panel console needs 80 columns and sixteen
 colours on their own values and a stock 800XL has neither — without VBXE the
-program runs and you see nothing. In Altirra that is *System → Configure
-System → Devices → Add → VBXE*, at its default `$D6xx` base. It is a device you
-add to the machine, not a command-line switch.
+program runs and you see nothing.
+
+**In Altirra**, set up a profile for an **XL machine, NTSC, 1088K, with VBXE
+enabled**, and select it. Then launch the disk:
+
+    File → Boot Image…   and pick egatrek-atari.atr
+
+Dragging the `.atr` onto the window does the same thing, and on the command
+line it is `/disk <path to egatrek-atari.atr>`. **Leave BASIC off** — that is
+the default for XL unless you ask for it with `/basic`, and this disk needs it
+off the way real hardware does.
+
+**There is no `/vbxe` switch.** Altirra's author: *"The /vbxe switch was a
+casualty of when I moved VBXE onto the more general device framework."* VBXE is
+a device, so it has to come from the profile — which is why the profile is the
+first step rather than an afterthought.
 
 **Be patient with the first screen: about two minutes on a stock 1050.** That
 is measured, not estimated — 112 seconds to read 36,474 bytes of overlays,
