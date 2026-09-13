@@ -7,9 +7,9 @@ is running shows Disk BASIC's `EXEC` and nothing else. Every check in this port
 has therefore gone through VRAM read-back, which proves bytes and shows
 NOBODY THE PICTURE.
 
-That is a real gap and not a small one: six of the seven ports were played and
-looked at before release, and on this project a person watching the screen has
-beaten the instruments seven times. This does not replace that -- it is not
+That is a real gap and not a small one: every other port was played and looked
+at before release -- ALL SEVEN HAVE BEEN NOW, this one included -- and on this
+project a person watching the screen has beaten the instruments seven times. This does not replace that -- it is not
 interactive and it cannot notice that a panel reads wrong -- but it turns "the
 bytes are right" into a frame somebody can look at.
 

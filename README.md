@@ -249,7 +249,8 @@ is ordered by **what each actually costs**, cheapest first:
    today, untouched. Its code space is the same shape as the C128's, so the
    overlay machinery transfers rather than being redesigned, and **every KERNAL
    call the C128 disk seam uses exists for it** — that is the seam that cost
-   four bugs on the C128 and is still unfinished on the MEGA65. Sixteen
+   four bugs on the C128 and was, when this was written, unfinished on the
+   MEGA65 — it has shipped there since, SAVE included. Sixteen
    colours, so no mapping. `x16emu` gives `-dump` of RAM, banked RAM and VRAM,
    so the string pool and overlays can be checked byte-exact.
 

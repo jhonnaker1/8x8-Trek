@@ -10,8 +10,10 @@ compared against the file they claim to be.
 It is separate from tools/ovlrun.py on purpose. ovlrun boots the WHOLE GAME,
 which reaches ovl_load through a title screen, a stubbed keyboard and the
 video driver, so a failure there can be any of a dozen things. This one
-narrows it to the seam, and it is the reason the seam is known to work while
-the game's own boot is still being chased.
+narrows it to the seam, and it is the reason the seam was known to work while
+the game's own boot was still being chased -- that boot has since been fixed
+and the port released, but the separation is still why this check is worth
+having.
 """
 import os, struct, subprocess, sys, tempfile
 

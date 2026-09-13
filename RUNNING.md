@@ -12,6 +12,11 @@ fact what this port was developed against.
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
 put one. The four `.zip` assets carry theirs inside as `README.txt`.
 
+**This file is the source for the release page.** `make running-section` emits
+it with the heading demoted, so the GitHub release body is generated from here
+rather than retyped — two copies of the same instructions is how other counts
+in this project drifted six times.
+
 ---
 
 ### `egatrek-c128.d64` — Commodore 128

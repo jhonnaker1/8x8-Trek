@@ -14,6 +14,15 @@ its stopping point and keeps a ring of the last samples, so the report is not
 
 A SINGLE END-STATE SAMPLE IS WHAT SENT THE LAST THREE RUNS WRONG -- it cannot
 tell a stall from a slow floppy, or a crash from either. Sample over time.
+
+ARCHIVED 2026-09-13. It answered its question -- the copy stopped at 99 sectors
+because the NMI jump slot at $FEFD still pointed into ROM that had been paged
+away -- and the boot it was chasing has shipped. Nothing runs it: no Makefile
+target, no doc, no other tool. Kept because it is an ANSWERED INSTRUMENT and
+the next boot mystery on this machine wants it back, not rewritten.
+ITS ARMING BUG IS THE PART WORTH REMEMBERING: it triggered on `copied >= 24000`
+against UNINITIALISED RAM, where $FFFF satisfies the test, so it reported a
+finished copy before the copy began.
 """
 import os, subprocess, sys, tempfile
 

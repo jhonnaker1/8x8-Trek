@@ -72,8 +72,8 @@ def check_relink(path):
 
     Editing a Makefile changes the flags, the source list, the linker script
     name -- everything about the output -- and make cannot see that unless the
-    Makefile is a prerequisite. Four of this project's five ports did not list
-    it, and the cost was not theoretical: on 2026-09-10 an Atari Makefile edit
+    Makefile is a prerequisite. Four of the five ports that existed then did
+    not list it, and the cost was not theoretical: on 2026-09-10 an Atari Makefile edit
     left the game unrelinked, a test ran for twenty minutes against a binary
     that was not the one on disk, and the finding it produced had to be thrown
     away because the symbols came from a different link.

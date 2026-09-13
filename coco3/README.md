@@ -26,6 +26,9 @@ make ovlcheck  # the overlay seam, on a real diskette
 make screenshot # render the frame out of VRAM -- MAME will not draw the card
 make verify    # the cheap gate, no emulator: what `make ports` runs
 make check-all # verify plus the four checks that start MAME
+make sdccheck  # every value written to $FF40, because $43 would drop a CoCo SDC
+               # out of FDC emulation. NOT in check-all: it re-runs writecheck's
+               # own binary, for a question about a library this port never edits
 make release   # build/egatrek-coco3.zip -- the diskette image and a README
 ```
 
@@ -508,7 +511,7 @@ driver was correct to 0.35%. To listen or to play, drop `-nothrottle` and
 MAME holds its machine-information screen waiting for a keypress, which an
 automated run has nobody to give it.
 
-**Always `-window`.** And do not open the debugger: on a windowed run it
+**Do not open the debugger**: on a windowed run it
 freezes MAME until the mouse moves. Drive it from an autoboot Lua script using
 `emu.wait()` instead — `emu.add_machine_frame_notifier` stops firing after the
 first callback that does real work, which looks exactly like the program
@@ -524,9 +527,29 @@ is this port's:**
 **The 1.78 MHz mode has never run on real hardware.** `vdc_init()` writes
 `$FFD9`, so the machine runs at double speed from the title screen on —
 including every overlay load and every SAVE. CoCo 3 disk access at double speed
-is historically a hazard; MAME is more forgiving than a WD1773, and nobody here
-has the machine. If a real CoCo 3 misbehaves, suspect that first. The safe
-shape, if it does: drop to `$FFD8` around `read_sec`/`write_sec` and restore.
+is historically a hazard and MAME is more forgiving than a WD1773. If a real
+CoCo 3 misbehaves, suspect that first. The safe shape, if it does: drop to
+`$FFD8` around `read_sec`/`write_sec` and restore.
+
+**"Nobody here has the machine" stopped being true on 2026-09-13 and the item
+did not move.** Jamie has a real CoCo 3 — with a **CoCo SDC** rather than a
+floppy drive. **He does not have a SuperSprite FM+, so there is still nothing
+to run**: the program would load, write `$FF7E` to a chip that is not in the
+machine, and draw a picture nobody can see. **NOTHING IN THIS PORT HAS EVER RUN
+ON METAL, and every measurement in this file rests on MAME's `ssfm`.**
+
+**The drive is not the obstacle it looked like.** This port drives the WD1773's
+registers directly, which is exactly what fails on SD-card replacements that
+hook DSKCON in software — but the CoCo SDC emulates the controller in hardware
+and is in that mode by default. A driver loses it by storing `$43` in `$FF40`,
+and `make sdccheck` taps every write to that latch: **5,911 writes, four values
+(`$29`/`$A9` reading, `$39`/`$B9` writing), no `$43`**. MAME has no SDC device,
+so that removes a named risk and confirms nothing.
+
+**The experiment that would NOT need the card**: set `$FFD9`, read and verify a
+few hundred sectors, drop to `$FFD8`, leave a report where `PEEK` can reach it,
+return to BASIC. The double-speed question is a disk question and the disk is
+the half that exists.
 
 **Closed, and worth knowing about rather than hunting again:** a dirty-cell
 shadow would cut the repaint far more than the 3.19× already taken, and is
