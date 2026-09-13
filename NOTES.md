@@ -1869,6 +1869,21 @@ are the CoCo 3**, which is started and not released:
       **THE THIRD OPTION IS BUILT: `make screenshot`** (tools/vramshot.py)
       pulls the frame out of the V9958's own VRAM through MAME's device space
       and writes a PNG. Real hardware and a second emulator are still open.
+      **AND THE CLAIM IS NOW MEASURED RATHER THAN OBSERVED (2026-09-13)**,
+      because Jamie said "when you launch mame, all I see is the green basic
+      screen" and chasing it turned up two things I did not know: MAME has TWO
+      screens here (`:screen` 640x239 and `:ext:multi:slot1:ssfm:screen`
+      544x466) and the DEFAULT VIEW IS SCREEN 0, the green one; and the card
+      carries a `J4 Default Video` jumper that DEFAULTS TO MC6847, with V9958
+      as its other setting. Both were live candidates for "you just never
+      asked MAME to draw it", and I had asserted the negative without knowing
+      either existed.
+      Neither makes a picture. What rules the port out is everything else
+      being right, read out of MAME's own device state with the title up:
+      `R0=0A R1=40 R2=1F R7=00 R8=0A R9=80` (exactly vdc_init's, display
+      enable set), `m_mode=7 m_height=262`, all 32 palette bytes identical to
+      ega_pal, and VRAM holding a correct title screen. The port programs the
+      chip, the chip agrees, MAME does not put it on its screen.
   46. **AFTER THE TITLE SCREEN THERE IS NOTHING BUT A CURSOR.** Found
       2026-09-13 by the first picture anyone has seen of this port. The title
       draws correctly -- "EGA TREK" and its two boxes, white on black. Press a

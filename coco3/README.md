@@ -43,6 +43,32 @@ nothing has to touch a bank register mid-blit.
 not read that as the driver failing — the CoCo's own VDG output is what shows.
 **Verify by reading VRAM back**, not by looking at the window.
 
+That sentence was an observation for a week. It is now a measurement, because
+Jamie said "when you launch mame, all I see is the green basic screen" and two
+things turned up that I had not known:
+
+* **MAME has TWO screens here.** `:screen` is the CoCo's VDG at 640x239 and
+  `:ext:multi:slot1:ssfm:screen` is the card at 544x466 — and the default view
+  is *Screen 0*, the green one. `-view "Screen 1 Standard (4:3)"` selects the
+  card. So "all I see is the green BASIC screen" is the default, not a fault.
+* **The card has a video jumper.** `J4 Default Video` defaults to `MC6847`,
+  the CoCo's own video, and its other setting is `V9958`. There is a `J5 Video
+  Lock` as well.
+
+Neither makes a picture. With J4 on V9958 and J5 either way, screen 1 is one
+colour, black. **What rules the port out is everything else being right**, read
+out of MAME's own device state while the title screen was up:
+
+* control registers `R0=0A R1=40 R2=1F R7=00 R8=0A R9=80` — exactly what
+  `vdc_init()` writes, and R1 bit 6 is the display enable, set;
+* `m_mode=7`, `m_height=262` — the chip reconfigured itself for the mode;
+* all 32 palette bytes identical to `ega_pal` in coco3vid.c;
+* VRAM holding a correct title screen.
+
+So the port programs the chip, the chip agrees, and MAME does not put it on
+its screen. **Use `make screenshot`** — tools/vramshot.py renders the frame
+from VRAM — and do not spend another evening on the window.
+
 ## The blit cost was the real risk, and it is measured
 
 **10.625 cycles a byte** to the V9958, timed under MAME with `totalcycles`.
