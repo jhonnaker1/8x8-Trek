@@ -58,6 +58,12 @@
    is what the real board needs. The J5 "Video Lock" jumper can disable the
    software select; it ships Unlocked, which is what makes this work. */
 #define VDP_VIDSEL ((unsigned char *)0xFF7E)
+
+/* THE CoCo 3 RUNS AT 1.78 MHz AND THIS PORT NEVER ASKED. $FFD9 is the GIME's
+   high-speed latch, $FFD8 puts it back; the ADDRESS is the latch and the
+   value is ignored. */
+#define CPU_FAST   (*(unsigned char *)0xFFD9)
+#define CPU_SLOW   (*(unsigned char *)0xFFD8)
 #define VIDSEL_VDP    0x00
 #define VIDSEL_COCO   0x01
 /* $FF7B is register-INDIRECT access (via R#17). This driver does not use
@@ -83,6 +89,21 @@
 /* EGA's sixteen, in EGA's order, so -DTREK_COLOUR_IS_EGA makes a colour name
    its own index. The V9958 wants three bits a channel: EGA's 0/85/170/255
    scale to 0/2/5/7. Two bytes a colour -- 0RRR0BBB then 00000GGG. */
+/* Two pixels at a time out of a four-entry table, rebuilt only when the
+   colour changes -- a row byte only ever takes one of four values. */
+static unsigned char pair[4];
+static unsigned char pair_fg = 0xFF;
+
+static void set_pair(unsigned char fg)
+{
+    if (fg == pair_fg) return;
+    pair_fg = fg;
+    pair[0] = 0;
+    pair[1] = fg;
+    pair[2] = (unsigned char)(fg << 4);
+    pair[3] = (unsigned char)((fg << 4) | fg);
+}
+
 static const unsigned char ega_pal[16][2] = {
     {0x00,0x00}, {0x05,0x00}, {0x00,0x05}, {0x05,0x05},
     {0x50,0x00}, {0x55,0x00}, {0x50,0x02}, {0x55,0x05},
@@ -117,6 +138,16 @@ static void vdp_write_at(unsigned int addr)
     vdp_reg(14, (unsigned char)((addr >> 14) & 0x07));
     *VDP_ADDR = (unsigned char)(addr & 0xFF);
     *VDP_ADDR = (unsigned char)(((addr >> 8) & 0x3F) | 0x40);
+}
+
+/* THE ROW ADDRESS AS TWO BYTES. SCR_STRIDE is 256, so the high byte IS the
+   scan line and the low byte the column, and stepping down a row is an
+   increment -- no 16-bit arithmetic and, crucially, no multiply. */
+static void vdp_write_at_hl(unsigned char line, unsigned char col)
+{
+    vdp_reg(14, (unsigned char)(line >> 6));
+    *VDP_ADDR = col;
+    *VDP_ADDR = (unsigned char)((line & 0x3F) | 0x40);
 }
 
 static void vdp_read_at(unsigned int addr)
@@ -161,6 +192,7 @@ void vdc_init(void)
     /* LAST, so the monitor switches to a screen that already has a picture on
        it rather than to whatever VRAM held at power-on. */
     *VDP_VIDSEL = VIDSEL_VDP;
+    CPU_FAST = 0;                       /* 1.78 MHz from here on */
 }
 
 /* DELIBERATELY DOES NOT CLEAR, and does not blank the display. The farewell
@@ -191,6 +223,7 @@ void plat_exit(void)
        that is not being displayed, which looks exactly like a machine that
        has hung. The same courtesy as restoring the memory map below. */
     *VDP_VIDSEL = VIDSEL_COCO;
+    CPU_SLOW = 0;                       /* Disk BASIC expects its own speed */
 
     asm { orcc #$50 }           /* no interrupts while the map changes */
     asm { sta $FFDE }           /* ROM/RAM mode: Disk BASIC comes back */
@@ -227,6 +260,19 @@ void scr_clear(void)
 /* Eight rows of six significant bits, bit 5 leftmost -- whatever the code
    turns out to mean. Screen codes 0..63 are the text set, 64..127 the box
    set, and bit 7 is reverse video, which is a RULE rather than data. */
+static void glyph_rows(unsigned char ch, unsigned char *out);
+
+/* The eight rows of `ch`, WITHOUT COPYING when it can be helped: plain text is
+   most of the screen and can be read where the font lies. `scratch` is only
+   touched for reverse video and the missing-glyph marker. */
+static const unsigned char *glyph_ptr(unsigned char ch, unsigned char *scratch)
+{
+    if (!(ch & 0x80) && (unsigned char)(ch & 0x7F) < FONT_CODES)
+        return font6x8[ch & 0x7F];
+    glyph_rows(ch, scratch);
+    return scratch;
+}
+
 static void glyph_rows(unsigned char ch, unsigned char *out)
 {
     unsigned char base = (unsigned char)(ch & 0x7F);
@@ -260,29 +306,30 @@ shade:
 void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char color)
 {
     unsigned char rows[FONT_CELL_H];
-    unsigned int  addr;
-    unsigned char r, bits, fg;
+    const unsigned char *g;
+    unsigned char r, bits, fg, line, col;
 
     if (x >= VDC_COLS || y >= VDC_ROWS) return;
 
-    glyph_rows(ch, rows);
+    g = glyph_ptr(ch, rows);
     fg   = (unsigned char)(color & 0x0F);
+    set_pair(fg);
     /* 16-BIT THROUGHOUT. The whole of VRAM this driver touches -- 54,272
        bytes of display and 2K of message log at $E000 -- fits under 65,536,
        so R#14's A16-A14 are just bits 14-15 of an ordinary unsigned int.
        There is no 32-bit arithmetic anywhere in this file and there must not
        be: on a 6809 it is what turned a screen clear into a hang. */
-    addr = (unsigned int)(MARGIN_Y + (unsigned int)y * FONT_CELL_H) * SCR_STRIDE
-         + MARGIN_X + (unsigned int)x * 3;
+    line = (unsigned char)(MARGIN_Y + (y << 3));
+    col  = (unsigned char)(MARGIN_X + x + x + x);
 
     for (r = 0; r < FONT_CELL_H; r++) {
-        bits = rows[r];
+        bits = g[r];
         /* Three whole bytes, two pixels each, high nibble left. */
-        vdp_write_at(addr);
-        *VDP_DATA = (unsigned char)(((bits & 0x20) ? fg << 4 : 0) | ((bits & 0x10) ? fg : 0));
-        *VDP_DATA = (unsigned char)(((bits & 0x08) ? fg << 4 : 0) | ((bits & 0x04) ? fg : 0));
-        *VDP_DATA = (unsigned char)(((bits & 0x02) ? fg << 4 : 0) | ((bits & 0x01) ? fg : 0));
-        addr += SCR_STRIDE;
+        vdp_write_at_hl(line, col);
+        *VDP_DATA = pair[bits >> 4];
+        *VDP_DATA = pair[(bits >> 2) & 3];
+        *VDP_DATA = pair[bits & 3];
+        line++;
     }
 }
 

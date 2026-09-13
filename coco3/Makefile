@@ -308,6 +308,18 @@ keymatrix:
 keycheck: $(KEY_OUT)
 	@python3 tools/keycheck.py
 
+# HOW SLOW IS IT, and what does the CoCo 3's high-speed latch buy? Jamie played
+# it and said the redraws are the problem; this measures them.
+PERF_SRC = src/perftest.c src/coco3vid.c
+PERF_OUT = build/PERFTEST.BIN
+
+perftest: $(PERF_OUT)
+
+$(PERF_OUT): $(PERF_SRC) src/font6x8.h Makefile
+	@mkdir -p build
+	$(CMOC) $(CFLAGS) -o $@ $(PERF_SRC)
+	@ls -l $@
+
 # WRITING. plat_write_all was a stub for the life of the port, so SAVE could
 # not work. writecheck has the machine write a file and then reads the .dsk
 # on the host with independent code -- a return code is not a witness.

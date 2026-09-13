@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and twelve times on 2026-09-13 (5 open of 52 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and thirteen times on 2026-09-13 (4 open of 53 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1725,6 +1725,37 @@ are the CoCo 3**, which is started and not released:
       `core/serial.c` stopped being an overlay in the process: it carries no
       marker, so it is resident everywhere else, and `overlay_check` found four
       separate faults caused by paging it here.
+  53. **THE CONSOLE REPAINT WAS TWELVE SECONDS. It is 3.84 now** (2026-09-13,
+      raised and mostly fixed by the play session that closed item 31).
+      **MEASURED FIRST, with `make perftest`**: a full 80x25 repaint took
+      **12.24 seconds** at 0.89 MHz -- about 5,400 cycles a character to write
+      24 bytes. Four fixes, each verified against `make vidcheck` on its own:
+        * **$FFD9, THE HIGH-SPEED LATCH, WHICH THIS PORT HAD NEVER WRITTEN.**
+          The CoCo 3 runs at 1.78 MHz and the port had used 0.89 for its whole
+          life. Exactly 2.00x, and the V9958 tolerates the faster access --
+          checked, not assumed, and so does DSKCON under MAME.
+        * **THREE MUL16 CALLS PER CHARACTER.** cmoc does not strength-reduce a
+          constant multiply, so `y*8`, `*256` and `x*3` were each a subroutine
+          call into a shift-and-add loop. SCR_STRIDE IS 256, which makes the
+          address two bytes -- the high one is the scan line, the low one the
+          column, and stepping down a row is an INCREMENT.
+        * **SIX TERNARIES PER ROW BYTE**, replaced by a four-entry table
+          indexed by the bit pair and rebuilt only when the colour changes.
+        * **AN EIGHT-BYTE GLYPH COPY** on every character, for the benefit of
+          a reverse-video branch most characters do not take.
+      **ONE CHANGE OF THE FIVE BROKE THE DISPLAY and I could not tell which,
+      because I applied them together.** Reverting to the committed file to
+      re-establish 11 of 11 and then adding them ONE AT A TIME found it in
+      four runs: a cache of R#14 that skipped the write when the bank was
+      unchanged. It is the smallest win of the set and it is left out.
+      **STILL OPEN**: 3.84 seconds is better and is not fast. The structural
+      fix is a DIRTY-CELL SHADOW -- 80x25 of glyph and colour, ~4K -- so that
+      a panel redraw only touches cells that changed. Jamie's words were
+      "redraws of each panel for each turn", and most of those cells are
+      identical between turns.
+      **AND DOUBLE SPEED IS UNTESTED ON REAL HARDWARE**: CoCo 3 disk I/O at
+      1.78 MHz is a known hazard, MAME is more forgiving than a WD1773, and
+      nobody has ever run this port on a real machine.
   30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained. Routed around by not using the MMU; see below. **Less
       urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
@@ -1966,8 +1997,11 @@ are the CoCo 3**, which is started and not released:
       from overlay images five minutes older than the source change, so it
       measured the OLD binary and showed no error. Checked the timestamps
       before believing it. See [[instruments-that-cannot-see]].
-  31. **Nobody has played it** -- and on this project that is the item that
-      finds what the instruments cannot. **It could not be played until
+  31. ~~**Nobody has played it.**~~ **CLOSED 2026-09-13: "the game looks,
+      plays, and sounds good"** -- the same verdict the other six ports got,
+      and it took the whole day's work to become possible. **AND IT FOUND THE
+      THING NO INSTRUMENT HAD**: *"the main issue is it runs so slow. main
+      screen redraws and redraws of each panel for each turn."* See item 53. **It could not be played until
       2026-09-13**: kb_waitkey() returned KB_RETURN unconditionally, so the
       game auto-advanced through every prompt. See item 43.
       **BUT IT DOES PLAY, AND THE BRIDGE HAS BEEN SEEN (2026-09-13).** Driven
