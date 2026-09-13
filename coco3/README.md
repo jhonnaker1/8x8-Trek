@@ -241,7 +241,47 @@ step of it was found on the hardware rather than reasoned out:
 All four are injected at `program_start` by `build_ovl.place_stack()`, before
 `INILIB` and before `main()`.
 
-## The loading architecture is wrong, and the CoCo world settled this long ago
+## Loading it the way a CoCo does
+
+```
+CLEAR 25,&H6FFF
+OK
+LOADM"TREKLDR"
+OK
+EXEC
+```
+
+**A 42K program cannot be placed by `LOADM`.** It spans `$2800..$CE5C`, under
+the BASIC and Disk BASIC ROMs, and `CLEAR` cannot move BASIC's ceiling that
+far -- `CLEAR 25,&H11FF` answers `?OM ERROR`. So BASIC loads a **3K
+first-stage loader** instead, and the loader reads the image itself. That is
+the CoCo idiom, not an invention of this port.
+
+    TREKLDR.BIN   28-byte stub at $2800 + 2,963-byte body loaded at $6000
+    EGATREK.RAW   42,589 bytes, headerless, read to $2800..$CE5C
+
+**Three things had to be measured to get the shape right, and each one
+changed it:**
+
+1. **`LOADM` will not place a block above BASIC's memory top.** The body is
+   linked to run at `$E400` -- the gap above the overlay window that the game
+   never uses -- but asking `LOADM` to put it there fails *silently*: the load
+   does not happen, `EXEC` uses a stale address, and the CPU ends up at `$0028`
+   with BASIC's stack still intact. So the body is **loaded at `$6000`**, where
+   BASIC allows it, and the stub copies it up.
+2. **A CPU write to ROM space passes through to the RAM underneath.** Writing
+   `$11`/`$22`/`$33` to `$8000`/`$A000`/`$C000` with the ROM mapped and reading
+   them back after switching to all-RAM returned all three. That is what lets
+   the stub copy the body to `$E400` before the machine is taken.
+3. **The stub sits at `$2800`, the game's own org, deliberately.** It is 28
+   bytes and jumps away before a byte of the game is read, so being overwritten
+   afterwards costs nothing -- and it means BASIC only has to `CLEAR` to a
+   height it will actually accept.
+
+`tools/mkboot.py` builds both files and refuses a layout where the stub or the
+body would sit inside the image.
+
+## The architecture this replaced, and why it was wrong
 
 **The idiom for a big CoCo 3 program is a first-stage loader plus the GIME
 MMU** -- see *"CoCo 3 Loader for big programs"*. A small loader goes in at

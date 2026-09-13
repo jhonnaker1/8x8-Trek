@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck ovltest ovlcheck data disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck ovltest ovlcheck data boot disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -237,12 +237,30 @@ build/MUSIC.DAT: src/music_data.c
 # program the way a CoCo does -- LOADM from Disk BASIC -- rather than have a
 # debugger poke 42K over BASIC's live stack. That poke is what made every
 # earlier ovlrun failure look like a port bug.
-disk: overlays data
-	@cp build/egatrek-ovl.bin build/EGATREK.BIN
-	python3 tools/mkdisk.py build/trek.dsk build/EGATREK.BIN build/img/*.OVL \
-	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
-	python3 tools/checkdisk.py build/trek.dsk build/EGATREK.BIN build/img/*.OVL \
-	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
+# THE FIRST-STAGE LOADER. Disk BASIC cannot place a 42K image spanning
+# $2800..$CE5C -- that is under the BASIC and Disk BASIC ROMs, and CLEAR
+# cannot move BASIC's ceiling there. So BASIC loads a small loader instead and
+# the loader reads the image. This is the CoCo idiom, not an invention; see
+# NOTES.md item 35.
+BOOT_SRC = src/coco3boot.c src/coco3storage.c
+BOOT_OUT = build/BOOT.BIN
+
+boot: $(BOOT_OUT)
+
+# --org=E400 puts the body in the gap above the overlay window and below the
+# stack reserve -- space the game never uses, so it needs no relocation.
+$(BOOT_OUT): $(BOOT_SRC) Makefile
+	@mkdir -p build
+	$(CMOC) --coco --org=E400 -O2 -fomit-frame-pointer --intdir=build \
+	    -Isrc -I../core -o $@ $(BOOT_SRC)
+	@ls -l $@
+
+disk: overlays data boot
+	python3 tools/mkboot.py build/BOOT.BIN build/egatrek-ovl.bin build/
+	python3 tools/mkdisk.py build/trek.dsk build/TREKLDR.BIN build/EGATREK.RAW \
+	    build/img/*.OVL build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
+	python3 tools/checkdisk.py build/trek.dsk build/TREKLDR.BIN build/EGATREK.RAW \
+	    build/img/*.OVL build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
 
 # THE OVERLAY BUILD, ON THE MACHINE. Everything else about overlays here is
 # arithmetic about files; this boots the resident image with the images on a

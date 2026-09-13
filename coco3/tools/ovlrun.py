@@ -15,7 +15,7 @@ AND THE LOAD ADDRESS IS PART OF THE SAME LESSON. The port linked at $1200,
 reasoning that it owns the machine. It does -- but something has to LOAD it
 first, and `CLEAR 25,&H11FF` comes back ?OM ERROR because $11FF is below
 BASIC's own workspace, so the ceiling never moves. At $2800, cmoc's default,
-`CLEAR 25,&H27FF` answers OK and LOADM is safe.
+`CLEAR 25,&H6FFF` answers OK and LOADM is safe.
 """
 import os, re, subprocess, sys, tempfile
 
@@ -37,10 +37,12 @@ emu.wait(14)                       -- Disk BASIC to its OK prompt
 -- failed to start.
 local kbd = manager.machine.natkeyboard
 kbd.in_use = true
-kbd:post_coded("CLEAR 25,&H27FF{ENTER}")
+-- CLEAR below the stub at $2600, then load the LOADER -- 3K, which BASIC can
+-- place -- and let it read the 42K image into position itself.
+kbd:post_coded("CLEAR 25,&H6FFF{ENTER}")
 emu.wait(3)
-kbd:post_coded('LOADM"EGATREK"{ENTER}')
-emu.wait(40)                       -- 42K off a floppy, at floppy speed
+kbd:post_coded('LOADM"TREKLDR"{ENTER}')
+emu.wait(8)
 kbd:post_coded("EXEC{ENTER}")
 
 local cpu  = manager.machine.devices[":maincpu"]
