@@ -2128,8 +2128,15 @@ are the CoCo 3**, which is started and not released:
       in the recording that is not any pitch MUS_TITLE uses, and across all
       stable windows only about half land within 3% of a pitch in the track.
       A single held note being exact does not make a tune correct.
-      **AND NOBODY HAS HEARD IT**, which on this project is the only test that
-      has ever counted -- see [[jamie-plays-and-instruments-miss]].
+      **HEARD, AND CORRECT (2026-09-13).** Jamie listened to it at real speed
+      and said *"it works now. sounds correct"* -- which is the only sound
+      test this project has ever accepted, and the one the C128, X16, Atari
+      and Falcon each had to pass. See [[jamie-plays-and-instruments-miss]].
+      **IT TOOK THREE TRIES TO LET HIM HEAR IT AT ALL**, and none of the three
+      failures was the driver: the first runs were under `-nothrottle` at 2490%
+      (item 52), and the first real-speed launch he closed after 84 seconds --
+      **the screen stays green for about SIXTY-FIVE of them** while a 44K image
+      comes off an emulated floppy, and I had not told him that.
       The YM2413 OPLL at `$FF76-$FF77` is untouched and is a better
       instrument; a second project, not a blocker.
   51. ~~**A ~175 Hz TONE IN THE TITLE TRACK THAT THE DATA DOES NOT CONTAIN.**~~
