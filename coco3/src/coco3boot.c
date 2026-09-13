@@ -45,6 +45,13 @@ int main(void)
 {
     uint16_t got = 0;
 
+    /* MARK EACH STAGE, and mark the first one BEFORE anything can fail.
+       The previous version wrote its report only after plat_read_all
+       returned, and the failure path loops forever before reaching it -- so a
+       failed read and a loader that never started looked identical, both
+       reporting $FF. */
+    BOOTR[0] = 0xA1;                /* entered main() */
+
     /* Interrupts off and our own stack before anything else: from here on
        Disk BASIC's handler and its stack are not ours to rely on. */
     asm { orcc #$50 }
@@ -52,7 +59,12 @@ int main(void)
 
     /* The image is RAW -- no DECB block headers -- so it lands exactly at
        GAME_ORG and the loader needs to know nothing about its shape. */
-    if (plat_read_all("EGATREK.RAW", (void *)GAME_ORG, GAME_MAX, &got) != STOR_OK)
+    BOOTR[1] = 0xA2;                /* about to call plat_read_all */
+    BOOTR[2] = plat_read_all("EGATREK.RAW", (void *)GAME_ORG, GAME_MAX, &got);
+    BOOTR[9]  = (unsigned char)(got >> 8);
+    BOOTR[10] = (unsigned char)(got & 0xFF);
+    BOOTR[11] = 0x5A;               /* the report is complete */
+    if (BOOTR[2] != STOR_OK)
         for (;;) ;               /* nothing to jump to; stop rather than guess */
 
     /* REPORT BEFORE JUMPING, ALWAYS. `got` is the one number that separates
@@ -61,33 +73,23 @@ int main(void)
        ROM mode where the answer is meaningless. $2000 is below the image
        ($2800..$CE5B) and below anything the game touches, so it survives
        whatever happens next. */
-    BOOTR[0] = 0xA1;                            /* the loader got here */
-    BOOTR[1] = (unsigned char)(got >> 8);
-    BOOTR[2] = (unsigned char)(got & 0xFF);
     BOOTR[3] = ((unsigned char *)0x2800)[0];    /* first byte of the image */
     BOOTR[4] = ((unsigned char *)0x8000)[0];    /* and one from above $8000, */
     BOOTR[5] = ((unsigned char *)0xA000)[0];    /* read while all-RAM is live */
     BOOTR[6] = ((unsigned char *)0xCE50)[0];
 
 #ifdef BOOT_HALT
+    /* Extra samples, taken here because the machine never leaves all-RAM mode
+       in this build: a read above $8000 means what it says. */
+    BOOTR[7]  = ((unsigned char *)0x6000)[0];
+    BOOTR[8]  = ((unsigned char *)0xC000)[0];
+
     /* HALT INSTEAD OF JUMPING, so the machine stays in all-RAM mode and the
        image can be READ. Every check of it so far ran after the game had
        crashed and the ROM was back, where a read above $8000 returns ROM
        whatever the RAM beneath holds -- inconclusive, not failing. This
        leaves the machine in exactly the state the game starts in.
        Answers at $2000, below the image and below BASIC's ceiling. */
-    {
-        unsigned char *r = (unsigned char *)0x2000;
-        unsigned char i;
-        r[0] = 0xA1;                       /* the loader got here */
-        r[1] = (unsigned char)(got >> 8);  /* how many bytes it read */
-        r[2] = (unsigned char)(got & 0xFF);
-        for (i = 0; i < 4; i++) r[4 + i]  = ((unsigned char *)0x2800)[i];
-        for (i = 0; i < 4; i++) r[8 + i]  = ((unsigned char *)0x6000)[i];
-        for (i = 0; i < 4; i++) r[12 + i] = ((unsigned char *)0xA000)[i];
-        for (i = 0; i < 4; i++) r[16 + i] = ((unsigned char *)0xC000)[i];
-        for (i = 0; i < 4; i++) r[20 + i] = ((unsigned char *)0xCE50)[i];
-    }
     for (;;) ;
 #else
     /* ALL RAM, and only now. Everything above $8000 has been written through

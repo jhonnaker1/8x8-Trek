@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and seven times on 2026-09-12 (9 open of 39 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and eight times on 2026-09-12 (10 open of 40 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1689,6 +1689,22 @@ are the CoCo 3**, which is started and not released:
       experiment showed from the other side, since putting the FDC in slot 1
       leaves the machine unable to boot Disk BASIC at all.
       **The check is kept in vidtest** rather than written down and forgotten.
+  37. **plat_read_all HANGS ON THE 42K IMAGE.** Measured 2026-09-12 with a
+      loader built `-DBOOT_HALT` -- it reads and then STOPS, so the machine
+      stays in all-RAM mode and nothing cold-starts BASIC over the answer.
+      Staged markers say exactly how far it gets: entered main YES, reached
+      plat_read_all YES, **returned NO**. The read does not fail, it never
+      comes back.
+      **SO THE GAME DOES NOT CRASH AFTER THE LOADER HANDS OVER -- THE LOADER
+      NEVER HANDS OVER.** Every earlier account of "the game starts and
+      crashes" was reading a machine that had gone somewhere else entirely.
+      **The same storage layer passes `make ovlcheck` 3 of 3**, reading
+      HOF.OVL (1,709 bytes, one granule) and TITLE.OVL byte-exact off the same
+      diskette. What is new here is SCALE: 42,588 bytes, 19 granules, ~171
+      sectors against 8. Whatever breaks is in the FAT walk or the sector loop
+      at a size the seam has never been asked for.
+      That is the next thing, and it is now a bounded question about one
+      function rather than about the whole port.
   34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
       on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
       as "weird rainbow colors" while watching a run** -- the third time on

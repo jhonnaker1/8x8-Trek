@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck ovltest ovlcheck data boot disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -254,6 +254,18 @@ $(BOOT_OUT): $(BOOT_SRC) Makefile
 	$(CMOC) --coco --org=E400 -O2 -fomit-frame-pointer --intdir=build \
 	    -Isrc -I../core -o $@ $(BOOT_SRC)
 	@ls -l $@
+
+# THE BYTE COUNT, measured with a loader that STOPS instead of jumping -- so
+# the machine stays in all-RAM mode and nothing cold-starts BASIC over the
+# answer. See tools/bootcheck.py.
+bootchk: overlays data
+	@mkdir -p build
+	$(CMOC) --coco --org=E400 -O2 -fomit-frame-pointer --intdir=build \
+	    -Isrc -I../core -DBOOT_HALT -o build/BOOTCHK.BIN $(BOOT_SRC)
+	python3 tools/mkboot.py build/BOOTCHK.BIN build/egatrek-ovl.bin build/
+	python3 tools/mkdisk.py build/bootchk.dsk build/TREKLDR.BIN build/EGATREK.RAW \
+	    build/img/*.OVL build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
+	@python3 tools/bootcheck.py
 
 disk: overlays data boot
 	python3 tools/mkboot.py build/BOOT.BIN build/egatrek-ovl.bin build/
