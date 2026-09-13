@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and eleven times on 2026-09-13 (5 open of 51 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and twelve times on 2026-09-13 (5 open of 52 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2152,8 +2152,30 @@ are the CoCo 3**, which is started and not released:
       half of 350 and I nearly filed an octave bug off it.** An autocorrelator
       pointed at a mixed four-channel recording is not an instrument, it is a
       guess with decimal places.
-      **STILL OPEN AS ITEM 52: it sounds weird to the person listening**, and
-      that is the only sound test this project has ever trusted.
+      **ALL 106 NOTES VERIFIED** on a second pass -- the apparent mismatches
+      after note 92 were the LOGGER again: notes 92 and 93 are both 290 Hz
+      (12 ticks then 48), so the registers never change and the log recorded
+      one 59.7-tick note instead of two, shifting everything after it by one.
+      Log the VALUE, not the change, when consecutive values can be equal.
+  52. **IT SOUNDS TOO FAST TO THE PERSON LISTENING**, and that is the only
+      sound test this project has ever trusted. Raised 2026-09-13: Jamie
+      listened and said *"sounds weird"*, then *"the tune itself sounds
+      wrong"*, then *"like its too fast i think"*.
+      **AND THE TEMPO MEASURES CORRECT**: 24 notes of 3 ticks span 72.48s to
+      76.42s, which is 72 ticks in 3.94 seconds = **18.27 ticks/s against the
+      18.2065 the data intends** (+0.35%). That is the PC timer tick the
+      original ran on. Pitch, order and duration all match MUSIC.DAT.
+      **THE HYPOTHESIS THAT WOULD MAKE BOTH TRUE, and it is testable**: every
+      port calls snd_poll() from its keyboard wait loop, so a port that spends
+      frames DRAWING drops ticks and plays slower than the data says. The
+      CoCo 3's title screen sits in kb_waitkey polling every frame, so this
+      may be the first port playing the track at full intended speed -- and an
+      ear calibrated on the C128 or the Atari would hear correct as fast.
+      **DO NOT SLOW IT ON THE STRENGTH OF THE IMPRESSION.** Record the same
+      21 seconds from a released port and compare; if the C128 is slower,
+      the bug is THERE and has been shipping for months. If it is not, this
+      driver is wrong somewhere the registers do not show.
+      coco3/build/title-music.wav is the CoCo 3 excerpt.
       Raised 2026-09-13 by the recording that confirmed the frequency law.
       MUS_TITLE uses twelve pitches -- 150 220 290 330 350 390 440 470 520 590
       660 700 -- and 175 is not one of them, yet it sustains for half a second
