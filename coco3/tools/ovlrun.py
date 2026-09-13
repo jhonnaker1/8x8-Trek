@@ -166,10 +166,17 @@ def names_from_map(ovlmap_h):
 def main():
     mappath = os.path.join(COCO3, "build", "egatrek-ovl.bin.map")
     ovlmap  = os.path.join(COCO3, "build", "img", "ovlmap.h")
-    disk    = os.path.join(COCO3, "build", "trek.dsk")
+    # DEFAULTS TO THE BUILD TREE, BUT A RELEASE MUST BOOT THE STAGED ARTEFACT.
+    # `make release` copies build/trek.dsk into the staging directory and zips
+    # it; booting the build tree proves the BUILD works and says nothing about
+    # what is in the archive people download. The map files still come from
+    # build/ -- they describe the same link and never travel.
+    disk = sys.argv[1] if len(sys.argv) > 1 \
+        else os.path.join(COCO3, "build", "trek.dsk")
     for p in (mappath, ovlmap, disk):
         if not os.path.exists(p):
             sys.exit("ovlrun: missing %s -- run `make disk`" % p)
+    print("ovlrun: booting %s" % disk)
     if not os.path.exists(MAME):
         print("ovlrun: SKIPPED -- no MAME at %s" % MAME)
         return 0
