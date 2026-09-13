@@ -48,7 +48,15 @@ kbd:post_coded("EXEC{ENTER}")
 local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
 
+function probe(a, n)
+    local t = {}
+    for k = 0, n - 1 do t[#t+1] = string.format("%02X", prog:read_u8(a + k)) end
+    return table.concat(t, "")
+end
+
 local seen, order, trace, snap = {}, {}, {}, nil
+local xy = {}
+local imgsnap = nil
 local smin, smax = nil, nil
 for i = 1, 300 do
     emu.wait(0.25)
@@ -57,6 +65,20 @@ for i = 1, 300 do
     if smin == nil or sv < smin then smin = sv end
     if smax == nil or sv > smax then smax = sv end
     if i <= 14 then trace[#trace+1] = string.format("%04X/%04X", cpu.state["PC"].value, sv) end
+    -- IS THE LOOP ACTUALLY LOOPING? X is the pointer and Y the counter; if Y
+    -- is not falling the loop is not the thing that is stuck.
+    -- SAMPLE THE IMAGE WHILE THE GAME IS LIVE. Reading it at the end is
+    -- reading after the machine has gone back to ROM mode, which shows ROM at
+    -- $A000 and says nothing about whether the loader did its job.
+    if imgsnap == nil and prog:read_u8(0x2800) == 0x1A and i > 60 then
+        imgsnap = probe(0x2800, 8) .. " " .. probe(0x6000, 8) .. " "
+               .. probe(0xA000, 8) .. " " .. probe(0xCE58, 8)
+    end
+    if i % 40 == 0 then
+        xy[#xy+1] = string.format("%.0fs:PC=%04X X=%04X Y=%04X CC=%02X",
+            i*0.25, cpu.state["PC"].value, cpu.state["X"].value,
+            cpu.state["Y"].value, cpu.state["CC"].value)
+    end
     if v ~= 0xFF and not seen[v] then
         seen[v] = true
         order[#order+1] = v
@@ -68,11 +90,14 @@ for i = 1, 300 do
     end
 end
 local o = io.open(os.getenv("OUTF"), "w")
+o:write("img " .. (imgsnap or (probe(0x2800,8).." "..probe(0x6000,8).." "
+        ..probe(0xA000,8).." "..probe(0xCE58,8))) .. "\n")
 o:write("order " .. table.concat(order, ",") .. "\n")
 o:write("snap " .. (snap or "none") .. "\n")
 o:write(string.format("pc %04X\n", cpu.state["PC"].value))
 o:write(string.format("s %04X %04X\n", smin or 0, smax or 0))
 o:write("trace " .. table.concat(trace, " ") .. "\n")
+o:write("xy " .. table.concat(xy, " | ") .. "\n")
 o:write(string.format("ready %02X\n", prog:read_u8(rdy)))
 o:write(string.format("dskcon opc=%02X drv=%02X trk=%02X sec=%02X sta=%02X\n",
   prog:read_u8(dc), prog:read_u8(dc+1), prog:read_u8(dc+2), prog:read_u8(dc+3),
@@ -125,6 +150,10 @@ def main():
                DCOPC="%X" % sym(mappath, "_DCOPC"),
                READYAT="%X" % sym(mappath, "_ready"))
     p = subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
+                    # SLOT ORDER IS LOAD-BEARING AND WAS TESTED, not assumed. Putting the FDC in
+                    # slot 1 and the card in slot 4 leaves the machine unable to boot Disk
+                    # BASIC at all -- rainbow blocks, no prompt, nothing runs. The FDC's ROM
+                    # has to be in the slot the machine looks in.
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
                     "-autoboot_script", lua, "-autoboot_delay", "1",
@@ -139,7 +168,22 @@ def main():
 
     order = [int(x) for x in got["order"].strip().split(",") if x]
     print("ovlrun: loaded by CLEAR/LOADM/EXEC from the diskette, window $%04X" % win)
+    raw = open(os.path.join(COCO3, "build", "EGATREK.RAW"), "rb").read()
+    spots = [(0x2800, "start"), (0x6000, "a third in"),
+             (0xA000, "two thirds in"), (0xCE58, "the last bytes")]
+    parts = got["img"].strip().split()
+    allok = True
+    for (addr, lbl), have in zip(spots, parts):
+        want = raw[addr - 0x2800: addr - 0x2800 + 8].hex().upper()
+        ok = have == want
+        allok &= ok
+        print("  image %-15s $%04X %s %s %s" % (lbl, addr, have,
+              "==" if ok else "!=", want))
+    print("  -> the loader placed the image CORRECTLY" if allok
+          else "  -> THE IMAGE IS NOT IN MEMORY AS WRITTEN")
     print("  PC at the end   : $%s" % got["pc"].strip())
+    for line in got["xy"].strip().split(" | "):
+        if line: print("     %s" % line)
     print("  stack S ranged  : $%s..$%s" % tuple(got["s"].strip().split()))
     print("  PC/S trace      : %s" % got["trace"].strip())
     print("  disk ready flag : %s   dskcon %s"

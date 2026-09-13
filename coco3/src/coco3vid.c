@@ -148,7 +148,25 @@ void vdc_shutdown(void) { }
 
 /* Nothing to hand back: this port owns the machine from $1200 up, the way
    the Atari one does since it dropped DOS. */
-void plat_exit(void) { }
+/* HAND THE MACHINE BACK, because this port took it.
+ *
+ * An empty plat_exit() is right on a machine whose OS is still there. It is
+ * wrong here: the startup wrote $FFDF and paged Disk BASIC away, so when
+ * main() returns, cmoc's _exit tries to return to a BASIC that no longer
+ * exists and the 6809 wanders. The symptom was the whole program RESTARTING
+ * every ten to twenty seconds -- sampled at $282A with the bss counter part
+ * way down, then at $282A again on a later pass with a different count, which
+ * is what finally showed it was cycling rather than stuck.
+ *
+ * $FFDE puts the ROM back and the machine's own reset vector cold-starts it,
+ * which is the same answer the C128 port reached for the same reason: a port
+ * sitting in the whole address space cannot politely return. */
+void plat_exit(void)
+{
+    asm { orcc #$50 }           /* no interrupts while the map changes */
+    asm { sta $FFDE }           /* ROM/RAM mode: Disk BASIC comes back */
+    asm { jmp [$FFFE] }         /* the machine's own reset vector */
+}
 
 void wait_vsync(void)
 {
