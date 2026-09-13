@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and five times on 2026-09-13 (8 open of 47 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and five times on 2026-09-13 (7 open of 47 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1884,7 +1884,34 @@ are the CoCo 3**, which is started and not released:
       enable set), `m_mode=7 m_height=262`, all 32 palette bytes identical to
       ega_pal, and VRAM holding a correct title screen. The port programs the
       chip, the chip agrees, MAME does not put it on its screen.
-  46. **AFTER THE TITLE SCREEN THERE IS NOTHING BUT A CURSOR.** Found
+  46. ~~**AFTER THE TITLE SCREEN THERE IS NOTHING BUT A CURSOR.**~~
+      **CLOSED 2026-09-13: FAR MEMORY WAS A STUB AND THE GAME RAN WORDLESS.**
+      coco3farmem.c's far_load() returned FAR_NONE, so str_load() failed, so
+      every S() returned an empty string -- which core/strpool.h promises and
+      the game survives by design. The cursor block was a real prompt with no
+      question beside it.
+      **AND THE PICTURE I CALLED CORRECT WAS NOT.** The title screen shot
+      earlier the same day was reported as right; it was the title with every
+      pooled string empty -- the two boxes drawn and their contents missing. I
+      read the part I could see and called the frame good. It now carries the
+      Anderson credit, the ship, the U.S.S. Lexington and PRESS RETURN TO
+      BEGIN, and the front end walks welcome / briefing / restore / name /
+      command level / self-destruct password with prose throughout.
+      **THE FIX IS THE ONE THE STUB ITSELF DESCRIBED**: the SuperSprite's
+      128K of VRAM. The display uses 54,272 bytes plus a 2K message log at
+      $E000, all inside the first 64K; THE SECOND 64K IS UNREACHABLE BY THE
+      6809 ANY OTHER WAY, which is exactly the shape core/farmem.h asks for.
+      The Atari reached the same answer through VBXE's VRAM.
+      **THE CHIP NOW HAS THREE TENANTS** -- screen, message log, far memory --
+      sharing ONE address counter, and only the log remembers where it left
+      it. coco3vdp.h carries the two sanctioned entry points, which invalidate
+      that cache; the bank arithmetic lives there rather than in coco3vid.c,
+      which is 16-bit throughout by a rule that cost twelve emulated seconds
+      to learn.
+      It streams through plat_open/plat_read, which also exercises the path
+      every disk measurement so far had skipped: they all went through
+      plat_read_all.
+      ORIGINAL: Found
       2026-09-13 by the first picture anyone has seen of this port. The title
       draws correctly -- "EGA TREK" and its two boxes, white on black. Press a
       key and the screen clears, FRONT.OVL pages in (resident_image goes

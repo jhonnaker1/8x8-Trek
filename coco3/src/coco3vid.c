@@ -36,6 +36,7 @@
 #include <stdint.h>
 
 #include "../../c128/src/vdc.h"
+#include "coco3vdp.h"
 #include "font6x8.h"
 
 #define VDP_DATA   ((unsigned char *)0xFF78)
@@ -344,3 +345,26 @@ unsigned char vdc_data_read(void)
 /* C128-only: that machine's CRTC registers. Nothing here has them. */
 unsigned char vdc_reg_read(unsigned char reg) { (void)reg; return 0; }
 void vdc_reg_write(unsigned char reg, unsigned char value) { (void)reg; (void)value; }
+
+/* FAR MEMORY'S WINDOW INTO THE SAME CHIP. See coco3vdp.h for why this lives
+   here rather than in coco3farmem.c: R#14 and the two-byte address dance are
+   this file's knowledge, and the log's cached position is this file's to
+   invalidate. FAR_BANK is 4 because R#14 counts 16K banks and far memory
+   starts at VRAM $10000 -- 4 * 16384. */
+#define FAR_BANK 4
+
+void vdp_far_write_at(uint16_t off)
+{
+    vdp_reg(14, (unsigned char)(FAR_BANK + (unsigned char)(off >> 14)));
+    *VDP_ADDR = (unsigned char)(off & 0xFF);
+    *VDP_ADDR = (unsigned char)(((off >> 8) & 0x3F) | 0x40);
+    log_mode = MODE_NONE;               /* the counter has moved; say so */
+}
+
+void vdp_far_read_at(uint16_t off)
+{
+    vdp_reg(14, (unsigned char)(FAR_BANK + (unsigned char)(off >> 14)));
+    *VDP_ADDR = (unsigned char)(off & 0xFF);
+    *VDP_ADDR = (unsigned char)((off >> 8) & 0x3F);
+    log_mode = MODE_NONE;
+}

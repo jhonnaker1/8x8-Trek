@@ -68,11 +68,32 @@ emu.wait(8)
 kbd:post_coded("EXEC{ENTER}")
 emu.wait(at)
 
--- Dismiss the title and walk forward, if asked. The game waits for a key now.
-local enter = manager.machine.ioport.ports[":row6"].fields["ENTER"]
-for i = 1, keys do
-    enter:set_value(1); emu.wait(0.15)
-    enter:set_value(0); emu.wait(2.0)
+-- Dismiss the title and walk forward. The game waits for a key now.
+-- FIND A KEY BY ITS LABEL rather than carrying a table: MAME's field names
+-- start with the unshifted character ("a  A", "0", "ENTER"), so the first
+-- token IS the key. A table here would be a third copy of the matrix.
+local function keyfield(want)
+    for r = 0, 6 do
+        local port = manager.machine.ioport.ports[":row" .. r]
+        for name, f in pairs(port.fields) do
+            if name ~= "Keyboard" then
+                local tok = name:match("^(%S+)")
+                if tok and tok:lower() == want:lower() then return f end
+            end
+        end
+    end
+    error("vramshot: no key named " .. want)
+end
+
+local function press(f, hold)
+    f:set_value(1); emu.wait(0.15)
+    f:set_value(0); emu.wait(hold)
+end
+
+local enter = keyfield("ENTER")
+for i = 1, keys do press(enter, 2.0) end
+for want in string.gmatch(os.getenv("SEQ") or "", "[^,]+") do
+    press(keyfield(want), 2.5)
 end
 -- LET THE SCREEN FINISH. An overlay load off a floppy plus a full redraw is
 -- seconds, and catching it half-drawn reports a black frame as a dead port.
@@ -115,6 +136,9 @@ def main():
                     help="emulated seconds to wait after EXEC before shooting")
     ap.add_argument("--keys", type=int, default=0,
                     help="ENTER presses before the shot, to walk past the title")
+    ap.add_argument("--seq", default="",
+                    help="comma-separated keys to type first, e.g. ENTER,n,ENTER -- "
+                         "a letter or digit, or a named key (ENTER SPACE UP DOWN)")
     ap.add_argument("--settle", type=float, default=6.0,
                     help="emulated seconds to let the screen finish drawing")
     a = ap.parse_args()
@@ -129,7 +153,7 @@ def main():
     tmp = tempfile.mkdtemp(prefix="vramshot")
     lua, raw = (os.path.join(tmp, n) for n in ("run.lua", "vram.bin"))
     open(lua, "w").write(LUA)
-    secs = int(30 + a.at + a.keys * 3 + a.settle + 40)
+    secs = int(30 + a.at + a.keys * 3 + len(a.seq.split(',')) * 4 + a.settle + 40)
     subprocess.run([MAME, "coco3", "-window", "-skip_gameinfo", "-rompath", ROMS,
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
@@ -137,7 +161,7 @@ def main():
                     "-seconds_to_run", str(secs), "-nothrottle",
                     "-cfg_directory", tmp, "-snapshot_directory", tmp],
                    env=dict(os.environ, RAWF=raw, AT=str(a.at),
-                            KEYS=str(a.keys), SETTLE=str(a.settle),
+                            KEYS=str(a.keys), SETTLE=str(a.settle), SEQ=a.seq,
                             NBYTES=str(CHIP_BYTES)),
                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                    cwd=tmp, check=False)
