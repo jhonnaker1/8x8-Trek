@@ -2171,11 +2171,24 @@ are the CoCo 3**, which is started and not released:
       CoCo 3's title screen sits in kb_waitkey polling every frame, so this
       may be the first port playing the track at full intended speed -- and an
       ear calibrated on the C128 or the Atari would hear correct as fast.
-      **DO NOT SLOW IT ON THE STRENGTH OF THE IMPRESSION.** Record the same
-      21 seconds from a released port and compare; if the C128 is slower,
-      the bug is THERE and has been shipping for months. If it is not, this
-      driver is wrong somewhere the registers do not show.
-      coco3/build/title-music.wav is the CoCo 3 excerpt.
+      **THE CAUSE IS `-nothrottle`, AND IT IS MINE.** Every MAME run in this
+      session passes it, and MAME reported *"Average speed: 2490.10%"* --
+      Jamie was listening to the emulator running at TWENTY-FIVE TIMES REAL
+      TIME. At that rate the title track is an unrecognisable warble, which is
+      exactly "sounds weird", "the tune sounds wrong", "too fast". When I sent
+      him a recording he said *"thats not what i hear"*, and that was the
+      tell: a `-wavwrite` file is written in EMULATED time, so it plays at the
+      correct speed and could not match what he had been hearing.
+      **`-nothrottle` IS RIGHT FOR EVERY AUTOMATED CHECK AND WRONG FOR ANY
+      HUMAN.** The tools keep it; anything a person watches or listens to must
+      not have it. See coco3/README.md, which now says so beside the
+      `-window` and `-skip_gameinfo` rule.
+      **AND I NEARLY "FIXED" A CORRECT DRIVER.** I had a hypothesis ready that
+      the RELEASED ports were dropping ticks and had been shipping slow for
+      months, and was one step from recording the C128 to prove it. The
+      measurement that would have settled it -- 18.27 ticks/s against 18.2065
+      -- was already in hand and already correct; what was missing was asking
+      what the LISTENER's machine was doing, not what the port was doing.
       Raised 2026-09-13 by the recording that confirmed the frequency law.
       MUS_TITLE uses twelve pitches -- 150 220 290 330 350 390 440 470 520 590
       660 700 -- and 175 is not one of them, yet it sustains for half a second

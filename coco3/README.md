@@ -406,6 +406,14 @@ plus the `ym2413` the card's OPLL needs.
 mame64 coco3 -window -skip_gameinfo -ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc
 ```
 
+**NEVER `-nothrottle` WHEN A PERSON IS LISTENING OR WATCHING.** Every tool
+here passes it, and it is right for them -- a check that waits in real time is
+a check nobody runs. But MAME then reports speeds like *2490%*, and at
+twenty-five times real time the title music is an unrecognisable warble. Jamie
+heard exactly that and reported the tune as wrong three different ways; the
+driver was correct to 0.35%. To listen or to play, drop `-nothrottle` and
+`-seconds_to_run`.
+
 **Always `-window`, and always `-skip_gameinfo`** -- without the second one
 MAME holds its machine-information screen waiting for a keypress, which an
 automated run has nobody to give it.
