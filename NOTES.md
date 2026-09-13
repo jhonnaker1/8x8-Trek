@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and four times on 2026-09-13 (6 open of 44 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and four times on 2026-09-13 (7 open of 45 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1850,6 +1850,26 @@ are the CoCo 3**, which is started and not released:
       finds what the instruments cannot. **It could not be played until
       2026-09-13**: kb_waitkey() returned KB_RETURN unconditionally, so the
       game auto-advanced through every prompt. See item 43.
+      **AND IT STILL CANNOT BE PLAYED ON THIS RIG, which is item 45.**
+  45. **THE PORT CANNOT BE SEEN UNDER MAME.** Not new -- coco3/README.md has
+      said since the video driver landed that "MAME renders the card's screen
+      black no matter what the VDP is doing", and every check since has gone
+      through VRAM read-back for exactly that reason. What is new is
+      realising what it COSTS: a MAME snapshot taken while the game was
+      running shows the CoCo's own VDG text screen, still displaying
+      `CLEAR 25,&H6FFF` / `LOADM"TREKLDR"` / `EXEC`, because the game's
+      output is going to a card the emulator does not draw.
+      **So item 31 is not waiting on Jamie, it is BLOCKED.** Six ports were
+      played before release; this one cannot be, on the only rig there is.
+      Every claim about this port -- video, overlays, the loader, the
+      keyboard -- rests on read-back and breadcrumbs, and NOT ONE of them has
+      been confirmed by a person looking at the screen. On a project where a
+      person watching the screen has beaten the instruments seven times, that
+      is the most important open item, not the smallest.
+      Options, none of them measured yet: real hardware; another emulator
+      that draws a V9958 on a CoCo; or rendering the VRAM to a PNG from the
+      harness so at least the FRAME can be inspected even if the window is
+      black. The third is cheap and is ours to do.
   43. **THE COUNT WAS WRONG BECAUSE A CLOSED-LOOKING ENTRY HELD TWO OPEN
       SEAMS.** Found 2026-09-13, one question after the re-derivation that
       produced it. Item 27 reads `~~Video, sound and input are stubs.~~` with
