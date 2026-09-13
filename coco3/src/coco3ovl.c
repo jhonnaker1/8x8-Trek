@@ -3,7 +3,7 @@
  * THE C128'S DESIGN, NOT THE GIME'S. Paging an 8K block with the MMU would
  * make a swap one store instead of a disk read -- but enabling MMUEN breaks
  * standalone DSKCON on this machine (isolated to that single bit; see
- * coco3bank.h and NOTES.md), so the port does not enable the MMU at all. That
+ * NOTES.md item 30), so the port does not enable the MMU at all. That
  * leaves the shape four shipping ports here already use: a window in ordinary
  * RAM, and an image loaded into it on demand.
  *

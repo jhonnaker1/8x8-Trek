@@ -14,7 +14,8 @@ then STOPS, leaving the machine in all-RAM mode with nothing to wipe anything.
 The report is then simply there to be read.
 
 THE REPORT USES AN ABSOLUTE-ADDRESS MACRO, not a local pointer: cmoc emitted
-no stores at all for the pointer version, exactly as coco3bank.h warns. This
+no stores at all for the pointer version, exactly as README.md's "cmoc
+traps" warns. This
 tool verifies the stores are in the binary before trusting the run, and looks
 for BOTH encodings -- cmoc emits STB (F7), not STA (B7), because it prefers B
 for 8-bit values, and checking only for STA reported them missing once.

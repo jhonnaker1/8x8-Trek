@@ -130,6 +130,34 @@ The message log now lives in the card's VRAM rather than in the 6809's address
 space, which is what the stub always said should happen — **2,048 bytes bought
 back** on a machine that had 2,468 free.
 
+## cmoc traps, and where the MMU code went
+
+**These three were written in `src/coco3bank.h`**, which was deleted on
+2026-09-13 with the rest of the banking code — the MMU is not used and never
+will be here (NOTES item 30). The lessons are cited from three other files and
+are the most expensive things this port learned about its compiler, so they
+live here now.
+
+**A RUN OF STORES THROUGH A LOCAL POINTER CAN VANISH ENTIRELY.** cmoc has no
+`volatile` — it says so: *"the `volatile' keyword is not supported by this
+compiler"* — so a sequence of writes through `unsigned char *r = (unsigned
+char *)0x2000;` that nothing ever reads back is free to disappear, and did.
+Write hardware through an absolute-address macro instead. Every working probe
+in this port uses one.
+
+**AND A READ FROM A LITERAL ADDRESS CAN BE HOISTED AND CACHED.** Three reads of
+a paged window came back as the same stale `$FF` while the writes were landing
+correctly — proven by paging the blocks in from the host and finding the right
+bytes there. Keep hardware access straight-line; a loop that reads the same
+address repeatedly is not safe.
+
+**THE GIME's MMU SLOT REGISTERS DO READ BACK, but mask the top two bits** —
+`$FFA0-$FFA7` return bus bleedover in bits 6 and 7, sometimes zero and
+sometimes one, so a raw read looks like nonsense. **`INIT0`/`INIT1` at
+`$FF90`/`$FF91` do NOT read back** — both answer `$1B` whatever you wrote.
+Two different registers with two different answers, recorded together because
+conflating them is how the wrong belief survived twice.
+
 ## What is a stub
 
 `src/coco3snd.c` and `src/coco3input.c` say so in their first line. Two
@@ -368,8 +396,11 @@ page out mid-call.
 **Setting MMUEN alone — no remapping, nothing else — permanently breaks
 standalone DSKCON access.** Isolated by bisection to that one bit. Restoring
 the registers does not recover it, restoring TR does not, re-initialising the
-driver does not. Unexplained, and routed around by not using the MMU;
-`src/coco3bank.c` is kept and is not linked into the game.
+driver does not. Unexplained, and routed around by not using the MMU. **`src/coco3bank.c` and
+`coco3bank.h` were DELETED on 2026-09-13** (NOTES item 30): 192 lines linked
+into nothing, for a feature whose purpose — finding memory — the disk overlays
+and the card's VRAM had already solved. The compiler lessons they carried are
+above, under "cmoc traps".
 
 Two traps from that work worth keeping. **The GIME registers do not read back
 what was written** here — `$FF90` and `$FF91` both read `$1B` — so ask the

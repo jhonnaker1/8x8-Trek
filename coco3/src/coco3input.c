@@ -46,7 +46,8 @@
 #include "../../c128/src/sid.h"
 
 /* ABSOLUTE ADDRESSES, NOT POINTERS THROUGH A LOCAL. cmoc has no `volatile`,
-   and coco3bank.h already carries the scar: a run of stores through a local
+   and README.md's "cmoc traps" already carries the scar: a run of stores
+   through a local
    pointer that nothing reads back is free to vanish, and did. */
 #define KB_STROBE  (*(unsigned char *)0xFF02)   /* PIA0 port B: columns, low */
 #define KB_ROWS    (*(unsigned char *)0xFF00)   /* PIA0 port A: rows, low    */

@@ -25,7 +25,7 @@
 /* AN ABSOLUTE ADDRESS, NOT A LOCAL POINTER. The first version of the report
    below used `unsigned char *r = (unsigned char *)0x2000;` and cmoc emitted
    NO STORES AT ALL -- checked by looking for B7 20 00 in the binary, which
-   was not there. coco3bank.h already says why: a local pointer lives in the
+   was not there. README.md's "cmoc traps" says why: a local pointer lives in the
    stack frame and is reloaded before every store through it, and a run of
    stores nothing ever reads is free to vanish. Every working probe in this
    port uses a macro like this one. I had the note and ignored it.

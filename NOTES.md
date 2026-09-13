@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (4 open of 55 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (1 open of 55 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1828,10 +1828,35 @@ are the CoCo 3**, which is started and not released:
       The safe shape if it turns out to bite: drop to `$FFD8` around
       `read_sec`/`write_sec` and restore. That costs two port writes a sector
       and is not worth adding on speculation.
-  30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
-      unexplained. Routed around by not using the MMU; see below. **Less
-      urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
-      it, which was the problem the MMU was for.
+  30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
+      unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
+      banking code is DELETED and the MMU is not this port's problem.**
+      `src/coco3bank.c` and `coco3bank.h` were 192 lines linked into NOTHING --
+      `grep -c coco3bank Makefile` answered 0 -- kept against a day when the
+      port would need the memory. It never came: the disk overlays freed
+      12,860 bytes and far memory went into the card's VRAM. **The feature's
+      PURPOSE was solved by other means, which is a better reason to delete
+      something than proving it works.**
+      **THE COMPILER LESSONS IT CARRIED ARE NOT LOST.** Three other files and
+      one tool cited `coco3bank.h` for cmoc's behaviour -- stores through a
+      local pointer vanishing, reads from a literal address being hoisted --
+      and deleting it would have left four dangling citations, the same defect
+      as the README link in item 32. They are in `coco3/README.md` under
+      "cmoc traps" now and every citation was retargeted.
+      **AND A FACT WORTH KEEPING STRAIGHT WAS ALMOST LOST WITH THEM**: the MMU
+      SLOT registers `$FFA0-$FFA7` DO read back, masked in the top two bits,
+      while `INIT0`/`INIT1` at `$FF90`/`$FF91` do NOT -- both answer `$1B`.
+      Two registers, two answers; conflating them is how "GIME registers do
+      not read back" survived being wrong twice.
+      **THE EXPLANATION IT NEVER GOT, recorded in case anyone wants it**:
+      `bank_init()` wrote a HARDCODED map, `MMU0[i] = 0x38 + i`, and slot 0
+      covers `$0000-$1FFF` -- which holds the interrupt vector table at
+      `$0100-$010F`. Items 37, 38 and 49 were all, in the end, that table
+      going missing under DSKCON, which then waits for ever for an NMI that
+      vectors into nothing. If the hardcoded map was wrong for the first
+      block, enabling MMUEN would swap that table out. That hypothesis did not
+      exist when this was parked, because the vectors had not yet been learned
+      to be load-bearing. It is testable in about one run, and nobody needs to.
   38. ~~**THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.**~~ **CLOSED
       2026-09-13: THE GAME BOOTS.** `make ovlrun` passes: the loader places
       all 42,680 bytes correctly, hands over, and the running game pages in
