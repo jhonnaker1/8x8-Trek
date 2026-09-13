@@ -208,5 +208,8 @@ fail.**
 **All five are closed and the list is empty.** The one thing this port has
 never had is a second pair of hands: it has been played once, by Jamie, on an
 emulated Falcon under Hatari. Nobody has run it on real hardware, and the VGA
-mode it sets is the only one it knows -- an RGB monitor or a TV is untested
+mode follows VgetMonitor(): 640x480 on VGA, 640x400 interlaced on RGB and
+TV (which flickers, being interlaced), and a refusal on ST monochrome, which
+would need a one-plane driver rather than another mode. All four checked under
+Hatari with `--monitor`.
 and expected to be wrong.

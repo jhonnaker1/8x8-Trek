@@ -11,11 +11,20 @@ enjoy that, register it. That was always the deal.
 
 RUNNING IT
 
-A Falcon030 with a VGA MONITOR, and about 150K free.
+A Falcon030 with a COLOUR display -- VGA, RGB or a television -- and about
+150K free.
 
-The VGA monitor is not a preference. The game sets 640x480 in sixteen colours
--- the mode a Falcon on VGA already boots into -- and that mode does not exist
-on an RGB monitor or a television. It has been run on VGA and nowhere else.
+The game asks the machine which monitor it has (VgetMonitor) and picks a mode
+to suit: 640x480 in sixteen colours on VGA, 640x400 interlaced on RGB and on a
+television. All three have been run under Hatari.
+
+A TELEVISION WILL FLICKER. An interlaced 400-line picture is what the console
+needs -- 80 columns by 25 rows of 8x16 characters -- and 640x200, the most a
+TV shows without interlace, cannot hold it. That is a property of the display,
+not something the game can fix.
+
+AN ST MONOCHROME MONITOR IS NOT SUPPORTED. The game says so and returns you to
+the desktop rather than painting a screen you could not read.
 
 Copy the whole folder anywhere and run EGATREK.PRG from the desktop. It sets
 the screen mode at startup and PUTS THE OLD ONE BACK when you quit, so you get

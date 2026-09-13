@@ -6,11 +6,26 @@
  * turn into pixels, because this machine has no character generator -- same
  * position as the Amiga, and the shape of this driver follows it.
  *
- * THE MODE IS THE ONE THE MACHINE ALREADY BOOTS INTO. A Falcon on a VGA
- * monitor comes up in $001A = VGA|COL80|BPS4, which VgetSize reports as
- * 153,600 bytes: 640x480 at four planes. Measured, not assumed -- see
- * NOTES.md, "SCOPE: the ATARI FALCON", and tools/falcon/vidprobe.c. We still
- * set it explicitly, because a Falcon on an RGB monitor boots elsewhere.
+ * THE MODE DEPENDS ON THE MONITOR, and until 2026-09-13 this file forced
+ * VGA|COL80|BPS4 on every machine -- a mode that does not exist on an RGB
+ * monitor or a television, shipped in a released port. VgetMonitor() (XBIOS
+ * 59) answers 0 ST-mono, 1 RGB, 2 VGA, 3 TV, and the console's geometry is
+ * what each answer has to satisfy: 80x25 of 8x16 cells is 640x400.
+ *
+ *   VGA   640x480, four planes, $001A. What it always did, and it works.
+ *   RGB   640x400 needs VERTFLAG ($100) -- interlace. Same cells, same font,
+ *         same glyphs; only the height and the top margin change.
+ *   TV    the same signal path as RGB, so it gets the same mode. A television
+ *         will FLICKER on an interlaced 400-line picture; the alternative is
+ *         640x200, which cannot hold 25 rows of 16-pixel cells at all. See
+ *         README.md -- this is a caveat, not a bug to be fixed in software.
+ *   mono  a single plane with no word interleave and no colour: a different
+ *         driver, not a different mode. It says so and exits rather than
+ *         painting an unreadable screen on a monitor it cannot drive.
+ *
+ * VgetSize reports 153,600 bytes for the VGA mode: 640x480 at four planes.
+ * Measured, not assumed -- see NOTES.md, "SCOPE: the ATARI FALCON", and
+ * tools/falcon/vidprobe.c.
  *
  * THE PLANES ARE WORD-INTERLEAVED, AND THIS IS THE ONE THING THAT DOES NOT
  * CARRY FROM THE AMIGA. There, four bitplanes are four separate regions and a
@@ -40,12 +55,12 @@
 #include "../../core/ega.h"
 
 #define SCR_W    640
-#define SCR_H    480
+#define SCR_H    480                  /* the TALLEST mode; scr_h is the live one */
 #define STRIDE   (SCR_W / 2)          /* 4 planes, 1 bit each = 320 bytes */
 #define CELL_W   8
 #define CELL_H   16
 #define CON_H    (VDC_ROWS * CELL_H)  /* 25 rows of 16 = 400 lines */
-#define MARGIN_Y ((SCR_H - CON_H) / 2)
+#define MARGIN_Y ((SCR_H - CON_H) / 2)   /* VGA's; margin_y is the live one */
 
 /* Line-A init: d0/a0 = variable table, a1 = the three font headers, a2 = the
    routine table. Only a1 is wanted. d2 and a2 are saved because Line-A is
@@ -73,6 +88,12 @@ struct fnthdr {
 };
 
 static unsigned char *scr;              /* Physbase(), once */
+
+/* SET FROM VgetMonitor() AND THEN CONSTANT. The console is the same 80x25 of
+   8x16 cells on every monitor; only the screen height and the top margin
+   differ, which is why nothing else in this file has to know. */
+static int scr_h   = SCR_H;
+static int margin_y = MARGIN_Y;
 static const struct fnthdr *rom_font;   /* the 8x16 system font */
 static short old_mode = -1;
 
@@ -249,8 +270,29 @@ void vdc_init(void)
         }
     }
 
-    old_mode = VsetMode(-1);
-    VsetMode(VGA | COL80 | BPS4);
+    /* THE MONITOR DECIDES THE MODE. Forcing VGA here is what item 33 was. */
+    {
+        WORD mon = VgetMonitor();
+
+        if (mon == 0) {
+            /* One plane, no colour: not a mode away, a driver away. Say so
+               through GEMDOS and hand the machine back untouched rather than
+               painting something unreadable on it. */
+            Cconws("\r\nEGA Trek needs a colour monitor.\r\n"
+                   "This Falcon reports an ST monochrome display.\r\n");
+            Pterm(1);
+        }
+
+        old_mode = VsetMode(-1);
+        if (mon == 2) {                        /* VGA */
+            VsetMode(VGA | COL80 | BPS4);
+            scr_h = 480;
+        } else {                               /* RGB, and TV on the same path */
+            VsetMode(COL80 | BPS4 | VERTFLAG); /* 640x400, interlaced */
+            scr_h = 400;
+        }
+        margin_y = (scr_h - CON_H) / 2;
+    }
     scr = (unsigned char *)Physbase();
     VsetRGB(0, 16, (RGB *)ega_rgb);
     scr_clear();
@@ -276,7 +318,7 @@ void wait_vsync(void) { Vsync(); }
 void scr_clear(void)
 {
     if (scr)
-        memset(scr, 0, (long)STRIDE * SCR_H);
+        memset(scr, 0, (long)STRIDE * scr_h);
 }
 
 void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char color)
@@ -288,7 +330,7 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
         return;
 
     glyph_rows(ch, rows);
-    py = MARGIN_Y + y * CELL_H;
+    py = margin_y + y * CELL_H;
 
     for (r = 0; r < CELL_H; r++) {
         unsigned char bits = rows[r];

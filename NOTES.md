@@ -2374,7 +2374,23 @@ ports rather than reciting the list above found:
       port with no README. Every other port link resolved, which is why it
       looked fine. *A release creates the most items*, and this one was created
       by the release that closed item 26.
-  33. **THE FALCON'S RGB / TV PATH IS UNTESTED AND EXPECTED TO BE WRONG.**
+  33. ~~**THE FALCON'S RGB / TV PATH IS UNTESTED AND EXPECTED TO BE WRONG.**~~
+      **CLOSED 2026-09-13: it follows VgetMonitor() and all four types were
+      run under Hatari.**
+        VGA  640x480, $001A -- unchanged, still right.
+        RGB  640x400 with VERTFLAG. The title screen draws IDENTICALLY to
+             VGA, checked side by side; the empty boxes in both shots are the
+             screenshot catching a mid-draw, which the VGA control proved.
+        TV   the same mode and the same picture. It will flicker on real
+             glass, being interlaced, and 640x200 cannot hold 25 rows of
+             16-pixel cells -- a property of the display, written up as a
+             caveat rather than pretended away.
+        mono says so through GEMDOS and returns to the desktop. One plane with
+             no colour is a different driver, not a different mode.
+      **THE SHIPPED README SAID "A Falcon030 with a VGA MONITOR" and that was
+      a real restriction on a real release** -- now three of four displays are
+      supported and the fourth is refused politely.
+      ORIGINAL:
       `vdc_init()` sets `VGA|COL80|BPS4` unconditionally; that mode does not
       exist on an RGB monitor or a television. It is written up as a caveat in
       `falcon/README.md` and `falcon/README-release.txt` and **had never been
