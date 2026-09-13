@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -307,6 +307,22 @@ keymatrix:
 
 keycheck: $(KEY_OUT)
 	@python3 tools/keycheck.py
+
+# WRITING. plat_write_all was a stub for the life of the port, so SAVE could
+# not work. writecheck has the machine write a file and then reads the .dsk
+# on the host with independent code -- a return code is not a witness.
+WRITE_SRC = src/writetest.c src/coco3storage.c
+WRITE_OUT = build/WRITETEST.BIN
+
+writetest: $(WRITE_OUT)
+
+$(WRITE_OUT): $(WRITE_SRC) Makefile
+	@mkdir -p build
+	$(CMOC) $(CFLAGS) -o $@ $(WRITE_SRC)
+	@ls -l $@
+
+writecheck: $(WRITE_OUT) disk
+	@python3 tools/writecheck.py
 
 # MAME DRAWS THE CARD'S SCREEN BLACK, so nothing here has ever been LOOKED at.
 # This pulls the frame out of the V9958's own VRAM and writes a PNG.

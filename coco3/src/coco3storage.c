@@ -180,6 +180,18 @@ interrupt void trek_stray(void)
 {
 }
 
+/* One sector OUT of secbuf. DSKCON opcode 3 is write; 2 is read. */
+static unsigned char write_sec(unsigned char trk, unsigned char sec)
+{
+    DCOPC = 3;
+    DCDRV = 0;
+    DCTRK = trk;
+    DCSEC = sec;
+    DCBPT = secbuf;
+    dskcon_processSector();
+    return (unsigned char)(DCSTA == 0);
+}
+
 static unsigned char disk_ready(void)
 {
     if (ready) return 1;
@@ -354,14 +366,153 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
     return (copied == (unsigned int)len) ? STOR_OK : STOR_ERROR;
 }
 
-/* WRITING IS NOT IMPLEMENTED. DSKCON writes sectors (DCOPC = 3); what is
-   missing is allocating granules and writing the FAT and directory back.
-   Returning STOR_ERROR makes SAVE say "COULD NOT SAVE." instead of pretending
-   -- the Falcon's sound stub kept the same honesty. */
+/* WRITING: allocate granules, write the data, then the FAT, then the
+ * directory -- IN THAT ORDER, so a file only becomes findable once its bytes
+ * are already on the disk. An interrupted write leaves granules marked free
+ * and nothing pointing at them, which is a leak; the other order leaves a
+ * directory entry pointing at garbage, which is a corrupt file.
+ *
+ * THE FORMAT IS NOT INVENTED HERE. tools/mkdisk.py already writes this
+ * filesystem and tools/checkdisk.py already round-trips it, so the
+ * conventions are copied from the host writer rather than re-derived:
+ * ngran = ceil(len/2304), the last granule's FAT byte is $C0|nsec with nsec =
+ * ceil(bytes-in-that-granule/256), lastbytes is `len % 256 or 256` stored
+ * BIG ENDIAN at [14..15], file type 2 (machine language), ASCII flag 0, and
+ * short sectors are padded with $00.
+ *
+ * CAPACITY IS CHECKED BEFORE ANYTHING IS FREED. Replacing an existing file
+ * frees its chain first, and if the check came after, a write that then
+ * turned out not to fit would leave the in-memory FAT disagreeing with the
+ * disk -- with the old file's granules marked free and its directory entry
+ * still pointing at them.
+ */
 uint8_t plat_write_all(const char *name, const void *buf, uint16_t len)
 {
-    (void)name; (void)buf; (void)len;
-    return STOR_ERROR;
+    const unsigned char *src = (const unsigned char *)buf;
+    char want[11];
+    unsigned char dsec = 0, dent = 0, haveslot = 0;
+    unsigned char oldgran = 0xFF;
+    unsigned char need, freeg, oldn, g, prev, first;
+    unsigned char s, e, k;
+    unsigned int  pos;
+
+    if (len == 0) return STOR_ERROR;
+    if (!disk_ready()) return STOR_ERROR;
+
+    normalise(name, want);
+
+    /* 1. The directory: an entry with this name, or failing that the first
+          free slot. Both are wanted in ONE pass -- the entry may come after
+          the free slot, and replacing beats appending. */
+    for (s = DIR_FIRST; s <= DIR_LAST; s++) {
+        if (!read_sec(DIR_TRACK, s)) return STOR_ERROR;
+        for (e = 0; e < ENT_PER_SEC; e++) {
+            unsigned char *p = secbuf + (unsigned int)e * ENT_SIZE;
+            if (p[0] == 0xFF || p[0] == 0x00) {
+                if (!haveslot) { dsec = s; dent = e; haveslot = 1; }
+                continue;
+            }
+            for (k = 0; k < 11 && p[k] == (unsigned char)want[k]; k++) { }
+            if (k == 11) {
+                dsec = s; dent = e; haveslot = 2;    /* replacing */
+                oldgran = p[13];
+                break;
+            }
+        }
+        if (haveslot == 2) break;
+    }
+    if (!haveslot) return STOR_ERROR;                /* directory full */
+
+    /* 2. How many granules, and are there that many? COUNT BEFORE FREEING. */
+    need = (unsigned char)((len - 1) / GRAN_BYTES + 1);
+    freeg = 0;
+    for (g = 0; g < NUM_GRAN; g++) if (fat[g] == 0xFF) freeg++;
+    oldn = 0;
+    if (oldgran < NUM_GRAN) {
+        unsigned char t = oldgran, guard = 0;
+        while (guard++ < NUM_GRAN + 1) {
+            unsigned char v = fat[t];
+            oldn++;
+            if ((v & 0xC0) == 0xC0) break;
+            if (v >= NUM_GRAN) break;                /* a corrupt chain */
+            t = v;
+        }
+    }
+    if ((unsigned int)freeg + oldn < (unsigned int)need) return STOR_ERROR;
+
+    /* 3. Now it is safe to give the old chain back. */
+    if (oldgran < NUM_GRAN) {
+        unsigned char t = oldgran, guard = 0;
+        while (guard++ < NUM_GRAN + 1) {
+            unsigned char v = fat[t];
+            fat[t] = 0xFF;
+            if ((v & 0xC0) == 0xC0 || v >= NUM_GRAN) break;
+            t = v;
+        }
+    }
+
+    /* 4. Allocate and chain. The last granule carries its sector count. */
+    first = 0xFF;
+    prev  = 0xFF;
+    pos   = 0;
+    g     = 0;
+    for (k = 0; k < need; k++) {
+        unsigned int chunk;
+        while (g < NUM_GRAN && fat[g] != 0xFF) g++;
+        if (g >= NUM_GRAN) return STOR_ERROR;        /* counted, cannot happen */
+        if (first == 0xFF) first = g;
+        if (prev != 0xFF) fat[prev] = g;
+        chunk = (unsigned int)(len - pos);
+        if (chunk > GRAN_BYTES) chunk = GRAN_BYTES;
+        /* Claim it now so the scan above cannot hand out the same one twice. */
+        fat[g] = (unsigned char)(0xC0 | (unsigned char)((chunk - 1) / SEC_SIZE + 1));
+        prev = g;
+        pos = (unsigned int)(pos + chunk);
+        g++;
+    }
+
+    /* 5. The data. Short sectors are padded, as the host writer pads them. */
+    pos = 0;
+    g = first;
+    while (g < NUM_GRAN) {
+        unsigned char v = fat[g], nsec, trk, sec0;
+        nsec = (unsigned char)(((v & 0xC0) == 0xC0) ? (v & 0x3F) : GRAN_SECS);
+        gran_loc(g, &trk, &sec0);
+        for (s = 0; s < nsec; s++) {
+            unsigned int i;
+            for (i = 0; i < SEC_SIZE; i++)
+                secbuf[i] = (pos + i < len) ? src[pos + i] : 0x00;
+            if (!write_sec(trk, (unsigned char)(sec0 + s))) return STOR_ERROR;
+            pos = (unsigned int)(pos + SEC_SIZE);
+            if (pos > len) pos = len;
+        }
+        if ((v & 0xC0) == 0xC0) break;
+        g = v;
+    }
+
+    /* 6. The FAT, read-modify-write so whatever else the sector holds
+          survives -- only the first NUM_GRAN bytes are ours. */
+    if (!read_sec(DIR_TRACK, FAT_SECTOR)) return STOR_ERROR;
+    for (k = 0; k < NUM_GRAN; k++) secbuf[k] = fat[k];
+    if (!write_sec(DIR_TRACK, FAT_SECTOR)) return STOR_ERROR;
+
+    /* 7. The directory entry, LAST. */
+    if (!read_sec(DIR_TRACK, dsec)) return STOR_ERROR;
+    {
+        unsigned char *p = secbuf + (unsigned int)dent * ENT_SIZE;
+        unsigned int lastb = (unsigned int)(len % SEC_SIZE);
+        if (lastb == 0) lastb = SEC_SIZE;
+        for (k = 0; k < ENT_SIZE; k++) p[k] = 0x00;
+        for (k = 0; k < 11; k++) p[k] = (unsigned char)want[k];
+        p[11] = 2;                       /* machine language */
+        p[12] = 0;                       /* binary, not ASCII */
+        p[13] = first;
+        p[14] = (unsigned char)(lastb >> 8);
+        p[15] = (unsigned char)(lastb & 0xFF);
+    }
+    if (!write_sec(DIR_TRACK, dsec)) return STOR_ERROR;
+
+    return STOR_OK;
 }
 
 uint8_t plat_open(const char *name)

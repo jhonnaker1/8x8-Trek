@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seven times on 2026-09-13 (6 open of 48 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and eight times on 2026-09-13 (6 open of 49 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1614,8 +1614,43 @@ are the CoCo 3**, which is started and not released:
       like a hang. Every address fits in 16 bits and none of that was needed.
       **The instrument was checked before the driver**: write two values, read
       the first back -- a latch returns the second. It returned the first.
-  28. **`plat_write_all` returns `STOR_ERROR`** -- the filesystem reads and
-      cannot write, so SAVE cannot work.
+  28. ~~**`plat_write_all` returns `STOR_ERROR`**~~ **THE SEAM IS BUILT AND
+      WITNESSED 2026-09-13.** `make writecheck`: the machine writes a
+      600-byte file (three sectors -- two full and one short, so the padding
+      and the lastbytes arithmetic are both exercised), reads it back
+      byte-exact, AND tools/writecheck.py then walks the directory and the FAT
+      on the HOST and reads the same 600 bytes. Two independent readers, which
+      is the point: a port writing a file and reading it back with its own
+      reader proves only that it is consistent with itself, and the same wrong
+      idea about the format would sit on both sides. Same standard as
+      [[hof-write-witnessed]].
+      Allocation frees a replaced file's chain only AFTER checking capacity,
+      and writes data, then the FAT, then the directory -- in that order, so a
+      file becomes findable only once its bytes are on the disk.
+      **THE FORMAT WAS COPIED FROM tools/mkdisk.py, NOT RE-DERIVED**: ngran,
+      the $C0|nsec last-granule byte, `len % 256 or 256` big-endian at
+      [14..15], type 2, $00 padding.
+      **STILL OPEN: SAVE FROM INSIDE THE GAME HAS NOT BEEN SEEN TO WORK.**
+      See item 49 -- and note that is a different claim from this one.
+  49. **TYPING `SAVE` AT THE COMMAND PROMPT LEAVES A BLACK SCREEN, and I could
+      not tell whose fault it is.** Raised 2026-09-13 while trying to witness
+      an in-game save on top of item 28. Driving the game to the bridge and
+      typing S-A-V-E-RETURN gives a frame that is 100% colour 0, and it stays
+      that way through 45 emulated seconds of settle. No EGATREK.SAV appears
+      on the disk.
+      **NOT ISOLATED, AND THE HARNESS IS A LIVE SUSPECT.** A probe run
+      reported PC parked at $634F -- one address across 35 seconds, which is
+      what waiting for a keystroke looks like -- and `resident_image` reading
+      234, which is not a valid overlay index at all. Either the game is
+      sitting at a prompt whose screen never drew, or my key-driving desynced
+      somewhere earlier and it is waiting at a different prompt than I think.
+      The same sequence with slightly different key timing reached the bridge
+      and drew all nine panels twenty minutes earlier, which is exactly the
+      kind of difference that says the harness, not the port.
+      Filed as an observation, not a diagnosis. Whoever picks it up should
+      settle the harness question FIRST -- screenshot after every key rather
+      than only at the end -- because five instruments on this port have
+      already reported their own faults as the port's.
   29. ~~The overlay set is too small to pay.~~ **CLOSED 2026-09-12: ELEVEN
       OVERLAYS, AND 575 FREE BYTES BECAME 12,860.** The candidates were never
       missing -- the shared sources have carried `OVL_CODE("name")` on 33
