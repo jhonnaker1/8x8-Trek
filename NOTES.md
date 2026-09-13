@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and thirteen times on 2026-09-13 (4 open of 53 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (6 open of 55 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1757,9 +1757,32 @@ are the CoCo 3**, which is started and not released:
       a panel redraw only touches cells that changed. Jamie's words were
       "redraws of each panel for each turn", and most of those cells are
       identical between turns.
-      **AND DOUBLE SPEED IS UNTESTED ON REAL HARDWARE**: CoCo 3 disk I/O at
-      1.78 MHz is a known hazard, MAME is more forgiving than a WD1773, and
-      nobody has ever run this port on a real machine.
+      Double speed on real hardware is item 55.
+  54. **THE CoCo 3 HAS NO `verify` TARGET, so `make ports` only BUILDS it.**
+      Found 2026-09-13 by re-deriving: the gate prints `make verify` for the
+      C128, Atari, X16, Falcon and MEGA65 and `make (build)` for this port --
+      and the difference is that this port has **six checks nothing runs**:
+      vidcheck, keycheck, writecheck, ovlcheck, bootchk, keymatrix. Every one
+      of them caught a real fault today; none of them is in the gate.
+      [[check-ports-gate]] says "make ports runs every port's verify and
+      CHECKS THE EXIT STATUS", and for this port there is no verify to run,
+      so the sentence is true and means nothing. The Amiga is the same shape
+      and has been all along.
+      **Wiring it needs a decision, which is why this is an item and not a
+      commit**: vidcheck, keycheck, writecheck and ovlcheck each start MAME
+      and take about a minute. A gate nobody runs because it takes six
+      minutes is worse than no gate, so `verify` probably wants the cheap
+      structural checks and a separate `make check-all` for the MAME ones.
+  55. **DOUBLE SPEED IS UNTESTED ON REAL HARDWARE.** Split out of item 53 on
+      2026-09-13 -- it was a paragraph inside another item, which is the
+      defect items 43 and 48 already are. `vdc_init()` now writes `$FFD9` and
+      the machine runs at 1.78 MHz from the title screen on, INCLUDING every
+      overlay load and every SAVE. **CoCo 3 disk I/O at double speed is a
+      known hazard on real hardware**; MAME is more forgiving than a WD1773,
+      and nobody has ever run this port on a real machine.
+      The safe shape if it turns out to bite: drop to `$FFD8` around
+      `read_sec`/`write_sec` and restore. That costs two port writes a sector
+      and is not worth adding on speculation.
   30. **MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained. Routed around by not using the MMU; see below. **Less
       urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
