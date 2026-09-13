@@ -117,9 +117,21 @@ end
 local enter = keyfield("ENTER")
 grab("start")
 for i = 1, keys do press(enter, 2.0); grab("enter") end
+-- `+N` IS A WAIT, AND IT IS NOT A CONVENIENCE. This port has no keyboard
+-- buffer: kb_waitkey() polls the PIA matrix, so a key pressed while the game
+-- is busy is GONE. The console redraw is a 54K blit at 10.6 cycles a byte and
+-- takes over ten seconds of emulated time, and a "save" typed into it
+-- vanishes letter by letter with nothing on screen to show for it -- which is
+-- precisely what Jamie reported seeing, and what cost item 49 and 50.
 for want in string.gmatch(os.getenv("SEQ") or "", "[^,]+") do
-    press(keyfield(want), 2.5)
-    grab(want)
+    local secs = want:match("^%+(%d+)$")
+    if secs then
+        emu.wait(tonumber(secs))
+        grab("wait" .. secs)
+    else
+        press(keyfield(want), 2.5)
+        grab(want)
+    end
 end
 -- LET THE SCREEN FINISH. An overlay load off a floppy plus a full redraw is
 -- seconds, and catching it half-drawn reports a black frame as a dead port.

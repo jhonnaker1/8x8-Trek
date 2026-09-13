@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and nine times on 2026-09-13 (6 open of 50 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and ten times on 2026-09-13 (5 open of 50 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1665,8 +1665,30 @@ are the CoCo 3**, which is started and not released:
       **WHAT IS NOT SETTLED, AND IS NOW ITEM 50**: whether SAVE works. This
       hunt never issued the command -- the film shows the setup still asking
       for the self-destruct password while my "s,a,v,e" went into that field.
-  50. **SAVE FROM INSIDE THE GAME IS STILL UNTESTED, because the harness
-      cannot reliably reach a command prompt.** Raised 2026-09-13 out of 49.
+  50. ~~**SAVE FROM INSIDE THE GAME IS STILL UNTESTED.**~~ **CLOSED
+      2026-09-13: SAVE WORKS, AND THE FILE HAS BEEN READ BACK OFF THE DISK.**
+      `EGATREK.SAV`, 625 bytes at granule 46 -- name **JAMIE**, password
+      **ABC**, level **3**, and 601 bytes of game state behind the 24-byte
+      header, walked out of the .dsk by the host's own reader. The console
+      shows **`CMD: SAVE`** in the COMMAND panel as it is typed.
+      **THE CAUSE WAS NOT THE PORT AND NOT THE COMMAND: THIS PORT HAS NO
+      KEYBOARD BUFFER.** kb_waitkey() polls the PIA matrix, so a key pressed
+      while the game is busy is simply GONE. The console redraw is a 54K blit
+      at 10.6 cycles a byte -- over ten emulated seconds -- and every letter
+      of "save" typed into it vanished with nothing on screen to show for it.
+      **JAMIE SAW EXACTLY THAT AND SAID SO**: *"I did not see it on the screen
+      when you typed the save command."* I had been treating the absence as a
+      command that did nothing; he was reporting that the LETTERS never
+      arrived, which is a different fault entirely and the true one.
+      **THE FIX IS IN THE HARNESS, NOT THE GAME**: `vramshot --seq` now takes
+      a `+N` token that WAITS N seconds, and the sequence pauses 30 seconds
+      for the redraw before typing. Built by WATCHING the film -- frame 021
+      caught the console being painted over the setup screen mid-keystroke,
+      which is the whole answer in one picture.
+      **A REAL PORT CONSEQUENCE WORTH KEEPING**: a player who types ahead
+      during a redraw loses the keystrokes. That is how the original behaves
+      too on a machine this slow, so it is filed as known rather than as a
+      bug -- but anything automating this game must WAIT, never count. Raised 2026-09-13 out of 49.
       `plat_write_all` is built and witnessed (item 28); what is missing is a
       way to DRIVE the game there. Every attempt guesses how many keystrokes
       each setup prompt consumes, and the guesses are wrong in ways that only
