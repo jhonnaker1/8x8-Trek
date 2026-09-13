@@ -40,9 +40,31 @@ int main(void)
     if (plat_read_all("EGATREK.RAW", (void *)GAME_ORG, GAME_MAX, &got) != STOR_OK)
         for (;;) ;               /* nothing to jump to; stop rather than guess */
 
+#ifdef BOOT_HALT
+    /* HALT INSTEAD OF JUMPING, so the machine stays in all-RAM mode and the
+       image can be READ. Every check of it so far ran after the game had
+       crashed and the ROM was back, where a read above $8000 returns ROM
+       whatever the RAM beneath holds -- inconclusive, not failing. This
+       leaves the machine in exactly the state the game starts in.
+       Answers at $2000, below the image and below BASIC's ceiling. */
+    {
+        unsigned char *r = (unsigned char *)0x2000;
+        unsigned char i;
+        r[0] = 0xA1;                       /* the loader got here */
+        r[1] = (unsigned char)(got >> 8);  /* how many bytes it read */
+        r[2] = (unsigned char)(got & 0xFF);
+        for (i = 0; i < 4; i++) r[4 + i]  = ((unsigned char *)0x2800)[i];
+        for (i = 0; i < 4; i++) r[8 + i]  = ((unsigned char *)0x6000)[i];
+        for (i = 0; i < 4; i++) r[12 + i] = ((unsigned char *)0xA000)[i];
+        for (i = 0; i < 4; i++) r[16 + i] = ((unsigned char *)0xC000)[i];
+        for (i = 0; i < 4; i++) r[20 + i] = ((unsigned char *)0xCE50)[i];
+    }
+    for (;;) ;
+#else
     /* ALL RAM, and only now. Everything above $8000 has been written through
        the ROM; this is what makes it readable. */
     asm { sta $FFDF }
     asm { jmp $2800 }
+#endif
     return 0;
 }
