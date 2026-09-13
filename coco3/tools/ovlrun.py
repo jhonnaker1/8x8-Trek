@@ -57,6 +57,7 @@ end
 local seen, order, trace, snap = {}, {}, {}, nil
 local xy = {}
 local imgsnap = nil
+local gotsnap = nil
 local smin, smax = nil, nil
 for i = 1, 300 do
     emu.wait(0.25)
@@ -74,6 +75,12 @@ for i = 1, 300 do
         imgsnap = probe(0x2800, 8) .. " " .. probe(0x6000, 8) .. " "
                .. probe(0xA000, 8) .. " " .. probe(0xCE58, 8)
     end
+    -- CATCH THE REPORT WHILE IT EXISTS. plat_exit() cold-starts BASIC, which
+    -- clears low memory -- so reading $2000 at the end reads a wiped page and
+    -- says the loader never got there.
+    if gotsnap == nil and prog:read_u8(0x2000) == 0xA1 then
+        gotsnap = probe(0x2000, 7)
+    end
     if i % 40 == 0 then
         xy[#xy+1] = string.format("%.0fs:PC=%04X X=%04X Y=%04X CC=%02X",
             i*0.25, cpu.state["PC"].value, cpu.state["X"].value,
@@ -90,6 +97,7 @@ for i = 1, 300 do
     end
 end
 local o = io.open(os.getenv("OUTF"), "w")
+o:write("got " .. (gotsnap or probe(0x2000, 7)) .. "\n")
 o:write("img " .. (imgsnap or (probe(0x2800,8).." "..probe(0x6000,8).." "
         ..probe(0xA000,8).." "..probe(0xCE58,8))) .. "\n")
 o:write("order " .. table.concat(order, ",") .. "\n")
@@ -181,6 +189,16 @@ def main():
               "==" if ok else "!=", want))
     print("  -> the loader placed the image CORRECTLY" if allok
           else "  -> THE IMAGE IS NOT IN MEMORY AS WRITTEN")
+    g = bytes.fromhex(got["got"].strip())
+    raw = open(os.path.join(COCO3, "build", "EGATREK.RAW"), "rb").read()
+    n = g[1] * 256 + g[2]
+    print("  loader reached its report : %s" % (g[0] == 0xA1))
+    print("  BYTES READ                : %-6d  file is %d   %s"
+          % (n, len(raw), "COMPLETE" if n == len(raw) else "SHORT"))
+    print("  sampled while all-RAM live: $2800=%02X want %02X | $8000=%02X want %02X"
+          % (g[3], raw[0], g[4], raw[0x5800]))
+    print("                              $A000=%02X want %02X | $CE50=%02X want %02X"
+          % (g[5], raw[0x7800], g[6], raw[0xA650]))
     print("  PC at the end   : $%s" % got["pc"].strip())
     for line in got["xy"].strip().split(" | "):
         if line: print("     %s" % line)

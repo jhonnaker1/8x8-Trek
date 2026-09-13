@@ -22,6 +22,21 @@
 
 #include "../../core/storage.h"
 
+/* AN ABSOLUTE ADDRESS, NOT A LOCAL POINTER. The first version of the report
+   below used `unsigned char *r = (unsigned char *)0x2000;` and cmoc emitted
+   NO STORES AT ALL -- checked by looking for B7 20 00 in the binary, which
+   was not there. coco3bank.h already says why: a local pointer lives in the
+   stack frame and is reloaded before every store through it, and a run of
+   stores nothing ever reads is free to vanish. Every working probe in this
+   port uses a macro like this one. I had the note and ignored it.
+
+   AND THE CHECK FOR IT WAS WRONG TOO: I looked for B7 20 00 (STA $2000) in
+   the binary and reported the stores missing. cmoc emits C6 A1 / F7 20 00 --
+   LDB/STB, because it prefers B for 8-bit values. The stores were there the
+   second time and the instrument said they were not. Search for both, or
+   read the generated assembly instead of guessing an encoding. */
+#define BOOTR      ((unsigned char *)0x2000)
+
 #define GAME_ORG   0x2800
 #define GAME_MAX   0xC000        /* far more than the image; the read is bounded
                                     by the file's own length on disk */
@@ -39,6 +54,20 @@ int main(void)
        GAME_ORG and the loader needs to know nothing about its shape. */
     if (plat_read_all("EGATREK.RAW", (void *)GAME_ORG, GAME_MAX, &got) != STOR_OK)
         for (;;) ;               /* nothing to jump to; stop rather than guess */
+
+    /* REPORT BEFORE JUMPING, ALWAYS. `got` is the one number that separates
+       "the image did not load" from "the image loaded and the game is at
+       fault", and every attempt to read the image itself has been taken in
+       ROM mode where the answer is meaningless. $2000 is below the image
+       ($2800..$CE5B) and below anything the game touches, so it survives
+       whatever happens next. */
+    BOOTR[0] = 0xA1;                            /* the loader got here */
+    BOOTR[1] = (unsigned char)(got >> 8);
+    BOOTR[2] = (unsigned char)(got & 0xFF);
+    BOOTR[3] = ((unsigned char *)0x2800)[0];    /* first byte of the image */
+    BOOTR[4] = ((unsigned char *)0x8000)[0];    /* and one from above $8000, */
+    BOOTR[5] = ((unsigned char *)0xA000)[0];    /* read while all-RAM is live */
+    BOOTR[6] = ((unsigned char *)0xCE50)[0];
 
 #ifdef BOOT_HALT
     /* HALT INSTEAD OF JUMPING, so the machine stays in all-RAM mode and the
