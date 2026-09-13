@@ -1850,7 +1850,17 @@ are the CoCo 3**, which is started and not released:
       finds what the instruments cannot. **It could not be played until
       2026-09-13**: kb_waitkey() returned KB_RETURN unconditionally, so the
       game auto-advanced through every prompt. See item 43.
-      **AND IT STILL CANNOT BE PLAYED ON THIS RIG, which is item 45.**
+      **BUT IT DOES PLAY, AND THE BRIDGE HAS BEEN SEEN (2026-09-13).** Driven
+      through its whole front end by tools/vramshot.py --seq -- welcome,
+      briefing, restore, name JAMIE, command level 3, self-destruct password
+      -- the game reaches the console and DRAWS ALL NINE PANELS: short range
+      scan, status, chart of known galaxy, lasers with its efficiency and
+      temperature bars, main viewer, command, systems status, the U.S.S.
+      Lexington plate with its emblem, and HELM: AWAITING ORDERS CAPTAIN.
+      Twelve of sixteen colours on screen.
+      So what is left of this item is narrow and precise: **a PERSON has not
+      played it**, because they cannot watch it (item 45). The port is not
+      unproven any more; it is unwatched.
   45. **THE PORT CANNOT BE SEEN UNDER MAME.** Not new -- coco3/README.md has
       said since the video driver landed that "MAME renders the card's screen
       black no matter what the VDP is doing", and every check since has gone
