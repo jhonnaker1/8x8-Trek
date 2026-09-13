@@ -1569,13 +1569,23 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and eight times on 2026-09-12 (10 open of 40 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and nine times on 2026-09-12 (7 open of 40 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
 asking it has caught built-but-listed items before. Every entry here was
 checked against the code or the port it names. **Nothing on it blocks anything
 that is released.**
+
+### THE LIST ITSELF HAD DUPLICATE NUMBERS (found 2026-09-12 by re-deriving)
+
+**32, 33 and 34 were each used TWICE** -- once by the items a sweep turned up
+in the morning, once by the CoCo 3 items raised that evening. Neither author
+of either batch noticed, because nobody reads a list top to bottom; they read
+the entry they came for. The CoCo 3 trio is renumbered 38, 39, 40.
+**A count can be right while the list is wrong**: the header said "40 raised"
+and was correct, which is exactly why the collision survived. Re-deriving
+means checking the NUMBERS, not just the entries.
 
 ### THE HEADER SAID "EMPTY" FOR A DAY WHILE TWO PORTS CARRIED WORK (2026-09-12)
 
@@ -1618,7 +1628,7 @@ are the CoCo 3**, which is started and not released:
       unexplained. Routed around by not using the MMU; see below. **Less
       urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
       it, which was the problem the MMU was for.
-  32. **THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.** `make ovlcheck`
+  38. **THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.** `make ovlcheck`
       passes 3 of 3 (2026-09-12): a 6809 finds HOF.OVL in a real Disk BASIC
       directory, walks the FAT through the standalone WD1773 driver, lands
       1,709 bytes at $C300 matching the file, overwrites it with TITLE.OVL,
@@ -1644,8 +1654,10 @@ are the CoCo 3**, which is started and not released:
       the bounds match the final link exactly, and the loop DOES NOT EXECUTE
       -- pre-painting the range with $EE shows 5 to 14 bytes of 2,587 ever
       change. Skipped, not failing part way. That is the next thing to chase.
-  35. **THE LOADING ARCHITECTURE IS WRONG, and the CoCo world settled this
-      long ago.** Researched 2026-09-12 after Jamie said to look online.
+  35. ~~**THE LOADING ARCHITECTURE IS WRONG.**~~ **REWRITTEN 2026-09-12 the
+      way a CoCo does it, and it works** -- CLEAR/LOADM/EXEC, a first-stage
+      loader, the org moved to $2800. What remains is item 37, which is a
+      different and much narrower fault. Original finding: Researched 2026-09-12 after Jamie said to look online.
       *"CoCo 3 Loader for big programs"* (nowhereman999) describes the idiom:
       a FIRST-STAGE LOADER at $2000, put there by an ordinary `LOADM`, which
       then reads the rest of its own file **through Disk BASIC's get-byte
@@ -1732,14 +1744,22 @@ are the CoCo 3**, which is started and not released:
       zero looks like. Granule 12 is simply where $8900 happens to fall.
       So the remaining question is about the COPY, not the read: what stops
       `dst[copied + k] = secbuf[k]` at $8900. Not isolated.
-  34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
+  40. ~~**The stack climbs into the I/O page.**~~ **CLOSED 2026-09-12 -- IT
+      WAS THE HARNESS.** S reached $FFFC and pushes landed on the GIME's
+      palette and video registers at $FFB0-$FFDF, which Jamie saw as "weird
+      rainbow colors". The cause was tools/ovlrun.py poking a 42K image over
+      Disk BASIC's live stack at ~$34xx before the program was ever started;
+      with the machine paused during the load, S stays healthy at $FDxx. A
+      real symptom of a fault that was never in the port. See
+      [[instruments-that-cannot-see]].
+  40b. ORIGINAL TEXT, kept because the symptom is worth recognising: S reaches $FFFC, so pushes land
       on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
       as "weird rainbow colors" while watching a run** -- the third time on
       this project a person looking at the screen has named a fault no
       instrument here reported. A climbing stack means unbalanced pulls, which
       is what executing an unloaded window does, so it is probably downstream
       of 32 rather than separate.
-  33. **ovl_load's failure is SILENT on every port.** It returns void, so a
+  39. **ovl_load's failure is SILENT on every port.** It returns void, so a
       failed image leaves the caller to jump into whatever the window holds.
       On the C128 a KERNAL LOAD failing is rare enough that nobody noticed;
       here it is the difference between a hang and a diagnosis. Raised
