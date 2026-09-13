@@ -241,6 +241,27 @@ step of it was found on the hardware rather than reasoned out:
 All four are injected at `program_start` by `build_ovl.place_stack()`, before
 `INILIB` and before `main()`.
 
+## The loading architecture is wrong, and the CoCo world settled this long ago
+
+**The idiom for a big CoCo 3 program is a first-stage loader plus the GIME
+MMU** -- see *"CoCo 3 Loader for big programs"*. A small loader goes in at
+`$2000` by ordinary `LOADM`, then reads the rest of its own file **through
+Disk BASIC's get-byte routine at `$A176`**, while the ROM is still mapped and
+working, banking each 8K chunk into a fixed low window with the MMU. Only once
+the image is in place does the program take the machine. It **does not use
+all-RAM mode**, and it ends up owning `$0000-$FCFF`.
+
+**This port did the opposite on both counts** -- `$FFDF` all-RAM mode, and its
+own standalone WD1773 driver -- which is why a 42K image cannot be loaded at
+all: `LOADM` will not place `$2800..$CE5C` under the BASIC and Disk BASIC
+ROMs, and nothing else was reading it.
+
+**It also reframes the MMU blocker below.** That was parked because enabling
+MMUEN broke our own disk driver. The idiom never meets that conflict: the disk
+read is done by ROM code, into a fixed window, **before** the ROM is paged
+away, so the MMU and the disk are never live at the same time. The MMU
+blocker, the boot failure and this are one design decision, not three bugs.
+
 ## Why the game's first ovl_load fails -- FOUND
 
 **BSS is never zeroed in the overlay build**, and that is the whole of it.

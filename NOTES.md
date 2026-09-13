@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and five times on 2026-09-12 (8 open of 37 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and six times on 2026-09-12 (9 open of 38 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1644,6 +1644,31 @@ are the CoCo 3**, which is started and not released:
       the bounds match the final link exactly, and the loop DOES NOT EXECUTE
       -- pre-painting the range with $EE shows 5 to 14 bytes of 2,587 ever
       change. Skipped, not failing part way. That is the next thing to chase.
+  35. **THE LOADING ARCHITECTURE IS WRONG, and the CoCo world settled this
+      long ago.** Researched 2026-09-12 after Jamie said to look online.
+      *"CoCo 3 Loader for big programs"* (nowhereman999) describes the idiom:
+      a FIRST-STAGE LOADER at $2000, put there by an ordinary `LOADM`, which
+      then reads the rest of its own file **through Disk BASIC's get-byte
+      routine at `$A176`** -- while the ROM is still mapped and working -- and
+      banks each 8K chunk into a fixed low window with the **GIME MMU**
+      (`$FFA2`, `$FFA5`, `$FFA6`). Only when the image is in place does the
+      program take the machine. It explicitly **does not use all-RAM mode**,
+      and it ends up owning `$0000-$FCFF` -- 64,768 bytes.
+      **THIS PORT DID THE OPPOSITE ON BOTH COUNTS**: `$FFDF` all-RAM mode, and
+      its own standalone WD1773 driver. That is why a 42K image cannot be
+      loaded -- `LOADM` will not place `$2800..$CE5C` under the BASIC and Disk
+      BASIC ROMs, and nothing else was reading it.
+      **AND IT REFRAMES ITEM 30.** The MMUEN/DSKCON conflict was parked
+      because enabling the MMU broke our own disk driver. The idiom never has
+      that conflict: the disk read is done by ROM code, into a fixed window,
+      BEFORE the ROM is paged away -- so the MMU and the disk are never live
+      at the same time. Items 30, 32 and 35 are one design decision, not
+      three bugs.
+      The 9918-Adventures project (cdoty) confirms the launch half: a
+      `CoCoBoot.bas` of `LOADM "BURGER":EXEC`, started with `RUN "BOOT"`.
+      Its VDP addresses are Dragon cartridge space ($E000), not this card's
+      $FF78 -- and the SuperSprite FM+ ships BOTH, "…O" builds for $FF7x and
+      "…M" builds for $FF5x, which is worth knowing before blaming a port.
   34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
       on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
       as "weird rainbow colors" while watching a run** -- the third time on
