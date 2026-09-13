@@ -2379,9 +2379,30 @@ ports rather than reciting the list above found:
       exist on an RGB monitor or a television. It is written up as a caveat in
       `falcon/README.md` and `falcon/README-release.txt` and **had never been
       filed as an item** -- a known-bad configuration in a SHIPPED release,
-      living only in prose. The port has also been played exactly once, by
-      Jamie, under Hatari; **no real hardware.** OPEN: the fix is a VIDEL mode
-      check and nobody here has the machine to check it on.
+      living only in prose.
+      **"NOBODY HERE HAS THE MACHINE TO CHECK IT ON" WAS WRONG (corrected
+      2026-09-13).** Hatari takes `--monitor <mono|rgb|vga|tv>` and this
+      port's own Makefile ALREADY PASSES `--monitor vga`, on line 165. The
+      other three values were one word away the whole time. A blocker asserted
+      without checking the tool already sitting in the build -- the same shape
+      as the $FF7E claim earlier the same day.
+      **WHAT IT ACTUALLY NEEDS:**
+        * **Detection**: `VgetMonitor()` (XBIOS 59) -- 0 ST mono, 1 RGB,
+          2 VGA, 3 TV. `vdc_init()` ignores it and forces VGA.
+        * **A mode per monitor, and the GEOMETRY is the constraint.** The
+          console is 80x25 of 8x16 cells = **640x400**.
+            VGA  640x480, four planes -- what it does today, and it works.
+            RGB  640x400 wants VERTFLAG (interlace). Cheapest of the three and
+                 the one most likely to matter.
+            TV   640x200 is the ceiling, so 25 rows of 16-pixel cells DO NOT
+                 FIT: it needs the 8x8 ROM font, and vdc_init already
+                 enumerates 6x6, 8x8 and 8x16 by measuring their headers, so
+                 the machinery to pick it is there.
+            mono 640x400, one plane: a different pixel path, no word
+                 interleave, no colour. Arguably out of scope for a colour
+                 game -- a decision, not an obstacle.
+        * **Testing**: `--monitor rgb` and `--monitor tv`. No hardware.
+      The port has been played exactly once, by Jamie, under Hatari on VGA.
   34. ~~**Five per-port READMEs still said "all five ports"**~~, one in the
       present tense (the X16's "ships on all five ports"). **CLOSED
       2026-09-12.** Two of them also RECITED the list's count -- and both said
