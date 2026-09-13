@@ -261,7 +261,7 @@ $(BOOT_OUT): $(BOOT_SRC) Makefile
 bootchk: overlays data
 	@mkdir -p build
 	$(CMOC) --coco --org=E400 -O2 -fomit-frame-pointer --intdir=build \
-	    -Isrc -I../core -DBOOT_HALT -o build/BOOTCHK.BIN $(BOOT_SRC)
+	    -Isrc -I../core -DBOOT_HALT -DSTOR_TRACE -o build/BOOTCHK.BIN $(BOOT_SRC)
 	python3 tools/mkboot.py build/BOOTCHK.BIN build/egatrek-ovl.bin build/
 	python3 tools/mkdisk.py build/bootchk.dsk build/TREKLDR.BIN build/EGATREK.RAW \
 	    build/img/*.OVL build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT

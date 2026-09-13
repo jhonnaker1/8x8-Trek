@@ -1689,7 +1689,7 @@ are the CoCo 3**, which is started and not released:
       experiment showed from the other side, since putting the FDC in slot 1
       leaves the machine unable to boot Disk BASIC at all.
       **The check is kept in vidtest** rather than written down and forgotten.
-  37. **plat_read_all HANGS ON THE 42K IMAGE.** Measured 2026-09-12 with a
+  37. **plat_read_all STOPS DEAD AT 99 SECTORS.** Measured 2026-09-12 with a
       loader built `-DBOOT_HALT` -- it reads and then STOPS, so the machine
       stays in all-RAM mode and nothing cold-starts BASIC over the answer.
       Staged markers say exactly how far it gets: entered main YES, reached
@@ -1703,6 +1703,23 @@ are the CoCo 3**, which is started and not released:
       diskette. What is new here is SCALE: 42,588 bytes, 19 granules, ~171
       sectors against 8. Whatever breaks is in the FAT walk or the sector loop
       at a size the seam has never been asked for.
+      **WHERE IT STOPS IS EXACT AND REPEATABLE**: 99 sectors attempted, 99
+      completed, every one status 00; 24,832 bytes copied; `dst` at `$8900`;
+      granule 12. Identical across waits of 90, 300 and **900** emulated
+      seconds, so it is STUCK, not slow -- Jamie asked twice whether it just
+      needed more time and the ten-fold margin answers it.
+      **AND THE MACHINE ENDS AT THE BASIC PROMPT**, PC in Disk BASIC's
+      keyboard poll at `$A7D5-$A7D7`. The flashing cursor Jamie saw is BASIC's
+      IDLE cursor, blinked by its 60Hz interrupt while it waits for input --
+      during `LOADM` it does not blink, because BASIC is busy inside ROM. The
+      loader has stopped and the machine has gone back.
+      **ONE REAL FIX CAME OUT OF THE HUNT AND IS KEPT**: the NMI jump slot.
+      The 6809's NMI vector points at `$FEFD`, a JMP in the CoCo's RAM vector
+      table, and that JMP goes to Disk BASIC's handler in `$8000-$BFFF` --
+      which this port pages away. dskcon_init() only sets DNMIVC and NMIFLG,
+      variables THAT ROM HANDLER reads. coco3storage.c now points the slot
+      straight at dskcon's own service. It did not fix this stall, but it was
+      wrong before and is right now.
       That is the next thing, and it is now a bounded question about one
       function rather than about the whole port.
   34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land

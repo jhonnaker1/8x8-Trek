@@ -87,14 +87,32 @@ static void gran_loc(unsigned char g, unsigned char *trk, unsigned char *sec)
 }
 
 /* One sector into secbuf. Non-zero on success. */
+/* STOR_TRACE: leave a breadcrumb at $2010 before every sector, so a hang says
+   WHICH sector rather than just "somewhere in the read". Absolute address,
+   not a local pointer -- cmoc drops stores through one of those. */
+#ifdef STOR_TRACE
+#define TR ((unsigned char *)0x2010)
+#endif
+
 static unsigned char read_sec(unsigned char trk, unsigned char sec)
 {
+#ifdef STOR_TRACE
+    TR[0] = trk;
+    TR[1] = sec;
+    TR[2] = (unsigned char)(TR[2] + 1);      /* sectors attempted */
+    TR[3] = 0xB1;                            /* about to call DSKCON */
+#endif
     DCOPC = 2;
     DCDRV = 0;
     DCTRK = trk;
     DCSEC = sec;
     DCBPT = secbuf;
     dskcon_processSector();
+#ifdef STOR_TRACE
+    TR[3] = 0xB2;                            /* DSKCON returned */
+    TR[4] = DCSTA;
+    TR[5] = (unsigned char)(TR[5] + 1);      /* sectors completed */
+#endif
     return (unsigned char)(DCSTA == 0);
 }
 
@@ -103,6 +121,22 @@ static unsigned char disk_ready(void)
     if (ready) return 1;
     asm { orcc #$50 }                           /* init wants interrupts masked */
     dsk_handle = dskcon_init(dskcon_nmiService);
+
+    /* TAKE THE NMI JUMP SLOT. THIS IS THE ONE THAT COST THE MOST TO FIND.
+       The 6809's NMI vector at $FFFC points to $FEFD -- a JMP in the CoCo's
+       RAM vector table -- and that JMP goes to Disk BASIC's NMI handler in
+       $8000-$BFFF. dskcon_init() only sets DNMIVC and NMIFLG, which are
+       variables THAT ROM HANDLER reads. THIS PORT PAGES THE ROM AWAY, so the
+       handler address holds the port's own image, and the floppy controller
+       raises an NMI on every completed operation.
+       Measured: the first-stage loader read 99 sectors -- every one
+       successful, status 00 -- and died once the copy passed $8000 and
+       replaced the handler with game data. It also explains why the failure
+       moved around between runs: it depends on when an NMI lands.
+       So the slot is pointed straight at dskcon's own service, which is what
+       the ROM handler would have called anyway. */
+    *((unsigned char *)0xFEFD) = 0x7E;                  /* JMP */
+    *((void **)0xFEFE) = (void *)dskcon_nmiService;
     if (!read_sec(DIR_TRACK, FAT_SECTOR)) return 0;
     {   unsigned char i;
         for (i = 0; i < NUM_GRAN; i++) fat[i] = secbuf[i];
@@ -210,6 +244,13 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
                 for (k = 0; k < n; k++) dst[copied + k] = secbuf[k];
             }
             copied = (unsigned int)(copied + n);
+#ifdef STOR_TRACE
+            TR[6] = (unsigned char)(copied >> 8);   /* how far the copy got */
+            TR[7] = (unsigned char)(copied & 0xFF);
+            TR[8] = gran;                           /* and in which granule */
+            TR[9] = (unsigned char)(n >> 8);
+            TR[10] = (unsigned char)(n & 0xFF);
+#endif
         }
         if ((v & 0xC0) == 0xC0) break;
         gran = v;

@@ -35,14 +35,23 @@ emu.wait(3)
 kbd:post_coded('LOADM"TREKLDR"{ENTER}')
 emu.wait(10)
 kbd:post_coded("EXEC{ENTER}")
-emu.wait(90)                       -- 42K off a floppy, then it halts
+-- 42K IS 167 SECTORS AND A REAL FLOPPY IS SLOW. The first version allowed 90
+-- seconds, got 99 sectors -- every one successful -- and reported a HANG. It
+-- was still loading. Jamie said "it looked like it was loading, maybe wait a
+-- bit", which is the whole of it: a timeout dressed up as a diagnosis.
+-- 167 SECTORS OFF A REAL FLOPPY. Ninety seconds got 99 of them, every one
+-- successful, and the tool called it a hang. Jamie said twice that it was
+-- still loading. Allow far more than the job can need.
+emu.wait(900)
 
 local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
 local t = {}
 for i = 0, 11 do t[#t+1] = string.format("%02X", prog:read_u8(0x2000 + i)) end
+for i = 0, 10 do t[#t+1] = string.format("%02X", prog:read_u8(0x2010 + i)) end
 local o = io.open(os.getenv("OUTF"), "w")
 o:write(table.concat(t, "") .. "\n")
+
 o:write(string.format("%04X\n", cpu.state["PC"].value))
 o:close()
 '''
@@ -73,7 +82,7 @@ def main():
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
                     "-autoboot_script", lua, "-autoboot_delay", "1",
-                    "-seconds_to_run", "130", "-nothrottle"],
+                    "-seconds_to_run", "1000", "-nothrottle"],
                    env=dict(os.environ, OUTF=outf),
                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                    cwd=tmp, check=False)
@@ -92,9 +101,16 @@ def main():
     if b[0] != 0xA1:
         print("  -> THE LOADER NEVER RAN. Nothing below is a measurement.")
         return 1
+    print("  last sector asked for : track %d sector %d" % (b[12], b[13]))
+    print("  sectors attempted     : %d   completed: %d" % (b[14], b[17]))
+    print("  DSKCON stage          : %s   last status %02X"
+          % ({0xB1: "called, NOT returned", 0xB2: "returned"}.get(b[15], "%02X" % b[15]), b[16]))
+    cop = b[18] * 256 + b[19]
+    print("  bytes copied          : %d   -> dst reached $%04X" % (cop, 0x2800 + cop))
+    print("  granule               : %d   last chunk %d bytes" % (b[20], b[21] * 256 + b[22]))
     if b[11] != 0x5A:
-        print("  -> plat_read_all NEVER RETURNED (sentinel %02X). The read is "
-              "hanging, not failing." % b[11])
+        print("  -> plat_read_all did not return in the time allowed. If sectors "
+              "are still\n     advancing, that is a SHORT TIMEOUT, not a hang.")
         return 1
     rc = {0: "STOR_OK", 1: "STOR_NOTFOUND", 2: "STOR_ERROR"}.get(b[2], "?%02X" % b[2])
     print("  plat_read_all returned: %s" % rc)
