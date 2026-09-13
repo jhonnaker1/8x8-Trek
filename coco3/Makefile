@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -288,6 +288,25 @@ ovlrun: disk
 
 vidcheck: $(VID_OUT)
 	@python3 tools/vidcheck.py
+
+# THE KEYBOARD IS A TABLE, and a table can be wrong in one cell without any
+# other symptom than a player unable to type one letter. keymatrix derives the
+# matrix from the machine; keycheck presses keys and checks what came back.
+KEY_SRC = src/keytest.c src/coco3input.c
+KEY_OUT = build/KEYTEST.BIN
+
+keytest: $(KEY_OUT)
+
+$(KEY_OUT): $(KEY_SRC) Makefile
+	@mkdir -p build
+	$(CMOC) $(CFLAGS) -o $@ $(KEY_SRC)
+	@ls -l $@
+
+keymatrix:
+	@python3 tools/keymatrix.py
+
+keycheck: $(KEY_OUT)
+	@python3 tools/keycheck.py
 
 $(VID_OUT): $(VID_SRC) src/font6x8.h Makefile
 	@mkdir -p build

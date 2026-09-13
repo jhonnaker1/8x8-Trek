@@ -1,0 +1,4 @@
+
+# MAME writes these into the port directory when it runs.
+snap/
+cfg/

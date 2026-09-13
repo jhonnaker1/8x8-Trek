@@ -54,6 +54,13 @@ function probe(a, n)
     return table.concat(t, "")
 end
 
+-- PRESS A KEY, BECAUSE THE GAME NOW WAITS FOR ONE. Until 2026-09-13
+-- kb_waitkey() returned KB_RETURN unconditionally and the title screen
+-- dismissed itself, so this tool saw two overlays without ever touching the
+-- keyboard. With a real driver it sees exactly one and stops -- which looks
+-- like a regression and is the opposite. Pressing ENTER exercises the whole
+-- path: load, title, key, next overlay.
+local enter = manager.machine.ioport.ports[":row6"].fields["ENTER"]
 local seen, order, trace, snap = {}, {}, {}, nil
 local xy = {}
 local imgsnap = nil
@@ -61,6 +68,11 @@ local gotsnap = nil
 local smin, smax = nil, nil
 for i = 1, 300 do
     emu.wait(0.25)
+    if i > 190 and i % 8 == 0 then
+        enter:set_value(1)
+    elseif i > 190 and i % 8 == 1 then
+        enter:set_value(0)
+    end
     local v  = prog:read_u8(resident_image)
     local sv = cpu.state["S"].value
     if smin == nil or sv < smin then smin = sv end

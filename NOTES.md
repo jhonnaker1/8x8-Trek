@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and three times on 2026-09-13 (5 open of 42 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and four times on 2026-09-13 (6 open of 44 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1602,7 +1602,10 @@ are the CoCo 3**, which is started and not released:
 
   27. ~~Video, sound and input are stubs.~~ **VIDEO IS BUILT AND CHECKED ON
       THE CARD 2026-09-12** -- `make vidcheck`, 11 of 11, and the checks were
-      verified by breaking what they protect. **Sound and input remain stubs.**
+      verified by breaking what they protect. **INPUT IS REAL AND CHECKED ON THE MACHINE
+      2026-09-13** -- `make keycheck`, 26 of 26 keys, including the three this
+      keyboard shifts (`:` `;` `-` carry `*` `+` `=`). **Sound remains a
+      stub.**
       Two bugs found, both mine: a register write goes to `$FF79` and I was
       sending them to `$FF7B` (register-*indirect* via R#17, which the stub's
       own comment named correctly), so R#14 took garbage and reads landed in
@@ -1844,7 +1847,28 @@ are the CoCo 3**, which is started and not released:
       here it is the difference between a hang and a diagnosis. Raised
       2026-09-12 by watching it happen.
   31. **Nobody has played it** -- and on this project that is the item that
-      finds what the instruments cannot.
+      finds what the instruments cannot. **It could not be played until
+      2026-09-13**: kb_waitkey() returned KB_RETURN unconditionally, so the
+      game auto-advanced through every prompt. See item 43.
+  43. **THE COUNT WAS WRONG BECAUSE A CLOSED-LOOKING ENTRY HELD TWO OPEN
+      SEAMS.** Found 2026-09-13, one question after the re-derivation that
+      produced it. Item 27 reads `~~Video, sound and input are stubs.~~` with
+      the strike-through applied to the whole line and the live half -- "Sound
+      and input remain stubs" -- in bold INSIDE it. Re-deriving walked the
+      numbered entries, saw a struck-through 27, and counted it closed. So the
+      list said five open when seven seams were, and worse, item 31 ("nobody
+      has played it") was handed over as though the port were playable when
+      `kb_waitkey()` returned KB_RETURN unconditionally and no prompt could be
+      answered.
+      **A STRIKE-THROUGH IS A CLAIM ABOUT THE WHOLE LINE.** Partial closure
+      needs its own number, not a bold sentence inside a cancelled one --
+      which is the same shape as [[sweep-where-stale-claims-hide]]: status
+      living in formatting rather than in text. Sound is now item 44 rather
+      than a clause.
+  44. **Sound is a stub on the CoCo 3.** coco3snd.c returns 0 from
+      snd_enabled() so the SND command tells the truth, and every entry point
+      is empty. The SuperSprite FM+ carries a YM2413 OPLL and an AY-3-8910 and
+      neither has been touched. Split out of item 27 on 2026-09-13.
   41. ~~**THE VECTOR FIX AS WRITTEN IS WRONG: IT STORMS.**~~ **CLOSED
       2026-09-13, AND THE ANSWER IS WORTH MORE THAN THE BUG.**
       **A BARE RTI DOES NOT MAKE A STRAY PIA INTERRUPT HARMLESS -- IT MAKES
