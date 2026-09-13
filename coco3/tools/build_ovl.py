@@ -228,12 +228,15 @@ def place_stack(spath):
     #    built by a single cmoc invocation, with cmoc's own link script --
     #    passed every time.
     #
-    #    THIS LOOP IS IN THE BINARY AND DOES NOT RUN. Pre-painting the whole
-    #    range with $EE and counting what changes shows 5 to 14 bytes of 2,587
-    #    ever move, so it is being skipped, not failing part way. The
-    #    instruction bytes assemble correctly (8E B86C / 8C C287 / 24 07 /
-    #    6F 80) and the bounds match the final link exactly. NOT SOLVED --
-    #    open item 32.
+    #    THE BOUNDS COME FROM lwlink, NOT FROM A MEASUREMENT. `s_bss` and
+    #    `l_bss` are synthesised by the `define basesympat` / `lensympat`
+    #    lines at the top of the link script -- the two lines cmoc's OWN
+    #    generated script carries, which is where this was found. An earlier
+    #    version computed the range from the per-object bss_start/bss_end
+    #    symbols in the map and got $B86C, missing $B85D..$B86B: fifteen bytes
+    #    that happen to be the DSKCON request block itself, the very thing
+    #    whose garbage started this. The linker knows where its own section
+    #    is; do not re-derive it.
     pre = ("\tORCC\t#$50\t\tmask IRQ+FIRQ: BASIC's handler resets S\n"
            "\tLDS\t#$%04X\t\tour stack, not BASIC's\n"
            "\tSTA\t$FFDF\t\tall RAM: the ADDRESS is the latch\n"
@@ -244,19 +247,24 @@ def place_stack(spath):
            "\tBRA\ttrek_int_done\n"
            "trek_safe_int\tRTI\n"
            "trek_int_done\tEQU\t*\n"
-           "\tLDX\t#$%04X\t\tzero bss: see place_stack()\n"
-           "\tCMPX\t#$%04X\n"
-           "\tBHS\ttrek_bss_done\n"
+           "\tLDX\t#s_bss\t\tzero bss: lwlink's own base and length\n"
+           "\tLDY\t#l_bss\n"
+           "\tBEQ\ttrek_bss_done\n"
            "trek_bss_loop\tCLR\t,X+\n"
-           "\tCMPX\t#$%04X\n"
-           "\tBLO\ttrek_bss_loop\n"
+           "\tLEAY\t-1,Y\n"
+           "\tBNE\ttrek_bss_loop\n"
            "trek_bss_done\tEQU\t*\n"
-           % (STACK_TOP, BSS[0], BSS[1], BSS[1]))
-    out = s.replace("program_start\tEQU\t*\n", "program_start\tEQU\t*\n" + pre, 1)
+           % STACK_TOP)
+    # s_bss and l_bss are SYNTHESISED BY lwlink from the `define basesympat`
+    # and `lensympat` lines at the top of the link script -- the same two
+    # lines cmoc's own generated script carries. They have to be imported.
+    out = s.replace("INILIB\tIMPORT\n", "INILIB\tIMPORT\ns_bss\tIMPORT\nl_bss\tIMPORT\n", 1)
+    out = out.replace("program_start\tEQU\t*\n", "program_start\tEQU\t*\n" + pre, 1)
     out = out.replace(
         "\tLBSR\tINILIB\t\tinitialize standard library and global variables\n",
         "\tLBSR\tINILIB\t\tinitialize standard library and global variables\n"
-        "\tLDS\t#$%04X\t\tINILIB positions its own; take it back\n" % STACK_TOP, 1)
+        "\tLDS\t#$%04X\t\tINILIB positions its own; take it back\n"
+        % STACK_TOP, 1)
     if out == s:
         sys.exit("build_ovl: program_start did not match -- machine not taken")
     open(spath, "w").write(out)
