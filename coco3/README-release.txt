@@ -11,7 +11,8 @@ enjoy that, register it. That was always the deal.
 
 WHAT YOU NEED
 
-A Color Computer 3, a disk drive, and a SuperSprite FM+ video card.
+A Color Computer 3, a SuperSprite FM+ video card, and something to read a
+disk with -- a real floppy drive or a CoCo SDC.
 
 THE CARD IS NOT OPTIONAL. The CoCo 3's own video gives eight colours in
 80 columns; this game wants sixteen per pixel and a 512-wide bitmap, and the
@@ -21,7 +22,39 @@ to run this on.
 In a Multi-Pak, put the DISK CONTROLLER IN SLOT 4 and the card in slot 1. That
 order is not a preference: with the controller anywhere else the machine will
 not boot Disk BASIC at all. The card answers at $FF7x regardless of which slot
-is selected, which is why the two coexist.
+is selected, which is why the two coexist. You need the Multi-Pak: the card
+and the controller both want the cartridge port.
+
+
+A CoCo SDC SHOULD WORK, AND THIS IS USUALLY THE PART THAT DOES NOT
+
+Most SD-card replacements hook DSKCON in software, and this port never calls
+DSKCON -- it runs in all-RAM mode with no ROM to call and drives the WD1773's
+own registers. That is the exact thing that makes software fail on those
+devices. The CoCo SDC is built for this case: it emulates the floppy
+controller in hardware, and it is in that mode unless something deliberately
+takes it out.
+
+Four settings, all of them the factory defaults:
+
+    DIP "DRGN"      OFF        -- the CoCo address scheme, not the Dragon one
+    DIP 4, 2, 1     all OFF    -- Flash bank 0, which holds SDC-DOS
+    Jumper DRQ      NOT fitted -- it routes the drive's DRQ to the CART FIRQ
+                                  line, which is a Dragon arrangement
+    Jumper AUTO     NOT fitted
+
+MOUNT TREK.DSK FROM THE SD CARD, NOT OVER DRIVEWIRE. DriveWire is implemented
+in software by SDC-DOS and gets none of the hardware emulation -- the guide
+says the emulation features "are only available to images located on the SD
+card". Mount it as an ordinary disk image in drive 0; a raw block array will
+not work either, for the same reason.
+
+This has NOT been run on real hardware. What has been checked is the one thing
+that is checkable without it: $43 written to $FF40 is how a program takes the
+SDC out of FDC Emulation Mode, and this port never writes it -- it uses four
+values, $29 and $A9 reading, $39 and $B9 writing, across 5,911 writes. MAME
+has no SDC device to test against, so that is a removed risk rather than a
+confirmation.
 
 
 RUNNING IT
@@ -32,12 +65,12 @@ Put the disk in drive 0 and type:
     LOADM"TREKLDR"
     EXEC
 
-THEN WAIT ABOUT A MINUTE, AND KEEP WATCHING THE BASIC SCREEN. Nothing appears
-to happen for roughly sixty seconds while the loader reads 44K off the floppy
--- a real drive is not fast and there is no progress bar. When it finishes,
-THE MONITOR SWITCHES ITSELF to the card's output and the title screen is
-there. If you give up at forty seconds you will conclude it does not work; it
-does.
+THEN WAIT, AND KEEP WATCHING THE BASIC SCREEN. Nothing appears to happen while
+the loader reads 44K in, and there is no progress bar. ON A REAL FLOPPY THAT IS
+ABOUT SIXTY SECONDS; on a CoCo SDC it is far quicker, because there is no head
+to step. When it finishes, THE MONITOR SWITCHES ITSELF to the card's output and
+the title screen is there. If you give up at forty seconds on a real drive you
+will conclude it does not work; it does.
 
 Quitting hands the monitor back to the CoCo and restarts BASIC.
 
@@ -83,6 +116,13 @@ THE 1.78 MHz MODE HAS NOT BEEN TRIED ON REAL HARDWARE. Everything here was
 developed and tested under MAME. CoCo 3 disk access at double speed is
 historically a hazard, and if this port misbehaves on a real machine that is
 the first thing to suspect.
+
+WHERE THAT WOULD SHOW. The 44K load is NOT at risk -- the loader runs before
+the game touches the speed latch, so it reads at the standard 0.89 MHz. The
+switch to 1.78 MHz is the last line of the video setup, so everything after the
+title screen is at double speed: the briefing and the music are read then, and
+so is every SAVE. A machine that loads and shows a title screen but comes up
+with no words in it, or that fails only on SAVE, is pointing straight at this.
 
 THE DISK IS A STANDARD DISK BASIC DISKETTE, 35 tracks single sided, written by
 this project's own tools. DIR will list it.

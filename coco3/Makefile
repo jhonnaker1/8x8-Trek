@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck verify check-all release ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck sdccheck verify check-all release ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -373,6 +373,20 @@ $(WRITE_OUT): $(WRITE_SRC) Makefile
 
 writecheck: $(WRITE_OUT) disk
 	@python3 tools/writecheck.py
+
+# CAN THIS PORT RUN FROM A CoCo SDC? It drives the WD1773 registers directly,
+# which is normally what stops a program working on an SD-card replacement --
+# but the SDC emulates the controller in hardware, so the answer turns on ONE
+# value: $43 in $FF40 is how you take an SDC out of FDC Emulation Mode, and a
+# driver that wrote it would break mid-transfer. This taps every write.
+#
+# DELIBERATELY NOT IN check-all. It re-runs the same WRITETEST.BIN that
+# writecheck already runs -- two minutes of MAME for a question about a
+# third-party library this port never modifies. Item 55's own note says a gate
+# nobody runs is worse than no gate; this is the other half of that. Run it if
+# the storage seam changes.
+sdccheck: $(WRITE_OUT) disk
+	@python3 tools/sdccheck.py
 
 # MAME DRAWS THE CARD'S SCREEN BLACK, so nothing here has ever been LOOKED at.
 # This pulls the frame out of the V9958's own VRAM and writes a PNG.

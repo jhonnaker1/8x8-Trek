@@ -30,10 +30,30 @@
  *   A granule is nine sectors, half a track, and TRACK 17 IS SKIPPED in the
  *   numbering: granules 0..33 are tracks 0..16, and 34..67 are tracks 18..34.
  *
- * WRITING IS NOT HERE YET. plat_write_all returns STOR_ERROR, so SAVE reports
- * "COULD NOT SAVE." rather than pretending -- the same honesty the Falcon's
- * sound stub kept. DSKCON writes sectors happily (DCOPC = 3); what is missing
- * is granule allocation and writing the FAT and directory back.
+ * WRITING IS HERE, as of 2026-09-13. plat_write_all allocates granules and
+ * writes the data, the FAT and the directory back, in that order, and
+ * tools/writecheck.py has the machine write a file which the HOST then reads
+ * off the .dsk with independent arithmetic -- a return code is not a witness.
+ * The four paragraphs this replaced said writing was a stub returning
+ * STOR_ERROR and stayed that way for a day after it stopped being true.
+ *
+ * DRIVING THE WD1773 DIRECTLY IS WHAT NORMALLY BREAKS SD-CARD REPLACEMENTS,
+ * and it does not break the CoCo SDC -- which matters, because a real floppy
+ * drive is now the rarer half of the hardware. The SDC emulates the controller
+ * in silicon rather than hooking DSKCON in software:
+ *
+ *     "The CoCo SDC normally operates in FDC Emulation Mode. This makes it
+ *      appear to the CoCo that a standard floppy disk controller is present."
+ *         -- CoCo SDC User Guide v4, "Low-Level Hardware Interface"
+ *
+ * There is exactly one way for a driver to lose that, and the same page names
+ * it: storing $43 in the control latch at $FF40 switches the card into
+ * Command Mode, chosen because it "would not normally be used with a real
+ * floppy controller". That is an assumption about the driver, and this port
+ * brought its own. tools/sdccheck.py taps every write to $FF40 across a read
+ * and a write and reports the set: $29/$A9 reading, $39/$B9 writing, 5,911
+ * writes, no $43. MAME HAS NO SDC DEVICE, so that is the nearest thing to a
+ * measurement available here and it is not a claim that the port runs on one.
  */
 #include <stdint.h>
 #include <dskcon-standalone.h>

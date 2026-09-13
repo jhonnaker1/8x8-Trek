@@ -1828,6 +1828,28 @@ are the CoCo 3**, which is started and not released:
       The safe shape if it turns out to bite: drop to `$FFD8` around
       `read_sec`/`write_sec` and restore. That costs two port writes a sector
       and is not worth adding on speculation.
+      **2026-09-13 -- A REAL MACHINE EXISTS NOW.** Jamie has a CoCo 3, with a
+      CoCo SDC rather than a floppy drive. Two things follow.
+      **First, the drive is not the obstacle it looked like.** This port never
+      calls DSKCON -- it drives the WD1773's registers -- which is precisely
+      what fails on SD-card replacements that hook DSKCON in software. The SDC
+      is the exception: it emulates the controller in hardware and is in that
+      mode by default. The single way a driver loses that is storing `$43` in
+      `$FF40`, and `tools/sdccheck.py` taps every write to that latch across a
+      read and a write: 5,911 writes, four values, `$29`/`$A9`/`$39`/`$B9`, no
+      `$43`. **MAME HAS NO SDC DEVICE** (`coco3 -listslots` lists `ssfm` and
+      `fdc`), so that removes a named risk and confirms nothing.
+      **Second, the SDC changes what this item is even asking.** The hazard is
+      about a WD1773's timing at double speed and AN SDC IS NOT A WD1773 --
+      it is an ATmega presenting the same registers. A pass on the SDC would
+      NOT close this item for a real floppy, and a failure would not condemn
+      one. Say which drive any result came from.
+      **Where to look when it is tried**: the 44K load is at 0.89 MHz and is
+      not at risk -- `vdc_init()` writes `$FFD9` as its LAST line, after the
+      loader has finished. Everything after the title screen is at 1.78 MHz,
+      including `far_load("MUSIC.DAT")`, the briefing, and every SAVE. **A
+      machine that reaches the title screen and then has no words in it is
+      this item**, not item 46 coming back.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
