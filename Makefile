@@ -17,7 +17,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 # ~/amiga-toolchain/bin; override if it lives elsewhere.
 M68K = $(HOME)/amiga-toolchain/bin/m68k-amigaos-gcc
 
-.PHONY: all test port-check c89-check check-tables tiers exit-test sound-check ports check-makefiles clean
+.PHONY: release release-clean all test port-check c89-check check-tables tiers exit-test sound-check ports check-makefiles clean
 
 c89-check:
 	@echo "port-check: the core must stay C89 (cc65 needs it)"
@@ -80,6 +80,31 @@ tiers:
 # needs no toolchain, where the ports below want six cross compilers. The
 # header has been wrong five separate ways, always because status sat where a
 # count could not see it -- see NOTES item 56.
+# EVERY PORT'S RELEASE ARTEFACT, IN ONE PLACE. Cutting a release used to mean
+# remembering seven directories and running `make release` in each -- and the
+# v0.14.0 release attached six assets because six was what somebody remembered.
+# Each port decides its own artefact: a .d64, a .d81, an .atr, a .zip, a disk
+# image. This just makes sure none is forgotten.
+#
+# IT DOES NOT CLEAN FOR YOU. The clean rebuild is an instrument on this project
+# and it is the RELEASE MANAGER's job to wipe first -- `make release-clean`.
+RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3
+
+release:
+	@python3 tools/open_list.py
+	@for d in $(RELEASE_PORTS); do \
+	    echo "=== $$d ==="; \
+	    $(MAKE) -C $$d release || exit 1; \
+	done
+	@echo ""
+	@echo "release artefacts:"
+	@ls -l */build/egatrek-*.zip */build/egatrek-*.d64 */build/egatrek-*.d81 \
+	      */build/egatrek-*.atr 2>/dev/null | awk '{printf "  %10s  %s\n", $$5, $$9}'
+
+release-clean:
+	@for d in $(RELEASE_PORTS); do rm -rf $$d/build; done
+	@echo "every port's build/ wiped -- now run: make release"
+
 ports:
 	@python3 tools/open_list.py
 	@python3 tools/check_ports.py $(P)
