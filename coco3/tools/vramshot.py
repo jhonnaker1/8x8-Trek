@@ -85,15 +85,41 @@ local function keyfield(want)
     error("vramshot: no key named " .. want)
 end
 
+local vram = manager.machine.devices[":ext:multi:slot1:ssfm:v9958"].spaces["vram"]
+local film = os.getenv("FILM")
+local shot = 0
+
+-- ONLY THE BYTES THE SCREEN USES. GRAPHIC6 interleaves, so logical 0..54271
+-- lives at physical 0..27135 and 65536..92671 -- half the reads of dumping
+-- the whole chip, which matters when this runs once per keystroke.
+local function grab(tag)
+    if film == nil or film == "" then return end
+    shot = shot + 1
+    local f = io.open(string.format("%s/%03d-%s.bin", film, shot, tag), "wb")
+    local c = {}
+    for a = 0, 27135 do
+        c[#c+1] = string.char(vram:read_u8(a))
+        if #c == 8192 then f:write(table.concat(c)); c = {} end
+    end
+    for a = 65536, 92671 do
+        c[#c+1] = string.char(vram:read_u8(a))
+        if #c == 8192 then f:write(table.concat(c)); c = {} end
+    end
+    if #c > 0 then f:write(table.concat(c)) end
+    f:close()
+end
+
 local function press(f, hold)
     f:set_value(1); emu.wait(0.15)
     f:set_value(0); emu.wait(hold)
 end
 
 local enter = keyfield("ENTER")
-for i = 1, keys do press(enter, 2.0) end
+grab("start")
+for i = 1, keys do press(enter, 2.0); grab("enter") end
 for want in string.gmatch(os.getenv("SEQ") or "", "[^,]+") do
     press(keyfield(want), 2.5)
+    grab(want)
 end
 -- LET THE SCREEN FINISH. An overlay load off a floppy plus a full redraw is
 -- seconds, and catching it half-drawn reports a black frame as a dead port.
@@ -139,6 +165,10 @@ def main():
     ap.add_argument("--seq", default="",
                     help="comma-separated keys to type first, e.g. ENTER,n,ENTER -- "
                          "a letter or digit, or a named key (ENTER SPACE UP DOWN)")
+    ap.add_argument("--film", default="",
+                    help="directory to write a FRAME AFTER EVERY KEY into -- "
+                         "a black screen at the end says nothing about which "
+                         "key caused it")
     ap.add_argument("--settle", type=float, default=6.0,
                     help="emulated seconds to let the screen finish drawing")
     a = ap.parse_args()
@@ -160,7 +190,7 @@ def main():
                     "-autoboot_script", lua, "-autoboot_delay", "1",
                     "-seconds_to_run", str(secs), "-nothrottle",
                     "-cfg_directory", tmp, "-snapshot_directory", tmp],
-                   env=dict(os.environ, RAWF=raw, AT=str(a.at),
+                   env=dict(os.environ, RAWF=raw, AT=str(a.at), FILM=a.film,
                             KEYS=str(a.keys), SETTLE=str(a.settle), SEQ=a.seq,
                             NBYTES=str(CHIP_BYTES)),
                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
@@ -178,6 +208,39 @@ def main():
 
     pal = palette()
     from PIL import Image
+
+    if a.film:
+        import glob
+        # THE TWO HALVES MUST BE INTERLEAVED BACK, not concatenated. The Lua
+        # reads physical 0..27135 (every EVEN logical byte) and 65536..92671
+        # (every ODD one); writing them one after the other and rendering that
+        # gives the console drawn twice and shifted -- the same false picture
+        # the whole-chip linear read gave before, in a new place.
+        n = 0
+        for fn in sorted(glob.glob(os.path.join(a.film, "*.bin"))):
+            raw_f = open(fn, "rb").read()
+            if len(raw_f) != VRAM_BYTES:
+                continue
+            half = VRAM_BYTES // 2
+            fd = bytearray(VRAM_BYTES)
+            fd[0::2] = raw_f[:half]
+            fd[1::2] = raw_f[half:]
+            fd = bytes(fd)
+            im = Image.new("RGB", (W, H)); q = im.load()
+            live = 0
+            for y in range(H):
+                row = fd[y * STRIDE:(y + 1) * STRIDE]
+                for i, byte in enumerate(row):
+                    if byte:
+                        live += 1
+                    q[i * 2, y] = pal[byte >> 4]
+                    q[i * 2 + 1, y] = pal[byte & 15]
+            png = fn[:-4] + ".png"
+            im.save(png)
+            n += 1
+            print("   %-40s %5.1f%% ink" % (os.path.basename(png),
+                                            100.0 * live / (H * STRIDE)))
+        print("vramshot: %d film frames in %s" % (n, a.film))
     img = Image.new("RGB", (W, H))
     px = img.load()
     hist = [0] * 16

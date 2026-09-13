@@ -27,10 +27,20 @@ its shape.
 import os, struct, sys
 
 STUB_ORG = 0x2800      # where BASIC drops the stub; the game's own org
-BODY_LOAD = 0x6000     # where LOADM can place the body
+BODY_LOAD = 0x4000     # where LOADM can place the body
 BODY_ORG  = 0xE400     # where the body is LINKED to run
 GAME_ORG = 0x2800
 STACK    = 0x7E00
+
+# THE CEILING THE HARNESSES AND THE README TYPE, and the body must fit under
+# it. `LOADM` SILENTLY REFUSES A BLOCK ABOVE BASIC'S MEMORY TOP -- no error,
+# no load, and EXEC then runs a stale address. That is item 35's lesson and it
+# BIT AGAIN on 2026-09-13: adding plat_write_all to coco3storage.c grew this
+# loader, which links it, from 3,427 bytes to 4,406 -- and at the old
+# BODY_LOAD of $6000 that reached $715D, past $6FFF. The game stopped booting
+# and the first thing I blamed was the SAVE command I had just written.
+# So it is an ASSERTION now, not a number somebody remembers to check.
+CLEAR_TOP = 0x6FFF
 
 
 def decb_blocks(path):
@@ -72,6 +82,18 @@ def stub(nbytes):
     ])
 
 
+def check_fits(nbytes):
+    end = BODY_LOAD + nbytes - 1
+    if end > CLEAR_TOP:
+        sys.exit("mkboot: the loader body is %d bytes at $%04X, ending $%04X -- "
+                 "ABOVE the CLEAR 25,&H%04X ceiling the harnesses type.\n"
+                 "        LOADM will refuse it silently: no error, no load, and "
+                 "EXEC runs a stale address.\n"
+                 "        Lower BODY_LOAD, raise the CLEAR everywhere, or take "
+                 "something out of the loader."
+                 % (nbytes, BODY_LOAD, end, CLEAR_TOP))
+
+
 def main():
     if len(sys.argv) != 4:
         sys.exit("usage: mkboot.py BOOT.BIN GAME.BIN OUTDIR")
@@ -83,6 +105,7 @@ def main():
     bad, bytes_ = body[0]
     if bad != BODY_ORG:
         sys.exit("mkboot: %s loads at $%04X, expected $%04X" % (bootbin, bad, BODY_ORG))
+    check_fits(len(bytes_))
 
     game, _ = decb_blocks(gamebin)
     if len(game) != 1:

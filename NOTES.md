@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and eight times on 2026-09-13 (6 open of 49 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and nine times on 2026-09-13 (6 open of 50 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1632,8 +1632,49 @@ are the CoCo 3**, which is started and not released:
       [14..15], type 2, $00 padding.
       **STILL OPEN: SAVE FROM INSIDE THE GAME HAS NOT BEEN SEEN TO WORK.**
       See item 49 -- and note that is a different claim from this one.
-  49. **TYPING `SAVE` AT THE COMMAND PROMPT LEAVES A BLACK SCREEN, and I could
-      not tell whose fault it is.** Raised 2026-09-13 while trying to witness
+  49. ~~**TYPING `SAVE` AT THE COMMAND PROMPT LEAVES A BLACK SCREEN.**~~
+      **CLOSED 2026-09-13: IT WAS NOT SAVE. THE GAME HAD STOPPED BOOTING, AND
+      I BROKE IT MYSELF AN HOUR EARLIER IN THE SAME SESSION.**
+      Adding `plat_write_all` grew `coco3storage.c`, which the FIRST-STAGE
+      LOADER links too -- from 3,427 bytes to 4,406. At `BODY_LOAD = $6000`
+      that body reached **$715D, above the `CLEAR 25,&H6FFF` ceiling the
+      harnesses type**, and *LOADM SILENTLY REFUSES A BLOCK ABOVE BASIC'S
+      MEMORY TOP*: no error, no load, EXEC on a stale address. That is item
+      35's lesson, biting a second time, in the one file nobody thinks of as
+      part of the loader.
+      **THE SYMPTOM POINTED AT THE NEWEST CODE AND THE CAUSE WAS THE NEWEST
+      CODE -- in a different binary.** I had just written SAVE, so a black
+      screen after typing SAVE read as a SAVE bug. It was every screen: a
+      frame captured before the first keystroke was already blank, and I had
+      not looked.
+      **FIXED AS AN ASSERTION, NOT A NUMBER.** `BODY_LOAD` is $4000 and
+      `mkboot.py` now REFUSES to build a loader whose body crosses
+      `CLEAR_TOP`, naming the ceiling and what LOADM will do. Verified by
+      putting $6000 back and watching it fail.
+      **AND THE INSTRUMENT THAT FOUND IT IS THE ONE I ASKED FOR IN THIS
+      ITEM'S OWN TEXT**: `vramshot --film DIR` writes a frame after EVERY
+      keystroke. "A black screen at the end says nothing about which key
+      caused it" -- frame 001, before any key, was already black, which is the
+      whole diagnosis in one picture. Jamie's note is why it got built: *"when
+      you were testing the save with mame, I could only see the green
+      screen"* -- he could not see any of this happening, and neither could I.
+      **THE FILM'S FIRST RENDER WAS ITSELF WRONG**, for the third time on this
+      port: it concatenated the two interleaved VRAM halves instead of
+      weaving them, and drew the console twice and shifted. Same fault as the
+      whole-chip linear read, in a new place.
+      **WHAT IS NOT SETTLED, AND IS NOW ITEM 50**: whether SAVE works. This
+      hunt never issued the command -- the film shows the setup still asking
+      for the self-destruct password while my "s,a,v,e" went into that field.
+  50. **SAVE FROM INSIDE THE GAME IS STILL UNTESTED, because the harness
+      cannot reliably reach a command prompt.** Raised 2026-09-13 out of 49.
+      `plat_write_all` is built and witnessed (item 28); what is missing is a
+      way to DRIVE the game there. Every attempt guesses how many keystrokes
+      each setup prompt consumes, and the guesses are wrong in ways that only
+      show up as the game quietly being somewhere else -- "save" typed into a
+      password field looks exactly like a command that did nothing.
+      **The tool to fix it exists**: `vramshot --film` shows each frame, so a
+      sequence can be built by WATCHING rather than counting. Do that first;
+      do not add keystrokes until a film says where the game actually is. Raised 2026-09-13 while trying to witness
       an in-game save on top of item 28. Driving the game to the bridge and
       typing S-A-V-E-RETURN gives a frame that is 100% colour 0, and it stays
       that way through 45 emulated seconds of settle. No EGATREK.SAV appears
