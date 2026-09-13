@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and four times on 2026-09-12 (7 open of 36 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and five times on 2026-09-12 (8 open of 37 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1629,6 +1629,28 @@ are the CoCo 3**, which is started and not released:
       into a window that was never filled. Four bootstrap bugs were found and
       fixed on the way (vdc_init below $8000; mask interrupts; place the
       stack; all-RAM mode) and none of them was the last one.
+      **ROOT CAUSE FOUND 2026-09-12: BSS IS NEVER ZEROED.**
+      coco3storage.c opens `if (ready) return 1;` and `ready` reads NON-ZERO
+      BEFORE THE PROGRAM EXECUTES AN INSTRUCTION -- so disk_ready() reports
+      success without calling dskcon_init or reading the FAT, and every read
+      after walks a garbage FAT with an uninitialised controller (the DSKCON
+      block read opc=$C0, where only 2 and 3 are legal). ovltest passes on the
+      same disk because cmoc links IT with cmoc's own script and one
+      contiguous bss range; the overlay build uses our lwlink script and gets
+      FIFTEEN per-object bss_start/bss_end pairs that nothing clears. The bug
+      is in this port's custom link, not in the overlay seam.
+      **STILL OPEN: the fix does not work.** place_stack() injects a zeroing
+      loop, the bytes assemble correctly (8E B86C / 8C C287 / 24 07 / 6F 80),
+      the bounds match the final link exactly, and the loop DOES NOT EXECUTE
+      -- pre-painting the range with $EE shows 5 to 14 bytes of 2,587 ever
+      change. Skipped, not failing part way. That is the next thing to chase.
+  34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
+      on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
+      as "weird rainbow colors" while watching a run** -- the third time on
+      this project a person looking at the screen has named a fault no
+      instrument here reported. A climbing stack means unbalanced pulls, which
+      is what executing an unloaded window does, so it is probably downstream
+      of 32 rather than separate.
   33. **ovl_load's failure is SILENT on every port.** It returns void, so a
       failed image leaves the caller to jump into whatever the window holds.
       On the C128 a KERNAL LOAD failing is rare enough that nobody noticed;

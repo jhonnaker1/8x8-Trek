@@ -42,6 +42,14 @@ prog:write_u8(resident_image, 0xFF)          -- "nothing loaded", so a stale
 -- a CPU write to $FFDF. Poking it from here does nothing -- these are
 -- write-only address latches and a debugger write never triggers them, which
 -- is why doing it here appeared to disprove a correct diagnosis.
+-- IS BSS ZEROED? Read the storage layer's `ready` flag and the DSKCON block
+-- BEFORE the program runs. If `ready` is non-zero, disk_ready() returns
+-- success without ever initialising the driver or reading the FAT.
+local ready_at = tonumber(os.getenv("READYAT"), 16)
+local dc0 = tonumber(os.getenv("DCOPC"), 16)
+local bss0 = string.format("ready=%02X dskcon=%02X%02X%02X%02X",
+    prog:read_u8(ready_at), prog:read_u8(dc0), prog:read_u8(dc0+1),
+    prog:read_u8(dc0+2), prog:read_u8(dc0+3))
 cpu.state["S"].value  = 0xFE00
 cpu.state["PC"].value = ex
 
@@ -73,11 +81,20 @@ for i = 1, 120 do
 end
 local o = io.open(os.getenv("OUTF"), "w")
 o:write("pre " .. table.concat(pre, "") .. "\n")
+o:write("bss0 " .. bss0 .. "\n")
+o:write("bss1 " .. string.format("ready=%02X", prog:read_u8(ready_at)) .. "\n")
 o:write("order " .. table.concat(order, ",") .. "\n")
 o:write("snap " .. (snap or "none") .. "\n")
 o:write(string.format("pc %04X\n", cpu.state["PC"].value))
 o:write(string.format("s %04X %04X\n", smin or 0, smax or 0))
 o:write("trace " .. table.concat(trace, " ") .. "\n")
+-- ASK THE DISK CONTROLLER WHAT IT WAS ASKED FOR. A hang inside
+-- dskcon_processSector says nothing about WHICH sector; this does.
+local dc = tonumber(os.getenv("DCOPC"), 16)
+o:write(string.format("dskcon opc=%02X drv=%02X trk=%02X sec=%02X bpt=%02X%02X sta=%02X nmiflg=%02X nmivec=%02X%02X\n",
+  prog:read_u8(dc), prog:read_u8(dc+1), prog:read_u8(dc+2), prog:read_u8(dc+3),
+  prog:read_u8(dc+4), prog:read_u8(dc+5), prog:read_u8(dc+6),
+  prog:read_u8(dc+13), prog:read_u8(dc+14), prog:read_u8(dc+15)))
 local tail = {}
 for k = 0, 63 do tail[#tail + 1] = string.format("%02X", prog:read_u8(win + k)) end
 o:write("final " .. prog:read_u8(resident_image) .. " " .. table.concat(tail, "") .. "\n")
@@ -133,7 +150,9 @@ def main():
     open(lua, "w").write(LUA)
 
     env = dict(os.environ, ADDRF=adr, RAWF=raw, OUTF=outf,
-               RESIMG="%X" % resimg, WINDOW="%X" % win)
+               RESIMG="%X" % resimg, WINDOW="%X" % win,
+               DCOPC="%X" % sym(mappath, "_DCOPC"),
+               READYAT="%X" % sym(mappath, "_ready"))
     subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
@@ -153,6 +172,9 @@ def main():
     print("  _resident_image at the end    : %s" % got["final"].strip().split(" ")[0])
     print("  PC at the end                 : $%s" % got["pc"].strip())
     print("  PC/S over the first 4s        : %s" % got["trace"].strip())
+    print("  BEFORE the program ran        : %s" % got["bss0"].strip())
+    print("  after                         : %s" % got["bss1"].strip())
+    print("  %s" % got["dskcon"].strip())
     lo_s, hi_s = got["s"].strip().split()
     print("  stack S ranged over           : $%s..$%s" % (lo_s, hi_s))
     if int(lo_s, 16) <= ld + ln:

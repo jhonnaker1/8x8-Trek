@@ -169,6 +169,11 @@ def split_functions(spath, fnmap, sect_for):
 STACK_TOP    = 0xFE00
 STACK_BYTES  = 1024
 
+# The uninitialised range to clear at startup, measured from the probe link.
+# [0, 0] on the first pass; the zeroing loop is emitted EITHER WAY so the two
+# passes produce identical code sizes and nothing moves underneath the second.
+BSS = [0, 0]
+
 
 def place_stack(spath):
     """Take the machine at program_start, before anything else runs.
@@ -211,6 +216,24 @@ def place_stack(spath):
     #    the isolated ovltest loaded two images off a real diskette with the
     #    NMI slot exactly as BASIC left it, and claiming it here is the one
     #    change between that working and the game's first ovl_load failing.
+    # 5. ZERO BSS. cmoc's own crt clears one contiguous bss range; THIS BUILD
+    #    LINKS WITH ITS OWN lwlink SCRIPT and gets fifteen per-object
+    #    bss_start/bss_end pairs instead, so nothing cleared it and every
+    #    static started as whatever the machine had there. Measured on the
+    #    hardware: coco3storage.c's `ready` flag read 01 before the program
+    #    executed an instruction, so disk_ready() returned success WITHOUT
+    #    ever calling dskcon_init or reading the FAT, and every read after
+    #    that walked a garbage FAT with an uninitialised controller. That is
+    #    why the game's first ovl_load failed while the isolated ovltest --
+    #    built by a single cmoc invocation, with cmoc's own link script --
+    #    passed every time.
+    #
+    #    THIS LOOP IS IN THE BINARY AND DOES NOT RUN. Pre-painting the whole
+    #    range with $EE and counting what changes shows 5 to 14 bytes of 2,587
+    #    ever move, so it is being skipped, not failing part way. The
+    #    instruction bytes assemble correctly (8E B86C / 8C C287 / 24 07 /
+    #    6F 80) and the bounds match the final link exactly. NOT SOLVED --
+    #    open item 32.
     pre = ("\tORCC\t#$50\t\tmask IRQ+FIRQ: BASIC's handler resets S\n"
            "\tLDS\t#$%04X\t\tour stack, not BASIC's\n"
            "\tSTA\t$FFDF\t\tall RAM: the ADDRESS is the latch\n"
@@ -220,7 +243,15 @@ def place_stack(spath):
            "\tSTA\t$0106\n\tSTX\t$0107\t\tFIRQ -> RTI\n"
            "\tBRA\ttrek_int_done\n"
            "trek_safe_int\tRTI\n"
-           "trek_int_done\tEQU\t*\n" % STACK_TOP)
+           "trek_int_done\tEQU\t*\n"
+           "\tLDX\t#$%04X\t\tzero bss: see place_stack()\n"
+           "\tCMPX\t#$%04X\n"
+           "\tBHS\ttrek_bss_done\n"
+           "trek_bss_loop\tCLR\t,X+\n"
+           "\tCMPX\t#$%04X\n"
+           "\tBLO\ttrek_bss_loop\n"
+           "trek_bss_done\tEQU\t*\n"
+           % (STACK_TOP, BSS[0], BSS[1], BSS[1]))
     out = s.replace("program_start\tEQU\t*\n", "program_start\tEQU\t*\n" + pre, 1)
     out = out.replace(
         "\tLBSR\tINILIB\t\tinitialize standard library and global variables\n",
@@ -435,6 +466,20 @@ def main():
     # goes above that. Pass two is then self-consistent, and asserted to be.
     sectnames = set(sect for sect, _ in names)
     if names:
+        link(0xFE00)
+        # The bss range, from the link that just happened. Every object
+        # contributes its own pair, so the range is the outer hull.
+        los, his = [], []
+        for line in open(a.out + ".map"):
+            m = re.match(r'Symbol: bss_(start|end) \([^)]*\) = ([0-9A-Fa-f]+)',
+                         line.strip())
+            if m:
+                (los if m.group(1) == "start" else his).append(int(m.group(2), 16))
+        if los and his:
+            BSS[0], BSS[1] = min(los), max(his)
+            print("  bss          $%04X..$%04X, %d bytes cleared at startup"
+                  % (BSS[0], BSS[1] - 1, BSS[1] - BSS[0]))
+        objs = build_objs()
         link(0xFE00)
         top = map_top(a.out + ".map", sectnames)
         placed = (top + 0xFF) & ~0xFF

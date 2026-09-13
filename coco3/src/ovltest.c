@@ -6,6 +6,14 @@
  * report the return code, the byte count and the first bytes that landed.
  *
  * Results at $2F00.
+ *
+ * TWO THINGS THIS RULED OUT while the game's own boot was being chased, both
+ * by adding one variable at a time and both negative: running vdc_init()
+ * first (the game does, this did not) and matching the game's startup exactly
+ * (stack at $FE00, safe IRQ/FIRQ vectors). The seam passed with each. What
+ * finally separated them was BSS: cmoc links this file with its own script
+ * and one contiguous bss range, and the overlay build links with ours and
+ * gets fifteen per-object pairs that nothing clears.
  */
 #include <stdint.h>
 #include "../../core/overlay.h"

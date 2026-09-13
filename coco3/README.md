@@ -241,12 +241,37 @@ step of it was found on the hardware rather than reasoned out:
 All four are injected at `program_start` by `build_ovl.place_stack()`, before
 `INILIB` and before `main()`.
 
-**`make ovlrun` STILL DOES NOT PASS.** The game's first `ovl_load` fails,
-`dskcon_processSector` spinning on a read that never completes -- and because
-`ovl_load()` returns `void`, the failure is SILENT: `main()` calls into a
-window that was never filled and executes whatever was there. The seam works
-in isolation and does not work from inside the game, and the difference has
-not been found. It is item 32.
+## Why the game's first ovl_load fails -- FOUND
+
+**BSS is never zeroed in the overlay build**, and that is the whole of it.
+
+`src/coco3storage.c` opens with `if (ready) return 1;`. Measured on the
+machine, `ready` reads **non-zero before the program has executed a single
+instruction** -- 01 in one run, B2 in another, whatever the machine happened
+to leave there. So `disk_ready()` reports success **without ever calling
+`dskcon_init` and without ever reading the FAT**, and every read after that
+walks a garbage FAT with an uninitialised controller. The DSKCON request block
+confirms it: `opc=$C0` where the only legal values are 2 and 3.
+
+**Why `ovlcheck` passes and the game does not.** `ovltest` is built by a
+single cmoc invocation using **cmoc's own link script**, which gives the
+runtime one contiguous bss range to clear. The overlay build links with
+`tools/ovl.link`, and the map shows **fifteen** separate `bss_start`/`bss_end`
+pairs, one per object -- nothing clears them. The bug is in this port's custom
+link, not in the overlay seam, which is why the seam passes on the same disk
+in the same emulator.
+
+**It is not fixed.** `build_ovl.place_stack()` now injects a zeroing loop at
+`program_start`; the instructions assemble correctly, the bounds match the
+final link exactly, and **the loop does not execute** -- pre-painting the
+range with `$EE` and counting what changes shows 5 to 14 bytes of 2,587 ever
+move. Skipped, not failing part way. Open item 32.
+
+**And there is a second fault, which you can see.** `S` climbs to `$FFFC`, so
+every push lands in the I/O page at `$FFB0-$FFDF` -- the GIME's palette and
+video control registers. On screen that is **rainbow colours**, which is how
+Jamie spotted it while watching a run. A stack that climbs means unbalanced
+pulls, which is what executing an unloaded window does. Item 34.
 
 ## The GIME MMU is proven and abandoned
 
