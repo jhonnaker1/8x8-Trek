@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (5 open of 55 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (4 open of 55 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1725,7 +1725,8 @@ are the CoCo 3**, which is started and not released:
       `core/serial.c` stopped being an overlay in the process: it carries no
       marker, so it is resident everywhere else, and `overlay_check` found four
       separate faults caused by paging it here.
-  53. **THE CONSOLE REPAINT WAS TWELVE SECONDS. It is 3.84 now** (2026-09-13,
+  53. ~~**THE CONSOLE REPAINT WAS TWELVE SECONDS.**~~ **3.84 NOW, AND CLOSED
+      BY JAMIE'S CALL.** (2026-09-13,
       raised and mostly fixed by the play session that closed item 31).
       **MEASURED FIRST, with `make perftest`**: a full 80x25 repaint took
       **12.24 seconds** at 0.89 MHz -- about 5,400 cycles a character to write
@@ -1752,11 +1753,17 @@ are the CoCo 3**, which is started and not released:
       all the ports, but it is playable."** That is the judgement that matters
       and it changes this item's status rather than closing it: **playable is
       not a release blocker**, so item 48 is no longer waiting on speed.
-      **STILL OPEN**: 3.84 seconds is better and is not fast. The structural
-      fix is a DIRTY-CELL SHADOW -- 80x25 of glyph and colour, ~4K -- so that
-      a panel redraw only touches cells that changed. Jamie's words were
-      "redraws of each panel for each turn", and most of those cells are
-      identical between turns.
+      **CLOSED BY JAMIE'S JUDGEMENT, NOT BY BEING FAST** (2026-09-13): *"close
+      53. i'm fine with it. don't think there is much more that can be done
+      for speed."* A DECISION, like item 19's parked link and item 5's 112
+      seconds -- the work is not finished, the question is.
+      **ONE THING WOULD STILL HELP AND IS RECORDED SO IT IS NOT LOST**: a
+      dirty-cell shadow, 80x25 of glyph and colour in about 4K, so a panel
+      redraw touches only cells that changed. Jamie's own description --
+      "redraws of each panel for each turn" -- is the case for it, because
+      most of those cells are identical between turns, and it would cut far
+      more than the 3.19x already taken. It is available to anyone who wants
+      the port faster; it is not needed for a release.
       Double speed on real hardware is item 55.
   54. ~~**THE CoCo 3 HAS NO `verify` TARGET, so `make ports` only BUILDS it.**~~
       **CLOSED 2026-09-13.** `make verify` is the cheap half and is now in the
