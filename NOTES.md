@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and twice on 2026-09-13 (6 open of 41 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and three times on 2026-09-13 (5 open of 42 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1628,7 +1628,18 @@ are the CoCo 3**, which is started and not released:
       unexplained. Routed around by not using the MMU; see below. **Less
       urgent since 2026-09-12** -- the disk overlays free 12,860 bytes without
       it, which was the problem the MMU was for.
-  38. **THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.** `make ovlcheck`
+  38. ~~**THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.**~~ **CLOSED
+      2026-09-13: THE GAME BOOTS.** `make ovlrun` passes: the loader places
+      all 42,680 bytes correctly, hands over, and the running game pages in
+      TITLE.OVL and FRONT.OVL -- the window verified to hold the real first 64
+      bytes of the file. The cause was the same one as item 37, from the other
+      side: place_stack() wrote `$0109` calling it IRQ and `$0106` calling it
+      FIRQ, so it claimed the NMI slot DSKCON needs and left the real IRQ and
+      FIRQ pointing into ROM that is gone. Corrected to $010C and $010F, with
+      handlers that ACKNOWLEDGE their PIA (see item 41).
+      **THE BSS FINDING BELOW STANDS AND WAS A REAL SECOND BUG** -- it is why
+      this item was opened -- but with the vectors right the game runs.
+      ORIGINAL: `make ovlcheck`
       passes 3 of 3 (2026-09-12): a 6809 finds HOF.OVL in a real Disk BASIC
       directory, walks the FAT through the standalone WD1773 driver, lands
       1,709 bytes at $C300 matching the file, overwrites it with TITLE.OVL,
@@ -1806,6 +1817,27 @@ are the CoCo 3**, which is started and not released:
       instrument here reported. A climbing stack means unbalanced pulls, which
       is what executing an unloaded window does, so it is probably downstream
       of 32 rather than separate.
+  42. **ovlrun.py WAS WRONG IN THREE PLACES AT ONCE, and all three said the
+      port was broken when it was not.** Found 2026-09-13 the moment the game
+      actually booted, because a passing run is when a lying instrument
+      finally becomes visible:
+        * it read the byte count from BOOTR[1..2] -- the "about to call
+          plat_read_all" marker and the return code -- instead of BOOTR[9..10],
+          and printed `$A2FF` as "41,727 bytes, SHORT" for a file it had read
+          COMPLETELY. A number can be plausible and not be a length.
+        * it snapshotted the report when BOOTR[0] == $A1, which coco3boot.c
+          writes BEFORE calling plat_read_all -- so it caught the report
+          unfilled and printed uninitialised RAM.
+        * it sampled the image at fifteen seconds into a read that takes
+          thirty, and called the half that had not arrived yet a MISMATCH.
+      And a fourth: it watched `resident_image` from the instant the run
+      started, while that address still held IMAGE BYTES the loader was
+      writing -- which is the whole of "overlay index 128". Not an overlay, a
+      byte of the game.
+      **ALL FOUR ARE THE SAME MISTAKE**: sampling a thing before it exists.
+      That is now five instruments on this port with that fault. See
+      [[instruments-that-cannot-see]]. CLOSED as found and fixed, kept because
+      the pattern is the point.
   39. **ovl_load's failure is SILENT on every port.** It returns void, so a
       failed image leaves the caller to jump into whatever the window holds.
       On the C128 a KERNAL LOAD failing is rare enough that nobody noticed;

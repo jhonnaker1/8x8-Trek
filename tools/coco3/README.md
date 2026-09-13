@@ -33,11 +33,13 @@ hex -- 12,288 ms -- and happened to be generous enough.
 DECB `.bin` into RAM, sets PC, waits again and reads the result out. Sequential
 and readable, no debugger window -- **and the debugger window is what makes
 MAME freeze until the mouse is moved**, which Jamie had to point out. Always
-pass `-window`.
+pass `-window`, and pass `-skip_gameinfo` so MAME does not sit on its
+machine-information screen waiting for a keypress nobody is there to give.
 
     mame coco3 -rompath ... -ramsize 128K -ext multi \
          -ext:multi:slot1 ssfm -ext:multi:slot4 fdc \
-         -autoboot_script run.lua -seconds_to_run 8 -nothrottle -video none -window
+         -autoboot_script run.lua -seconds_to_run 8 -nothrottle -video none -window -skip_gameinfo \
+         -skip_gameinfo
 
 The older advice below is kept because the debugger still works and floppy
 tests need its long `gtime` waits:
@@ -60,7 +62,7 @@ Run a Lua probe with:
 
     mame coco3 -rompath "$HOME/Library/Application Support/Ample/roms" \
          -ext ssfm -autoboot_script <f>.lua -seconds_to_run 8 \
-         -nothrottle -video none -window
+         -nothrottle -video none -window -skip_gameinfo
 
 ## MAME WILL NOT SHOW YOU THE CARD'S SCREEN
 

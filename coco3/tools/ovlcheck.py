@@ -68,7 +68,7 @@ def main():
     open(adr, "w").write("%d %d" % (ld, ex))
     open(lua, "w").write(LUA)
 
-    subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
+    subprocess.run([MAME, "coco3", "-window", "-skip_gameinfo", "-rompath", ROMS,
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
                     "-autoboot_script", lua, "-autoboot_delay", "1",

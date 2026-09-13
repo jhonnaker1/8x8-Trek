@@ -94,7 +94,7 @@ def main():
     env = dict(os.environ, ADDRF=adr, RAWF=raw, OUTF=out)
     # -window ALWAYS: without it MAME takes the whole screen away from whoever
     # is at the keyboard, and a runaway headless run is then a fight.
-    subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
+    subprocess.run([MAME, "coco3", "-window", "-skip_gameinfo", "-rompath", ROMS,
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc",
                     "-autoboot_script", lua, "-autoboot_delay", "1",

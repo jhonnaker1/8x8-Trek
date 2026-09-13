@@ -71,22 +71,37 @@ for i = 1, 300 do
     -- SAMPLE THE IMAGE WHILE THE GAME IS LIVE. Reading it at the end is
     -- reading after the machine has gone back to ROM mode, which shows ROM at
     -- $A000 and says nothing about whether the loader did its job.
-    if imgsnap == nil and prog:read_u8(0x2800) == 0x1A and i > 60 then
+    -- AND SAMPLE THE IMAGE ONLY ONCE IT IS ALL THERE. `i > 60` is fifteen
+    -- seconds, and the read takes thirty -- so "two thirds in" was sampled
+    -- before two thirds of it had been written, and reported as a mismatch.
+    if imgsnap == nil and prog:read_u8(0x200B) == 0x5A then
         imgsnap = probe(0x2800, 8) .. " " .. probe(0x6000, 8) .. " "
                .. probe(0xA000, 8) .. " " .. probe(0xCE58, 8)
     end
     -- CATCH THE REPORT WHILE IT EXISTS. plat_exit() cold-starts BASIC, which
     -- clears low memory -- so reading $2000 at the end reads a wiped page and
     -- says the loader never got there.
-    if gotsnap == nil and prog:read_u8(0x2000) == 0xA1 then
-        gotsnap = probe(0x2000, 7)
+    -- WAIT FOR THE REPORT TO BE COMPLETE, not for its first byte. This
+    -- triggered on BOOTR[0] == $A1, which coco3boot.c writes BEFORE it calls
+    -- plat_read_all -- so the snapshot caught the report unfilled and the
+    -- tool printed uninitialised RAM as a byte count. BOOTR[11] == $5A is the
+    -- loader's own "the report is complete" marker; use that.
+    if gotsnap == nil and prog:read_u8(0x200B) == 0x5A then
+        gotsnap = probe(0x2000, 12)
     end
     if i % 40 == 0 then
         xy[#xy+1] = string.format("%.0fs:PC=%04X X=%04X Y=%04X CC=%02X",
             i*0.25, cpu.state["PC"].value, cpu.state["X"].value,
             cpu.state["Y"].value, cpu.state["CC"].value)
     end
-    if v ~= 0xFF and not seen[v] then
+    -- DO NOT WATCH resident_image UNTIL THERE IS A PROGRAM TO WATCH. This
+    -- byte lives in the game's rwdata, inside $2800..$CE5B, and the poll
+    -- started the instant the run did -- so for the first thirty seconds it
+    -- was reading whatever byte of the IMAGE the loader had just written
+    -- there. That is where "overlay index 128" came from: not an overlay, an
+    -- image byte. Third instrument in this file to sample something before it
+    -- existed.
+    if gotsnap ~= nil and v ~= 0xFF and not seen[v] then
         seen[v] = true
         order[#order+1] = v
         if snap == nil then
@@ -157,7 +172,7 @@ def main():
                RESIMG="%X" % sym(mappath, "_resident_image"),
                DCOPC="%X" % sym(mappath, "_DCOPC"),
                READYAT="%X" % sym(mappath, "_ready"))
-    p = subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
+    p = subprocess.run([MAME, "coco3", "-window", "-skip_gameinfo", "-rompath", ROMS,
                     # SLOT ORDER IS LOAD-BEARING AND WAS TESTED, not assumed. Putting the FDC in
                     # slot 1 and the card in slot 4 leaves the machine unable to boot Disk
                     # BASIC at all -- rainbow blocks, no prompt, nothing runs. The FDC's ROM
@@ -191,8 +206,14 @@ def main():
           else "  -> THE IMAGE IS NOT IN MEMORY AS WRITTEN")
     g = bytes.fromhex(got["got"].strip())
     raw = open(os.path.join(COCO3, "build", "EGATREK.RAW"), "rb").read()
-    n = g[1] * 256 + g[2]
-    print("  loader reached its report : %s" % (g[0] == 0xA1))
+    # BOOTR[9..10] IS THE COUNT. This read BOOTR[1..2] -- the "about to call
+    # plat_read_all" marker and the return code -- and printed $A2xx as a
+    # length, which is 41,472 plus whatever the low byte held. A number that
+    # looked plausibly short for a 42K file and was not a length at all.
+    n = g[9] * 256 + g[10]
+    rc = {0: "STOR_OK", 1: "STOR_NOTFOUND", 2: "STOR_ERROR"}.get(g[2], "?%02X" % g[2])
+    print("  loader reached its report : %s   returned %s"
+          % (g[11] == 0x5A, rc))
     print("  BYTES READ                : %-6d  file is %d   %s"
           % (n, len(raw), "COMPLETE" if n == len(raw) else "SHORT"))
     print("  sampled while all-RAM live: $2800=%02X want %02X | $8000=%02X want %02X"

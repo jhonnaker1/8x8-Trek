@@ -379,8 +379,12 @@ MAME, with Ample's romsets — `coco3` verifies good there, `coco_fdc` included,
 plus the `ym2413` the card's OPLL needs.
 
 ```sh
-mame64 coco3 -window -ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc
+mame64 coco3 -window -skip_gameinfo -ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc
 ```
+
+**Always `-window`, and always `-skip_gameinfo`** -- without the second one
+MAME holds its machine-information screen waiting for a keypress, which an
+automated run has nobody to give it.
 
 **Always `-window`.** And do not open the debugger: on a windowed run it
 freezes MAME until the mouse moves. Drive it from an autoboot Lua script using

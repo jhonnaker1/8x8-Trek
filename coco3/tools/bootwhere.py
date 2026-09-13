@@ -128,7 +128,7 @@ def main():
     tmp = tempfile.mkdtemp(prefix="bootwhere")
     lua, outf = (os.path.join(tmp, n) for n in ("run.lua", "out.txt"))
     open(lua, "w").write(LUA)
-    subprocess.run([MAME, "coco3", "-window", "-rompath", ROMS,
+    subprocess.run([MAME, "coco3", "-window", "-skip_gameinfo", "-rompath", ROMS,
                     "-ext", "multi", "-ext:multi:slot1", "ssfm",
                     "-ext:multi:slot4", "fdc", "-flop1", disk,
                     "-autoboot_script", lua, "-autoboot_delay", "1",
