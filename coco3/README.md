@@ -1,22 +1,37 @@
 # EGA Trek — CoCo 3 + SuperSprite FM+
 
-Seventh port, **started 2026-09-12** and **not released**. It links, it fits,
-and its storage, font, overlay machinery **and video driver** are real —
-`make vidcheck` proves the console reaches VRAM on the card. **Sound and input
-are still stubs, and nobody has played it**, so nothing below is a claim that
-the game is playable on this machine. It is not yet.
+Seventh port, **started 2026-09-12 and released as v0.15.0 on 2026-09-13**.
+Every seam is real — video, keyboard, sound, storage (read *and* write),
+overlays and far memory — and **it has been played**: *"the game looks, plays,
+and sounds good… still the slowest of all the ports, but it is playable."*
+
+It is the most expensive port in this project. It is the only one that needed a
+filesystem written from scratch, a first-stage loader for an image `LOADM`
+cannot place, and far memory in a video card's spare VRAM.
+
+**Much of this file is a record of it not working.** That history is kept on
+purpose — the failures were expensive and most of them were instruments, not
+the port — but every heading below that asserts a state is telling you about
+the day it was written. The status is this paragraph.
 
 ```sh
 make           # build/egatrek.bin -- the whole game, resident
 make early     # link it and read the overflow: the question this port turns on
 make font      # regenerate src/font6x8.h from the authored pictures
-make overlays  # cut the overlay images (currently REFUSES ITSELF -- see below)
-make vidtest   # build the VRAM-readback program
-make vidcheck  # run it on the card under MAME and check what it read back
+make overlays  # cut the eleven overlay images
+make vidcheck  # the console reaches VRAM on the card: 11 checks
+make keycheck  # 26 keys, pressed through MAME's own keyboard fields
+make writecheck # write a file, and read it back on the HOST as well
+make ovlcheck  # the overlay seam, on a real diskette
+make screenshot # render the frame out of VRAM -- MAME will not draw the card
+make verify    # the cheap gate, no emulator: what `make ports` runs
+make check-all # verify plus the four checks that start MAME
+make release   # build/egatrek-coco3.zip -- the diskette image and a README
 ```
 
-The root `make ports` gate runs `make` here, because there is no overlay budget
-for a `make verify` to check yet.
+**`make verify` is what the root `make ports` gate runs**, and it is the cheap
+half on purpose: the four MAME checks take about a minute each, and a gate
+costing six minutes is a gate nobody runs.
 
 ## The machine, and why it needs a card
 
@@ -67,7 +82,16 @@ shows. I only read it when Jamie asked me to go and check.
 VRAM, and it is still the way to inspect a picture byte-exactly — but it is no
 longer the only way to see the game.
 
-## The blit cost was the real risk, and it is measured
+## The blit cost was measured, and it was NOT the real risk
+
+**This section's arithmetic is right and its conclusion was wrong**, which is
+why it is kept. It predicted a **0.287 s** repaint. The real one, timed on the
+machine a day later with `make perftest`, was **12.24 SECONDS** — because the
+per-character work *around* each byte dwarfs the byte: three `MUL16` calls, six
+ternaries a row and an eight-byte glyph copy, none of which appears in a
+cycles-per-byte figure. It is 3.84 s now. **A component benchmark is not a
+system measurement**, and this one shipped a number into the root README that
+told everybody the port was fast.
 
 **10.625 cycles a byte** to the V9958, timed under MAME with `totalcycles`.
 A 6×8 cell blitted on its own costs 512 cycles; the same cell **walking
@@ -91,6 +115,27 @@ until you know it.
 **The font.** `tools/gen_font.py` — 61 text glyphs and 17 box glyphs in 665
 bytes, authored as ASCII-art pictures with `--sheet` and `--box-sheet` proofs.
 Ours, like every other port's box glyphs.
+
+**Writing, too** — `plat_write_all` allocates granules, writes the data, then
+the FAT, then the directory, in that order, so a file becomes findable only
+once its bytes are on the disk. `make writecheck` has the machine write a file
+AND the host read it back with independent code, because a port reading back
+its own writes proves only that it is self-consistent.
+
+**Video.** The V9958 in GRAPHIC6, checked by VRAM read-back (`make vidcheck`,
+11 of 11) because MAME will not draw the card — and by `make screenshot`, which
+renders the frame out of VRAM so a person can look at it.
+
+**The keyboard.** The PIA matrix at `$FF00`/`$FF02`, with **the matrix derived
+from the machine** by `tools/keymatrix.py` rather than copied from a manual;
+it self-checks that every key answers on the row its own MAME port tag
+predicts. `make keycheck` presses 26 of them.
+
+**Sound.** The card's YM2149, two voices, at a clock read out of MAME's device
+source. A held note measures 220.2 Hz where the music data says 220.
+
+**Far memory.** The card's second 64K of VRAM, unreachable by the 6809 any
+other way — the string pool and the music live there.
 
 **The overlay machinery**, below.
 
@@ -158,12 +203,17 @@ sometimes one, so a raw read looks like nonsense. **`INIT0`/`INIT1` at
 Two different registers with two different answers, recorded together because
 conflating them is how the wrong belief survived twice.
 
-## What is a stub
+## What was a stub — nothing, as of 2026-09-13
 
-`src/coco3snd.c` and `src/coco3input.c` say so in their first line. Two
-consequences worth stating: the input stub never advances the entropy source,
-**so a stubbed build plays the same game every time**; and
-`plat_write_all` returns `STOR_ERROR`, so **SAVE reports "COULD NOT SAVE."
+**Every seam named below was built on release day and this section is history.**
+`coco3snd.c` drives the YM2149, `coco3input.c` reads the PIA matrix, and
+`plat_write_all` writes files that a host-side reader can find. Kept because
+the honesty rule in the last paragraph is the durable part.
+
+*As it stood:* `src/coco3snd.c` and `src/coco3input.c` said so in their first
+line. Two consequences worth stating: the input stub never advanced the entropy
+source, **so a stubbed build played the same game every time**; and
+`plat_write_all` returned `STOR_ERROR`, so **SAVE reported "COULD NOT SAVE."
 rather than pretending.**
 
 **The message log's backing store never was one of those stubs.** `ui.c` calls
@@ -243,7 +293,7 @@ one port inventing a partition the shared design does not have.
 calling into it, and three resident helpers in `ui.c` reaching it with nothing
 loaded. It is resident now, as it is everywhere else.
 
-## The images DO load on the machine -- and the game still does not boot
+## The images DO load on the machine — and the game did not boot (2026-09-12)
 
 ```sh
 make disk       # write a Disk BASIC diskette and round-trip every file back
@@ -354,7 +404,7 @@ read is done by ROM code, into a fixed window, **before** the ROM is paged
 away, so the MMU and the disk are never live at the same time. The MMU
 blocker, the boot failure and this are one design decision, not three bugs.
 
-## Why the game's first ovl_load fails -- FOUND
+## Why the game's first ovl_load failed — FOUND, and fixed (2026-09-13)
 
 **BSS is never zeroed in the overlay build**, and that is the whole of it.
 
@@ -467,12 +517,18 @@ short wait looks exactly like the disk hardware failing.
 
 ## What is open
 
-See THE OPEN LIST in [`NOTES.md`](../NOTES.md) — items 27 through 31, and all
-five of them are this port:
+See THE OPEN LIST in [`NOTES.md`](../NOTES.md), whose count is checked by
+`tools/open_list.py` rather than maintained by hand. **One item is open and it
+is this port's:**
 
-1. ~~Video~~ **BUILT and checked on the card** — sound and input are still stubs.
-2. **`plat_write_all` is unimplemented**, so SAVE cannot work.
-3. **The overlay set is too small to pay**, and needs candidates.
-4. **MMUEN breaks DSKCON**, unexplained and parked.
-5. **Nobody has played it** — which on this project is the item that finds what
-   the instruments cannot.
+**The 1.78 MHz mode has never run on real hardware.** `vdc_init()` writes
+`$FFD9`, so the machine runs at double speed from the title screen on —
+including every overlay load and every SAVE. CoCo 3 disk access at double speed
+is historically a hazard; MAME is more forgiving than a WD1773, and nobody here
+has the machine. If a real CoCo 3 misbehaves, suspect that first. The safe
+shape, if it does: drop to `$FFD8` around `read_sec`/`write_sec` and restore.
+
+**Closed, and worth knowing about rather than hunting again:** a dirty-cell
+shadow would cut the repaint far more than the 3.19× already taken, and is
+recorded in item 53 for anyone who wants the port faster. It is not needed for
+a release.

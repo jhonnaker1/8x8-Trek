@@ -11,17 +11,21 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**
 > and now the **Tandy CoCo 3 + SuperSprite FM+** are feature complete and
 > released as [v0.15.0](../../releases/latest), 2026-09-13.
-> The Falcon is the new one, and it is the cheapest port here: it **boots into
-> the mode the console wants** (640×480 in sixteen colours on VGA), takes its
-> 8×16 font out of the machine's own ROM, and has **no overlays, no far-memory
-> banking and no hand-rolled filesystem** — three seams that dominate the four
-> 6502 ports simply do not exist on it. Sound is the YM2149, with the chip's
-> 2 MHz clock **measured rather than looked up**. See
-> [`falcon/README.md`](falcon/README.md).
+> The CoCo 3 is the new one, and it is the **most expensive port here** — the
+> opposite of the Falcon it followed. It is the only one that needed **a
+> filesystem written from scratch** (directory, FAT and granule chain on a
+> standalone WD1773 driver, because the game pages the Disk BASIC ROM away and
+> cannot call it), **a first-stage loader** for a 44K image `LOADM` will not
+> place, **far memory in the video card's spare VRAM**, and eleven overlays.
+> Its sound is the SuperSprite's YM2149, at a clock **read out of MAME's device
+> source rather than looked up**. It is the slowest of the seven and it is
+> playable. See [`coco3/README.md`](coco3/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All six have been played by a person**, and the Falcon's sitting found two
-> bugs in one afternoon that no automated check here saw or could have seen.
+> **All seven have been played by a person**, and that is where the faults have
+> come from: the CoCo 3's sitting found a console repaint taking **12 seconds**
+> that no benchmark here had ever timed, because the benchmark measured the
+> blit and the blit was a third of the cost.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
