@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and six times on 2026-09-12 (9 open of 38 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11 and seven times on 2026-09-12 (9 open of 39 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1669,6 +1669,26 @@ are the CoCo 3**, which is started and not released:
       Its VDP addresses are Dragon cartridge space ($E000), not this card's
       $FF78 -- and the SuperSprite FM+ ships BOTH, "…O" builds for $FF7x and
       "…M" builds for $FF5x, which is worth knowing before blaming a port.
+  36. ~~**Does the Multi-Pak slot have to be switched between the card and the
+      disk?**~~ **ANSWERED 2026-09-12: NO, and it was asked as a question the
+      machine could answer.** Jamie's reasoning was sound -- an MPI has ONE
+      active slot per function, `$FF7F` bits 1-0 select which slot gets SCS
+      and bits 5-4 which gets CTS/CART, and this port needs the card AND the
+      disk. So `vidtest` was made to write `$FF7F = $33` (slot 4, the disk
+      controller) BEFORE driving the video card, and **all eleven VRAM checks
+      still pass**. The V9958 at `$FF78` is reachable with the disk's slot
+      selected: it is decoded outside the slot mechanism.
+      **THAT IS ALMOST CERTAINLY WHY THE CARD OFFERS THE ADDRESS AT ALL.** The
+      SuperSprite FM+ ships "...M" builds at `$FF5x` -- inside SCS
+      (`$FF40-$FF5F`), so slot-switched -- and "...O" builds at `$FF7x`, which
+      is not. This port measured `$FF78` and is on the variant that coexists
+      with a disk controller.
+      Two facts confirmed on the way: the documented `$FF7F` values are 0, 17,
+      34, 51 (`$00/$11/$22/$33`, both nibbles the same slot), and **"the disk
+      controller must be used in slot 4"** -- which is what the slot-swap
+      experiment showed from the other side, since putting the FDC in slot 1
+      leaves the machine unable to boot Disk BASIC at all.
+      **The check is kept in vidtest** rather than written down and forgotten.
   34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
       on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
       as "weird rainbow colors" while watching a run** -- the third time on

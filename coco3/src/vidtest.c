@@ -34,6 +34,15 @@ int main(void)
     asm { lds #$3F00 }
     for (i = 0; i < 32; i++) R[i] = 0xEE;
 
+    /* SELECT THE FDC'S SLOT FIRST, DELIBERATELY. If the V9958 at $FF78 is
+       reached through the Multi-Pak's SCS -- so only the selected slot
+       answers -- then with slot 4 selected these VRAM checks must FAIL, and
+       the port has to switch $FF7F between the card and the disk. If they
+       still pass, the card is decoded outside the slot mechanism and no
+       switching is needed. This is Jamie's hypothesis, asked as a question
+       the machine can answer. */
+    *((unsigned char *)0xFF7F) = 0x33;      /* slot 4: the disk controller */
+
     vdc_init();
 
     scr_put(0, 0, 1, 15);                       /* 'A', white, top-left */
