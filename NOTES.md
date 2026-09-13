@@ -2132,7 +2132,28 @@ are the CoCo 3**, which is started and not released:
       has ever counted -- see [[jamie-plays-and-instruments-miss]].
       The YM2413 OPLL at `$FF76-$FF77` is untouched and is a better
       instrument; a second project, not a blocker.
-  51. **A ~175 Hz TONE IN THE TITLE TRACK THAT THE DATA DOES NOT CONTAIN.**
+  51. ~~**A ~175 Hz TONE IN THE TITLE TRACK THAT THE DATA DOES NOT CONTAIN.**~~
+      **THE TONE WAS IN MY INSTRUMENT. THE TUNE IS EXACT** -- and something is
+      still wrong, because Jamie listened and said *"sounds weird"*.
+      **WHAT IS NOW PROVEN, by logging the YM2149's own registers against the
+      file rather than analysing the air**: the first 24 notes play
+      150/220/290/350 repeated six times at ~2.9 ticks each, which is
+      MUSIC.DAT note for note; then 440 held 24 ticks, 350 for 12, 390 for 12,
+      which is the file again. Periods 1491/1017/771/639 give 150.0/220.0/
+      290.2/350.1 Hz. **Pitch, order and duration are all correct at the
+      chip.** MAME's ay8910.cpp settles the frequency law too: `m_step` is 2
+      only for PSG_TYPE_AY, and a YM2149 gets 1, so f = clock/(16*period) --
+      the formula the driver uses.
+      **MY WAV ANALYSIS FAILED THREE SEPARATE WAYS** and each failure produced
+      a confident wrong number: it read a channel I picked by guessing; it
+      reported ratios of 0.26 to 1.0 against the same commanded notes, which
+      is not any real defect; and on the correlated run every channel read
+      amplitude zero where the registers say notes were sounding. **175 is
+      half of 350 and I nearly filed an octave bug off it.** An autocorrelator
+      pointed at a mixed four-channel recording is not an instrument, it is a
+      guess with decimal places.
+      **STILL OPEN AS ITEM 52: it sounds weird to the person listening**, and
+      that is the only sound test this project has ever trusted.
       Raised 2026-09-13 by the recording that confirmed the frequency law.
       MUS_TITLE uses twelve pitches -- 150 220 290 330 350 390 440 470 520 590
       660 700 -- and 175 is not one of them, yet it sustains for half a second
