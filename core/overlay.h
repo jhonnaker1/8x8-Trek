@@ -234,7 +234,38 @@
 
 /* Makes `which` resident, and is IDEMPOTENT: asking for the overlay that is
    already loaded costs nothing, so a stub may call it on every entry. A
-   platform with no overlays implements this as an empty function. */
+   platform with no overlays implements this as an empty function.
+
+   A FAILURE MUST NOT RETURN. The caller's very next instruction jumps into
+   the window, so a loader that gives up quietly runs WHATEVER THE LAST
+   OVERLAY LEFT THERE -- code for a different screen, at the right address,
+   with a plausible stack. There is no recovering from it and no way to
+   describe it afterwards. Call ovl_fatal() instead.
+
+   THIS WAS SILENT ON FOUR OF THE SEVEN PORTS UNTIL 2026-09-13, which is the
+   whole of item 39: the CoCo 3 dropped a failed plat_read_all, the MEGA65
+   returned on a failed init, and the X16 and the Atari copied from a far
+   store they had never checked was loaded. The C128 learned it once already
+   -- see the OVLXTRA note in c128/src/overlay.c -- and fixed it only where it
+   hurt. It cost the CoCo 3 a fortnight of failures read as other things.
+
+   WHY NOT RETURN A STATUS AND LET THE CALLER DECIDE. It was written that way
+   first, and the X16 -- the tightest port -- OVERFLOWED ITS RAM BY 140 BYTES:
+   eleven call sites each paying for a test, a branch and a call. No caller
+   could have done anything with the answer anyway, so the cost bought
+   nothing. The loader knows it failed; the loader says so. */
 void ovl_load(uint8_t which);
+
+/* Says which overlay could not be loaded, and STOPS. Defined in the shared
+   main.c beside the stubs. Never returns.
+
+   ITS WORDS ARE LITERAL, NOT POOLED, and that is deliberate: a failure
+   message must not depend on the thing that failed. On three ports the
+   overlays and the string pool come out of the same far store, so `S()` is
+   exactly what might be unavailable at the moment this has something to say. */
+void ovl_fatal(uint8_t which);
+
+/* THE ONLY WAY TO WRITE ONE OF THESE STUBS, so they cannot drift apart. */
+#define OVL_STUB(fn, id) OVL_LOADER fn(void) { ovl_load(id); }
 
 #endif

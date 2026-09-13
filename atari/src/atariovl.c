@@ -130,6 +130,8 @@ static void ovl_init(void) {
 void ovl_load(uint8_t which) {
     if (which >= OVL_COUNT || which == live) return;
     if (ovl_base == FAR_NONE) ovl_init();      /* first call brings them in */
+    /* ovl_init() returns void and CAN fail; the store itself is the report. */
+    if (ovl_base == FAR_NONE) ovl_fatal(which);
 
     /* Marked absent BEFORE the copy, as on every other port: if it fails half
        way the window holds a mixture, and claiming it holds `which` would be a

@@ -14,31 +14,59 @@
 #include "../../core/trek.h"
 #include "../../core/planet.h"
 
+/* THE BACKSTOP FOR A FAILED OVERLAY, and it stops rather than returns --
+   see core/overlay.h. The C128 keeps its own, better-worded version for the
+   two cases it can name (a missing file, and images from a different build);
+   this catches everything else, on every port.
+
+   THE WORDS ARE LITERAL ON PURPOSE. A message about a failure must not go
+   through the machinery that may have caused it, and on three ports the
+   overlays and the string pool share one far store. */
+void ovl_fatal(uint8_t which)
+{
+    scr_clear();
+    scr_puts(2, 2, S(S_326), EGA_TO_VDC(EGA_LTRED));
+    scr_puts(2, 4, S(S_329), EGA_TO_VDC(EGA_WHITE));
+    {   /* THROUGH scr_puts, NOT scr_put: scr_put takes a SCREEN code and this
+           is ASCII. Digits happen to map to themselves on these machines,
+           which is exactly the kind of coincidence that works until a port
+           where it does not. */
+        char n[3];
+        n[0] = (char)('0' + (which / 10));
+        n[1] = (char)('0' + (which % 10));
+        n[2] = 0;
+        scr_puts(10, 4, n, EGA_TO_VDC(EGA_WHITE));
+    }
+    scr_puts(13, 4, S(S_328), EGA_TO_VDC(EGA_WHITE));
+    scr_puts(2, 6, S(S_327), EGA_TO_VDC(EGA_LTCYAN));
+    for (;;) { }
+}
+
 /* THE OVERLAY LOADERS -- one per window, and the ONLY way this file asks for
    one. See OVL_LOADER in core/overlay.h for why these are functions and not
    `ovl_load(OVL_X)` written where it is wanted. */
-OVL_LOADER load_eval(void)   { ovl_load(OVL_EVAL); }
-OVL_LOADER load_hof(void)    { ovl_load(OVL_HOF); }
-OVL_LOADER load_front(void)  { ovl_load(OVL_FRONT); }
-OVL_LOADER load_info(void)   { ovl_load(OVL_INFO); }
-OVL_LOADER load_repair(void) { ovl_load(OVL_REPAIR); }
-OVL_LOADER load_msgs(void)   { ovl_load(OVL_MSGS); }
-OVL_LOADER load_planet(void) { ovl_load(OVL_PLANET); }
-OVL_LOADER load_cmds(void)   { ovl_load(OVL_CMDS); }
-OVL_LOADER load_title(void)  { ovl_load(OVL_TITLE); }
-OVL_LOADER load_events(void) { ovl_load(OVL_EVENTS); }
-OVL_LOADER load_xtra(void)   { ovl_load(OVL_XTRA);   }
+OVL_STUB(load_eval, OVL_EVAL)
+OVL_STUB(load_hof, OVL_HOF)
+OVL_STUB(load_front, OVL_FRONT)
+OVL_STUB(load_info, OVL_INFO)
+OVL_STUB(load_repair, OVL_REPAIR)
+OVL_STUB(load_msgs, OVL_MSGS)
+OVL_STUB(load_planet, OVL_PLANET)
+OVL_STUB(load_cmds, OVL_CMDS)
+OVL_STUB(load_title, OVL_TITLE)
+OVL_STUB(load_events, OVL_EVENTS)
+OVL_STUB(load_xtra, OVL_XTRA)
 
 /* THE TWO OPT-IN WINDOWS -- see core/overlay.h. A port that does not want
    them compiles the loader away entirely rather than calling an empty
    function, so no released port pays a byte for either. */
 #ifdef TREK_OVL_ENEMY
-OVL_LOADER load_enemy(void)  { ovl_load(OVL_ENEMY);  }
+OVL_STUB(load_enemy, OVL_ENEMY)
 #else
 #define load_enemy() ((void)0)
 #endif
 #ifdef TREK_OVL_MOVE
-OVL_LOADER load_move(void)   { ovl_load(OVL_MOVE);   }
+OVL_STUB(load_move, OVL_MOVE)
 #else
 #define load_move() ((void)0)
 #endif

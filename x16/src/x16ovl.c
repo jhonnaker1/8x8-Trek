@@ -94,6 +94,9 @@ static void ovl_init(void) {
 void ovl_load(uint8_t which) {
     if (which >= OVL_COUNT || which == live) return;
     if (ovl_base == FAR_NONE) ovl_init();      /* first call loads the images */
+    /* ovl_init() returns void and CAN fail; the store itself is the report.
+       Copying from FAR_NONE fills the window with whatever is at $FFFF. */
+    if (ovl_base == FAR_NONE) ovl_fatal(which);
 
     /* Marked absent BEFORE the copy, as on the C128: if it fails half way the
        window holds a mixture, and claiming it holds `which` would be a lie

@@ -43,7 +43,11 @@ void ovl_load(uint8_t which)
        is invalidated first: better to re-read than to call into whatever
        happens to be there. */
     resident_image = 0xFF;
+    /* A FAILED READ USED TO VANISH HERE -- the `if` simply did not fire and
+       ovl_load returned with the window holding the previous image, which
+       main() then jumped into. Item 39. */
     if (plat_read_all(ovl_name[which], (void *)OVL_WINDOW, OVL_SIZE, &got)
-        == STOR_OK)
-        resident_image = which;
+        != STOR_OK)
+        ovl_fatal(which);
+    resident_image = which;
 }

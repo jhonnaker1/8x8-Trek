@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 326
+#define STR_COUNT 330
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -332,5 +332,9 @@
 #define S_323  323   /* PLASMA BOLT SHIELD RAISED. */
 #define S_324  324   /* SECTOR TO FIRE AT:  */
 #define S_325  325   /* THE BOLT FAILS TO DETONATE. */
+#define S_326  326   /* CANNOT LOAD PART OF THE GAME */
+#define S_327  327   /* CHECK THE DISK AND START AGAIN. */
+#define S_328  328   /* COULD NOT BE READ. */
+#define S_329  329   /* OVERLAY */
 
 #endif

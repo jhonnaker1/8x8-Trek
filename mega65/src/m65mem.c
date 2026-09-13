@@ -126,7 +126,7 @@ static uint8_t stage[64];
 
 void ovl_load(uint8_t which) {
     /* Lazily, so the SHARED main.c needs no MEGA65-specific startup call. */
-    if (ovl_live == 0xFE) { if (!ovl_init()) return; }
+    if (ovl_live == 0xFE) { if (!ovl_init()) ovl_fatal(which); }   /* used to just return */
     if (which >= OVL_COUNT || which == ovl_live) return;
     trek_dma(OVL_IMAGES + (uint32_t)which * OVL_SIZE, OVL_WINDOW, (uint16_t)OVL_SIZE);
     ovl_live = which;

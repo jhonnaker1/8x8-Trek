@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and six times on 2026-09-13 (7 open of 48 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seven times on 2026-09-13 (6 open of 48 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1841,11 +1841,33 @@ are the CoCo 3**, which is started and not released:
       That is now five instruments on this port with that fault. See
       [[instruments-that-cannot-see]]. CLOSED as found and fixed, kept because
       the pattern is the point.
-  39. **ovl_load's failure is SILENT on every port.** It returns void, so a
-      failed image leaves the caller to jump into whatever the window holds.
-      On the C128 a KERNAL LOAD failing is rare enough that nobody noticed;
-      here it is the difference between a hang and a diagnosis. Raised
-      2026-09-12 by watching it happen.
+  39. ~~**ovl_load's failure is SILENT on every port.**~~ **CLOSED 2026-09-13.**
+      A failed overlay now says which one and stops, on all seven.
+      **FOUR PORTS WERE SILENT, EACH IN ITS OWN WAY**, which is why no single
+      reading found them: the CoCo 3 dropped a failed plat_read_all (the `if`
+      simply did not fire), the MEGA65 `return`ed on a failed init, and the
+      X16 and the Atari copied from a far store they had never checked was
+      loaded -- FAR_NONE is $FFFF, so the window would fill from the top of
+      memory. The C128 had learned this once already, in the OVLXTRA bug, and
+      fixed it only where it hurt.
+      **IT WAS WRITTEN AS A RETURN VALUE FIRST AND THE X16 REFUSED IT**:
+      `uint8_t ovl_load()` checked at eleven call sites overflowed its RAM by
+      **140 bytes** -- a test, a branch and a call, eleven times, to buy an
+      answer no caller could act on. There is no recovering from a window that
+      does not hold what you asked for. So the LOADER says so: ovl_fatal()
+      names the overlay and stops, and the stubs are back to one call each.
+      The cheaper design was also the one that cannot be forgotten.
+      **THE MESSAGE IS LITERAL, NOT POOLED**, because a failure message must
+      not go through the machinery that may have caused it -- on three ports
+      the overlays and the string pool come out of the same far store.
+      **VERIFIED BY BREAKING WHAT IT PROTECTS**: a CoCo 3 disk built without
+      TITLE.OVL now stops with "CANNOT LOAD PART OF THE GAME / OVERLAY 08
+      COULD NOT BE READ. / CHECK THE DISK AND START AGAIN." -- 08 being the
+      right index from ovlmap.h -- where before it jumped into the window.
+      **AND THE FIRST ATTEMPT AT THAT TEST WAS INVALID**: the disk was built
+      from overlay images five minutes older than the source change, so it
+      measured the OLD binary and showed no error. Checked the timestamps
+      before believing it. See [[instruments-that-cannot-see]].
   31. **Nobody has played it** -- and on this project that is the item that
       finds what the instruments cannot. **It could not be played until
       2026-09-13**: kb_waitkey() returned KB_RETURN unconditionally, so the
