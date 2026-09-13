@@ -63,8 +63,9 @@ directory and SIO seam.
 
 **VBXE is required.** The nine-panel console needs 80 columns and sixteen
 colours on their own values and a stock 800XL has neither — without VBXE the
-program runs and you see nothing. In Altirra, add the VBXE device at its
-default `$D6xx` base; the emulator takes it from your settings, not a switch.
+program runs and you see nothing. In Altirra that is *System → Configure
+System → Devices → Add → VBXE*, at its default `$D6xx` base. It is a device you
+add to the machine, not a command-line switch.
 
 **Be patient with the first screen: about two minutes on a stock 1050.** That
 is measured, not estimated — 112 seconds to read 36,474 bytes of overlays,
@@ -78,11 +79,34 @@ from a shell, or double-click it from Workbench — **it finds its files through
 `PROGDIR:`, so the current directory does not matter.** It opens its own
 640×200 sixteen-colour screen and gives the machine back when you quit.
 
-In [FS-UAE](https://fs-uae.net/), mount the unzipped drawer as a hard drive
-with a Kickstart 2.0+ ROM:
+**Under [Amiberry](https://github.com/BlitterStudio/amiberry)**, which is what
+this port was developed and played on. Amiberry mounts a **host directory as an
+Amiga volume**, so there is no ADF to build and nothing to copy — point it
+straight at the unzipped drawer. Write a `.uae` config:
 
-    fs-uae --amiga-model=A1200 --kickstart_file=<your kickstart.rom> \
-           --hard_drive_0=<the egatrek-amiga folder>
+    config_description=EGA Trek
+    cpu_type=68ec020
+    chipmem_size=4
+    fastmem_size=8
+    kickstart_rom_file=<your kicka1200.rom>
+    hardfile2=rw,:<your AmigaOS 3.x .hdf>,0,0,0,512,0,,uae
+    filesystem2=rw,WORK:WORK:<the unzipped egatrek-amiga folder>,0
+
+and run it:
+
+    amiberry -f egatrek.uae
+
+On macOS the app bundle is not on `PATH`, so that is:
+
+    /Applications/Amiberry.app/Contents/MacOS/Amiberry -f egatrek.uae
+
+Then at the Amiga shell: `work:egatrek`. (Add `-G` to skip Amiberry's GUI —
+that is what this project's automation passes; leave it off if you want the
+settings window.) You still need **your own Kickstart and a bootable AmigaOS
+volume**; neither ships here.
+
+**On real hardware, just copy the drawer across** — `PROGDIR:` makes its
+location irrelevant, so it runs from anywhere, Workbench included.
 
 ### `egatrek-falcon.zip` — Atari Falcon030
 
@@ -92,7 +116,7 @@ where it looks. In [Hatari](https://hatari.tuxfamily.org/):
 
     hatari --machine falcon --tos <your tos.img> --monitor vga \
            --vdi off --gemdos-drive C -d <the egatrek-falcon folder> \
-           --auto C:\EGATREK.PRG
+           --auto 'C:\EGATREK.PRG'
 
 **Use EmuTOS.** `etos512us.img` is what this port was developed on; Atari's TOS
 4.04 double bus-errors on a Falcon here.
