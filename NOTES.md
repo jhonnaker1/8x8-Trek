@@ -1720,8 +1720,18 @@ are the CoCo 3**, which is started and not released:
       variables THAT ROM HANDLER reads. coco3storage.c now points the slot
       straight at dskcon's own service. It did not fix this stall, but it was
       wrong before and is right now.
-      That is the next thing, and it is now a bounded question about one
-      function rather than about the whole port.
+      **THE FILESYSTEM IS NOT THE CAUSE, and "after 11 granules" was the
+      wrong frame.** Traced 2026-09-12: `file_len` computes **42,605 against
+      an actual 42,605**, `lastbytes` is 109, and the chain is intact --
+      `fat[2]=3`, `fat[12]=13`, `fat[13]=14`, `fat[20]=$C5` (last granule,
+      five sectors). Every sector read returns status 00. The FAT walk, the
+      directory entry and the length arithmetic are all correct.
+      **IT STOPS AT A FIXED ADDRESS, NOT A FIXED GRANULE**: `copied` reaches
+      **24,832** and `dst` reaches **$8900**, every run. 24,832 is 97 sectors'
+      worth against 99 read -- a two-sector gap, which is what `n` going to
+      zero looks like. Granule 12 is simply where $8900 happens to fall.
+      So the remaining question is about the COPY, not the read: what stops
+      `dst[copied + k] = secbuf[k]` at $8900. Not isolated.
   34. **The stack climbs into the I/O page.** S reaches $FFFC, so pushes land
       on the GIME's palette and video registers at $FFB0-$FFDF. **Jamie saw it
       as "weird rainbow colors" while watching a run** -- the third time on

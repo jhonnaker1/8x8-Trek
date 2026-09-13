@@ -48,7 +48,7 @@ local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
 local t = {}
 for i = 0, 11 do t[#t+1] = string.format("%02X", prog:read_u8(0x2000 + i)) end
-for i = 0, 10 do t[#t+1] = string.format("%02X", prog:read_u8(0x2010 + i)) end
+for i = 0, 19 do t[#t+1] = string.format("%02X", prog:read_u8(0x2010 + i)) end
 local o = io.open(os.getenv("OUTF"), "w")
 o:write(table.concat(t, "") .. "\n")
 
@@ -108,6 +108,13 @@ def main():
     cop = b[18] * 256 + b[19]
     print("  bytes copied          : %d   -> dst reached $%04X" % (cop, 0x2800 + cop))
     print("  granule               : %d   last chunk %d bytes" % (b[20], b[21] * 256 + b[22]))
+    ln = b[23] * 256 + b[24]
+    img = open(raw, "rb").read()
+    print("  file_len computed     : %d   actual file %d   %s"
+          % (ln, len(img), "ok" if ln == len(img) else "WRONG"))
+    print("  lastbytes from dir    : %d" % (b[25] * 256 + b[26]))
+    print("  first granule         : %d  chain: fat[%d]=%d fat[12]=%d fat[13]=%d fat[20]=%d"
+          % (b[27], b[27], b[28], b[29], b[30], b[31]))
     if b[11] != 0x5A:
         print("  -> plat_read_all did not return in the time allowed. If sectors "
               "are still\n     advancing, that is a SHORT TIMEOUT, not a hang.")

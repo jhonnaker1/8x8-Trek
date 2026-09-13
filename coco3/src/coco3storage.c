@@ -226,6 +226,21 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
     if (gran == 0xFF) return STOR_NOTFOUND;
 
     len = file_len(gran, lastbytes);
+#ifdef STOR_TRACE
+    /* WHAT DID THE CHAIN ACTUALLY SAY? 24,832 bytes copied is 97 sectors
+       against 99 read, and that two-sector gap is what `n` going to zero
+       looks like -- which happens when copied reaches len. So len is the
+       suspect, and len comes from the FAT chain and the directory. */
+    TR[11] = (unsigned char)(len >> 8);
+    TR[12] = (unsigned char)(len & 0xFF);
+    TR[13] = (unsigned char)(lastbytes >> 8);
+    TR[14] = (unsigned char)(lastbytes & 0xFF);
+    TR[15] = gran;                 /* first granule */
+    TR[16] = fat[gran];            /* and the first few links */
+    TR[17] = fat[12];
+    TR[18] = fat[13];
+    TR[19] = fat[20];
+#endif
     if (len == 0) return STOR_ERROR;
     /* storage.h: a file longer than max is an ERROR, not a truncation. */
     if (len > (unsigned long)max) return STOR_ERROR;
