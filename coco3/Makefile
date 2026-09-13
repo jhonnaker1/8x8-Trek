@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -307,6 +307,11 @@ keymatrix:
 
 keycheck: $(KEY_OUT)
 	@python3 tools/keycheck.py
+
+# MAME DRAWS THE CARD'S SCREEN BLACK, so nothing here has ever been LOOKED at.
+# This pulls the frame out of the V9958's own VRAM and writes a PNG.
+screenshot: disk
+	@python3 tools/vramshot.py build/screen.png --at 45
 
 $(VID_OUT): $(VID_SRC) src/font6x8.h Makefile
 	@mkdir -p build

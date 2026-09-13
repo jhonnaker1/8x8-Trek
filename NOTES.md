@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and four times on 2026-09-13 (7 open of 45 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and five times on 2026-09-13 (8 open of 47 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1866,10 +1866,39 @@ are the CoCo 3**, which is started and not released:
       been confirmed by a person looking at the screen. On a project where a
       person watching the screen has beaten the instruments seven times, that
       is the most important open item, not the smallest.
-      Options, none of them measured yet: real hardware; another emulator
-      that draws a V9958 on a CoCo; or rendering the VRAM to a PNG from the
-      harness so at least the FRAME can be inspected even if the window is
-      black. The third is cheap and is ours to do.
+      **THE THIRD OPTION IS BUILT: `make screenshot`** (tools/vramshot.py)
+      pulls the frame out of the V9958's own VRAM through MAME's device space
+      and writes a PNG. Real hardware and a second emulator are still open.
+  46. **AFTER THE TITLE SCREEN THERE IS NOTHING BUT A CURSOR.** Found
+      2026-09-13 by the first picture anyone has seen of this port. The title
+      draws correctly -- "EGA TREK" and its two boxes, white on black. Press a
+      key and the screen clears, FRONT.OVL pages in (resident_image goes
+      8 -> 255 -> 2), and what is drawn is A SINGLE WHITE BLOCK near the top
+      left and nothing else. Identical after one keypress and after two, with
+      twelve emulated seconds to settle.
+      So the port boots, loads, pages overlays and takes keys, and draws no
+      text after the title. Nothing in the byte-level checks says so, because
+      every one of them asks about bytes it chose in advance.
+      Not investigated. The obvious suspects are the string pool (STRINGS.DAT
+      via plat_open/plat_read rather than plat_read_all, a path the loader
+      work never exercised) and scr_puts' colour argument, but that is a guess
+      and belongs in the item as a guess.
+  47. **THE FIRST RENDER BLAMED THE PORT AND WAS THE TOOL.** vramshot read
+      MAME's `vram` space linearly and produced "EGA TREK" drawn TWICE side by
+      side, half width, stopping halfway down -- which is precisely what a
+      stride bug looks like, and coco3vid.c's address arithmetic was the first
+      place I went. GRAPHIC6 INTERLEAVES VRAM ACROSS TWO BANKS: logical A
+      lives at physical (A >> 1) | ((A & 1) << 16), and MAME's space is the
+      physical one. What gave it away was that both 128-byte halves of every
+      line were IDENTICAL while content spanned all 256 bytes -- no single
+      drawing pass makes that. De-interleaved, the same dump is one clean
+      title screen.
+      **That signature is now a guard in the tool**, checked by breaking it:
+      with the de-interleave removed it reports "42 of 46 non-empty lines are
+      two identical halves -- THE VRAM LAYOUT IS BEING READ WRONG, not the
+      port drawing wrong", and exits 1. SIXTH instrument fault in this
+      session, and the first where the instrument was a picture.
+      See [[instruments-that-cannot-see]].
   43. **THE COUNT WAS WRONG BECAUSE A CLOSED-LOOKING ENTRY HELD TWO OPEN
       SEAMS.** Found 2026-09-13, one question after the re-derivation that
       produced it. Item 27 reads `~~Video, sound and input are stubs.~~` with
