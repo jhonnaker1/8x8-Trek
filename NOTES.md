@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (1 open of 55 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fifteen times on 2026-09-13 (2 open of 56 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2046,8 +2046,9 @@ are the CoCo 3**, which is started and not released:
       instrument here reported. A climbing stack means unbalanced pulls, which
       is what executing an unloaded window does, so it is probably downstream
       of 32 rather than separate.
-  42. **ovlrun.py WAS WRONG IN THREE PLACES AT ONCE, and all three said the
-      port was broken when it was not.** Found 2026-09-13 the moment the game
+  42. ~~**ovlrun.py WAS WRONG IN THREE PLACES AT ONCE.**~~ **CLOSED 2026-09-13 --
+      four places, actually, and all four said the port was broken when it was
+      not.** Found 2026-09-13 the moment the game
       actually booted, because a passing run is when a lying instrument
       finally becomes visible:
         * it read the byte count from BOOTR[1..2] -- the "about to call
@@ -2206,7 +2207,8 @@ are the CoCo 3**, which is started and not released:
       via plat_open/plat_read rather than plat_read_all, a path the loader
       work never exercised) and scr_puts' colour argument, but that is a guess
       and belongs in the item as a guess.
-  47. **THE FIRST RENDER BLAMED THE PORT AND WAS THE TOOL.** vramshot read
+  47. ~~**THE FIRST RENDER BLAMED THE PORT AND WAS THE TOOL.**~~ **CLOSED
+      2026-09-13 -- the guard is in the tool and was verified by removing it.** vramshot read
       MAME's `vram` space linearly and produced "EGA TREK" drawn TWICE side by
       side, half width, stopping halfway down -- which is precisely what a
       stride bug looks like, and coco3vid.c's address arithmetic was the first
@@ -2222,8 +2224,8 @@ are the CoCo 3**, which is started and not released:
       port drawing wrong", and exits 1. SIXTH instrument fault in this
       session, and the first where the instrument was a picture.
       See [[instruments-that-cannot-see]].
-  43. **THE COUNT WAS WRONG BECAUSE A CLOSED-LOOKING ENTRY HELD TWO OPEN
-      SEAMS.** Found 2026-09-13, one question after the re-derivation that
+  43. ~~**THE COUNT WAS WRONG BECAUSE A CLOSED-LOOKING ENTRY HELD TWO OPEN
+      SEAMS.**~~ **CLOSED 2026-09-13, and see item 56: it happened again.** Found 2026-09-13, one question after the re-derivation that
       produced it. Item 27 reads `~~Video, sound and input are stubs.~~` with
       the strike-through applied to the whole line and the live half -- "Sound
       and input remain stubs" -- in bold INSIDE it. Re-deriving walked the
@@ -2237,7 +2239,7 @@ are the CoCo 3**, which is started and not released:
       which is the same shape as [[sweep-where-stale-claims-hide]]: status
       living in formatting rather than in text. Sound is now item 44 rather
       than a clause.
-  44. **Sound is BUILT and MEASURED, and nobody has heard it.** The YM2149
+  44. ~~**Sound is a stub.**~~ **CLOSED 2026-09-13: BUILT, MEASURED AND HEARD.** The YM2149
       (an AY-3-8910) at `$FF7C`/`$FF7D` carries two voices, channel A music
       and channel B effects, as every other port does it.
       **THE CLOCK WAS READ, NOT GUESSED**: MAME's dragon_msx2.cpp builds it at
@@ -2296,8 +2298,9 @@ are the CoCo 3**, which is started and not released:
       (12 ticks then 48), so the registers never change and the log recorded
       one 59.7-tick note instead of two, shifting everything after it by one.
       Log the VALUE, not the change, when consecutive values can be equal.
-  52. **IT SOUNDS TOO FAST TO THE PERSON LISTENING**, and that is the only
-      sound test this project has ever trusted. Raised 2026-09-13: Jamie
+  52. ~~**IT SOUNDS TOO FAST TO THE PERSON LISTENING.**~~ **CLOSED 2026-09-13:
+      it was `-nothrottle` at 2490%.** The listening is still the only sound
+      test this project has ever trusted. Raised 2026-09-13: Jamie
       listened and said *"sounds weird"*, then *"the tune itself sounds
       wrong"*, then *"like its too fast i think"*.
       **AND THE TEMPO MEASURES CORRECT**: 24 notes of 3 ticks span 72.48s to
@@ -2345,6 +2348,18 @@ are the CoCo 3**, which is started and not released:
       So this item is no longer "unresearched"; it is unbuilt. The YM2149 is
       the AY-3-8910 shape every 8-bit port here already knows how to drive,
       and the OPLL is richer than anything else this project touches.
+  56. ~~**THE LIST'S OWN BOOKKEEPING DRIFTED FIVE MORE TIMES IN ONE DAY.**~~
+      **CLOSED 2026-09-13 BY A TOOL, because re-deriving by READING is what
+      produced every one of them.** Asked what was left, a mechanical count
+      said seven open, the header said one, and the truth was two: five items
+      had been fixed, said CLOSED in their bodies, and kept unstruck headings.
+      That is items 43 and 48's defect -- status where the count cannot see it
+      -- committed five more times by the person who filed both, hours later.
+      `tools/open_list.py` now derives the count from the list and FAILS if the
+      header disagrees, and catches a number used twice as well. It runs from
+      `make ports`, reads one file and needs no toolchain.
+      **A COUNT NOBODY CAN VERIFY MECHANICALLY WILL DRIFT**, however careful
+      the person doing it, and this list has now proved that six times.
   48. **THE SEVENTH PORT IS NOT RELEASED, and that was never filed.** Raised
       2026-09-13 by re-deriving. The list SAYS it in prose -- "all five are
       the CoCo 3, which is started and not released" -- and prose is not an

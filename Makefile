@@ -76,7 +76,12 @@ tiers:
 #
 #   make ports            all five
 #   make ports P=atari    one
+# THE OPEN LIST IS CHECKED FIRST, and it costs nothing: it reads one file and
+# needs no toolchain, where the ports below want six cross compilers. The
+# header has been wrong five separate ways, always because status sat where a
+# count could not see it -- see NOTES item 56.
 ports:
+	@python3 tools/open_list.py
 	@python3 tools/check_ports.py $(P)
 
 # A VARIABLE USED IN A RULE'S PREREQUISITES MUST BE DEFINED ABOVE THAT RULE.
