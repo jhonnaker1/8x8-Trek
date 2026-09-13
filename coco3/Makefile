@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck verify check-all ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -304,6 +304,31 @@ $(KEY_OUT): $(KEY_SRC) Makefile
 
 keymatrix:
 	@python3 tools/keymatrix.py
+
+# THE GATE, AND IT IS DELIBERATELY THE CHEAP HALF. tools/check_ports.py runs
+# `make verify` for every port and checks the exit status; this port had NONE,
+# so the cross-port gate only ever BUILT it -- six checks existed and the gate
+# ran none of them. Every one of them caught a real fault on 2026-09-13.
+#
+# WHY NOT ALL SIX HERE. vidcheck, ovlcheck, keycheck and writecheck each start
+# MAME and take about a minute; a gate that costs six minutes is a gate nobody
+# runs, and an unrun gate is worse than none because it still reads as one. So
+# `verify` is everything that needs no emulator and `check-all` is the lot.
+#
+# What `verify` actually gates, all of it via `disk`:
+#   build_ovl.py  the bootstrap is below $8000, bss does not meet the window,
+#                 the window fits under the I/O page, bss is zeroed
+#   overlay_check the per-function overlay rules out of core/overlay.h
+#   mkboot.py     the loader body fits under the CLEAR ceiling -- the check
+#                 that did not exist when the loader silently outgrew it
+#   checkdisk.py  every file read back off the image it just wrote
+verify: disk
+	@python3 tools/binsize.py build/egatrek-ovl.bin
+
+# Everything, including the four that want an emulator. Run this before a
+# release, or after touching the video, keyboard, storage or overlay seams.
+check-all: verify vidcheck ovlcheck keycheck writecheck
+	@echo "coco3: every check ran"
 
 keycheck: $(KEY_OUT)
 	@python3 tools/keycheck.py

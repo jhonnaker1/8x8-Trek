@@ -28,4 +28,11 @@ for path in sys.argv[1:]:
           if execaddr is not None else f"      spans ${lo:04X}..${hi-1:04X}")
     print(f"      file on disk {len(d):,} bytes (DECB headers included)")
     free = 0xFF00 - hi
-    print(f"      {free:,} bytes between the end and $FF00 (the I/O page)")
+    print(f"      {free:,} bytes free between the end and $FF00 (the I/O page)")
+    # ONE LINE IN THE SHAPE THE CROSS-PORT GATE SURFACES. check_ports.py keeps
+    # a line only if it carries BOTH a word from its KEEP list and the literal
+    # "verify:", then prints what follows the colon -- so a number without that
+    # prefix is printed here and invisible there, which is how this port's
+    # figures would have gone stale unwatched like four others already have.
+    print(f"verify: resident {total:,} bytes at ${lo:04X}, {free:,} free "
+          f"below the I/O page")

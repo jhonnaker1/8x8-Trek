@@ -46,11 +46,17 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The Amiga takes its ASCII from a ROM font and its box glyphs from a table it
 # swept BY HAND -- which is the thing this check exists to stop going stale.
 #
-# THE COCO 3 HAS NO VERIFY YET because it has no drivers yet -- every seam is a
-# stub and the only real number is `make early`. Its build is its gate for now,
-# which is still worth having: it is the one port whose shared-code changes
-# (cmoc is non-conforming in ways the other five compilers are not) can break
-# a build nobody would otherwise run.
+# THE COCO 3 NOW HAS ONE, and the paragraph here that said it did not -- "it
+# has no drivers yet, every seam is a stub" -- was true when it was written and
+# false for most of 2026-09-13, while this file went on printing `make (build)`
+# for a port with video, keyboard, storage, overlays, far memory and sound all
+# real. A comment explaining an absence outlives the absence.
+#
+# ITS `verify` IS THE CHEAP HALF ON PURPOSE. Four of the port's six checks
+# start MAME and take a minute each; `make check-all` runs those. What `verify`
+# gates needs no emulator and is not nothing: build_ovl's bootstrap, bss and
+# window assertions, overlay_check's per-function rules, mkboot's CLEAR-ceiling
+# check, and checkdisk reading every file back off the image it just wrote.
 #
 # The third field is what lets this run from `all` on a machine with none of
 # the cross compilers. It is a VARIABLE NAME, not a path, because the path
@@ -63,7 +69,7 @@ PORTS = (
     ("atari",  "verify", "ATARICC"),
     ("amiga",  None,     "CC"),
     ("falcon", "verify",  "CC"),
-    ("coco3",  None,      "CMOC"),
+    ("coco3",  "verify",  "CMOC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

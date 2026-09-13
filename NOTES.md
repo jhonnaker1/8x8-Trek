@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (6 open of 55 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fourteen times on 2026-09-13 (5 open of 55 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1758,7 +1758,45 @@ are the CoCo 3**, which is started and not released:
       "redraws of each panel for each turn", and most of those cells are
       identical between turns.
       Double speed on real hardware is item 55.
-  54. **THE CoCo 3 HAS NO `verify` TARGET, so `make ports` only BUILDS it.**
+  54. ~~**THE CoCo 3 HAS NO `verify` TARGET, so `make ports` only BUILDS it.**~~
+      **CLOSED 2026-09-13.** `make verify` is the cheap half and is now in the
+      gate; `make check-all` is the lot.
+      **WHAT `verify` GATES, none of it needing an emulator**: build_ovl's
+      bootstrap/bss/window assertions, overlay_check's per-function rules,
+      mkboot's CLEAR-ceiling check, and checkdisk reading every file back off
+      the image it just wrote. **VERIFIED BY BREAKING IT**: putting
+      `BODY_LOAD` back to `$6000` turns the gate red -- `FAIL coco3 make
+      verify exit 2` -- where before the same break sailed through as
+      `ok coco3 make (build)` and cost an hour of blaming the SAVE command.
+      **AND THE NUMBERS ARE SURFACED, WHICH TOOK ONE WORD AND ONE PREFIX.**
+      check_ports.py keeps a line only if it carries BOTH a word from its KEEP
+      list AND the literal `verify:`; binsize.py had neither, so its figures
+      printed locally and were invisible in the gate -- which is exactly how
+      four other ports' numbers went stale. It now prints
+      `verify: resident 45,715 bytes at $2800, 9,325 free below the I/O page`.
+      **THE GATE'S OWN COMMENT HAD GONE STALE UNDER IT**: "THE COCO 3 HAS NO
+      VERIFY YET because it has no drivers yet -- every seam is a stub". True
+      when written, false for most of the day, while the file went on printing
+      `make (build)` for a port with video, keyboard, storage, overlays, far
+      memory and sound all real. **A comment explaining an absence outlives
+      the absence.**
+      **THE AMIGA IS STILL `None` AND THAT IS A DECISION, not an oversight** --
+      check_ports.py explains why, and the explanation is still true.
+      **IT PAID ON ITS FIRST HONEST RUN.** `make check-all` came back exit 2:
+      `ovltest` had not LINKED since item 39 went in that afternoon, because
+      coco3ovl.c now calls ovl_fatal() and that lives in the shared main.c
+      which the test does not link. It stayed broken for hours and nothing
+      noticed -- which is the argument for this item, demonstrated rather than
+      asserted. The stub belongs in the TEST, as keytest's snd_poll() does.
+      **AND I NEARLY MISSED IT THE SAME WAY.** My first check-all was
+      `make check-all 2>&1 | grep ... | tail`, which reports TAIL's exit
+      status: a pipeline incapable of returning red, printing green. The real
+      status was 2. [[measure-before-asserting]] says check the exit status
+      before the output; a pipe throws the exit status away and nothing warns
+      you. Redirect to a file and test `$?`.
+      Final: `make check-all` exit 0 -- checkdisk 16 files, vidcheck 11/11,
+      ovlcheck 3/3, keycheck 26/26, writecheck both readers. `make ports` 7/7.
+      ORIGINAL:
       Found 2026-09-13 by re-deriving: the gate prints `make verify` for the
       C128, Atari, X16, Falcon and MEGA65 and `make (build)` for this port --
       and the difference is that this port has **six checks nothing runs**:

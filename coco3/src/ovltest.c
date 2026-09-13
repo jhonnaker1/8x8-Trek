@@ -26,6 +26,20 @@
    above anything this test links and below the ROM window. */
 #define R ((unsigned char *)0x7F00)
 
+/* THE PORT'S ovl_load() STOPS ON A FAILED IMAGE and names the overlay, which
+   is item 39 -- and ovl_fatal() lives in the shared main.c, which this test
+   does not link. The stub belongs HERE, in the test, for the same reason
+   keytest carries a snd_poll(): the test links one seam on purpose.
+
+   THIS FILE DID NOT LINK FOR SEVERAL HOURS AND NOTHING NOTICED, because the
+   cross-port gate only BUILT this port -- see item 54. Wiring `verify` in was
+   what found it, on its first honest run. */
+void ovl_fatal(unsigned char which)
+{
+    (void)which;
+    for (;;) { }
+}
+
 int main(void)
 {
     unsigned char i;
