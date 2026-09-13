@@ -7,10 +7,10 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: six ports released.** The **Commodore 128**, **Commander X16**,
-> **Amiga**, **MEGA65**, the **Atari 800XL + VBXE** and now the **Atari
-> Falcon030** are feature complete and released as
-> [v0.14.0](../../releases/latest), 2026-09-12.
+> **Status: seven ports released.** The **Commodore 128**, **Commander X16**,
+> **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**
+> and now the **Tandy CoCo 3 + SuperSprite FM+** are feature complete and
+> released as [v0.15.0](../../releases/latest), 2026-09-13.
 > The Falcon is the new one, and it is the cheapest port here: it **boots into
 > the mode the console wants** (640×480 in sixteen colours on VGA), takes its
 > 8×16 font out of the machine's own ROM, and has **no overlays, no far-memory
@@ -130,7 +130,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all six released ports. EGA
+**Colour per message is built** (2026-09-10) and ships on all seven released ports. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -172,13 +172,13 @@ per-cell colour; anything that can hold that runs the game as designed.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
-| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.14.0](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.14.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
-| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.14.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
-| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.14.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
-| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.14.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
-| **Atari Falcon030** (VGA) | 640×480 bitmap, 16 colours — the boot mode | 68030 | **Released** — [v0.14.0](../../releases/latest). The cheapest port here: **no overlays, no banking, no filesystem of our own**, an 8×16 font out of ROM and GEMDOS for storage. **Needs a VGA monitor.** See [`falcon/README.md`](falcon/README.md) |
-| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Started, not released** — links and fits; storage, font and overlay machinery are real, video/sound/input are stubs. See [`coco3/README.md`](coco3/README.md) |
+| **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.15.0](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.15.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
+| **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.15.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
+| **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.15.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
+| **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.15.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
+| **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The cheapest port here: **no overlays, no banking, no filesystem of our own**, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
+| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **The slowest of the seven.** See [`coco3/README.md`](coco3/README.md) |
 
 **How much colour the console actually needs: fifteen.** Counted from the
 shared sources on 2026-09-05 rather than assumed — every EGA colour except
@@ -220,9 +220,12 @@ of them were settled by measurement in September 2026.
   branch nobody has built. **MSX2** has 80 columns but the colour collapses —
   though its V9938's SCREEN 7 is a bitmap route nobody has benchmarked. A
   **CoCo 3 with a SuperSprite FM+** carries the V9938's successor and **has
-  been benchmarked** (10.625 cycles a byte to the V9958; a full repaint is
-  0.287 s, so a dirty-cell scheme is the design and not an optimisation) —
-  **that port is started but not released**; see [`coco3/README.md`](coco3/README.md). The **stock Atari
+  been benchmarked** (10.625 cycles a byte to the V9958) — and **that
+  arithmetic was not the repaint**: the blit cost is a third of a second and a
+  real 80×25 repaint measured **12.24 seconds**, because the per-character
+  work around each byte dwarfs the byte. It is 3.84 s now and is still the
+  slowest of the seven; a dirty-cell scheme remains the structural fix. That
+  port is **released as of v0.15.0**; see [`coco3/README.md`](coco3/README.md). The **stock Atari
   800XL** stops at 40 columns; only VBXE brings it back. The 40-column colour
   machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
   a nine-panel console does not fit in 40 columns.
@@ -313,8 +316,8 @@ make all                # the native tests, the audits, and `ports`
 ```
 
 **`make ports` skips what it cannot build.** It runs each port's real gate --
-`make verify`, or `make` on the Amiga and the CoCo 3, which have no overlay
-budget for a verify to check -- and a port whose cross compiler is not
+`make verify`, or `make` on the Amiga, which has no overlay budget for a
+verify to check -- and a port whose cross compiler is not
 installed is reported as a skip rather than a failure, naming the variable and
 path it looked for. So a fresh clone with no toolchains still gets a green
 `make all`; a machine with all seven toolchains gets **seven real gates in

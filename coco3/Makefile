@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck verify check-all ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck verify check-all release ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -327,6 +327,19 @@ verify: disk
 
 # Everything, including the four that want an emulator. Run this before a
 # release, or after touching the video, keyboard, storage or overlay seams.
+# THE RELEASE IS A DISK IMAGE, because this port carries its own Disk BASIC
+# filesystem -- there is no host OS here to hand loose files to, the way GEMDOS
+# does on the Falcon. TREK.DSK is what you write to a floppy or mount.
+REL = build/release
+
+release: check-all
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco3
+	@cp build/trek.dsk $(REL)/egatrek-coco3/TREK.DSK
+	@cp README-release.txt $(REL)/egatrek-coco3/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-coco3.zip egatrek-coco3
+	@echo "release: build/egatrek-coco3.zip"
+	@unzip -l build/egatrek-coco3.zip | tail -n +4
+
 check-all: verify vidcheck ovlcheck keycheck writecheck
 	@echo "coco3: every check ran"
 

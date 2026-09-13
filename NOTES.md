@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fifteen times on 2026-09-13 (2 open of 56 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fifteen times on 2026-09-13 (1 open of 56 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2360,7 +2360,26 @@ are the CoCo 3**, which is started and not released:
       `make ports`, reads one file and needs no toolchain.
       **A COUNT NOBODY CAN VERIFY MECHANICALLY WILL DRIFT**, however careful
       the person doing it, and this list has now proved that six times.
-  48. **THE SEVENTH PORT IS NOT RELEASED, and that was never filed.** Raised
+  48. ~~**THE SEVENTH PORT IS NOT RELEASED, and that was never filed.**~~
+      **CLOSED 2026-09-13: RELEASED AS v0.15.0.** `coco3/build/egatrek-coco3.zip`
+      -- a Disk BASIC diskette image and a README, because this port carries
+      its own filesystem and there is no host OS to hand loose files to.
+      **CUT FROM A WIPED build/ DIRECTORY**, with `make release` depending on
+      `check-all`, so every one of the six checks ran against the tree the
+      archive came from. **THEN THE STAGED ARTEFACT WAS BOOTED** -- unzipped
+      to a scratch directory and run from there, never the build tree:
+      `rc=00, got=45,715, PC=$2B7C, AY R7=$3E`, which is the whole image
+      loaded, the game running and a tone gated on.
+      **MUSIC.DAT CHECKED BY SHASUM** against the C128's and the Falcon's:
+      `cc5947dc5e0fb88f` on all three, which is the project's own composition
+      from tools/make_music.py and never the note data gen_music.py extracts
+      from Anderson's binary.
+      **THE RELEASE NOTES CARRY WHAT BIT US TODAY**: the Multi-Pak slot order
+      as a requirement, "wait about a minute and keep watching the BASIC
+      screen" (Jamie closed the window at 84 seconds and the switch is at 60),
+      no keyboard buffer, the slowest of the seven, and item 55 -- 1.78 MHz
+      has never run on real hardware and is the first thing to suspect there.
+      ORIGINAL: Raised
       2026-09-13 by re-deriving. The list SAYS it in prose -- "all five are
       the CoCo 3, which is started and not released" -- and prose is not an
       item: nothing counts it, nothing closes it, and the same shape is what
