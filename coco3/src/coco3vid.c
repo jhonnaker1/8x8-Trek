@@ -7,6 +7,7 @@
  *
  *   $FF78  data          $FF79  address / status
  *   $FF7A  palette       $FF7B  register indirect
+ *   $FF7E  VIDEO SELECT -- which video the card puts on the monitor
  *
  * the MSX $98/$99/$9A/$9B layout moved into the CoCo's slot window. Confirmed
  * by writing VRAM and reading it back, not inferred from a table.
@@ -42,6 +43,23 @@
 #define VDP_DATA   ((unsigned char *)0xFF78)
 #define VDP_ADDR   ((unsigned char *)0xFF79)
 #define VDP_PAL    ((unsigned char *)0xFF7A)
+
+/* THE CARD DECIDES WHAT THE MONITOR SEES, AND IT DOES NOT DEFAULT TO US.
+   A SuperSprite FM+ feeds the monitor from EITHER the CoCo's own MC6847 or
+   the V9958, and $FF7E picks: bit 0 CLEAR selects the V9958, set selects the
+   MC6847. J4 on the board is only the POWER-ON default and it ships as
+   MC6847, so a program that never writes this register draws a perfect
+   picture into VRAM that nobody can see -- which is exactly what this port
+   did for a week. Jamie said "when you launch mame, all I see is the green
+   basic screen"; he was looking at the CoCo's own video, because that is
+   what the card was still being asked to show.
+   NOT AN EMULATOR QUIRK. MAME implements the mux by switching which screen
+   its window displays (dragon_msx2.cpp, video_select_w), and the same write
+   is what the real board needs. The J5 "Video Lock" jumper can disable the
+   software select; it ships Unlocked, which is what makes this work. */
+#define VDP_VIDSEL ((unsigned char *)0xFF7E)
+#define VIDSEL_VDP    0x00
+#define VIDSEL_COCO   0x01
 /* $FF7B is register-INDIRECT access (via R#17). This driver does not use
    it; it is named here so nobody reaches for it thinking it writes a
    register by number. See vdp_reg() below. */
@@ -139,6 +157,10 @@ void vdc_init(void)
     }
 
     scr_clear();
+
+    /* LAST, so the monitor switches to a screen that already has a picture on
+       it rather than to whatever VRAM held at power-on. */
+    *VDP_VIDSEL = VIDSEL_VDP;
 }
 
 /* DELIBERATELY DOES NOT CLEAR, and does not blank the display. The farewell
@@ -164,6 +186,12 @@ void vdc_shutdown(void) { }
  * sitting in the whole address space cannot politely return. */
 void plat_exit(void)
 {
+    /* HAND THE MONITOR BACK FIRST. vdc_init() pointed the card at the V9958;
+       leaving it there drops the player at a Disk BASIC prompt on a screen
+       that is not being displayed, which looks exactly like a machine that
+       has hung. The same courtesy as restoring the memory map below. */
+    *VDP_VIDSEL = VIDSEL_COCO;
+
     asm { orcc #$50 }           /* no interrupts while the map changes */
     asm { sta $FFDE }           /* ROM/RAM mode: Disk BASIC comes back */
     asm { jmp [$FFFE] }         /* the machine's own reset vector */

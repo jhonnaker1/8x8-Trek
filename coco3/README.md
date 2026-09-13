@@ -39,35 +39,33 @@ which is the MSX `$98/$99/$9A/$9B` layout moved into the CoCo's slot window.
 bytes a screen, and **the VRAM address counter carries past 16K by itself**, so
 nothing has to touch a bank register mid-blit.
 
-**MAME renders the card's screen black no matter what the VDP is doing.** Do
-not read that as the driver failing — the CoCo's own VDG output is what shows.
-**Verify by reading VRAM back**, not by looking at the window.
+**THE CARD DECIDES WHAT THE MONITOR SEES, AND IT DOES NOT DEFAULT TO US.**
+A SuperSprite FM+ feeds the monitor from EITHER the CoCo's own MC6847 or the
+V9958, and **`$FF7E` picks: bit 0 clear selects the V9958, set selects the
+MC6847.** The `J4 Default Video` jumper is only the power-on default and it
+ships as MC6847. A program that never writes `$FF7E` therefore draws a perfect
+picture into VRAM **that nobody can see** — on real hardware as much as under
+MAME. `vdc_init()` writes it last, once there is a picture to switch to, and
+`plat_exit()` hands the monitor back so the player is not returned to a BASIC
+prompt on a screen that is not being displayed.
 
-That sentence was an observation for a week. It is now a measurement, because
-Jamie said "when you launch mame, all I see is the green basic screen" and two
-things turned up that I had not known:
+**This file said the opposite for a week, and said it twice.** The first
+version was "MAME renders the card's screen black no matter what the VDP is
+doing" — an observation. When Jamie said "when you launch mame, all I see is
+the green basic screen", I went looking, found that MAME has two screens and
+that the card has a J4 jumper, TESTED BOTH, and still concluded the emulator
+was at fault — and wrote that up here as a *measurement*, with a table of
+evidence under it. Every line of that table was true and the conclusion was
+wrong: the registers, the palette and VRAM were all about the VDP, and not one
+of them was about the MUX. The answer was a register, not a jumper, and it was
+one file of MAME's source away the whole time —
+[dragon_msx2.cpp](https://github.com/mamedev/mame/blob/master/src/devices/bus/coco/dragon_msx2.cpp),
+`video_select_w`, which MAME implements by switching which screen its window
+shows. I only read it when Jamie asked me to go and check.
 
-* **MAME has TWO screens here.** `:screen` is the CoCo's VDG at 640x239 and
-  `:ext:multi:slot1:ssfm:screen` is the card at 544x466 — and the default view
-  is *Screen 0*, the green one. `-view "Screen 1 Standard (4:3)"` selects the
-  card. So "all I see is the green BASIC screen" is the default, not a fault.
-* **The card has a video jumper.** `J4 Default Video` defaults to `MC6847`,
-  the CoCo's own video, and its other setting is `V9958`. There is a `J5 Video
-  Lock` as well.
-
-Neither makes a picture. With J4 on V9958 and J5 either way, screen 1 is one
-colour, black. **What rules the port out is everything else being right**, read
-out of MAME's own device state while the title screen was up:
-
-* control registers `R0=0A R1=40 R2=1F R7=00 R8=0A R9=80` — exactly what
-  `vdc_init()` writes, and R1 bit 6 is the display enable, set;
-* `m_mode=7`, `m_height=262` — the chip reconfigured itself for the mode;
-* all 32 palette bytes identical to `ega_pal` in coco3vid.c;
-* VRAM holding a correct title screen.
-
-So the port programs the chip, the chip agrees, and MAME does not put it on
-its screen. **Use `make screenshot`** — tools/vramshot.py renders the frame
-from VRAM — and do not spend another evening on the window.
+**`make screenshot`** (tools/vramshot.py) still renders a frame straight out of
+VRAM, and it is still the way to inspect a picture byte-exactly — but it is no
+longer the only way to see the game.
 
 ## The blit cost was the real risk, and it is measured
 

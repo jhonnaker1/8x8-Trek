@@ -1858,10 +1858,30 @@ are the CoCo 3**, which is started and not released:
       temperature bars, main viewer, command, systems status, the U.S.S.
       Lexington plate with its emblem, and HELM: AWAITING ORDERS CAPTAIN.
       Twelve of sixteen colours on screen.
-      So what is left of this item is narrow and precise: **a PERSON has not
-      played it**, because they cannot watch it (item 45). The port is not
-      unproven any more; it is unwatched.
-  45. **THE PORT CANNOT BE SEEN UNDER MAME.** Not new -- coco3/README.md has
+      **AND SINCE 2026-09-13 IT CAN BE WATCHED** -- item 45 was a port bug
+      ($FF7E, the card's video select) and is closed. Nothing stands between
+      this port and a person playing it but a person playing it.
+  45. ~~**THE PORT CANNOT BE SEEN UNDER MAME.**~~ **CLOSED 2026-09-13, AND IT
+      WAS NEVER TRUE.** The SuperSprite feeds the monitor from EITHER the
+      CoCo's MC6847 or the V9958, and **`$FF7E` picks -- bit 0 clear selects
+      the V9958.** J4 is only the power-on default and it ships as MC6847.
+      This port never wrote $FF7E, so the card was still being asked to show
+      the CoCo's own video. **THAT IS A PORT BUG, NOT AN EMULATOR LIMIT**: on
+      a real SuperSprite FM+ this would have shipped showing the BASIC screen.
+      vdc_init() now writes it last, once there is a picture to switch to, and
+      plat_exit() hands the monitor back -- without that the player is
+      returned to a BASIC prompt on a screen that is not being displayed,
+      which looks exactly like a hang.
+      **I RULED THIS OUT WITH EVIDENCE AND THE EVIDENCE WAS BESIDE THE
+      POINT.** Asked to look, I found MAME's two screens and the J4 jumper,
+      tested both, and still concluded the emulator was at fault -- then wrote
+      that up as a MEASUREMENT with a table under it: registers, palette,
+      VRAM, all correct. Every line was true. All of it was about the VDP and
+      NONE of it was about the MUX, so the table could not have found this no
+      matter how long I stared at it. I tested a JUMPER and never considered a
+      REGISTER. The answer was in dragon_msx2.cpp's video_select_w, one file
+      away, and I read it only when Jamie said to go and check.
+      ORIGINAL: Not new -- coco3/README.md has
       said since the video driver landed that "MAME renders the card's screen
       black no matter what the VDP is doing", and every check since has gone
       through VRAM read-back for exactly that reason. What is new is
