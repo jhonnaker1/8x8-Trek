@@ -1748,6 +1748,10 @@ are the CoCo 3**, which is started and not released:
       re-establish 11 of 11 and then adding them ONE AT A TIME found it in
       four runs: a cache of R#14 that skipped the write when the bank was
       unchanged. It is the smallest win of the set and it is left out.
+      **JAMIE PLAYED THE OPTIMISED BUILD: "much better. still the slowest of
+      all the ports, but it is playable."** That is the judgement that matters
+      and it changes this item's status rather than closing it: **playable is
+      not a release blocker**, so item 48 is no longer waiting on speed.
       **STILL OPEN**: 3.84 seconds is better and is not fast. The structural
       fix is a DIRTY-CELL SHADOW -- 80x25 of glyph and colour, ~4K -- so that
       a panel redraw only touches cells that changed. Jamie's words were
