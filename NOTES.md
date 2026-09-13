@@ -2135,7 +2135,8 @@ are the CoCo 3**, which is started and not released:
       **IT TOOK THREE TRIES TO LET HIM HEAR IT AT ALL**, and none of the three
       failures was the driver: the first runs were under `-nothrottle` at 2490%
       (item 52), and the first real-speed launch he closed after 84 seconds --
-      **the screen stays green for about SIXTY-FIVE of them** while a 44K image
+      **the screen stays green for SIXTY of them** (measured, not estimated: the
+      loader's completion marker lands at t=60s on a per-second log) while a 44K image
       comes off an emulated floppy, and I had not told him that.
       The YM2413 OPLL at `$FF76-$FF77` is untouched and is a better
       instrument; a second project, not a blocker.

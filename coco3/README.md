@@ -406,10 +406,11 @@ plus the `ym2413` the card's OPLL needs.
 mame64 coco3 -window -skip_gameinfo -ext multi -ext:multi:slot1 ssfm -ext:multi:slot4 fdc
 ```
 
-**THE SCREEN STAYS GREEN FOR ABOUT A MINUTE, AND THAT IS NORMAL.** At real
-speed the sequence is ~14s to the Disk BASIC prompt, a few seconds for
-`CLEAR` and `LOADM`, and then **~35 seconds of floppy** while the loader reads
-44K into place. Nothing switches to the game screen until that finishes.
+**THE SCREEN STAYS GREEN FOR SIXTY SECONDS, AND THAT IS NORMAL.** Measured at
+real speed with a per-second log, not estimated: the loader's "read complete"
+marker lands at **t = 60s**, with ~14s to the Disk BASIC prompt, a few seconds
+for `CLEAR` and `LOADM`, and the rest floppy while 44K comes into place.
+Nothing switches to the game screen until that finishes.
 Jamie closed the window at 84 seconds the first time and saw only the BASIC
 screen; the port was working the whole time. Say so before handing anyone a
 window to watch.
