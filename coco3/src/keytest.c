@@ -15,6 +15,12 @@
 
 #include "../../c128/src/input.h"
 
+/* THE KEYBOARD DRIVER TICKS THE MUSIC from its wait loop, as every port's
+   does, so linking it pulls in snd_poll(). This test links the keyboard and
+   nothing else, and nothing here is meant to sound -- so the stub belongs
+   HERE, in the test, and not in the port. */
+void snd_poll(void) { }
+
 #define RESULT ((unsigned char *)0x7F00)
 #define NKEYS  26
 

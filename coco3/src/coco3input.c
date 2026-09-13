@@ -32,14 +32,18 @@
  * SHIFT+7 here as it is there, and is deliberately absent for the same
  * reason: c128/src/input.h does not name it.
  *
- * NO snd_poll() IN THE WAIT LOOP. Every other port calls it there so music
- * advances while a prompt is open; coco3snd.c is a stub whose snd_poll() does
- * nothing, so calling it would be a claim this port cannot back. When the
- * YM2413 seam is real this loop is where it goes.
+ * snd_poll() IS CALLED FROM THE WAIT LOOP, as it is on every other port: this
+ * is where the game spends every second it is not drawing, and the music can
+ * only advance while something calls it. The stub version of this file said
+ * "when the sound seam is real this loop is where it goes" -- and when the
+ * seam WAS built, the driver wrote its registers, the chip held them, and the
+ * game stayed silent, because nothing ever ticked it. A note to your future
+ * self is not a mechanism.
  */
 #include <stdint.h>
 
 #include "../../c128/src/input.h"
+#include "../../c128/src/sid.h"
 
 /* ABSOLUTE ADDRESSES, NOT POINTERS THROUGH A LOCAL. cmoc has no `volatile`,
    and coco3bank.h already carries the scar: a run of stores through a local
@@ -116,9 +120,10 @@ char kb_waitkey(void)
 {
     unsigned char c;
 
-    while (scan() != KB_NONE) kb_entropy++;      /* release anything held */
+    while (scan() != KB_NONE) { kb_entropy++; snd_poll(); }   /* release it */
     for (;;) {
         kb_entropy++;
+        snd_poll();                             /* the music lives here */
         c = scan();
         if (c != KB_NONE) break;
     }

@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and ten times on 2026-09-13 (5 open of 50 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and eleven times on 2026-09-13 (5 open of 51 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2106,7 +2106,39 @@ are the CoCo 3**, which is started and not released:
       which is the same shape as [[sweep-where-stale-claims-hide]]: status
       living in formatting rather than in text. Sound is now item 44 rather
       than a clause.
-  44. **Sound is a stub on the CoCo 3.** coco3snd.c returns 0 from
+  44. **Sound is BUILT and MEASURED, and nobody has heard it.** The YM2149
+      (an AY-3-8910) at `$FF7C`/`$FF7D` carries two voices, channel A music
+      and channel B effects, as every other port does it.
+      **THE CLOCK WAS READ, NOT GUESSED**: MAME's dragon_msx2.cpp builds it at
+      `21.477272_MHz_XTAL / 6` = 3,579,545 Hz, so period = 22372 / tenths.
+      **Calibrated at THREE points on paper** (440 -> 440.3, 1000 -> 1003.2,
+      200 -> 200.1, all inside 0.35%) because this project shipped an octave
+      flat for four months on a one-point check.
+      **AND THEN MEASURED OFF A RECORDING**: `-wavwrite`, and a held note in
+      MUS_TITLE reads **220.2 Hz where the track's data says 220 -- +0.08%**,
+      steady across more than a second. That is the frequency law confirmed
+      against the actual bytes, not against itself.
+      **THE SILENCE WAS NOT THE DRIVER: NOTHING WAS CALLING snd_poll().**
+      The chip held R7=$3F and the game made no sound, and coco3input.c said
+      why in its own comment -- *"NO snd_poll() IN THE WAIT LOOP ... when the
+      sound seam is real this loop is where it goes."* The seam became real
+      and the note did not move itself. **A note to your future self is not a
+      mechanism.**
+      **WHAT IS NOT ESTABLISHED**, and is item 51: a sustained ~175 Hz shows
+      in the recording that is not any pitch MUS_TITLE uses, and across all
+      stable windows only about half land within 3% of a pitch in the track.
+      A single held note being exact does not make a tune correct.
+      **AND NOBODY HAS HEARD IT**, which on this project is the only test that
+      has ever counted -- see [[jamie-plays-and-instruments-miss]].
+      The YM2413 OPLL at `$FF76-$FF77` is untouched and is a better
+      instrument; a second project, not a blocker.
+  51. **A ~175 Hz TONE IN THE TITLE TRACK THAT THE DATA DOES NOT CONTAIN.**
+      Raised 2026-09-13 by the recording that confirmed the frequency law.
+      MUS_TITLE uses twelve pitches -- 150 220 290 330 350 390 440 470 520 590
+      660 700 -- and 175 is not one of them, yet it sustains for half a second
+      at a time. Candidates, none tested: the note-length accumulator dropping
+      or repeating notes; channel B sounding when it should be gated; my
+      measurement locking onto a harmonic. **Measure before choosing.** coco3snd.c returns 0 from
       snd_enabled() so the SND command tells the truth, and every entry point
       is empty. The SuperSprite FM+ carries a YM2413 OPLL and an AY-3-8910 and
       neither has been touched. Split out of item 27 on 2026-09-13.
