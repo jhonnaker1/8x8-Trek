@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and five times on 2026-09-13 (7 open of 47 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and six times on 2026-09-13 (7 open of 48 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1990,6 +1990,23 @@ are the CoCo 3**, which is started and not released:
       snd_enabled() so the SND command tells the truth, and every entry point
       is empty. The SuperSprite FM+ carries a YM2413 OPLL and an AY-3-8910 and
       neither has been touched. Split out of item 27 on 2026-09-13.
+      **THE PORTS ARE KNOWN NOW, read off MAME's own device source the same
+      afternoon as $FF7E** (dragon_msx2.cpp, the native $FF7* decode):
+        `$FF76-$FF77`  YM2413 (OPLL, FM)  -- read and write
+        `$FF7C`        YM2149 register address (write)
+        `$FF7D`        YM2149 data (read and write)
+      So this item is no longer "unresearched"; it is unbuilt. The YM2149 is
+      the AY-3-8910 shape every 8-bit port here already knows how to drive,
+      and the OPLL is richer than anything else this project touches.
+  48. **THE SEVENTH PORT IS NOT RELEASED, and that was never filed.** Raised
+      2026-09-13 by re-deriving. The list SAYS it in prose -- "all five are
+      the CoCo 3, which is started and not released" -- and prose is not an
+      item: nothing counts it, nothing closes it, and the same shape is what
+      item 43 was about. The Falcon's release WAS an item (26), so this one
+      should have been from the day the port started.
+      What it needs before it can be one: SAVE (item 28) and a decision about
+      sound (item 44), because every released port has both, and somebody
+      playing it (item 31). Nothing else on this list blocks it.
   41. ~~**THE VECTOR FIX AS WRITTEN IS WRONG: IT STORMS.**~~ **CLOSED
       2026-09-13, AND THE ANSWER IS WORTH MORE THAN THE BUG.**
       **A BARE RTI DOES NOT MAKE A STRAY PIA INTERRUPT HARMLESS -- IT MAKES
