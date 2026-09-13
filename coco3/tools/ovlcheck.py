@@ -26,15 +26,22 @@ for a, b in io.open(os.getenv("ADDRF")):read("*a"):gmatch("(%d+) (%d+)") do
     ld, ex = tonumber(a), tonumber(b)
 end
 emu.wait(12)                       -- Disk BASIC needs twelve seconds to boot
+-- PAUSE BEFORE POKING. Disk BASIC is live and its stack sits around $34xx;
+-- this image now loads at $2800 and reaches into that, so poking it while the
+-- machine runs corrupts BASIC mid-instruction. The same trap cost a whole
+-- session on tools/ovlrun.py.
+pcall(function() manager.machine:pause() end)
 local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
 local f = io.open(os.getenv("RAWF"), "rb"); local img = f:read("*a"); f:close()
 for i = 1, #img do prog:write_u8(ld + i - 1, img:byte(i)) end
 cpu.state["S"].value  = 0x3F00
 cpu.state["PC"].value = ex
+pcall(function() manager.machine:resume() end)
+
 emu.wait(20)
 local t = {}
-for i = 0, 47 do t[#t + 1] = string.format("%02X", prog:read_u8(0x2F00 + i)) end
+for i = 0, 47 do t[#t + 1] = string.format("%02X", prog:read_u8(0x7F00 + i)) end
 local o = io.open(os.getenv("OUTF"), "w"); o:write(table.concat(t, " ")); o:close()
 '''
 

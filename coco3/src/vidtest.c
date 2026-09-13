@@ -7,7 +7,11 @@
 #include <stdint.h>
 #include "../../c128/src/vdc.h"
 
-#define R ((unsigned char *)0x2F00)
+/* RESULTS AT $7F00, not $2F00. The port moved its load address to $2800 so
+   Disk BASIC's LOADM can place it, and $2F00 is INSIDE the image at that org
+   -- these programs were writing their answers over their own code. $7F00 is
+   above anything this test links and below the ROM window. */
+#define R ((unsigned char *)0x7F00)
 #define VDP_DATA ((unsigned char *)0xFF78)
 #define VDP_ADDR ((unsigned char *)0xFF79)
 

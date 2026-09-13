@@ -5,7 +5,7 @@ answers it leaves in CPU RAM.
 WHY A READBACK AND NOT A SCREENSHOT: MAME renders this card's screen BLACK
 whatever the VDP is doing -- the window shows the CoCo's own VDG output -- so
 looking at it proves nothing either way. VIDTEST draws a known pattern, reads
-VRAM back through the card and parks the bytes at $2F00.
+VRAM back through the card and parks the bytes at $7F00.
 
 THE INSTRUMENT WAS CHECKED BEFORE THE DRIVER WAS. Write two values at two
 addresses, read the first back: a latch returns the second, real VRAM returns
@@ -43,15 +43,22 @@ end
 -- MAME until the mouse moves) and NOT a frame notifier (which stops firing
 -- after the first callback that does real work).
 emu.wait(12)                  -- Disk BASIC needs twelve seconds, not three
+-- PAUSE BEFORE POKING. Disk BASIC is live and its stack sits around $34xx;
+-- this image now loads at $2800 and reaches into that, so poking it while the
+-- machine runs corrupts BASIC mid-instruction. The same trap cost a whole
+-- session on tools/ovlrun.py.
+pcall(function() manager.machine:pause() end)
 local cpu  = manager.machine.devices[":maincpu"]
 local prog = cpu.spaces["program"]
 local f = io.open(os.getenv("RAWF"), "rb"); local img = f:read("*a"); f:close()
 for i = 1, #img do prog:write_u8(ld + i - 1, img:byte(i)) end
 cpu.state["S"].value  = 0x3F00
 cpu.state["PC"].value = ex
+pcall(function() manager.machine:resume() end)
+
 emu.wait(15)
 local out = {}
-for i = 0, 31 do out[#out + 1] = string.format("%02X", prog:read_u8(0x2F00 + i)) end
+for i = 0, 31 do out[#out + 1] = string.format("%02X", prog:read_u8(0x7F00 + i)) end
 local o = io.open(os.getenv("OUTF"), "w"); o:write(table.concat(out, " ")); o:close()
 '''
 
@@ -101,7 +108,7 @@ def main():
 
     if b[31] != 0x5A:
         sys.exit("vidcheck: VIDTEST did not run to completion "
-                 "(sentinel $2F1F = %02X, not 5A) -- results below are meaningless" % b[31])
+                 "(sentinel $7F1F = %02X, not 5A) -- results below are meaningless" % b[31])
 
     bad = 0
     for label, off, exp, mode in CHECKS:

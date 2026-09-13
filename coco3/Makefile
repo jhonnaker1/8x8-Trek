@@ -21,9 +21,17 @@ PKGDATADIR ?= $(HOME)/cmoc/share/cmoc
 export PKGDATADIR
 
 # -fomit-frame-pointer is worth 566 bytes here, measured, and this is a target
-# where that is real money. --org=1200 puts the load address below what Disk
-# BASIC would leave free: this port owns the machine, the way the Atari one
-# does since it dropped DOS.
+# where that is real money.
+#
+# --org=2800 IS cmoc's DEFAULT AND IT IS NOT ARBITRARY. This port used $1200,
+# reasoning that it owns the machine. It does -- but something has to LOAD it
+# first, and on a CoCo that is Disk BASIC's LOADM, which will not put a
+# program under its own workspace. `CLEAR 25,&H11FF` comes back ?OM ERROR
+# because $11FF is below where BASIC keeps its program and variable space, so
+# the ceiling never moves and LOADM then writes 42K over a live BASIC. Jamie
+# caught it on screen. $2800 is above BASIC's workspace, so `CLEAR 25,&H27FF`
+# succeeds and LOADM is safe. It costs 5,632 bytes of address space and buys
+# a program the machine can actually start.
 #
 # -DTREK_COLOUR_IS_EGA makes EGA_TO_VDC the identity: the V9958's palette gets
 # EGA's own values in EGA's own order, so a colour name IS its index. Same
@@ -32,7 +40,7 @@ export PKGDATADIR
 # deletes it on success: a run from the repository root clobbers any file
 # there with the same name, which is exactly how four generated .s files got
 # committed to the root during scoping and deleted again by the next run.
-CFLAGS = --coco --org=1200 -O2 -fomit-frame-pointer --intdir=build \
+CFLAGS = --coco --org=2800 -O2 -fomit-frame-pointer --intdir=build \
          -DTREK_COLOUR_IS_EGA -Isrc -Ibuild/img -I../core -I../c128/src
 
 # No -DTREK_OVERLAYS yet, and that is deliberate: the staging rule is to link
@@ -115,7 +123,7 @@ RES_SRC = src/coco3vid.c ../c128/src/main.c ../c128/src/ui.c \
 # into whatever the window happens to hold. `make game` stays all-resident.
 overlays:
 	@mkdir -p build/img build/int
-	python3 tools/build_ovl.py --org 1200 --window $(OVL_WINDOW) \
+	python3 tools/build_ovl.py --org 2800 --window $(OVL_WINDOW) \
 	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
 	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
 	    --resident $(RES_SRC) --overlay $(OVL_SRC) --split
@@ -225,10 +233,15 @@ build/MUSIC.DAT: src/music_data.c
 # with src/coco3storage.c's OWN algorithm and compares byte for byte, because a
 # writer checked only by the thing that wrote it checks nothing. It caught the
 # first version immediately.
+# EGATREK.BIN GOES ON THE DISKETTE TOO, because the machine has to load the
+# program the way a CoCo does -- LOADM from Disk BASIC -- rather than have a
+# debugger poke 42K over BASIC's live stack. That poke is what made every
+# earlier ovlrun failure look like a port bug.
 disk: overlays data
-	python3 tools/mkdisk.py build/trek.dsk build/img/*.OVL \
+	@cp build/egatrek-ovl.bin build/EGATREK.BIN
+	python3 tools/mkdisk.py build/trek.dsk build/EGATREK.BIN build/img/*.OVL \
 	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
-	python3 tools/checkdisk.py build/trek.dsk build/img/*.OVL \
+	python3 tools/checkdisk.py build/trek.dsk build/EGATREK.BIN build/img/*.OVL \
 	    build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
 
 # THE OVERLAY BUILD, ON THE MACHINE. Everything else about overlays here is
