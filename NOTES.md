@@ -1828,8 +1828,18 @@ are the CoCo 3**, which is started and not released:
       The safe shape if it turns out to bite: drop to `$FFD8` around
       `read_sec`/`write_sec` and restore. That costs two port writes a sector
       and is not worth adding on speculation.
-      **2026-09-13 -- A REAL MACHINE EXISTS NOW.** Jamie has a CoCo 3, with a
-      CoCo SDC rather than a floppy drive. Two things follow.
+      **2026-09-13 -- A REAL MACHINE EXISTS, AND IT STILL CANNOT RUN THIS.**
+      Jamie has a CoCo 3 with a CoCo SDC. **He does not have a SuperSprite
+      FM+, and without the card there is nothing to run** -- the program would
+      load, switch `$FF7E` to a chip that is not in the machine, and draw a
+      perfect picture nobody can see, which is the same failure the card's own
+      section describes. **SO ITEM 55 IS STILL NOT CLOSEABLE**, and the
+      findings below are about the OTHER half of the machine.
+      **A DISK-ONLY PROBE WOULD NOT NEED THE CARD, though**, and would answer
+      the actual question: set `$FFD9`, read and verify a few hundred sectors,
+      drop to `$FFD8`, leave a report somewhere `PEEK` can reach, and return to
+      BASIC. That is the cheap experiment if this item is ever worth closing.
+      Two things follow from the drive.
       **First, the drive is not the obstacle it looked like.** This port never
       calls DSKCON -- it drives the WD1773's registers -- which is precisely
       what fails on SD-card replacements that hook DSKCON in software. The SDC

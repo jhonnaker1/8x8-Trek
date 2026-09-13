@@ -26,6 +26,8 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > come from: the CoCo 3's sitting found a console repaint taking **12 seconds**
 > that no benchmark here had ever timed, because the benchmark measured the
 > blit and the blit was a third of the cost.
+> **How to run each release asset, machine by machine, is in
+> [`RUNNING.md`](RUNNING.md)** — emulator command lines included.
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this

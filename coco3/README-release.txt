@@ -17,7 +17,16 @@ disk with -- a real floppy drive or a CoCo SDC.
 THE CARD IS NOT OPTIONAL. The CoCo 3's own video gives eight colours in
 80 columns; this game wants sixteen per pixel and a 512-wide bitmap, and the
 SuperSprite's V9958 is what provides them. Without the card there is nothing
-to run this on.
+to run this on -- the program will load and run and draw a perfect picture
+into a chip that is not there, and your monitor will keep showing the BASIC
+screen.
+
+AND NOBODY HAS RUN THIS ON A REAL ONE. Every claim in this file was measured
+under MAME, whose SuperSprite FM+ emulation is what the whole port was
+developed against. The author of the port does not have the card. THIS PORT IS
+THEREFORE CORRECT AS FAR AS AN EMULATOR CAN SHOW AND UNTESTED ON THE MACHINE --
+the distinction matters, and the rest of this file tries to be honest about
+which half any given sentence rests on.
 
 In a Multi-Pak, put the DISK CONTROLLER IN SLOT 4 and the card in slot 1. That
 order is not a preference: with the controller anywhere else the machine will

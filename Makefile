@@ -88,6 +88,16 @@ tiers:
 #
 # IT DOES NOT CLEAN FOR YOU. The clean rebuild is an instrument on this project
 # and it is the RELEASE MANAGER's job to wipe first -- `make release-clean`.
+# THE RELEASE BODY'S "How to run each one" SECTION, out of RUNNING.md rather
+# than retyped into the GitHub release every time. Two copies of the same
+# instructions is how this project has drifted six times before; the one in the
+# repo is the source and this is what gets pasted.
+#   gh release edit vX.Y.Z --notes-file <(gh release view vX.Y.Z --json body \
+#       -q .body | sed '/^## How to run each one$/,$d'; make -s running-section)
+.PHONY: running-section
+running-section:
+	@sed '1s/^# /## /' RUNNING.md
+
 RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3
 
 release:
