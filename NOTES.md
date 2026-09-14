@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and three times on 2026-09-14 (2 open of 60 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and four times on 2026-09-14 (3 open of 61 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2104,6 +2104,30 @@ are the CoCo 3**, which is started and not released:
       release. The cheap way to close it: bisect the working-tree states
       inside that session with `git worktree`, or accept it and record the new
       hash as the baseline DELIBERATELY rather than by drift.
+  61. **FOUR 40-COLUMN SCREENS ARE NOT DONE, AND THE BRIEFING IS 80 COLUMNS.**
+      Raised 2026-09-14. The C64 port's shared-UI work is most of the way
+      through -- dialogs, console, title, setup, hall of fame, evaluation,
+      memo and play-again all fit 40 columns -- and what is left was living in
+      a commit message, which is how "the seventh port is not released" once
+      sat in prose for a week where nothing could count or close it.
+      **Seen on the bench** (`make screens40`, then `tools/screens40.py`):
+      * **STATE OF REPAIR** -- its DOCKED and UNDOCKED columns are at the
+        80-column offsets, so the values strand at `100.` with the two columns
+        empty.
+      * **PREVIOUS MESSAGES** -- the department runs straight into the text:
+        `HELMAWAITING ORDERS CAPTAIN`. Two columns that no longer clear each
+        other.
+      * **`ui_info_panel` and `ui_planet_list` drew NOTHING.** Whether that is
+        80-column geometry or simply state the bench does not set up is
+        UNKNOWN -- the bench says which, and saying "nothing drew" is the
+        honest answer until somebody gives them a planet to list.
+      * **`BRIEF.TXT` is 80-column prose**: 12 pages, 227 lines, **155 of them
+        wider than 40**. It is generated, so this is a `tools/gen_strings.py`
+        variant landing around 21 pages -- not a hand edit. `verify` still
+        checks it against 78x22 and would need to check both.
+      **This closes when the C64 can show every screen**, not when the C128
+      40-column build can -- they share the code, but only the C64 makes the
+      work worth shipping.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
