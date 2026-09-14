@@ -1926,6 +1926,17 @@ are the CoCo 3**, which is started and not released:
       is ~27, which **fits 32**. So the TI-99/4A and the ZX Spectrum are not
       excluded by WIDTH -- they fail on colour (attribute clash, per-group
       colour) instead. **Width was never the thing doing the work.**
+
+      **SCOPED 2026-09-13** -- "SCOPE: a 40-column C64 port" at the end of this
+      file. Headline: the C128 port is 7,466 lines of `src/` and **5,383 are
+      the shared UI seven ports already build**, so the platform layer is about
+      2,083 lines of which ~350 (the SID driver) arrive working. **The risk is
+      not the C64, it is that `layout.c` is compiled by seven released ports**,
+      so a second geometry either adds a second axis of `#if` to a 2,501-line
+      shared file or finally moves the shared UI out of `c128/src` --
+      which `egavdc.h` has said is overdue since the THIRD port.
+      **Step one is the C128 at 40 columns**, because it isolates the layout
+      with zero new seams and produces the C64's video driver.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
@@ -10988,3 +10999,131 @@ screen access pattern. **Item 57 carries the machine ranking.**
   if a third target lands on it; a fourth plus a second geometry is the moment
   to move `ui.c` out of `c128/src`.
 * Nothing here has been compiled, drawn or timed.
+
+## SCOPE: a 40-column C64 port (2026-09-13)
+
+Asked for by Jamie after the 40-column derivation and the machine ranking in
+item 57. **Nothing below has been compiled.** Line counts are measured off
+`c128/src`; everything else is a plan.
+
+### What comes free -- and it is most of it
+
+The C128 port is **7,466 lines under `src/`**, and **5,383 of those are the
+SHARED UI** already compiled by seven ports: `main.c` (2,279), `ui.c` (2,501),
+`strpool.c` (130), `strdata.h` (340), `ui.h` (133). Add `core/` entire.
+
+**Free on top of that, because the C64 IS the C128's smaller sibling:**
+
+* **`sid.c` (263) + `sid.h` + `sidfreq.h` (87) -- SID is at `$D400` on both.**
+  350 lines of a driver that took three ports to get right elsewhere.
+* **`c1541` builds the `.d64`** -- the C128's own rule, VICE's own tool.
+* **`x64sc` and VICE's binary monitor** are the rig already
+  ([[egatrek-emulator-verification]]).
+* **`STRINGS.DAT` (7,380) and `MUSIC.DAT` (412)** are byte-identical.
+* **`core/overlay.h`** machinery is portable already.
+
+So the platform layer is about **2,083 lines, of which ~350 arrive working.**
+
+### Adapted -- mechanical, with a C128 counterpart to diff against
+
+| File | Lines | Change |
+|---|---|---|
+| `storage.c` | 349 | same KERNAL calls, drop the bank juggling. The broken `cbm_k_chkout` lesson carries ([[c128-toolchain-llvm-mos]]) |
+| `input.c` | 248 | GETIN/PETSCII -- the C128's model, NOT the X16's ASCII |
+| `overlay.c` | 149 | same shape, new window address |
+
+### New
+
+| File | Replaces | Note |
+|---|---|---|
+| `vic.c`/`vic.h` | `vdc.c` (208) + `vdc.h` (68) | **should be SMALLER**: `sta $0400,x` against the VDC's address register, data register and status poll |
+| `egavic.h` | `egavdc.h` (64) | a 16-entry EGA->VIC-II table, not a nibble rotate |
+| `farmem.c` | `farmem.c` (185) | **a plain array at `$A000`**, not FETCH/STASH |
+| `layout40.c/h` | `layout.c/h` (229) | the 40-column geometry |
+| `trek64.ld`, `Makefile`, `verify` | -- | `verify` is REQUIRED: a port without one makes `make ports` true and meaningless ([[check-ports-gate]]) |
+| `README.md`, `README-release.txt`, `RUNNING.md` entry | -- | |
+
+**Roughly 700 genuinely new lines, 750 adapted.**
+
+### THE REAL RISK IS THE SHARED UI, NOT THE C64
+
+`c128/src/layout.c` is compiled by **fourteen references across six other
+Makefiles**; `ui.c` by ten, `main.c` by nine. **A second geometry is a change
+to code that seven released ports build.** Two ways, and this is a decision,
+not a detail:
+
+* **(a) `#if TREK_40COL` inside the shared files.** Cheap today. The shared UI
+  already carries one axis of conditionals (`TREK_COLOUR_IS_EGA`); this makes
+  two, in a file that is 2,501 lines.
+* **(b) Move the shared UI out of `c128/src` into its own directory.**
+  `egavdc.h` ALREADY SAYS THIS IS OVERDUE -- *"If a third target lands here
+  this file has outgrown its name and the shared UI should move out of
+  c128/src. Until then one #ifdef is cheaper than the restructure."* There are
+  seven. A fourth-plus-a-second-geometry is the moment it stops being cheaper.
+
+(b) touches seven Makefiles, and `make ports` gates it in one command.
+
+### Order, each step ending somewhere testable
+
+1. **The C128 at 40 columns first.** VIC-IIe driver plus `layout40` on the
+   EXISTING port: same disk, KERNAL, SID, bank-1 far memory, overlays and VICE
+   rig, so the layout is the only variable and there are no new seams. **It
+   produces the C64's video driver** -- VIC-IIe writes `$0400`/`$D800` exactly
+   as VIC-II does. Ends with a picture in `x128`.
+2. **Settle the paged-display question against that picture**, not against
+   arithmetic -- see the three options below.
+3. **C64 skeleton**: `trek64.ld`, Makefile, `verify`, a smoke build that draws
+   the console using step 1's driver.
+4. **Seams**: farmem, storage, input, overlay -- each with a C128 counterpart.
+5. **Sound**: drop `sid.c` in. If it does NOT work first time that is a
+   finding, not a task.
+6. **The briefing**: a 40-column `gen_strings.py` variant, ~21 pages from 12.
+7. **Overlay split**: RE-DERIVE from the call graph. Do not copy the C128's.
+8. **Play it.** Every other port's real faults came from that
+   ([[jamie-plays-and-instruments-miss]]).
+
+### The display decision (step 2), and it is a taste call
+
+**It cannot all fit, and that is arithmetic**: 80x25 is 2,000 cells, a C64
+screen is 1,000, and the seven non-chart non-message panels alone span cols
+0..40 x 25 rows = **1,025**. Something pages.
+
+**But it need not page the way the ancestors did.** SST2K scrolled text because
+it was a teletype game. Here **the right half of the console is ALREADY exactly
+40x25** -- CHART at cols 41..79 rows 0..10, MSG at cols 40..79 rows 11..24 --
+so the 80-column console is two 40-column screens side by side, and the real
+console can be shown a half at a time with the same geometry, borders and
+colours. The left half needs the one-column tightening; the right needs
+nothing. **`MSG_W` is 40 and `MSG_WIDTH` is 36: the message region is already a
+40-column design and reflows not at all.**
+
+**The actual problem is that COMMAND is on the left and the messages are on the
+right** -- you would type an order on one page and read its result on the
+other, which breaks the loop the game is built around. Three ways:
+
+1. **Auto-flip** to the message page when an order resolves; any key returns.
+   Zero layout work.
+2. **Trade the BADGE for a message strip.** It is 20x8 at rows 17..24 and the
+   least information-dense panel -- a crest and the ship name. A message box is
+   `MSG_BOX_H` = 3 rows, so **two boxes fit exactly where the badge is**,
+   borders included. Scanner, status, command line and what-just-happened stay
+   visible together; all four messages live on page B. **RECOMMENDED.**
+3. **Regroup** into tactical and strategic pages rather than cutting down the
+   middle. Most faithful per turn, but a genuinely new layout table rather than
+   an offset -- more work, more risk.
+
+**JAMIE DECIDES THIS ONE.** The nine-panel console is the emotional centre of
+this game for him ([[jamie-egatrek-connection]]), and this is the point where
+"vary presentation freely, never vary logic" costs the most.
+
+### Unknowns that could bite
+
+* **THE OVERLAY SPLIT MAY NOT TRANSFER.** The C128's eleven windows were
+  derived from ITS call graph; a 40-column `ui.c` has a different one. Budget
+  for re-deriving ([[c128-overlay-seam]]).
+* **`$A000-$BFFF` as plain RAM assumes BASIC's ROM stays banked out**, and the
+  KERNAL disk routines have not been checked for whether they care. Unverified.
+* **The program region is ~38K against the C128's 37.6K**, and the C128 needed
+  eleven overlays at that size. **No headroom should be assumed.**
+* **1 MHz.** A 40-column C128 build also drops to 1 MHz, so step 1 measures
+  this before the C64 exists.
