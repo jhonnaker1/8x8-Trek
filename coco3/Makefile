@@ -152,7 +152,7 @@ build/OVLDEMO.BIN: src/ovldemo.c tools/ovl.link
 	$(LWLINK) --format=raw --script=tools/ovl.link -o $@ build/ovldemo.o
 	@ls -l $@
 
-.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck sdccheck verify check-all release ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
+.PHONY: vidtest vidcheck keytest keycheck keymatrix screenshot writetest writecheck sdccheck speedtest speedcheck verify check-all release ovltest ovlcheck data boot bootchk disk ovlrun all game early ovl overlays font data music clean
 
 ovl: build/OVLDEMO.BIN
 
@@ -357,6 +357,33 @@ $(PERF_OUT): $(PERF_SRC) src/font6x8.h Makefile
 	@mkdir -p build
 	$(CMOC) $(CFLAGS) -o $@ $(PERF_SRC)
 	@ls -l $@
+
+# ITEM 55 ON REAL HARDWARE, WITHOUT THE SUPERSPRITE. The double-speed
+# question is a DISK question, and the disk is the half of the machine that
+# exists here -- so this probe touches no video at all and runs on a bare
+# CoCo 3 with any controller, a CoCo SDC included. It keeps the ROM mapped,
+# which is why it is 1,441 bytes and can RTS back to BASIC.
+# --org=7000 so `CLEAR 25,&H6FFF` (the same line the game already asks for)
+# leaves room for it, and the report sits at $7F00 above the ceiling.
+SPEED_OUT = build/SPEEDTST.BIN
+SPEED_DSK = build/speedtst.dsk
+
+speedtest: $(SPEED_DSK)
+
+$(SPEED_OUT): src/speedtest.c Makefile
+	@mkdir -p build
+	$(CMOC) --coco --org=7000 -O2 -fomit-frame-pointer --intdir=build \
+	    -Isrc -I../core -o $@ $<
+	@ls -l $@
+
+$(SPEED_DSK): $(SPEED_OUT) tools/mkdisk.py
+	@python3 tools/mkdisk.py $@ $(SPEED_OUT)
+
+# CHECKS THE PROBE, NOT THE CLAIM. MAME cannot answer item 55 -- the hazard is
+# a real WD1773's timing and an emulator is the forgiving case -- but handing
+# over a program that has never been executed would ask two questions at once.
+speedcheck: $(SPEED_DSK)
+	@python3 tools/speedcheck.py
 
 # WRITING. plat_write_all was a stub for the life of the port, so SAVE could
 # not work. writecheck has the machine write a file and then reads the .dsk

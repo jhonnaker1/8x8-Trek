@@ -1839,6 +1839,24 @@ are the CoCo 3**, which is started and not released:
       the actual question: set `$FFD9`, read and verify a few hundred sectors,
       drop to `$FFD8`, leave a report somewhere `PEEK` can reach, and return to
       BASIC. That is the cheap experiment if this item is ever worth closing.
+      **BUILT 2026-09-14: `src/speedtest.c`, `make speedtest`, and the disk is
+      `build/speedtst.dsk`.** It reads 306 sectors TWICE at 0.89 MHz and then
+      the same 306 twice at 1.78, and reports four numbers at `$7F00`. The
+      slow pass is the CONTROL -- a tired drive shows in both columns and says
+      nothing about the clock, so what matters is the DIFFERENCE. Every sector
+      is read twice and compared rather than trusted to `DCSTA`, because a
+      controller that reports success and returns a wrong byte is exactly what
+      double speed is suspected of and a status byte cannot see it.
+      It keeps the ROM MAPPED, which is why it is 1,441 bytes: Disk BASIC's
+      own NMI/IRQ/FIRQ handlers are still valid, `dskcon_init` works as
+      designed, and it RTSes back to BASIC. None of coco3storage.c's vector
+      work is needed or present.
+      **`make speedcheck` runs it under MAME to check the PROBE, not the
+      claim** -- MAME is the forgiving case and cannot answer this item, but
+      handing over a program that had never been executed would ask two
+      questions at once. It completes both passes, reports 0/0/0/0, and ends
+      at `PC=$A7D5`, which is BASIC's keyboard poll. Instructions for a person
+      are in `coco3/README-speedtest.txt`.
       **AND THERE IS NOW A SECOND ROUTE, WHICH DOES NOT NEED A CARD AT ALL:**
       the GIME's own 320x200x16 is 40x25, so **item 57's 40-column work makes
       this item reachable** rather than closing it. The ordering there is
