@@ -1933,6 +1933,19 @@ are the CoCo 3**, which is started and not released:
       excluded by WIDTH -- they fail on colour (attribute clash, per-group
       colour) instead. **Width was never the thing doing the work.**
 
+      **THE ANCESTORS ARE EVIDENCE HERE, read 2026-09-13** -- and they favour
+      the badge trade. SST2K ships TWO interfaces and its CURSES one
+      (`historic/c-version/src/io.c`) is a persistent 80-column panel layout:
+      scanner top left, status through the middle, **long range scan at column
+      64**, messages along the bottom, prompt at the foot. **That is this
+      console.** So "SST-shaped" conflated the TTY ancestor with the CURSES
+      one, and nothing on a narrow screen has to become a teletype. The
+      argument it produces: pressing a key for the chart is `LRSCAN` as a
+      command, which is the tty ancestor; the badge trade restores the
+      simultaneous per-turn loop BOTH the curses ancestor and Anderson have
+      and leaves only the chart behind a key. Full reading under "The
+      ancestors had TWO interfaces" at the end of this file.
+
       **SCOPED 2026-09-13** -- "SCOPE: a 40-column C64 port" at the end of this
       file. Headline: the C128 port is 7,466 lines of `src/` and **5,383 are
       the shared UI seven ports already build**, so the platform layer is about
@@ -11214,6 +11227,13 @@ other, which breaks the loop the game is built around. Three ways:
 3. **Regroup** into tactical and strategic pages rather than cutting down the
    middle. Most faithful per turn, but a genuinely new layout table rather than
    an offset -- more work, more risk.
+
+**AND THE ANCESTORS FAVOUR (2)** -- see "The ancestors had TWO interfaces"
+below. SST2K's curses layout IS this console, so persistent panels are the
+ancestry and scrolling text is the other branch; but a keypress for the chart
+is `LRSCAN` as a command, which is that other branch. (2) is the option that
+keeps the per-turn loop simultaneous, which is the property both ancestors'
+screen-oriented interface and Anderson's console actually have.
 
 **JAMIE DECIDES THIS ONE.** The nine-panel console is the emotional centre of
 this game for him ([[jamie-egatrek-connection]]), and this is the point where
