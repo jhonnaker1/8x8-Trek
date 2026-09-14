@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and four times on 2026-09-14 (3 open of 61 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and five times on 2026-09-14 (2 open of 61 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2104,7 +2104,22 @@ are the CoCo 3**, which is started and not released:
       release. The cheap way to close it: bisect the working-tree states
       inside that session with `git worktree`, or accept it and record the new
       hash as the baseline DELIBERATELY rather than by drift.
-  61. **FOUR 40-COLUMN SCREENS ARE NOT DONE, AND THE BRIEFING IS 80 COLUMNS.**
+  61. ~~**FOUR 40-COLUMN SCREENS ARE NOT DONE, AND THE BRIEFING IS 80
+      COLUMNS.**~~ **CLOSED 2026-09-14.** Two of the four findings were the
+      bench rather than the port (below); `ui_info_panel` was real and is
+      centred; `ui_planet_list` needed nothing. **THE BRIEFING IS GENERATED**:
+      `tools/reflow_briefing.py` turns the 80-column `briefing.txt` into
+      `briefing40.txt` -- 12 pages become 24, every line inside 38 columns and
+      every page inside 22 rows INCLUDING its footer, headers carried across
+      splits, the specifications table kept a table, and "Page N of M"
+      renumbered. `verify` checks BOTH now; a generated file nobody checks is
+      a generated file that drifts.
+      **THE COMMAND CONSOLE PAGE IS REPLACED, NOT REFLOWED**, and Jamie asked
+      for the reason: its 80-column text says "Nine panels, all live, all the
+      time. You will not need to ask for any of them", which is FALSE at forty
+      columns. `briefing40-console.txt` says the console comes in two halves
+      and **PRESS C FOR THE OTHER HALF**. Reflowing a false sentence only
+      makes it narrower.
       Raised 2026-09-14. The C64 port's shared-UI work is most of the way
       through -- dialogs, console, title, setup, hall of fame, evaluation,
       memo and play-again all fit 40 columns -- and what is left was living in

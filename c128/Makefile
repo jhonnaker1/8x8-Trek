@@ -389,14 +389,14 @@ $(DBG40_OUT): $(DBG40_ELF)
 # on 2026-09-13: the first 40-column disk carried 80-column overlays under a
 # 40-column program, and the stamp check in overlay.c said so on screen.
 d64-40-debug: $(DBG40_D64)
-$(DBG40_D64): $(DBG40_OUT) build/strings.dat build/music.dat Makefile
+$(DBG40_D64): $(DBG40_OUT) build/strings.dat build/music.dat src/briefing40.txt Makefile
 	$(call OVL_IMAGES,$(DBG40_ELF))
 	rm -f $(DBG40_D64)
 	c1541 -format "ega trek 40dbg,01" d64 $(DBG40_D64) >/dev/null
 	c1541 -attach $(DBG40_D64) -write $(DBG40_OUT) trek128 >/dev/null
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
 	c1541 -attach $(DBG40_D64) -write build/trek.scr trek.scr,s >/dev/null
-	c1541 -attach $(DBG40_D64) -write src/briefing.txt brief.txt,s >/dev/null
+	c1541 -attach $(DBG40_D64) -write src/briefing40.txt brief.txt,s >/dev/null
 	@python3 -c "d = open('build/strings.dat','rb').read(); \
 	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
 	c1541 -attach $(DBG40_D64) -write build/strings.pdat strings.dat >/dev/null
@@ -425,6 +425,13 @@ SCR40_SRC = src/screens40.c src/vdcram.c src/vic.c src/layout40.c src/ui.c \
             src/overlay.c src/strpool.c \
             ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
 
+# The 40-column briefing is GENERATED from the 80-column one -- one source of
+# prose, reflowed and re-paginated, with THE COMMAND CONSOLE page replaced
+# because its 80-column text ("all live, all the time... you will not need to
+# ask") is false here. See tools/reflow_briefing.py.
+src/briefing40.txt: src/briefing.txt src/briefing40-console.txt ../tools/reflow_briefing.py
+	@cd .. && python3 tools/reflow_briefing.py
+
 screens40: build/screens40.d64
 
 build/screens40.prg: $(SCR40_SRC) $(HDR) src/vic.h src/layout40.h Makefile
@@ -435,13 +442,13 @@ build/screens40.prg: $(SCR40_SRC) $(HDR) src/vic.h src/layout40.h Makefile
 # Formatted from empty every time: `c1541 -write` over an existing name
 # answers ERR = 63, FILE EXISTS and leaves the OLD file, which is how a
 # deliberately broken build once reported a pass on the C64 probe.
-build/screens40.d64: build/screens40.prg build/strings.dat build/music.dat
+build/screens40.d64: build/screens40.prg build/strings.dat build/music.dat src/briefing40.txt
 	@rm -f $@
 	@c1541 -format "screens40,01" d64 $@ >/dev/null
 	@c1541 -attach $@ -write build/screens40.prg screens40 >/dev/null
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
 	@c1541 -attach $@ -write build/trek.scr trek.scr,s >/dev/null
-	@c1541 -attach $@ -write src/briefing.txt brief.txt,s >/dev/null
+	@c1541 -attach $@ -write src/briefing40.txt brief.txt,s >/dev/null
 	@python3 -c "d = open('build/strings.dat','rb').read(); \
 	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
 	@c1541 -attach $@ -write build/strings.pdat strings.dat >/dev/null

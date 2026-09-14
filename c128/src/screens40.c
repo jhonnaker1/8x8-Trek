@@ -93,6 +93,7 @@ int main(void)
                                 "UNDER EXTREME LOW ENERGY CONDITIONS.");
                  (void)kb_waitkey();                          break;
         case 12: ui_setup(&s);                                break;
+        case 13: ui_briefing();                               break;
         default: scr_clear();                                 break;
         }
     }

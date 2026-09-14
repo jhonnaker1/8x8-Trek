@@ -27,7 +27,7 @@ NM  = os.path.expanduser("~/llvm-mos/bin/llvm-nm")
 SCREENS = ["console (tactical)", "console (chart page)", "hall of fame",
            "detailed evaluation", "top secret memo", "state of repair",
            "previous messages", "info panel", "planet list", "play again",
-           "title screen", "dialog (wrapping)", "setup"]
+           "title screen", "dialog (wrapping)", "setup", "briefing"]
 
 
 def symbol(name):

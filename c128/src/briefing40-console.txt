@@ -1,0 +1,29 @@
+       U.S.S. LEXINGTON  RCB-92
+         THE COMMAND CONSOLE
+
+  Nine panels, and forty columns to
+  put them on. So the console comes in
+  two halves and you choose which one
+  you are looking at.
+
+  The half you fly from:
+
+   SHORT RANGE SCAN  the sectors of
+     this quadrant
+   STATUS  stardate, energy, impulse,
+     shields, torpedoes, warp speed,
+     and Mongols left in the sector
+   LASERS  efficiency and heat
+   COMMAND  where you are, and the
+     prompt
+   MAIN VIEWER  the nearest enemy, or
+     the planet you are orbiting
+
+  Messages arrive below the command
+  line, newest at the bottom.
+
+  PRESS C FOR THE OTHER HALF: the
+  chart of the known galaxy, SYSTEMS
+  STATUS, and the ship's badge. Any
+  key brings you back, and C costs you
+  no time at all.
