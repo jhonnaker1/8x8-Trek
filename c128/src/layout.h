@@ -70,7 +70,15 @@ extern const Panel panels[PANEL_COUNT];
    stardate stamp in the right end of its top border.
 
    Columns 40..79 of rows 11..24, which is where the original puts it. */
+#ifdef TREK_40COL
+/* THE 40-COLUMN CONSOLE IS THE SAME CONSOLE, SEEN A HALF AT A TIME, and the
+   message region is the half that needs no thought: MSG_W is ALREADY 40 and
+   MSG_WIDTH already 36, so the game's narration reflows not at all. Only x
+   moves. See layout40.h and NOTES.md item 57. */
+#define MSG_X    0
+#else
 #define MSG_X   40
+#endif
 #define MSG_Y   11
 #define MSG_W   40
 #define MSG_H   14
@@ -80,9 +88,17 @@ extern const Panel panels[PANEL_COUNT];
    which is exactly the bug of 2026-08-29, when msgv_draw() wrote the log's
    department and text with no bound at all and a long line crossed the right
    border onto the console behind. */
+#ifdef TREK_40COL
+/* 41 WIDE DOES NOT FIT A 40-COLUMN SCREEN, which is the sort of thing that
+   draws one column off the edge rather than failing. Full width at x=0; the
+   line count is unchanged, so rows 6..20 still fit inside 25. */
+#define MSGV_X       0
+#define MSGV_W      40
+#else
 #define MSGV_X      25
-#define MSGV_Y       6
 #define MSGV_W      41
+#endif
+#define MSGV_Y       6
 #define MSGV_LINES  11
 #define MSGV_H      (MSGV_LINES + 4)   /* border, title, lines, footer, border */
 
@@ -104,9 +120,18 @@ void draw_console(void);
    dialog: twelve systems plus three header lines do not fit the dialog's
    thirteen, and the original gives the report a panel of its own. Here rather
    than in ui.c so the tests can address it. */
+#ifdef TREK_40COL
+/* 44 wide does not fit either. Full width at x=0 costs FOUR COLUMNS of the
+   report's interior -- it lists twelve systems by their full names, so this
+   is the one dialog where 40 columns actually takes something away and the
+   first place to look if a name is clipped. */
+#define REP_X     0
+#define REP_W    40
+#else
 #define REP_X    18
-#define REP_Y     3
 #define REP_W    44
+#endif
+#define REP_Y     3
 #define REP_H    19
 
 #endif

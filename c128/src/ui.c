@@ -2,6 +2,9 @@
 
 #include "vdc.h"
 #include "layout.h"
+#ifdef TREK_40COL
+#include "layout40.h"      /* layout40_page, PAGE_* -- 40-column builds only */
+#endif
 #include "ui.h"
 #include "../../core/strpool.h"
 #include "../../core/overlay.h"
@@ -1379,6 +1382,35 @@ void ui_dialog_close(void) {
     ui_draw_all();
 }
 
+#ifdef TREK_40COL
+/* THE ONLY PAGING IN THE SHARED UI, AND IT IS ONE FUNCTION.
+ *
+ * At 40 columns the console is the same console seen a half at a time
+ * (NOTES.md item 57), so a redraw must draw ONE page -- the panels of the
+ * other half are at coordinates this page also uses, and drawing both would
+ * put the long range chart on top of the scanner.
+ *
+ * IT IS HERE AND NOWHERE ELSE BECAUSE ui.c NEEDS NOTHING ELSE. The shared UI
+ * reads its geometry from panels[] and carries no width constant of its own,
+ * so the 40-column build swaps which layout .c is linked and every other one
+ * of these 2,501 lines is untouched. The scope expected a second axis of #if
+ * through this file; measuring found it needs exactly this. */
+void ui_draw_all(void) {
+    draw_console();
+    if (layout40_page == PAGE_TACTICAL) {
+        ui_draw_scan();
+        ui_draw_status();
+        ui_draw_systems();
+        ui_draw_lasers();
+        ui_draw_badge();
+        ui_draw_viewer();
+        ui_draw_position();
+    } else {
+        ui_draw_chart();
+        msg_redraw();
+    }
+}
+#else
 void ui_draw_all(void) {
     draw_console();
     ui_draw_scan();
@@ -1391,6 +1423,7 @@ void ui_draw_all(void) {
     ui_draw_position();
     msg_redraw();
 }
+#endif
 
 /* ------------------------------------------------ state of repair report */
 

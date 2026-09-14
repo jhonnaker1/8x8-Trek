@@ -41,9 +41,9 @@ def die(msg):
 
 def parse():
     src = open(SRC).read()
-    m = re.search(r"const Panel panels40\[PANEL_COUNT\] = \{(.*?)\n\};", src, re.S)
+    m = re.search(r"const Panel panels\[PANEL_COUNT\] = \{(.*?)\n\};", src, re.S)
     if not m:
-        die("cannot find panels40 in layout40.c")
+        die("cannot find the panel table in layout40.c")
     body = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
     rects = []
     for grp in re.findall(r"\{([^}]*)\}", body):

@@ -1,40 +1,11 @@
 #include "vdc.h"
 
-#define VDC_CTRL (*(volatile unsigned char *)0xD600)
-#define VDC_DATA (*(volatile unsigned char *)0xD601)
-#define VIC_RASTER (*(unsigned char *)0xD012)
+/* The two registers this driver still touches directly. The VDC's own
+   control/data ports and the RAM accessors moved to vdcram.c, which both
+   C128 screen drivers link -- see that file for why the scratch seam is
+   not part of the 80-column picture. */
+#define VIC_RASTER   (*(unsigned char *)0xD012)
 #define C128_CLKRATE (*(unsigned char *)0xD030)
-
-static void wait_ready(void) {
-    while (!(VDC_CTRL & 0x80)) {}
-}
-
-unsigned char vdc_reg_read(unsigned char reg) {
-    wait_ready();
-    VDC_CTRL = reg;
-    wait_ready();
-    return VDC_DATA;
-}
-
-void vdc_reg_write(unsigned char reg, unsigned char value) {
-    wait_ready();
-    VDC_CTRL = reg;
-    wait_ready();
-    VDC_DATA = value;
-}
-
-void vdc_set_address(unsigned int addr) {
-    vdc_reg_write(18, (unsigned char)(addr >> 8));
-    vdc_reg_write(19, (unsigned char)(addr & 0xFF));
-}
-
-void vdc_data_write(unsigned char value) {
-    vdc_reg_write(31, value);
-}
-
-unsigned char vdc_data_read(void) {
-    return vdc_reg_read(31);
-}
 
 /* The VIC-IIe keeps rastering at the normal rate even while the VDC drives
    the visible display, so its raster register is a free frame-rate timer.

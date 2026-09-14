@@ -31,7 +31,7 @@ CFLAGS = -Oz -I src -I ../core -Wall -Werror -DTREK_OVERLAYS -T trek128.ld
 # shows the bytes never arrived. `make verify` now checks for the routine.
 LDLIBS = -lcopy-data
 
-SRC = src/main.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
+SRC = src/main.c src/vdcram.c src/vdc.c src/layout.c src/ui.c src/input.c src/sid.c \
       src/music_data.c src/storage.c src/farmem.c src/overlay.c \
       src/strpool.c \
       ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
@@ -334,6 +334,32 @@ layout40check:
 # build/c40-chart.png.
 shot40: build/console40.prg
 	@python3 tools/shot40.py
+
+# THE 40-COLUMN GAME. The same sources as the 80-column build with two files
+# swapped -- vdc.c -> vic.c and layout.c -> layout40.c -- and -DTREK_40COL,
+# which switches the MSG/MSGV/REP geometry in layout.h and the one paging site
+# in ui.c. NOTHING ELSE in the 2,501-line shared UI changes.
+SRC40 = src/main.c src/vdcram.c src/vic.c src/layout40.c src/ui.c src/input.c \
+        src/sid.c src/music_data.c src/storage.c src/farmem.c src/overlay.c \
+        src/strpool.c \
+        ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
+OUT40 = build/trek128-40.prg
+
+game40: $(OUT40)
+
+build/trek128-40.elf: $(SRC40) $(HDR) src/vic.h src/egavic.h src/layout40.h trek128.ld Makefile
+	@mkdir -p build
+	$(MOSCC) $(CFLAGS) -DTREK_40COL $(LDFLAGS) -Wl,-Map=build/trek128-40.map \
+	    -o $@ $(SRC40) $(LDLIBS)
+
+# Built exactly the way $(OUT) is, including the $1C01 load address in front
+# and the eleven overlay images pulled out of the same ELF.
+$(OUT40): build/trek128-40.elf
+	$(OBJCOPY) -O binary --remove-section=.ovl_* $< build/trek128-40.res
+	@python3 -c "d = open('build/trek128-40.res','rb').read(); \
+	    open('$(OUT40)','wb').write(bytes([0x01,0x1C]) + d)"
+	$(call OVL_IMAGES,build/trek128-40.elf)
+	@ls -l $@
 
 CON40_SRC = src/console40.c src/vic.c src/layout40.c
 

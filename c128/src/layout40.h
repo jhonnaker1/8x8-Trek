@@ -47,12 +47,18 @@
 #define MSG40_W   40
 #define MSG40_H   14
 
-extern const Panel panels40[PANEL_COUNT];
+/* THE TABLE IS NAMED `panels`, NOT `panels40`, AND THAT IS THE WHOLE TRICK.
+   layout.h already declares `extern const Panel panels[PANEL_COUNT]` and
+   `void draw_console(void)`; ui.c reads the table thirteen times and calls
+   draw_console once, and uses NO width constant of its own. So a 40-column
+   build swaps WHICH layout .c is linked and the 2,501-line shared UI is not
+   touched at all. The scope feared a second axis of #if through ui.c; the
+   measurement says the conditional belongs in layout.h, which is 112 lines. */
 extern const unsigned char panel40_page[PANEL_COUNT];
 
-/* Titles are passed in rather than fetched. The real build hands pooled
-   strings through S(); a test hands literals and needs no string pool, no far
-   memory and no disk. NULL, or a NULL entry, draws borders only. */
-void draw_console40(unsigned char page, const char *const *titles);
+/* Which half of the console is on screen. A plain variable rather than an
+   accessor: ui.c's paging test reads it once per redraw and the C64 will read
+   it in an inner loop eventually. */
+extern unsigned char layout40_page;
 
 #endif

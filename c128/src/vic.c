@@ -94,6 +94,7 @@ void wait_vsync(void) {
     while (VIC_RASTER == 0) {}
 }
 
+__attribute__((noinline))
 void scr_clear(void) {
     unsigned int i;
     for (i = 0; i < (unsigned int)VIC_COLS * VIC_ROWS; i++) {
@@ -108,13 +109,28 @@ void scr_clear(void) {
    cell. Here a cell is two stores to memory the CPU can address, so hline,
    vline and fill_rect have nothing to optimise and are written as loops over
    scr_put. Half the cells, direct writes, half the megahertz -- whether that
-   nets out faster than the VDC build is UNMEASURED. */
+   nets out faster than the VDC build is STILL UNMEASURED.
+   WHAT IS MEASURED IS THE SPACE, and it went the other way from the guess.
+   Inlined, this driver made the 40-column game 1,817 bytes BIGGER than the
+   80-column one and it overflowed the region by 358. Out of line it is 249
+   bytes SMALLER. The noinline note below has the bisect. */
+/* NOINLINE, AND IT IS WORTH 1.8K. MEASURED: with this driver the 40-column
+   game overflowed its region by 358 bytes, and the SAME build with the VDC
+   driver fit -- so every one of those bytes was vic.c. Not the driver file,
+   which is smaller than vdc.c: LTO inlines these into every call site, and a
+   VIC cell is two 16-bit INDEXED stores where a VDC cell is two writes to a
+   fixed port. The cost lands in the CALLERS, which is [[seam-costs-more-than-
+   driver]] for the second time on this project -- video once cost 4,636 bytes
+   for a 1,559-byte driver. Keeping them out of line trades a call per cell
+   for the space, and the 40-column build has no space to trade back. */
+__attribute__((noinline))
 void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char color) {
     unsigned int off = (unsigned int)y * VIC_COLS + x;
     VIC_SCREEN[off] = ch;
     VIC_COLRAM[off] = color & 0x0F;
 }
 
+__attribute__((noinline))
 void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char color) {
     unsigned int off = (unsigned int)y * VIC_COLS + x;
     const char *p;
@@ -124,6 +140,7 @@ void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char col
     }
 }
 
+__attribute__((noinline))
 void scr_hline(unsigned char x, unsigned char y, unsigned char w,
                unsigned char ch, unsigned char color) {
     unsigned int off = (unsigned int)y * VIC_COLS + x;
@@ -134,12 +151,14 @@ void scr_hline(unsigned char x, unsigned char y, unsigned char w,
     }
 }
 
+__attribute__((noinline))
 void scr_vline(unsigned char x, unsigned char y, unsigned char h,
                unsigned char ch, unsigned char color) {
     unsigned char i;
     for (i = 0; i < h; i++) scr_put(x, (unsigned char)(y + i), ch, color);
 }
 
+__attribute__((noinline))
 void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w, unsigned char h,
                    unsigned char ch, unsigned char color) {
     unsigned char row;
