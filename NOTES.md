@@ -10957,9 +10957,60 @@ Only the right half of the screen:
   40-column screen and consumes all of it.
 * **MESSAGE REGION** -- 40 wide by design (`MSG_W 40`).
 
-So both become full-screen paged views, which is exactly the SST-shaped
-presentation the founding note predicted. **One of the two already exists**:
-`msgv_draw` is a modal full-screen message reader, built for MSGS.
+So both become full-screen paged views, which is what the founding note
+predicted -- **but that prediction mis-split the ancestry, and the correction
+matters to the decision.** See "The ancestors had TWO interfaces" below.
+**One of the two paged views already exists**: `msgv_draw` is a modal
+full-screen message reader, built for MSGS.
+
+### THE ANCESTORS HAD TWO INTERFACES, AND ONE OF THEM IS THIS CONSOLE
+
+Read out of `reference/sst2k` on 2026-09-13 rather than recalled, because
+Jamie asked whether the two-page split is in the ancestors' spirit and the
+honest answer needed the oracle. **SST2K SHIPS BOTH A TTY INTERFACE AND A
+CURSES ONE**, switchable at runtime with its `CURSES` command. Stas Sergeev,
+in the project's own history: he wrote a screen-oriented interface for it
+based on the curses library.
+
+**That curses interface is a persistent, positioned, 80-column panel layout**,
+and its geometry is in `historic/c-version/src/io.c` (BSD; the package is a
+gitignored reference oracle). Derived from its window set-up:
+
+    short range scan   12 rows x 25 cols   at row 0,  col 0
+    report             11 rows             at row 1,  col 25
+    status             10 rows             at row 1,  col 39
+    LONG RANGE SCAN     5 rows             at row 0,  col 64
+    messages           rest of the screen  from row 12, full width
+    prompt              1 row              at the foot
+
+**Scanner top left, status through the middle, LONG RANGE SCAN ON THE RIGHT,
+messages filling the bottom, prompt at the foot.** That is EGA Trek's console.
+Anderson did not invent the arrangement -- he made it graphical, boxed and
+coloured. The lineage is visible in the column numbers: this port's CHART sits
+at cols 41..79 and the ancestor's lrscan at col 64; both put it top right, and
+both put the messages along the bottom.
+
+**SO "SST-SHAPED" WAS TWO THINGS CONFLATED.** Scrolling text reports are the
+TTY ancestor. Persistent panels are the CURSES ancestor, and that is the one
+this game descends from. The founding note treated the first as the fate of
+any narrow screen; it is not, and nothing here has to become a teletype.
+
+**WHERE THAT LEAVES THE TWO-PAGE SPLIT, honestly.** It is neither ancestor.
+The tty model rations INFORMATION AVAILABILITY -- you see only what you asked
+for and it scrolls away; the split rations SCREEN AREA, and everything stays
+alive in its own place and its own colour. That is the more faithful of the
+two. **But pressing a key to see the chart IS functionally `LRSCAN` as a
+command**, which is the tty ancestor wearing the curses ancestor's clothes,
+and the ancestors never answered a narrow screen by halving a console -- they
+shipped a second interface entirely.
+
+**THIS IS THE STRONGEST ARGUMENT FOR THE BADGE TRADE** (option 2 in item 57).
+It makes the per-turn loop -- scanner, status, command, what just happened --
+simultaneous again, which is the property BOTH the curses ancestor and
+Anderson actually have, and leaves only the genuinely consult-occasionally
+chart behind a keypress. The ancestor gave its long range scan a five-row
+window it barely updated; treating the chart as the one thing you ask for is
+the line with the most evidence behind it.
 
 ### Costs, measured rather than estimated
 
