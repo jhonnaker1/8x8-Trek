@@ -1877,6 +1877,55 @@ are the CoCo 3**, which is started and not released:
       SuperSprite**, which is the only route to item 55 on real hardware, and a
       **C64** port reuses the SID driver, the toolchain, the keyboard model and
       the disk seam verbatim. Nothing in either has been compiled or drawn.
+
+      **WHICH MACHINE FIRST, ranked 2026-09-13 over the sub-80-column half of
+      commodore-uno's own lineup** -- that project shipped ~20 machines, so it
+      is the available menu rather than a guess.
+
+      **THE ANSWER IS THE C64, and it is not close.** Every seam exists except
+      one, and that one gets EASIER: VIC-II colour RAM is one foreground per
+      cell from sixteen, which is exactly what `scr_put` carries; SID is at
+      `$D400` byte-identical, so `c128/src/sid.c` ports verbatim;
+      `mos-platform/c64` is installed and is the C128's own compiler; GETIN is
+      PETSCII like the C128, not the X16's ASCII; storage is the C128 seam
+      minus banking; overlays are already shared. Only far memory is new, and
+      `$A000-$BFFF` as plain RAM beats FETCH/STASH.
+
+      **DO THE C128 AT 40 COLUMNS FIRST -- IT PRODUCES THE C64'S VIDEO DRIVER.**
+      It is not a new machine so it is not the answer, but it is the right
+      first move: same disk, same KERNAL, same SID, same bank-1 far memory,
+      same overlays, same VICE rig, so the ONLY new code is a ten-function
+      video driver plus the 40-column layout -- **the layout variable isolated
+      with zero new seams.** VIC-IIe writes `$0400`/`$D800` exactly as VIC-II
+      does, so that driver IS the C64's.
+      **IT COSTS THE 2 MHz, and that is measured, not assumed**: `vdc_init()`
+      sets `$D030` bit 0 precisely BECAUSE nothing ever displays the VIC-IIe --
+      "the VIC-IIe's own picture becomes unwatchable at 2x -- it cannot fetch
+      coherently" (`c128/src/vdc.c`). Any 40-column C128 build runs at 1 MHz,
+      half what the port does today -- which makes it an honest preview of C64
+      timing rather than a penalty.
+
+      **Then a gap, and the reasons differ:**
+      * **MEGA65 in C64 mode** -- free once the C64 exists; uno shipped that
+        same pairing.
+      * **Plus/4** -- 40x25 with 121 per-cell colours, so it LOOKS close.
+        **There is no `mos-platform/plus4`**, and it has TED rather than SID:
+        a new toolchain AND a new sound driver. **CBM-II 510** has no platform
+        either. The installed list is c128, c64, cx16, mega65, pet, vic20 and
+        the atari8 family; nothing else here is served.
+      * **Stock Atari 800XL** fails on **COLOUR**, ANTIC's text modes, not on
+        width. That is what VBXE was for, and it is the cleanest illustration
+        of why the two axes must not be bundled.
+      * **PET 4032 and Apple IIe 40-column** are monochrome, and colour carries
+        game information here.
+      * **VIC-20 at 22x23** is genuinely out.
+
+      **32-COLUMN MACHINES ARE CLOSER THAN THE 80-COLUMN RULE SUGGESTED.** The
+      binding constraint is the LONG RANGE CHART: eight quadrants of three
+      digits at four-column pitch needs ~34 columns. At three-column pitch it
+      is ~27, which **fits 32**. So the TI-99/4A and the ZX Spectrum are not
+      excluded by WIDTH -- they fail on colour (attribute clash, per-group
+      colour) instead. **Width was never the thing doing the work.**
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
@@ -10917,6 +10966,13 @@ overlay split should transfer rather than be redesigned -- and a 40-column
 reached through an address register and a data register with status polling;
 the C64's screen is `sta $0400,x`. Half the cells, direct writes, half the
 megahertz. **Unmeasured, and worth measuring before anyone repeats it.**
+
+**AND THE CLOCK HALVES FOR A 40-COLUMN C128 TOO**, which makes that comparison
+cleaner than it first looks. `vdc_init()` sets `$D030` bit 0 for 2 MHz only
+because the build never displays the VIC-IIe -- "the VIC-IIe's own picture
+becomes unwatchable at 2x -- it cannot fetch coherently". So a 40-column C128
+and a C64 both run at 1 MHz, and the only variable left between them is the
+screen access pattern. **Item 57 carries the machine ranking.**
 
 ### What is NOT known
 
