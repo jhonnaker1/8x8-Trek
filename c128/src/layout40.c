@@ -8,19 +8,29 @@
    20, losing one column of padding) and STATUS (x 20 -> 19) move, and only to
    close the single column the top band was over. See layout40.h. */
 const Panel panels[PANEL_COUNT] = {
-    {  0,  0, 20, 11, S_145 },      /* SCAN    -- one narrower than at 80 */
-    { 19,  0, 21, 11, S_146 },      /* STATUS  -- one left     */
-    {  0,  0, 40, 11, S_147 },      /* CHART   -- PAGE 2, full width      */
-    {  0, 11, 21,  4, S_127 },      /* LASERS  -- unchanged    */
-    {  0, 14, 21,  4, S_148 },      /* COMMAND -- unchanged    */
-    { 21, 11, 19,  7, S_149 },      /* VIEWER  -- unchanged    */
-    {  0, 17, 20,  8, PANEL_NO_TITLE },  /* BADGE   -- unchanged    */
-    { 20, 17, 20,  8, S_150 }       /* SYSTEMS -- unchanged    */
+    /* TACTICAL PAGE -- what a turn needs, all visible together.
+       SCAN is one narrower than at eighty columns (its column x+19 was blank
+       padding) and STATUS one left; the rest are their 80-column values. */
+    {  0,  0, 20, 11, S_145 },      /* SCAN     rows 0..10, cols 0..19  */
+    { 19,  0, 21, 11, S_146 },      /* STATUS   rows 0..10, cols 19..39 */
+    {  0,  0, 40, 11, S_147 },      /* CHART    -- PAGE 2, full width   */
+    {  0, 11, 21,  4, S_127 },      /* LASERS   rows 11..14             */
+    {  0, 14, 21,  4, S_148 },      /* COMMAND  rows 14..17             */
+    { 21, 11, 19,  7, S_149 },      /* VIEWER   rows 11..17, cols 21..39 */
+
+    /* CHART PAGE. The badge and SYSTEMS STATUS moved here so the message
+       region can have the tactical page's rows 18..24 at its full forty
+       columns -- see layout.h. Side by side under the chart, sharing column
+       19 the way SCAN and STATUS share it above. */
+    { 20, 11, 20,  8, PANEL_NO_TITLE },  /* BADGE   rows 11..18, cols 20..39 */
+    {  0, 11, 21,  8, S_150 }            /* SYSTEMS rows 11..18, cols 0..20  */
 };
 
 const unsigned char panel40_page[PANEL_COUNT] = {
-    PAGE_TACTICAL, PAGE_TACTICAL, PAGE_CHART, PAGE_TACTICAL,
-    PAGE_TACTICAL, PAGE_TACTICAL, PAGE_TACTICAL, PAGE_TACTICAL
+    PAGE_TACTICAL,  /* SCAN    */  PAGE_TACTICAL,  /* STATUS  */
+    PAGE_CHART,     /* CHART   */  PAGE_TACTICAL,  /* LASERS  */
+    PAGE_TACTICAL,  /* COMMAND */  PAGE_TACTICAL,  /* VIEWER  */
+    PAGE_CHART,     /* BADGE   */  PAGE_CHART      /* SYSTEMS */
 };
 
 #define BORDER_COL  EGA_TO_VIC(EGA_LTCYAN)
@@ -60,21 +70,19 @@ static void draw_panel40(const Panel *p) {
    command windows have no bottom border". */
 static const unsigned char junctions_tactical[] = {
     /* x   y   glyph */
-    19,  0, G_TEE_D,    /* SCAN and STATUS share column 19 ...      */
-    19, 10, G_TEE_U,    /* ... at both ends of the top band         */
-     0, 14, G_TEE_L,    /* LASERS bottom meets COMMAND top          */
-    20, 14, G_TEE_R,
-     0, 17, G_TEE_L,    /* COMMAND bottom meets the badge top       */
-    19, 17, G_TEE_D,    /* the badge's top right, mid COMMAND's line */
-    20, 17, G_CROSS,    /* COMMAND, the badge, SYSTEMS: four ways   */
-    21, 17, G_TEE_U,    /* VIEWER's bottom left                     */
-    39, 17, G_TEE_R     /* VIEWER meets SYSTEMS STATUS              */
+    19,  0, G_TEE_D,    /* SCAN and STATUS share column 19 ...       */
+    19, 10, G_TEE_U,    /* ... at both ends of the top band          */
+     0, 14, G_TEE_L,    /* LASERS bottom meets COMMAND top           */
+    20, 14, G_TEE_R
 };
 
-/* The chart page has NONE. The chart ends at row 10 and the message region
-   begins at row 11, so no border is shared -- and the message region has no
-   frame of its own at all, which is the original's design: a stack of
-   separately bordered boxes, one per message. */
+/* The chart page has its own, now that the badge and SYSTEMS STATUS live
+   there: they share column 20 under the chart. The chart itself shares no
+   border with anything -- it ends at row 10 and they begin at 11. */
+static const unsigned char junctions_chart[] = {
+    20, 11, G_TEE_D,
+    20, 18, G_TEE_U
+};
 
 void draw_console(void) {
     unsigned char i;
@@ -93,8 +101,13 @@ void draw_console(void) {
        runs its border straight through an earlier one's corner, so nothing
        written per panel survives. The 80-column file learned this the hard
        way and the comment is worth carrying. */
-    if (layout40_page == PAGE_TACTICAL)
+    if (layout40_page == PAGE_TACTICAL) {
         for (i = 0; i < sizeof junctions_tactical; i += 3)
             scr_put(junctions_tactical[i], junctions_tactical[i + 1],
                     junctions_tactical[i + 2], BORDER_COL);
+    } else {
+        for (i = 0; i < sizeof junctions_chart; i += 3)
+            scr_put(junctions_chart[i], junctions_chart[i + 1],
+                    junctions_chart[i + 2], BORDER_COL);
+    }
 }

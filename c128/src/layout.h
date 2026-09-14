@@ -71,17 +71,27 @@ extern const Panel panels[PANEL_COUNT];
 
    Columns 40..79 of rows 11..24, which is where the original puts it. */
 #ifdef TREK_40COL
-/* THE 40-COLUMN CONSOLE IS THE SAME CONSOLE, SEEN A HALF AT A TIME, and the
-   message region is the half that needs no thought: MSG_W is ALREADY 40 and
-   MSG_WIDTH already 36, so the game's narration reflows not at all. Only x
-   moves. See layout40.h and NOTES.md item 57. */
+/* THE MESSAGE REGION IS ON THE TACTICAL PAGE, BELOW THE COMMAND LINE, and
+   that is the fix for item 58 rather than a preference. A straight left/right
+   split put it at rows 11..24 across the whole width, where
+   msg_clear_region() erased five panels on every message -- and the first
+   message arrives before the player has typed anything.
+   ROWS 18..24, SEVEN ROWS, TWO SLOTS. A box is MSG_W wide and MSG_W is 40, so
+   it cannot share a band with anything; the tactical page gives up the BADGE
+   and SYSTEMS STATUS, which both move to the chart page. What it buys is the
+   loop the game is built around -- scanner, status, lasers, command line and
+   what just happened, all visible together.
+   The older two of the four live in the MSGS reviewer, which already exists.
+   MSG_WIDTH is 36, so the text itself reflows not at all. */
 #define MSG_X    0
+#define MSG_Y   18
+#define MSG_H    7
 #else
 #define MSG_X   40
-#endif
 #define MSG_Y   11
-#define MSG_W   40
 #define MSG_H   14
+#endif
+#define MSG_W   40
 
 /* PREVIOUS MESSAGES, the modal log viewer. Here rather than in ui.c because a
    test has to know where the box is to prove nothing is drawn outside it --

@@ -5,6 +5,20 @@
 #ifdef TREK_40COL
 #include "layout40.h"      /* layout40_page, PAGE_* -- 40-column builds only */
 #endif
+
+#ifdef TREK_40COL
+/* EVERY PANEL DRAW GATES ITSELF ON ITS OWN PAGE.
+ *
+ * Gating inside ui_draw_all() was not enough and the screen said so twice:
+ * SYSTEMS STATUS painted its twelve abbreviations over LASERS and the command
+ * line, and the long range chart painted over the scanner -- because BOTH have
+ * callers outside ui_draw_all (main.c redraws the chart every turn). A panel's
+ * table entry and its draw call have to agree about which page they are on,
+ * and the only way to guarantee that is to ask the table. */
+#define ON_PAGE(idx)  do { if (panel40_page[idx] != layout40_page) return; } while (0)
+#else
+#define ON_PAGE(idx)  do { } while (0)
+#endif
 #include "ui.h"
 #include "../../core/strpool.h"
 #include "../../core/overlay.h"
@@ -128,6 +142,7 @@ static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
 }
 
 void ui_draw_scan(void) {
+    ON_PAGE(P_SCAN);
     const Panel *p = &panels[P_SCAN];
     unsigned char row, col, glyph, color;
     unsigned char x0 = (unsigned char)(p->x + 4);
@@ -181,6 +196,7 @@ void ui_draw_scan(void) {
    dots. Quadrants holding enemies are highlighted red, bases orange -- both
    from core/ega.h. */
 void ui_draw_chart(void) {
+    ON_PAGE(P_CHART);
     const Panel *p = &panels[P_CHART];
     unsigned char row, col, q, color;
     unsigned char x, y;
@@ -269,6 +285,7 @@ void ui_draw_chart(void) {
 /* -------------------------------------------------------------- status */
 
 void ui_draw_status(void) {
+    ON_PAGE(P_STATUS);
     const Panel *p = &panels[P_STATUS];
     unsigned char lx = (unsigned char)(p->x + 2);
     unsigned char vx = (unsigned char)(p->x + 11);
@@ -326,6 +343,7 @@ void ui_draw_status(void) {
 #define BADGE_DISC_BODY   160    /* solid                                    */
 
 void ui_draw_badge(void) {
+    ON_PAGE(P_BADGE);
     const Panel *p = &panels[P_BADGE];
     unsigned char y = (unsigned char)(p->y + 1);
     unsigned char cx = (unsigned char)(p->x + p->w / 2);
@@ -468,6 +486,7 @@ static void draw_reserve(void) {
 }
 
 void ui_draw_systems(void) {
+    ON_PAGE(P_SYSTEMS);
     const Panel *p = &panels[P_SYSTEMS];
     unsigned char i, c, r, b, x, y, pct, fill, color;
 
@@ -581,6 +600,7 @@ static void gauge_row(unsigned char x, unsigned char y, const char *label,
 }
 
 void ui_draw_lasers(void) {
+    ON_PAGE(P_LASERS);
     const Panel *p = &panels[P_LASERS];
     unsigned char x = (unsigned char)(p->x + 1);
     unsigned char y = (unsigned char)(p->y + 1);
@@ -644,6 +664,7 @@ static unsigned char nearest_enemy(uint16_t *dist) {
 }
 
 void ui_draw_viewer(void) {
+    ON_PAGE(P_VIEWER);
     const Panel *p = &panels[P_VIEWER];
     unsigned char x = (unsigned char)(p->x + 1);
     unsigned char y = (unsigned char)(p->y + 1);
@@ -766,7 +787,16 @@ void ui_draw_viewer(void) {
    progress and grows as the turn reports itself. The original also wraps each
    message to three lines; ours holds one, which is what fourteen rows and a
    38-cell interior will take. */
+#ifdef TREK_40COL
+/* TWO, because the 40-column region is seven rows and a box is three. The
+   panel is a QUEUE AWAITING ACKNOWLEDGEMENT and MSGS is the permanent record,
+   so a shorter queue loses nothing but immediacy -- and the ancestor's own
+   screen-oriented interface gave its long range scan five rows it barely
+   updated. See NOTES.md item 58. */
+#define MSG_SLOTS   2
+#else
 #define MSG_SLOTS   4
+#endif
 #define MSG_BOX_H   3
 #define MSG_WIDTH  36
 
@@ -986,6 +1016,9 @@ void ui_clear_messages(void) {
     msg_count = 0;
     log_count = 0;
     log_head  = 0;
+#ifdef TREK_40COL
+    if (layout40_page != PAGE_TACTICAL) return;   /* see msg_redraw */
+#endif
     msg_clear_region();
 }
 
@@ -1038,6 +1071,14 @@ static void msg_box(unsigned char slot) {
 
 static void msg_redraw(void) {
     unsigned char i;
+#ifdef TREK_40COL
+    /* THE ONE CHOKE POINT. Every message that reaches the screen comes
+       through here, so gating it here is what stops the region painting over
+       the chart page -- the mirror of the bug it was drawing over the
+       instruments before. Messages keep being LOGGED either way; flipping
+       back redraws them. */
+    if (layout40_page != PAGE_TACTICAL) return;
+#endif
     msg_clear_region();
     for (i = 0; i < msg_count; i++) msg_box(i);
 }
@@ -1119,6 +1160,7 @@ void ui_ack(uint8_t n) {
    otherwise. Drawn separately from ui_read_command so that reading a command
    does not wipe it. */
 void ui_draw_position(void) {
+    ON_PAGE(P_COMMAND);
     const Panel *p = &panels[P_COMMAND];
     unsigned char x = (unsigned char)(p->x + 2);
     unsigned char y = (unsigned char)(p->y + 2);
@@ -1382,35 +1424,10 @@ void ui_dialog_close(void) {
     ui_draw_all();
 }
 
-#ifdef TREK_40COL
-/* THE ONLY PAGING IN THE SHARED UI, AND IT IS ONE FUNCTION.
- *
- * At 40 columns the console is the same console seen a half at a time
- * (NOTES.md item 57), so a redraw must draw ONE page -- the panels of the
- * other half are at coordinates this page also uses, and drawing both would
- * put the long range chart on top of the scanner.
- *
- * IT IS HERE AND NOWHERE ELSE BECAUSE ui.c NEEDS NOTHING ELSE. The shared UI
- * reads its geometry from panels[] and carries no width constant of its own,
- * so the 40-column build swaps which layout .c is linked and every other one
- * of these 2,501 lines is untouched. The scope expected a second axis of #if
- * through this file; measuring found it needs exactly this. */
-void ui_draw_all(void) {
-    draw_console();
-    if (layout40_page == PAGE_TACTICAL) {
-        ui_draw_scan();
-        ui_draw_status();
-        ui_draw_systems();
-        ui_draw_lasers();
-        ui_draw_badge();
-        ui_draw_viewer();
-        ui_draw_position();
-    } else {
-        ui_draw_chart();
-        msg_redraw();
-    }
-}
-#else
+/* ONE REDRAW, BOTH GEOMETRIES. Every ui_draw_* gates itself on its own
+   page (see ON_PAGE above), so this list does not have to know which panels
+   are where -- which is exactly the knowledge that drifted twice while the
+   40-column layout was being moved around. */
 void ui_draw_all(void) {
     draw_console();
     ui_draw_scan();
@@ -1423,7 +1440,6 @@ void ui_draw_all(void) {
     ui_draw_position();
     msg_redraw();
 }
-#endif
 
 /* ------------------------------------------------ state of repair report */
 

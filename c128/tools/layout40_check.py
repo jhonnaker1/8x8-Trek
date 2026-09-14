@@ -63,17 +63,28 @@ def parse():
     if len(rects) < 8:
         die("parsed %d panels -- the table shape changed" % len(rects))
 
-    m = re.search(r"static const unsigned char junctions_tactical\[\] = \{(.*?)\n\};",
-                  src, re.S)
-    if not m:
+    # ONE TABLE PER PAGE. This read only junctions_tactical until 2026-09-14,
+    # and the moment the badge and SYSTEMS STATUS moved to the chart page it
+    # reported "the chart page wants 2 junctions and the source declares none"
+    # -- against a source that declared them. A checker that knows about one
+    # of two tables is a checker that fails correct code, which is the kind of
+    # false red that teaches people to stop reading it.
+    have = {}
+    for page, name in ((0, "tactical"), (1, "chart")):
+        m = re.search(r"static const unsigned char junctions_%s\[\] = \{(.*?)\n\};"
+                      % name, src, re.S)
+        if not m:
+            have[page] = {}
+            continue
+        toks = [t.strip() for t in
+                re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S).replace("\n", " ").split(",")
+                if t.strip()]
+        if len(toks) % 3:
+            die("the %s junction table is not whole x,y,glyph triples" % name)
+        have[page] = {(int(toks[i]), int(toks[i + 1])): toks[i + 2]
+                      for i in range(0, len(toks), 3)}
+    if not have[0]:
         die("cannot find junctions_tactical in layout40.c")
-    toks = [t.strip() for t in
-            re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S).replace("\n", " ").split(",")
-            if t.strip()]
-    if len(toks) % 3:
-        die("the junction table is not whole x,y,glyph triples")
-    have = {(int(toks[i]), int(toks[i + 1])): toks[i + 2]
-            for i in range(0, len(toks), 3)}
     return rects, pages, have
 
 
@@ -123,22 +134,15 @@ def main():
                 if g not in PLAIN:
                     want[(x, y)] = g
 
-        if page == 0:
-            if want != have:
-                for k in sorted(set(want) | set(have)):
-                    if want.get(k) != have.get(k):
-                        print("  %s at %s: geometry says %s, table says %s"
-                              % (name, k, want.get(k, "nothing"),
-                                 have.get(k, "nothing")))
-                die("the %s junction table disagrees with the geometry" % name)
-            print("  %s page: %d junctions, all recomputed from the geometry"
-                  % (name, len(have)))
-        else:
-            if want:
-                die("the %s page wants %d junction(s) and the source declares "
-                    "none" % (name, len(want)))
-            print("  %s page: no shared borders, so no junctions -- correct, "
-                  "the chart ends at row 10 and the messages begin at 11" % name)
+        got = have[page]
+        if want != got:
+            for k in sorted(set(want) | set(got)):
+                if want.get(k) != got.get(k):
+                    print("  %s at %s: geometry says %s, table says %s"
+                          % (name, k, want.get(k, "nothing"), got.get(k, "nothing")))
+            die("the %s junction table disagrees with the geometry" % name)
+        print("  %-8s page: %d junction(s), recomputed from the geometry"
+              % (name, len(got)))
 
     print("layout40_check: the 40-column geometry is consistent")
     return 0

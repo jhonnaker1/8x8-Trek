@@ -4,6 +4,9 @@
 #include "vdc.h"
 #include "egavdc.h"
 #include "layout.h"
+#ifdef TREK_40COL
+#include "layout40.h"   /* layout40_page, PAGE_* -- 40-column builds only */
+#endif
 #include "ui.h"
 #include "../../core/strpool.h"
 #include "../../core/overlay.h"
@@ -1273,7 +1276,22 @@ OVL_CODE("cmds") static void do_plasma_bolt(void) {
    chart is "displayed at all times unless overridden", so redrawing the panel
    is exactly what the command is for, and it costs no turn. */
 static void do_chart(void) {
+#ifdef TREK_40COL
+    /* THE CHART IS A PAGE HERE, AND C IS ALREADY THE COMMAND FOR IT. At forty
+       columns the console is the same console seen a half at a time, and the
+       long range chart is on the other half -- so `C` flips, shows, and any
+       key flips back. That is not a concession: SST2K's own screen-oriented
+       interface reached its long range scan the same way, and `C` was already
+       the game's chart command and already MEASURED as costing no turn.
+       See NOTES.md item 58 and "The ancestors had TWO interfaces". */
+    layout40_page = PAGE_CHART;
+    ui_draw_all();
+    kb_waitkey();
+    layout40_page = PAGE_TACTICAL;
+    ui_draw_all();
+#else
     ui_draw_chart();
+#endif
 }
 
 /* HAIL. The empty COMMUNICATIONS box the 2026-08-23 session saw was the
