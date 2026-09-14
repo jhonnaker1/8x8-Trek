@@ -114,7 +114,7 @@ define OVL_IMAGES
 	done
 endef
 
-.PHONY: all run rund d64 monitor test verify music loadbench clean
+.PHONY: all run rund d64 vid40 vidcheck40 monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -304,6 +304,24 @@ $(DEBUG_D64): $(DEBUG_OUT)
 	    c1541 -attach $(DEBUG_D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \
 	done
 	@echo "debug disk: $(DEBUG_D64)"
+
+# THE 40-COLUMN WORK (NOTES.md item 57). A second video driver on the SAME
+# machine, so the layout is the only variable and there are no new seams --
+# and VIC-IIe writes $0400/$D800 exactly as a C64's VIC-II does, so this
+# driver is the C64 port's driver too.
+VID40_SRC = src/vidtest40.c src/vic.c
+vid40: build/vidtest40.prg
+
+build/vidtest40.prg: $(VID40_SRC) src/vic.h src/egavic.h src/layout.h src/vdc.h Makefile
+	@mkdir -p build
+	$(MOSCC) -Oz -I src -I ../core -Wall -Werror -o $@ $(VID40_SRC)
+	@ls -l $@
+
+# A PICTURE AND THE BYTES. vidtest40 draws for a person; this reads colour RAM
+# and the registers back, because the failure that cost a run here -- the
+# KERNAL editor IRQ undoing $D018 every frame -- looks exactly like a screen.
+vidcheck40: build/vidtest40.prg
+	@python3 tools/vidcheck40.py
 
 monitor: $(DEBUG_D64)
 	x128 -binarymonitor -binarymonitoraddress ip4://127.0.0.1:6502 \
