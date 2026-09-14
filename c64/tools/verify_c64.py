@@ -151,6 +151,21 @@ def main():
     check(far_limit <= 0xFFFA,
           "FAR_LIMIT $%04X leaves the six RAM vectors at $FFFA alone" % far_limit)
 
+    # 9. MUSIC.DAT IS THE COMPOSITION, NOT A COPY OF SOMETHING PRG-HEADERED.
+    #    This port shipped a 414-byte music.dat for its whole short life -- the
+    #    C128's music.pdat, two bytes of load address and all -- because a make
+    #    rule did not name its source and a stale file looked up to date. The
+    #    far store came back two bytes long and nothing else complained.
+    #    Compared by CONTENT against the C128's, which is where the composition
+    #    is generated; tools/make_music.py output is the only music that may
+    #    ship (see NOTES.md on why gen_music.py output never can).
+    ours = os.path.join(C64, "build", "music.dat")
+    theirs = os.path.join(os.path.dirname(C64), "c128", "build", "music.dat")
+    if os.path.exists(ours) and os.path.exists(theirs):
+        a, b = open(ours, "rb").read(), open(theirs, "rb").read()
+        check(a == b, "music.dat is byte-identical to the composition (%d bytes)"
+              % len(a))
+
     if fails:
         print("verify_c64: %d check(s) failed" % len(fails))
         return 1

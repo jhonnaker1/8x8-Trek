@@ -92,7 +92,7 @@ define MAKE_PRG
 	    open('$(2)','wb').write(bytes([0x01,0x08]) + d)"
 endef
 
-.PHONY: all game debug d64 d64-debug run rund verify probe logcheck clean
+.PHONY: all game debug d64 d64-debug run rund verify probe logcheck writecheck clean
 
 all: $(OUT)
 game: $(OUT)
@@ -129,10 +129,32 @@ build/strings.dat: ../c128/src/strings.txt src/strings.override.txt ../tools/gen
 	cd .. && python3 tools/gen_strings.py --override c64/src/strings.override.txt \
 	    c64/build/strings.dat
 
-build/music.dat: ../tools/make_music.py
+# THE SOURCE IS NAMED AS A PREREQUISITE, and it was not, and that shipped a
+# WRONG TUNE into every run of this port until 2026-09-14.
+#
+# The first version depended only on tools/make_music.py. build/music.dat
+# already existed -- left by this directory's ORIGINAL probe rule, which
+# copied ../c128/build/music.pdat, the PRG-headered copy -- and it was newer
+# than make_music.py, so make considered it up to date and never ran the rule.
+# The 414-byte pdat then got a SECOND two-byte header on the way to the disk,
+# and the far store came back 7,904 bytes instead of 7,902 with `00 40` sitting
+# where the first note should be.
+#
+# Nothing said so. The game loaded, mus_ok came up 1, and the only visible
+# trace was a far_len two bytes larger than arithmetic predicted -- which is
+# the sole reason it was caught. A STALE ARTEFACT IMITATES A PASS; this is the
+# same shape as the CoCo 3 test disk built from a binary five minutes older
+# than its fix, and as `c1541 -write` leaving the old file in place.
+#
+# cmp is the guard, not the comment.
+build/music.dat: ../c128/build/music.dat ../tools/make_music.py
 	@mkdir -p build
 	cd .. && python3 tools/make_music.py >/dev/null
 	cp ../c128/build/music.dat build/music.dat
+	@cmp ../c128/build/music.dat build/music.dat
+
+../c128/build/music.dat:
+	cd .. && python3 tools/make_music.py >/dev/null
 
 # $(1) = the .d64, $(2) = the program PRG, $(3) = the ELF the overlays come
 # from. THE IMAGES ARE CUT HERE, in the disk rule, and not left to the link
@@ -212,6 +234,23 @@ build/probe.d64: build/logprobe.prg build/music.dat
 	    open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"
 	@c1541 -attach $@ -write build/music.pdat music.dat >/dev/null
 	@echo "probe disk: $@"
+
+# THE WRITE PROBE. Two readers have to agree: the machine writes the file and
+# reads it back through its own plat_read_all, in ONE RUN, without stopping --
+# because the host .d64 lags the emulated drive and reading it answers a
+# different question. See src/writetest.c.
+build/writetest.prg: src/writetest.c ../c128/src/storage.c Makefile
+	@mkdir -p build
+	$(CC) -Oz -Wall -Werror -I ../c128/src -I ../core -o $@ $< ../c128/src/storage.c
+
+build/writetest.d64: build/writetest.prg
+	@rm -f $@
+	@c1541 -format "writetest,01" d64 $@ >/dev/null
+	@c1541 -attach $@ -write build/writetest.prg writetest >/dev/null
+	@echo "write probe disk: $@"
+
+writecheck: build/writetest.d64
+	@python3 tools/writecheck.py
 
 logcheck: build/probe.d64
 	@python3 tools/logcheck.py

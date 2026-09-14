@@ -48,6 +48,17 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     kill = "--kill" in sys.argv
     show = "--quiet" not in sys.argv
+
+    # --steps NAME=KEYS,NAME=KEYS,... replaces the default run. `\r` in the
+    # keys is a RETURN. Every prompt in this game is a LINE EDITOR, including
+    # the Y/N ones, so an answer is the letter AND a return -- a bare "n"
+    # echoes and submits nothing, which is how the first drive of the C128
+    # build looked like kb_inject had stopped working.
+    global STEPS
+    for a in sys.argv[1:]:
+        if a.startswith("--steps="):
+            STEPS = [(p.split("=", 1)[0], p.split("=", 1)[1].replace("\\r", "\r"))
+                     for p in a[len("--steps="):].split(",")]
     out = args[0] if args else os.path.join(C64, "build")
     for p in (D64, MAP):
         if not os.path.exists(p):
