@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and once on 2026-09-14 (2 open of 59 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twice on 2026-09-14 (1 open of 59 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2054,7 +2054,23 @@ are the CoCo 3**, which is started and not released:
         coordinates** and wrap. They do not come from `panels[]`, so the
         layout swap does not reach them.
       * **It still calls itself "C128-VDC PORT"** on the title screen.
-  59. **THE C64 HAS NOWHERE TO PUT THE MESSAGE LOG.** Raised 2026-09-13, and
+  59. ~~**THE C64 HAS NOWHERE TO PUT THE MESSAGE LOG.**~~
+      **CLOSED 2026-09-14 -- IT GOES UNDER THE KERNAL, and that is measured.**
+      2,048 bytes written to `$E000` with `$01 = $35` survive being read back,
+      and survive **a real KERNAL LOAD** -- which is the question that actually
+      decides it. Writing there was never in doubt: stores go to RAM whatever
+      is banked in. What mattered is that the port cannot avoid the KERNAL for
+      disk, so if any KERNAL routine stored under itself the log would be
+      destroyed by the act of loading a file. It does not; its variables live
+      at `$0200-$03FF`. `c64/src/logprobe.c`, `make -C c64 logcheck`.
+      **INTERRUPTS OFF WHILE THE ROM IS OUT** -- with bit 1 of `$01` clear the
+      CPU fetches its IRQ vector from `$FFFE` in RAM, which is the log.
+      That leaves the C64 map whole: program ~38K at `$0801`, the 7,380-byte
+      string pool in the 8K under BASIC at `$A000` (about 800 spare, so not
+      both), the overlay window in the never-covered 4K at `$C000`, and the
+      log under the KERNAL at `$E000`. **Far memory was called the one new
+      seam and it was two; both now have homes.**
+      Raised 2026-09-13, and
       it is the seam the C64 scope missed. `ui.c` keeps 2K of read/write
       scratch (`LOG_SLOTS` 32 x `LOG_STRIDE` 64) in VDC RAM, and EVERY port
       implements `vdc_set_address` -- it is a portable seam badly named after
