@@ -2823,7 +2823,11 @@ uint8_t ui_play_again(void) {
 
 /* --------------------------------------------------------------- INFO */
 
+#ifdef TREK_40COL
+#define INF_X    2                 /* (40 - INF_W) / 2; 36 wide still fits */
+#else
 #define INF_X   22
+#endif
 #define INF_Y    6
 #define INF_W   36
 #define INF_H   12

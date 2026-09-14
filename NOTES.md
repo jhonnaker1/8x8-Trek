@@ -2110,17 +2110,28 @@ are the CoCo 3**, which is started and not released:
       memo and play-again all fit 40 columns -- and what is left was living in
       a commit message, which is how "the seventh port is not released" once
       sat in prose for a week where nothing could count or close it.
-      **Seen on the bench** (`make screens40`, then `tools/screens40.py`):
-      * **STATE OF REPAIR** -- its DOCKED and UNDOCKED columns are at the
-        80-column offsets, so the values strand at `100.` with the two columns
-        empty.
-      * **PREVIOUS MESSAGES** -- the department runs straight into the text:
-        `HELMAWAITING ORDERS CAPTAIN`. Two columns that no longer clear each
-        other.
-      * **`ui_info_panel` and `ui_planet_list` drew NOTHING.** Whether that is
-        80-column geometry or simply state the bench does not set up is
-        UNKNOWN -- the bench says which, and saying "nothing drew" is the
-        honest answer until somebody gives them a planet to list.
+      **TWO OF THE FOUR WERE MY BENCH, NOT THE PORT (corrected 2026-09-14).**
+      * ~~STATE OF REPAIR's DOCKED/UNDOCKED columns are empty.~~ **THEY ARE
+        SUPPOSED TO BE.** The report leaves them blank for an undamaged system
+        -- "a column of 0.0 down twelve rows reads as noise", says its own
+        comment -- and the bench had a fresh ship with nothing damaged. Damage
+        three systems and the columns fill correctly inside the box: 1.2/2.9,
+        0.6/1.5, 1.7/4.3. **A deliberately blank column and a broken one look
+        identical**, which is how this got onto the list.
+      * ~~PREVIOUS MESSAGES runs the department into the text.~~ **THE POOLED
+        DEPARTMENT STRINGS CARRY THEIR OWN ": "** -- `S_170` is `HELM: ` --
+        which is why neither the panel nor the viewer inserts one. The bench
+        was passing bare literals. With the real strings it reads `HELM:
+        AWAITING ORDERS CAPTAIN`, clamped at the box edge as designed.
+      * **`ui_info_panel` WAS real and is fixed**: `INF_X` 22 plus `INF_W` 36
+        is columns 22..57, off the right edge. Centred at 2 for forty.
+      * **`ui_planet_list` needs nothing** -- it is drawn inside `REP_*`,
+        which is already conditional. It drew nothing on the bench because a
+        fresh game has scanned no quadrant, so no planet is known.
+      **AND A FINDING THAT IS NOT A BUG**: `ENERGYCONVERTER` and `ENTORP
+      TUBES` look like missing spaces and are NOT. `EnergyConverter` and
+      `EnTorp Tubes` are in EGATREK.EXE in Anderson's own hand; the pool is
+      faithful. Recorded so nobody "corrects" it later.
       * **`BRIEF.TXT` is 80-column prose**: 12 pages, 227 lines, **155 of them
         wider than 40**. It is generated, so this is a `tools/gen_strings.py`
         variant landing around 21 pages -- not a hand edit. `verify` still

@@ -39,10 +39,14 @@ volatile unsigned char screen40 = 0;
 
 static void sample_messages(void)
 {
-    ui_message("HELM", "AWAITING ORDERS CAPTAIN");
-    ui_message("ENGINEERING", "WARP DRIVE AT 100 PERCENT");
-    ui_message("SCIENCE", "LONG RANGE SCAN COMPLETE");
-    ui_message("COMMUNICATIONS", "STARBASE ACKNOWLEDGES OUR SIGNAL");
+    /* THE DEPARTMENT STRINGS IN THE POOL CARRY THEIR OWN ": ", which is why
+       neither the panel nor the viewer inserts one. Passing bare literals
+       here produced "HELMAWAITING ORDERS CAPTAIN" and I put that on the open
+       list as a 40-column collision. It was the bench. */
+    ui_message("HELM: ", "AWAITING ORDERS CAPTAIN");
+    ui_message("ENGINEERING: ", "WARP DRIVE AT 100 PERCENT");
+    ui_message("SCIENCE: ", "LONG RANGE SCAN COMPLETE");
+    ui_message("COMMS: ", "STARBASE ACKNOWLEDGES OUR SIGNAL");
 }
 
 int main(void)
@@ -68,7 +72,13 @@ int main(void)
                     why this drew NOTHING before. */
                  ship.lost_how = LOSS_RAY;
                  ui_loss_memo();                              break;
-        case 5:  ui_repair_report();                          break;
+        case 5:  /* DAMAGE SOMETHING FIRST. The report deliberately leaves
+                    the DOCKED/UNDOCKED times blank for an undamaged system --
+                    "a column of 0.0 down twelve rows reads as noise" -- so a
+                    fresh ship shows two empty columns, which I mistook for
+                    broken geometry and put on the open list as such. */
+                 ship.sys[0] = 42; ship.sys[3] = 70; ship.sys[7] = 15;
+                 ui_repair_report();                          break;
         case 6:  ui_draw_all(); sample_messages();
                  ui_messages_view();                          break;
         case 7:  ui_info_panel();                             break;
