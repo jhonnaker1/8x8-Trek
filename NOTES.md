@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and five times on 2026-09-14 (2 open of 61 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and six times on 2026-09-14 (1 open of 61 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2081,8 +2081,32 @@ are the CoCo 3**, which is started and not released:
       spare. Candidates: RAM under the KERNAL, RAM under BASIC beside the
       7,380-byte pool in `$A000-$BFFF` (about 800 bytes spare, so not both),
       or fewer/narrower log slots. **Nothing is measured yet.**
-  60. **THE 80-COLUMN C128 BINARY IS NO LONGER BYTE-IDENTICAL, AND I CANNOT
-      NAME THE LINE.** Raised 2026-09-14. Every 40-column change is behind
+  60. ~~**THE 80-COLUMN C128 BINARY IS NO LONGER BYTE-IDENTICAL, AND I CANNOT
+      NAME THE LINE.**~~ **CLOSED 2026-09-14. The line is `#define STR_COUNT`,
+      and the binary was RIGHT to change.**
+      Bisected to `f64b97c`, then inside it to `strdata.h`: the pool went from
+      **330 strings to 334** when `gen_strings.py` pooled four literals the
+      40-column setup screen needed. `strpool.c` compiles STR_COUNT in twice --
+      `if (count != STR_COUNT) return (loaded = 0);` and
+      `txt_base = idx_base + STR_COUNT * 2` -- so every port's binary carries
+      the size of the shared pool as an immediate. Reverting STR_COUNT to 330
+      reproduces `5606a2e439851f1e` exactly.
+      **SO IT IS NOT DRIFT, IT IS COUPLING, AND IT MATTERS AT RELEASE TIME.**
+      That guard is deliberate: a binary whose STR_COUNT disagrees with the
+      STRINGS.DAT beside it REFUSES THE POOL and the game runs with blank
+      labels, exactly as it does with the file missing. **Adding one string
+      for one port invalidates all seven released binaries** -- ship a rebuilt
+      STRINGS.DAT next to a v0.15.0 binary and every label on screen goes
+      blank, silently, with no error. `make release` rebuilds everything from
+      source, which is why the rule is ALWAYS REBUILD; this is what that rule
+      is protecting against.
+      **FOUR WRONG GUESSES AND THREE BAD MEASUREMENTS got in the way**, all
+      recorded in the commit: a bisect that checked out three files into a
+      tree where everything else sat at HEAD, a `git stash` test in that same
+      polluted tree, and a worktree I had already contaminated with file-level
+      checkouts. **Every clean answer came from a FRESH `git worktree` per
+      commit**; nothing measured in a mixed tree was worth anything.
+      Raised 2026-09-14. Every 40-column change is behind
       `#ifdef TREK_40COL` precisely so the RELEASED build stays what it was,
       and for a while it did: after `vdcram.c` was extracted, `trek128.prg`
       hashed `5606a2e439851f1e`, the same as before. It is `8b44c4d7bcec8873`
