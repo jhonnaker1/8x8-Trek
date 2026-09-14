@@ -2227,19 +2227,50 @@ static void put_signed(unsigned char x, unsigned char y, int16_t v,
 /* One row: the count on the left, the item with dot leaders, the points on the
    right. The original's leaders run to a fixed column, which is what makes the
    sheet read as a column of figures rather than ragged text. */
+#ifdef TREK_40COL
+/* THE SHEET AT FORTY COLUMNS. Count five wide (the kill rate prints "12.34"),
+   item from 5, dot leaders to 35, points five wide ending at 39.
+   THAT LEAVES 30 COLUMNS FOR THE ITEM AND ONE OF THE ELEVEN IS 31 --
+   "ENEMY BASES DESTROYED @ 50 EACH". Measured, not guessed. The choices were
+   to clip it, to reword it, or to give it a second line; rewording is editing
+   prose that may be Anderson's (177 of 326 pooled strings are verbatim his),
+   and clipping loses a word. So ev_row takes two lines when it has to, and
+   one when it does not -- which is ten times out of eleven. */
+#define EV_X        0
+#define EV_ITEM     (EV_X + 5)
+#define EV_DOTS_TO  35
+#else
 #define EV_X       12
 #define EV_ITEM    (EV_X + 6)
 #define EV_DOTS_TO (EV_X + 46)
+#endif
 
-static void ev_row(unsigned char y, const char *count, const char *item,
-                   int16_t pts, unsigned char color) {
+/* Returns the number of rows used -- 1 always at eighty columns, sometimes 2
+   at forty. The callers advance by it rather than by a fixed ++, so a row
+   that needs the extra line cannot silently overwrite the next one. */
+static unsigned char ev_row(unsigned char y, const char *count, const char *item,
+                            int16_t pts, unsigned char color) {
     unsigned char i, x;
+    unsigned char used = 1;
 
+#ifdef TREK_40COL
+    if (EV_ITEM + strlen(item) > EV_DOTS_TO) {
+        /* The item on its own line, its figures beneath it. */
+        scr_puts(EV_ITEM, y, item, color);
+        y++;
+        used = 2;
+        if (count) scr_puts(EV_X, y, count, color);
+        for (i = EV_ITEM; i < EV_DOTS_TO; i++) scr_put(i, y, SC_DOT, COL_GRID);
+        put_signed(EV_DOTS_TO, y, pts, 5, color);
+        return used;
+    }
+#endif
     if (count) scr_puts(EV_X, y, count, color);
     scr_puts(EV_ITEM, y, item, color);
     x = (unsigned char)(EV_ITEM + strlen(item));
     for (i = x; i < EV_DOTS_TO; i++) scr_put(i, y, SC_DOT, COL_GRID);
     put_signed(EV_DOTS_TO, y, pts, 5, color);
+    return used;
 }
 
 /* A count as text, so a row can print "0.00" for the rate and plain integers
@@ -2313,9 +2344,20 @@ void ui_evaluation(void) {
 
     trek_score_sheet(&sh);
     scr_clear();
+#ifdef TREK_40COL
+    /* Centred for forty rather than eighty: DEPT. OF SPACE is 14, EARTH
+       HEADQUARTERS 18 and DETAILED EVALUATION 19, so (40 - n) / 2 gives
+       13, 11 and 10. The ITEM and SCORE column heads below need no such
+       treatment -- they are already written at EV_ITEM and EV_DOTS_TO and
+       followed the sheet when it moved. */
+    scr_puts(13, 1, S(S_20),  COL_VALUE);
+    scr_puts(11, 2, S(S_26),  COL_LABEL);
+    scr_puts(10, 3, S(S_21),  COL_VALUE);
+#else
     scr_puts(32, 1, S(S_20),      COL_VALUE);
     scr_puts(31, 2, S(S_26),  COL_LABEL);
     scr_puts(31, 3, S(S_21), COL_VALUE);
+#endif
     scr_puts(EV_ITEM,    5, "ITEM",  COL_LABEL);
     scr_puts(EV_DOTS_TO, 5, "SCORE", COL_LABEL);
 
@@ -2323,18 +2365,18 @@ void ui_evaluation(void) {
        the ship-loss penalty and omits RESCUES, a surviving ship's does the
        reverse. MEASURED 2026-08-24 off both. */
     if (sh.ship_lost_pts)
-        ev_row(y++, NULL, S(S_120), sh.ship_lost_pts, COL_MSG);
+        y += ev_row(y, NULL, S(S_120), sh.ship_lost_pts, COL_MSG);
     else {
         ev_count(c, sh.rescues);
-        ev_row(y++, c, S(S_121), sh.rescue_pts, COL_MSG);
+        y += ev_row(y, c, S(S_121), sh.rescue_pts, COL_MSG);
     }
-    ev_row(y++, NULL, S(S_119), sh.incomplete_pts, COL_MSG);
+    y += ev_row(y, NULL, S(S_119), sh.incomplete_pts, COL_MSG);
     ev_count(c, sh.mongols);
-    ev_row(y++, c, S(S_118), sh.mongol_pts, COL_MSG);
+    y += ev_row(y, c, S(S_118), sh.mongol_pts, COL_MSG);
     ev_count(c, sh.commanders);
-    ev_row(y++, c, S(S_110), sh.commander_pts, COL_MSG);
+    y += ev_row(y, c, S(S_110), sh.commander_pts, COL_MSG);
     ev_count(c, sh.enemy_bases);
-    ev_row(y++, c, S(S_114), sh.enemy_base_pts, COL_MSG);
+    y += ev_row(y, c, S(S_114), sh.enemy_base_pts, COL_MSG);
 
     /* The rate prints with two decimals, as the original does -- 0.00 on an
        unfinished mission, which is the commonest sight on this screen. */
@@ -2347,15 +2389,15 @@ void ui_evaluation(void) {
         r[k++] = (char)('0' + (sh.rate_hundredths / 10) % 10);
         r[k++] = (char)('0' + sh.rate_hundredths % 10);
         r[k]   = '\0';
-        ev_row(y++, r, S(S_115), sh.rate_pts, COL_MSG);
+        y += ev_row(y, r, S(S_115), sh.rate_pts, COL_MSG);
     }
 
     ev_count(c, sh.casualties);
-    ev_row(y++, c, S(S_109), sh.casualty_pts, COL_MSG);
+    y += ev_row(y, c, S(S_109), sh.casualty_pts, COL_MSG);
     ev_count(c, sh.stars);
-    ev_row(y++, c, S(S_123), sh.star_pts, COL_MSG);
+    y += ev_row(y, c, S(S_123), sh.star_pts, COL_MSG);
     ev_count(c, sh.bases_hit);
-    ev_row(y++, c, S(S_106), sh.bases_hit_pts, COL_MSG);
+    y += ev_row(y, c, S(S_106), sh.bases_hit_pts, COL_MSG);
 
     y++;
     ev_row(y, NULL, "TOTAL", sh.total, COL_VALUE);
