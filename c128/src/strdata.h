@@ -4,7 +4,7 @@
 #ifndef STRDATA_H
 #define STRDATA_H
 
-#define STR_COUNT 330
+#define STR_COUNT 334
 
 #define S_0      0   /*  C128-VDC PORT  */
 #define S_1      1   /* 0 TO ABORT, L FOR LIST: */
@@ -336,5 +336,9 @@
 #define S_327  327   /* CHECK THE DISK AND START AGAIN. */
 #define S_328  328   /* COULD NOT BE READ. */
 #define S_329  329   /* OVERLAY */
+#define S_330  330   /* C128 40-COLUMN PORT */
+#define S_331  331   /* COMMAND LEVEL (1-5): */
+#define S_332  332   /* FILE NAME (RETURN=DEFAULT, ESC=ABORT): */
+#define S_333  333   /* SELF-DESTRUCT PASSWORD: */
 
 #endif

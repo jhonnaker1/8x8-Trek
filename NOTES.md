@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 (3 open of 59 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and once on 2026-09-14 (2 open of 59 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2010,8 +2010,21 @@ are the CoCo 3**, which is started and not released:
       **The 32-column family still fails `check_colours.py` on colour, so it
       may never have a consumer.** Decide when there is a second family in
       hand, not now.
-  58. **THE 40-COLUMN BUILD DRAWS, AND THREE THINGS ARE STILL 80 COLUMNS
-      WIDE.** Raised 2026-09-13 out of the first run of the real game.
+  58. ~~**THE 40-COLUMN BUILD DRAWS, AND THREE THINGS ARE STILL 80 COLUMNS
+      WIDE.**~~ **CLOSED 2026-09-14 -- all three done and looked at.**
+      The badge trade is in and both pages are correct; the title stacks EGA
+      over TREK and the setup prompts all fit; the port names itself "C128
+      40-COLUMN PORT". Two things worth carrying out of it:
+      **GATING INSIDE `ui_draw_all` WAS NOT ENOUGH** -- SYSTEMS STATUS and the
+      chart both have callers elsewhere, so every `ui_draw_*` now asks the
+      panel table which page it is on. A table entry and a draw call cannot
+      drift apart any more.
+      **`scr_puts` CLIPS AT THE ROW EDGE IN THE 40-COLUMN DRIVER.** Screen
+      memory is linear, so a 48-character prompt on a 40-column row landed on
+      the START OF THE NEXT ROW -- which is what made the setup screen look
+      like it was wrapping into itself. Clipping confines the damage; the
+      three over-long prompts got shorter wording as well.
+      Raised 2026-09-13 out of the first run of the real game.
       * **THE BADGE TRADE IS NOW A FIX, NOT A PREFERENCE.**
         `msg_clear_region()` clears `(MSG_X, MSG_Y, MSG_W, MSG_H)`; at forty
         columns `MSG_X` is 0, so every message wipes **rows 11..24 across the

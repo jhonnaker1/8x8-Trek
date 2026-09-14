@@ -130,11 +130,26 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
     VIC_COLRAM[off] = color & 0x0F;
 }
 
+/* IT CLIPS AT THE RIGHT EDGE, AND THE VDC DRIVER DOES NOT NEED TO.
+ *
+ * At eighty columns every string in the pool fits the row it is written to.
+ * At forty, THIRTEEN DO NOT -- `FILE NAME, <RETURN> FOR DEFAULT, <ESC> TO
+ * ABORT:` is 48 characters and the command-level prompt is 49. Without a
+ * bound, screen memory is linear: the overflow lands on the START OF THE NEXT
+ * ROW and corrupts whatever was there, which is what the setup screen looked
+ * like -- prompts apparently wrapping into each other with a letter of the
+ * previous line stranded at the left margin.
+ *
+ * Clipping does not make those strings right; a truncated prompt is still a
+ * bad prompt, and shortening them is item 58's own follow-up. What it does is
+ * confine the damage to the row that owns it, so a too-long string looks like
+ * a too-long string instead of like a broken screen. */
 __attribute__((noinline))
 void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char color) {
     unsigned int off = (unsigned int)y * VIC_COLS + x;
+    unsigned char col = x;
     const char *p;
-    for (p = s; *p; p++, off++) {
+    for (p = s; *p && col < VIC_COLS; p++, off++, col++) {
         VIC_SCREEN[off] = ascii_to_screencode(*p);
         VIC_COLRAM[off] = color & 0x0F;
     }
@@ -144,8 +159,9 @@ __attribute__((noinline))
 void scr_hline(unsigned char x, unsigned char y, unsigned char w,
                unsigned char ch, unsigned char color) {
     unsigned int off = (unsigned int)y * VIC_COLS + x;
+    unsigned char col = x;
     unsigned char i;
-    for (i = 0; i < w; i++, off++) {
+    for (i = 0; i < w && col < VIC_COLS; i++, off++, col++) {
         VIC_SCREEN[off] = ch;
         VIC_COLRAM[off] = color & 0x0F;
     }

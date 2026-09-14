@@ -1917,8 +1917,16 @@ void ui_save_game(const Setup *s) {
 
 static uint8_t ask_yes(unsigned char y, const char *prompt) {
     char buf[4];
-    scr_puts(2, y, prompt, COL_LABEL);
-    read_field((unsigned char)(2 + strlen(prompt) + 1), y, buf, sizeof buf);
+    /* FLUSH LEFT AT FORTY COLUMNS. The briefing question is 34 characters, so
+       at the 80-column indent of 2 its answer field would start at 37 and run
+       to 41 -- one past the edge. */
+#ifdef TREK_40COL
+    unsigned char px = 0;
+#else
+    unsigned char px = 2;
+#endif
+    scr_puts(px, y, prompt, COL_LABEL);
+    read_field((unsigned char)(px + strlen(prompt) + 1), y, buf, sizeof buf);
     return (uint8_t)(buf[0] == 'Y' || buf[0] == 'y');
 }
 
@@ -2026,9 +2034,22 @@ void ui_setup(Setup *s) {
     s->restored = 0;
 
     scr_clear();
+#ifdef TREK_40COL
+    /* THE SHIP PLATE MOVES IN, and the prompts below go flush left with
+       SHORTER WORDING -- three of them are longer than this whole screen:
+       S_33 is 48 characters and S_36 is 49. The driver clips now, so they
+       would truncate rather than corrupt the next row, but a truncated prompt
+       is still a bad prompt. These are literals rather than pool entries
+       because the generator owns the ids and one build's phrasing is not
+       worth five of them; the prose is this port's own either way. */
+    scr_puts(22, 1, S(S_89), COL_VALUE);
+    scr_puts(32, 2, S(S_174), COL_VALUE);
+    scr_puts(0,  5, S(S_96), COL_MSG);
+#else
     scr_puts(31, 1, S(S_89), COL_VALUE);
     scr_puts(36, 2, S(S_174),           COL_VALUE);
     scr_puts(2,  5, S(S_96), COL_MSG);
+#endif
 
     /* s->briefing was answered by ui_setup_briefing() and the pages, if any,
        have already been read -- see above. The header is redrawn because the
@@ -2040,9 +2061,16 @@ void ui_setup(Setup *s) {
            because the save already holds them. */
         char fname[18];
 
+#ifdef TREK_40COL
+        /* Prompt on its own row, field under it: even shortened this one is
+           38 characters and leaves no room beside it. */
+        scr_puts(0, 10, S(S_332), COL_LABEL);
+        if (read_field(2, 11, fname, sizeof fname)) {
+#else
         scr_puts(2, 10, S(S_33),
                  COL_LABEL);
         if (read_field(51, 10, fname, sizeof fname)) {
+#endif
             if (!fname[0]) strcpy(fname, SAVE_DEFAULT);
             if (save_read(s, fname)) {
                 s->restored = 1;
@@ -2055,24 +2083,42 @@ void ui_setup(Setup *s) {
         y = 10;
     }
 
+#ifdef TREK_40COL
+    scr_puts(0, y, S(S_61), COL_LABEL);        /* 23 chars, so the field fits */
+    read_field(24, y, s->name, sizeof s->name);   /* name[13] -> ends at 36 */
+#else
     scr_puts(2, y, S(S_61), COL_LABEL);
     read_field(26, y, s->name, sizeof s->name);
+#endif
     y++;
 
     /* Looped rather than clamped: the original asks again, and silently
        turning a typo into a different difficulty is worse than re-asking. */
     for (;;) {
+#ifdef TREK_40COL
+        scr_puts(0, y, S(S_331), COL_LABEL);
+        buf[0] = '\0';
+        read_field(21, y, buf, 3);
+        if (buf[0] >= '1' && buf[0] <= '5' && buf[1] == '\0') break;
+        scr_puts(21, y, "  ", COL_VALUE);
+#else
         scr_puts(2, y, S(S_36), COL_LABEL);
         buf[0] = '\0';
         read_field(51, y, buf, 3);
         if (buf[0] >= '1' && buf[0] <= '5' && buf[1] == '\0') break;
         scr_puts(51, y, "  ", COL_VALUE);
+#endif
     }
     s->level = (uint8_t)(buf[0] - '0');
     y++;
 
+#ifdef TREK_40COL
+    scr_puts(0, y, S(S_333), COL_LABEL);
+    read_field(24, y, s->password, sizeof s->password);   /* password[9] */
+#else
     scr_puts(2, y, S(S_13), COL_LABEL);
     read_field(47, y, s->password, sizeof s->password);
+#endif
 
     /* The whole point of the screen, mechanically: kb_entropy has been counting
        poll passes throughout, so it now holds something no two sittings will
@@ -2326,8 +2372,14 @@ static const unsigned char banner_font[6][5] = {
     { 0x1E, 0x11, 0x1E, 0x12, 0x11 },   /* R */
     { 0x11, 0x12, 0x1C, 0x12, 0x11 }    /* K */
 };
+#ifndef TREK_40COL
+/* The 80-column banner lays EGA and TREK out on ONE line and needs the word
+   and the gap between them. The 40-column one stacks the two halves and
+   indexes the font directly, so neither exists there -- and -Werror on an
+   unused const is what said so. */
 static const char banner_text[] = "EGATREK";       /* index into the font */
 static const unsigned char banner_gap = 3;         /* blank cols between EGA and TREK */
+#endif
 
 static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
                           unsigned char color) {
@@ -2341,6 +2393,76 @@ static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
 }
 
 OVL_CODE("title")   /* Runs once before the game and never again until PLAY AGAIN */
+#ifdef TREK_40COL
+/* THE TITLE AT FORTY COLUMNS -- a second layout, not a squeeze.
+ *
+ * The 80-column version puts EGA and TREK side by side: seven letters at a
+ * six-column pitch is 42 columns, wider than this whole screen. So the banner
+ * STACKS, which is the only change to the artwork itself -- the letters are
+ * the same 5x5 cells.
+ *
+ * THE CREDIT LOSES ITS BOX AND KEEPS ITS WORDS. S_81 is 39 characters, so
+ * inside a 40-wide border it would be one column too long -- and Anderson's
+ * credit is the one thing on this screen that is not decoration. Full width
+ * at x=0, no border.
+ *
+ * The ship plate goes, because the badge on the chart page already carries
+ * U.S.S. LEXINGTON / RCB-92 / DEPT. OF SPACE and twenty-five rows will not
+ * hold everything twice. The Lexington's own artwork stays. */
+void ui_title(void) {
+    unsigned char i, x;
+
+    scr_clear();
+
+    /* A LITERAL, NOT S_0. The pooled string says "C128-VDC PORT" and this
+       build is neither VDC nor eighty columns. Naming it correctly through
+       the pool would mean a second STRINGS.DAT for one string; the generator
+       owns the ids and this is not worth an id. */
+    scr_puts(1, 0, S(S_330), EGA_TO_VDC(EGA_LTCYAN));
+
+    /* EGA on one line, TREK under it. 3 letters span 17 columns and 4 span
+       23, so they centre at 11 and 8. */
+    x = 11;
+    for (i = 0; i < 3; i++) {
+        unsigned char idx = (i == 0) ? 0 : (i == 1) ? 1 : 2;   /* E G A */
+        banner_letter(x, 1, idx, COL_VALUE);
+        x = (unsigned char)(x + 6);
+    }
+    x = 8;
+    for (i = 0; i < 4; i++) {
+        unsigned char idx = (i == 0) ? 3 : (i == 1) ? 4 : (i == 2) ? 0 : 5;  /* T R E K */
+        banner_letter(x, 7, idx, COL_VALUE);
+        x = (unsigned char)(x + 6);
+    }
+
+    scr_puts(10, 12, S(S_80), EGA_TO_VDC(EGA_LTCYAN));
+
+    {
+        static const unsigned char ship_art_id[5] = {
+            S_141, S_142, S_141, S_143, S_144
+        };
+        unsigned char r, c;
+        for (r = 0; r < 5; r++) {
+            const char *art = S(ship_art_id[r]);
+            for (c = 0; art[c]; c++)
+                if (art[c] == '#')
+                    scr_put((unsigned char)(10 + c), (unsigned char)(14 + r),
+                            G_BLOCK, EGA_TO_VDC(EGA_LTGRAY));
+        }
+    }
+
+    /* The credit. The original earns this -- EGA Trek was shareware and Nels
+       Anderson wrote it; this port exists because of his game, so his name
+       goes on the front of it and not in a comment somewhere. */
+    scr_puts(0, 20, S(S_27),  COL_MSG);
+    scr_puts(0, 21, S(S_8),   COL_MSG);
+    scr_puts(0, 22, S(S_81),  EGA_TO_VDC(EGA_LTCYAN));
+    scr_puts(0, 23, S(S_82),  EGA_TO_VDC(EGA_LTCYAN));
+
+    scr_puts(9, 24, S(S_62), COL_DEPT);
+    while (kb_waitkey() != KB_RETURN) { }
+}
+#else
 void ui_title(void) {
     unsigned char i, x;
 
@@ -2410,6 +2532,7 @@ void ui_title(void) {
     scr_puts(28, 24, S(S_62), COL_DEPT);
     while (kb_waitkey() != KB_RETURN) { }
 }
+#endif
 
 /* ------------------------------------------------------- play again */
 
