@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twice on 2026-09-14 (1 open of 59 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and three times on 2026-09-14 (2 open of 60 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2081,6 +2081,29 @@ are the CoCo 3**, which is started and not released:
       spare. Candidates: RAM under the KERNAL, RAM under BASIC beside the
       7,380-byte pool in `$A000-$BFFF` (about 800 bytes spare, so not both),
       or fewer/narrower log slots. **Nothing is measured yet.**
+  60. **THE 80-COLUMN C128 BINARY IS NO LONGER BYTE-IDENTICAL, AND I CANNOT
+      NAME THE LINE.** Raised 2026-09-14. Every 40-column change is behind
+      `#ifdef TREK_40COL` precisely so the RELEASED build stays what it was,
+      and for a while it did: after `vdcram.c` was extracted, `trek128.prg`
+      hashed `5606a2e439851f1e`, the same as before. It is `8b44c4d7bcec8873`
+      now.
+      **WHAT IS RULED OUT.** Not the dialog work: stashing it gives the same
+      hash. Not any single commit -- 74aeb36, 5564f05 and f64b97c all produce
+      `8b44c4d7`, so it moved inside the session that led to the first of
+      them, after the measurement. Not `dlg_wrap`, which `llvm-nm` says is
+      absent from the 80-column build. Hoisting `px` in `ui_dialog_ask_esc`
+      was a suspect and guarding it did not restore the hash.
+      **WHAT IS MEASURED AND UNCHANGED**: the resident extent is still
+      `$1c01..$a94d` with 1,459 bytes free, lowram is still 2,172 of 2,304,
+      and there are still 11 overlays with the largest at 3,892. Same size,
+      same layout, same everything the checks can see -- and all of them pass.
+      So this is instruction selection shuffling, not a structural change.
+      **WHY IT IS AN ITEM ANYWAY.** The C128 is a RELEASED port. If a release
+      is re-cut its artefact will differ from v0.15.0's for a reason nobody
+      can state, and "probably codegen" is not a thing to discover during a
+      release. The cheap way to close it: bisect the working-tree states
+      inside that session with `git worktree`, or accept it and record the new
+      hash as the baseline DELIBERATELY rather than by drift.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**

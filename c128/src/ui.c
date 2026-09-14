@@ -1267,10 +1267,26 @@ void ui_read_command(char *buf, uint8_t max) {
 /* Centred over the viewer and communications panels, which is roughly where
    the original puts its WEAPONS CONTROL box. Sized to leave the scan, the
    status readout and the chart visible above it. */
+#ifdef TREK_40COL
+/* FULL WIDTH AND ONE COLUMN OF PADDING, which is what makes this fit at all.
+   A 40-wide box with the 80-column padding of 2 holds 36 characters and SEVEN
+   dialog lines are longer; with padding of 1 it holds 38 and only FOUR are.
+   Measured over all 109 dialog lines in the port -- the widest is 42.
+   DLG_Y stays at 9: rows 9..21 leave the scanner and the status readout
+   visible above the box, which is what the 80-column geometry was chosen for
+   and is just as true here. */
+#define DLG_X    0
+#define DLG_Y    9
+#define DLG_W   40
+#define DLG_H   13
+#define DLG_PAD  1
+#else
 #define DLG_X   14
 #define DLG_Y    9
 #define DLG_W   52
 #define DLG_H   13
+#define DLG_PAD  2
+#endif
 
 static unsigned char dlg_row;      /* next free line inside the box */
 
@@ -1286,7 +1302,7 @@ static void dlg_frame(const char *title) {
             scr_put((unsigned char)(DLG_X + x), (unsigned char)(DLG_Y + y), c, COL_LABEL);
         }
     }
-    scr_puts((unsigned char)(DLG_X + 2), DLG_Y, title, COL_VALUE);
+    scr_puts((unsigned char)(DLG_X + DLG_PAD), DLG_Y, title, COL_VALUE);
     dlg_row = 2;
 }
 
@@ -1301,12 +1317,56 @@ static void dlg_room(void) {
     dlg_frame("");
 }
 
+#define DLG_ROOM (DLG_W - 2 * DLG_PAD)
+
+#ifdef TREK_40COL
+/* IT WRAPS, RATHER THAN THE PROSE BEING SHORTENED TO FIT.
+ *
+ * Four of this port's 109 dialog lines are longer than a 40-column box holds
+ * -- the self-destruct and death-ray warnings, at 42 characters. The obvious
+ * fix was to reword them, and it is the wrong one: 177 of the 326 pooled
+ * strings appear VERBATIM in EGATREK.EXE, so rewording is editing Anderson's
+ * prose to suit my box. Wrapping is a presentation decision and belongs in
+ * the platform layer, where every other 40-column decision has gone.
+ *
+ * It breaks at the last space that fits, so words stay whole, and it costs
+ * nothing on lines that already fit -- which is 105 of the 109. A line with
+ * no space in the first DLG_ROOM characters is broken at the limit rather
+ * than dropped; there is no such line today and silently losing text would be
+ * worse than an ugly break. */
+/* STATIC, NOT A LOCAL. Thirty-nine bytes on llvm-mos's soft stack is not
+   free -- the X16 overflowed its stack on SAVE in every release from v0.10.0
+   to v0.13.1 and nothing reported it. This function is display-only and never
+   reentrant. */
+static char dlg_wrap[DLG_ROOM + 1];
+
+void ui_dialog_line(const char *text) {
+    while (*text) {
+        unsigned char i, cut;
+        for (i = 0; i < DLG_ROOM && text[i]; i++) { }
+        if (!text[i]) { cut = i; }              /* the rest fits */
+        else {
+            for (cut = i; cut && text[cut] != ' '; cut--) { }
+            if (!cut) cut = i;                  /* no space: break at the edge */
+        }
+        for (i = 0; i < cut; i++) dlg_wrap[i] = text[i];
+        dlg_wrap[cut] = 0;
+        dlg_room();
+        scr_puts((unsigned char)(DLG_X + DLG_PAD),
+                 (unsigned char)(DLG_Y + dlg_row), dlg_wrap, COL_MSG);
+        dlg_row++;
+        text += cut;
+        while (*text == ' ') text++;
+    }
+}
+#else
 void ui_dialog_line(const char *text) {
     dlg_room();
-    scr_puts((unsigned char)(DLG_X + 2), (unsigned char)(DLG_Y + dlg_row),
+    scr_puts((unsigned char)(DLG_X + DLG_PAD), (unsigned char)(DLG_Y + dlg_row),
              text, COL_MSG);
     dlg_row++;
 }
+#endif
 
 /* Reads a line at (x0,y), echoing as it goes and handling backspace. Shared by
    the modal dialog and the setup screen so both behave identically. */
@@ -1348,12 +1408,35 @@ static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t 
    this -- EGA Trek's own prompt says "Hit ESC to abort". */
 uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max) {
     unsigned char y;
+#ifdef TREK_40COL
+    unsigned char px = (unsigned char)(DLG_PAD + strlen(prompt) + 1);
+#endif
 
     dlg_room();
     y = (unsigned char)(DLG_Y + dlg_row);
-    scr_puts((unsigned char)(DLG_X + 2), y, prompt, COL_DEPT);
+    scr_puts((unsigned char)(DLG_X + DLG_PAD), y, prompt, COL_DEPT);
     dlg_row++;
-    return read_field((unsigned char)(DLG_X + 2 + strlen(prompt) + 1), y, buf, max);
+#ifdef TREK_40COL
+    /* THE FIELD GOES UNDER THE PROMPT WHEN IT WILL NOT SIT BESIDE IT. The
+       prompt alone fitting is not enough -- the cursor can be outside the box
+       while the text that led to it is inside, which is the gap
+       check_dialog_widths exists to close.
+       THE DECLARATION IS INSIDE THE GUARD TOO, and that is not tidiness: with
+       `px` hoisted above the scr_puts for both builds, the 80-column binary
+       changed -- same behaviour, different codegen. The point of every
+       #ifdef here is that the released build is byte-for-byte what it was,
+       and a harmless reordering costs that proof. */
+    if (px + max > DLG_ROOM + DLG_PAD) {
+        dlg_room();
+        y = (unsigned char)(DLG_Y + dlg_row);
+        dlg_row++;
+        px = DLG_PAD;
+    }
+    return read_field((unsigned char)(DLG_X + px), y, buf, max);
+#else
+    return read_field((unsigned char)(DLG_X + DLG_PAD + strlen(prompt) + 1),
+                      y, buf, max);
+#endif
 }
 
 void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
@@ -1408,7 +1491,7 @@ void ui_dialog_close(void) {
     unsigned char x, y;
 
     dlg_room();
-    scr_puts((unsigned char)(DLG_X + 2), (unsigned char)(DLG_Y + dlg_row),
+    scr_puts((unsigned char)(DLG_X + DLG_PAD), (unsigned char)(DLG_Y + dlg_row),
              S(S_40), COL_DEPT);
     for (;;) if (kb_waitkey() == KB_RETURN) break;
 

@@ -233,6 +233,11 @@ BRIEF_COLS = 78
 # frame and whatever is to the right of it.
 DLG_W = 52
 DLG_ROOM = DLG_W - 4
+# THE 40-COLUMN BOX IS NARROWER AND THE SAME TEXT HAS TO FIT IT. Full width
+# with one column of padding either side, so W - 2. Checked separately and
+# reported by name, because the 80-column build is not wrong about these --
+# they fit it perfectly well -- and a check that blamed it would be lying.
+DLG_ROOM_40 = 40 - 2
 
 
 def check_message_widths():
@@ -657,6 +662,35 @@ def _ui_sources():
             for n in ("main.c", "ui.c")]
 
 
+def _all_dialog_lines():
+    """Every dialog line in the port, as (file, kind, text, width, room).
+
+    Pulled out of check_dialog_widths so the 80-column and 40-column bounds
+    read the SAME list. Two extractors would drift, and this project has the
+    scars: check_message_widths and check_confirm_widths were two rigorous
+    checks with the gap between them."""
+    strings = _pool()
+    rows = []
+
+    def text_of(idg, litg):
+        return strings[int(idg)] if idg else litg
+
+    for name, src in _ui_sources():
+        for m in re.finditer(
+                r'ui_dialog_(line|open)\(\s*(?:S\(S_(\d+)\)|"((?:[^"\\]|\\.)*)")',
+                src):
+            t = text_of(m.group(2), m.group(3))
+            rows.append((name, "ui_dialog_" + m.group(1), t, len(t), DLG_ROOM))
+        sizes = dict(re.findall(r'char\s+(\w+)\s*\[\s*(\d+)\s*\]', src))
+        for m in re.finditer(
+                r'ui_dialog_(?:ask|ask_esc|yes)\(\s*(?:S\(S_(\d+)\)|"((?:[^"\\]|\\.)*)")'
+                r'(?:\s*,\s*(\w+)\s*,\s*sizeof\s+(\w+))?', src):
+            t = text_of(m.group(1), m.group(2))
+            width = int(sizes.get(m.group(4), 4)) if m.group(4) else 4
+            rows.append((name, "ui_dialog_ask", t, len(t) + 1 + (width - 1), DLG_ROOM))
+    return rows
+
+
 def check_dialog_widths():
     """A dialog line must fit inside the dialog frame.
 
@@ -704,6 +738,16 @@ def check_dialog_widths():
         die("dialog text wider than the dialog box:\n" + "\n".join(
             "         %s %s: %r needs %d, %d fit" % b for b in bad))
     print("verify: every dialog line fits the dialog box -- ok")
+
+    wide = sorted((n, t) for (_, _, t, n, _) in _all_dialog_lines()
+                  if n > DLG_ROOM_40)
+    if wide:
+        print("verify: %d dialog line(s) do NOT fit a 40-column box (%d fit):"
+              % (len(wide), DLG_ROOM_40))
+        for n, t in wide:
+            print("         %3d  %s" % (n, t))
+    else:
+        print("verify: every dialog line also fits a 40-column box -- ok")
 
 
 def check_confirm_not_in_dialog():
