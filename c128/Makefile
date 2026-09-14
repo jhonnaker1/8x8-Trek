@@ -114,7 +114,7 @@ define OVL_IMAGES
 	done
 endef
 
-.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 game40 d64-40-debug play40 monitor test verify music loadbench clean
+.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 game40 d64-40-debug play40 screens40 monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -414,6 +414,41 @@ $(DBG40_D64): $(DBG40_OUT) build/strings.dat build/music.dat Makefile
 # which is what the first version of this did.
 play40: $(DBG40_D64)
 	@python3 tools/shot40game.py
+
+# THE SCREEN BENCH. The real ui.c and the real string pool, drawing ONE screen
+# chosen by a poked byte -- no title, no setup, no game loop. Built WITHOUT
+# -DTREK_OVERLAYS so everything is resident, which is what a bench wants and
+# is a different link from the game. `make screens40` then
+# `python3 tools/screens40.py [n...]`.
+SCR40_SRC = src/screens40.c src/vdcram.c src/vic.c src/layout40.c src/ui.c \
+            src/input.c src/sid.c src/music_data.c src/storage.c src/farmem.c \
+            src/overlay.c src/strpool.c \
+            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
+
+screens40: build/screens40.d64
+
+build/screens40.prg: $(SCR40_SRC) $(HDR) src/vic.h src/layout40.h Makefile
+	@mkdir -p build
+	$(MOSCC) -Oz -I src -I ../core -Wall -Werror -DTREK_40COL -DTREK_DEBUG_INPUT -o $@ $(SCR40_SRC)
+	@ls -l $@
+
+# Formatted from empty every time: `c1541 -write` over an existing name
+# answers ERR = 63, FILE EXISTS and leaves the OLD file, which is how a
+# deliberately broken build once reported a pass on the C64 probe.
+build/screens40.d64: build/screens40.prg build/strings.dat build/music.dat
+	@rm -f $@
+	@c1541 -format "screens40,01" d64 $@ >/dev/null
+	@c1541 -attach $@ -write build/screens40.prg screens40 >/dev/null
+	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
+	@c1541 -attach $@ -write build/trek.scr trek.scr,s >/dev/null
+	@c1541 -attach $@ -write src/briefing.txt brief.txt,s >/dev/null
+	@python3 -c "d = open('build/strings.dat','rb').read(); \
+	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	@c1541 -attach $@ -write build/strings.pdat strings.dat >/dev/null
+	@python3 -c "d = open('build/music.dat','rb').read(); \
+	    open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	@c1541 -attach $@ -write build/music.pdat music.dat >/dev/null
+	@echo "screen bench: $@"
 
 CON40_SRC = src/console40.c src/vic.c src/layout40.c
 

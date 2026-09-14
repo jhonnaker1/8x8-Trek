@@ -1340,15 +1340,41 @@ static void dlg_room(void) {
    reentrant. */
 static char dlg_wrap[DLG_ROOM + 1];
 
+/* HOW MANY CHARACTERS OF `text` FIT IN `w`, breaking at a space so words stay
+   whole. ONE COPY OF THIS RULE, shared by the dialog and by wrap_puts below:
+   two of them would drift, and this project already carries the scars of
+   check_message_widths and check_confirm_widths being two rigorous checks
+   with the gap between them.
+   A run with no space inside `w` is cut at the limit rather than dropped --
+   there is no such string today and losing text silently would be worse than
+   an ugly break. */
+static unsigned char wrap_cut(const char *text, unsigned char w) {
+    unsigned char i, cut;
+    for (i = 0; i < w && text[i]; i++) { }
+    if (!text[i]) return i;                 /* the rest fits */
+    for (cut = i; cut && text[cut] != ' '; cut--) { }
+    return cut ? cut : i;
+}
+
+/* Draws `text` at (x,y) wrapped to `w`, and returns the rows it used. */
+static unsigned char wrap_puts(unsigned char x, unsigned char y, unsigned char w,
+                               const char *text, unsigned char colour) {
+    unsigned char used = 0, i, cut;
+    while (*text) {
+        cut = wrap_cut(text, w);
+        for (i = 0; i < cut; i++) dlg_wrap[i] = text[i];
+        dlg_wrap[cut] = 0;
+        scr_puts(x, (unsigned char)(y + used), dlg_wrap, colour);
+        used++;
+        text += cut;
+        while (*text == ' ') text++;
+    }
+    return used;
+}
+
 void ui_dialog_line(const char *text) {
     while (*text) {
-        unsigned char i, cut;
-        for (i = 0; i < DLG_ROOM && text[i]; i++) { }
-        if (!text[i]) { cut = i; }              /* the rest fits */
-        else {
-            for (cut = i; cut && text[cut] != ' '; cut--) { }
-            if (!cut) cut = i;                  /* no space: break at the edge */
-        }
+        unsigned char i, cut = wrap_cut(text, DLG_ROOM);
         for (i = 0; i < cut; i++) dlg_wrap[i] = text[i];
         dlg_wrap[cut] = 0;
         dlg_room();
@@ -2313,6 +2339,42 @@ void ui_loss_memo(void) {
 
     trek_score_sheet(&sh);
     scr_clear();
+#ifdef TREK_40COL
+    /* THE MEMO AT FORTY COLUMNS. Every line of it already fits -- the longest
+       is RE: LOSS OF U.S.S. LEXINGTON, RCB-92 at 38 -- so the body simply
+       goes flush left instead of indented to 8, and the three figures are
+       right-aligned to the edge rather than to column 44. Only the loss line
+       itself can be long, and that WRAPS.
+       Headers centred from their measured lengths: 14, 18 and 10 wide give
+       13, 11 and 15. */
+    {
+        unsigned char y;
+        scr_puts(13, 1, S(S_20),  COL_VALUE);
+        scr_puts(11, 2, S(S_26),  COL_LABEL);
+        scr_puts(15, 3, S(S_313), EGA_TO_VDC(EGA_LTRED));
+
+        scr_puts(0, 6, S(S_307), COL_LABEL);
+        scr_puts(0, 7, S(S_312), COL_LABEL);
+        scr_puts(0, 8, "DATE:", COL_LABEL);
+        put_tenths(6, 8, ship.stardate, COL_VALUE);
+        scr_puts(0, 9, S(S_309), COL_LABEL);
+
+        y = (unsigned char)(12 + wrap_puts(0, 12, 40,
+                                           loss_line(ship.lost_how), COL_MSG));
+        if (y < 16) y = 16;             /* keep the figures clear of the prose */
+
+        scr_puts(0, y, S(S_311), COL_LABEL);
+        put_tenths(34, y, (uint16_t)(ship.stardate - STARDATE_START), COL_VALUE);
+        y++;
+        scr_puts(0, y, S(S_308), COL_LABEL);
+        put_tenths(34, y, (uint16_t)(sh.rate_hundredths / 10u), COL_VALUE);
+        y++;
+        scr_puts(0, y, S(S_310), COL_LABEL);
+        put_signed(34, y, sh.total, 6, COL_VALUE);
+
+        scr_puts(9, 22, S(S_40), EGA_TO_VDC(EGA_LTRED));
+    }
+#else
     scr_puts(32, 1, S(S_20), COL_VALUE);
     scr_puts(31, 2, S(S_26), COL_LABEL);
     scr_puts(35, 3, S(S_313), EGA_TO_VDC(EGA_LTRED));
@@ -2333,6 +2395,7 @@ void ui_loss_memo(void) {
     put_signed(44, 17, sh.total, 6, COL_VALUE);
 
     scr_puts(8, 22, S(S_40), EGA_TO_VDC(EGA_LTRED));
+#endif
     kb_waitkey();
 }
 
@@ -2402,7 +2465,11 @@ void ui_evaluation(void) {
     y++;
     ev_row(y, NULL, "TOTAL", sh.total, COL_VALUE);
 
+#ifdef TREK_40COL
+    scr_puts(9, 22, S(S_40), COL_DEPT);     /* (40 - 22) / 2 */
+#else
     scr_puts(29, 22, S(S_40), COL_DEPT);
+#endif
     while (kb_waitkey() != KB_RETURN) { }
 }
 
@@ -2453,6 +2520,46 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     }
 
     scr_clear();
+#ifdef TREK_40COL
+    /* THREE COLUMNS IN FORTY, and the widths are measured rather than chosen.
+       The longest rank is LT. COMMANDER at 13 and the score column is 6, so
+       the name gets 0..12 and the rank 14..26 and the score ends at 39.
+       THE NAME IS CLIPPED TO 13, deliberately: HOF_NAME is 25 because that is
+       the FILE's field width, while ui_setup only ever collects name[13]. A
+       longer name in a hand-edited TREK.SCR would otherwise run straight
+       through the rank column, and clipping is what keeps the sheet a sheet.
+       The two intro lines are 57 and 50 characters -- longer than the screen
+       -- so they WRAP rather than being reworded. They may be Anderson's;
+       see the note on ui_dialog_line. */
+    scr_puts(13, 1, S(S_20), COL_VALUE);
+    scr_puts(14, 2, S(S_38), COL_VALUE);
+    y = 4;
+    y = (unsigned char)(y + wrap_puts(0, y, 40, S(S_35), COL_MSG));
+    y = (unsigned char)(y + wrap_puts(0, y, 40, S(S_59), COL_MSG));
+    y++;
+
+    scr_puts(0,  y, "NAME",  COL_LABEL);
+    scr_puts(14, y, "RANK",  COL_LABEL);
+    scr_puts(34, y, "SCORE", COL_LABEL);
+    y = (unsigned char)(y + 2);
+
+    for (i = 0; i < HOF_RANKS; i++) {
+        unsigned char top = (unsigned char)(y + i * 2);
+        scr_puts(14, top, S(rank_name_id[i]), COL_VALUE);
+        for (j = 0; j < HOF_PLACES; j++) {
+            unsigned char row = (unsigned char)(top + j);
+            unsigned char col = j ? COL_GRID : COL_MSG;
+            unsigned char k;
+            idx = hof_index((uint8_t)(i + 1), j);
+            for (k = 0; k < 13 && hof[idx].name[k]; k++) dlg_wrap[k] = hof[idx].name[k];
+            dlg_wrap[k] = 0;
+            scr_puts(0, row, dlg_wrap, col);
+            put_signed(34, row, hof[idx].score, 6, col);
+        }
+    }
+
+    scr_puts(9, 22, S(S_40), COL_DEPT);
+#else
     scr_puts(33, 1, S(S_20), COL_VALUE);
     scr_puts(34, 2, S(S_38),   COL_VALUE);
     scr_puts(14, 4, S(S_35), COL_MSG);
@@ -2480,6 +2587,7 @@ void ui_hall_of_fame(const char *name, uint8_t level, int16_t score) {
     }
 
     scr_puts(29, 22, S(S_40), COL_DEPT);
+#endif
     while (kb_waitkey() != KB_RETURN) { }
 }
 
@@ -2675,7 +2783,11 @@ void ui_title(void) {
    Answering YES in the original returns to the TITLE screen and re-runs the
    whole setup -- name, level and password are all asked again, verified by
    playing two games through. NO exits to DOS. */
+#ifdef TREK_40COL
+#define PA_X  11                 /* (40 - PA_W) / 2 */
+#else
 #define PA_X  19
+#endif
 #define PA_Y   5
 #define PA_W  17
 #define PA_H   5
@@ -2687,7 +2799,11 @@ uint8_t ui_play_again(void) {
        screen, and RETURN is not an answer to this prompt -- so it goes,
        rather than sitting there telling the player to press a key that does
        nothing. */
+#ifdef TREK_40COL
+    scr_fill_rect(9, 22, 22, 1, SC_SPACE, COL_DEPT);
+#else
     scr_fill_rect(29, 22, 22, 1, SC_SPACE, COL_DEPT);
+#endif
 
     box(PA_X, PA_Y, PA_W, PA_H, EGA_TO_VDC(EGA_LTMAGENTA));
     scr_puts(PA_X + 3, PA_Y + 1, S(S_60), COL_VALUE);
