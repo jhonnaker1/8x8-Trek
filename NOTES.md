@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and sixteen times on 2026-09-13 (2 open of 57 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 (3 open of 59 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1866,7 +1866,15 @@ are the CoCo 3**, which is started and not released:
       including `far_load("MUSIC.DAT")`, the briefing, and every SAVE. **A
       machine that reaches the title screen and then has no words in it is
       this item**, not item 46 coming back.
-  57. **40 COLUMNS IS AN OPEN QUESTION AND THE DOCS ANSWER IT TWO WAYS.**
+  57. ~~**40 COLUMNS IS AN OPEN QUESTION AND THE DOCS ANSWER IT TWO WAYS.**~~
+      **CLOSED 2026-09-13. Every decision it asked for has been made**,
+      and its own condition was "closes when a decision is made, not when
+      a port ships": the docs contradiction is resolved, the geometry is
+      derived, the first machine is decided (the C64, with the C128 at 40
+      columns as step one), and Jamie agreed the two-page split. The
+      REMAINING WORK is items 58 and 59 -- keeping this open because work
+      is left is the drift that made this list's count wrong six times,
+      and its heading had already gone stale: the docs no longer disagree.
       Raised 2026-09-13 when Jamie asked to explore it. `README.md` says the
       40-column colour machines "are viable but would need a paged UI"; THE
       TARGETS SECTION of this file says that assessment "is superseded -- the
@@ -2002,6 +2010,30 @@ are the CoCo 3**, which is started and not released:
       **The 32-column family still fails `check_colours.py` on colour, so it
       may never have a consumer.** Decide when there is a second family in
       hand, not now.
+  58. **THE 40-COLUMN BUILD DRAWS, AND THREE THINGS ARE STILL 80 COLUMNS
+      WIDE.** Raised 2026-09-13 out of the first run of the real game.
+      * **THE BADGE TRADE IS NOW A FIX, NOT A PREFERENCE.**
+        `msg_clear_region()` clears `(MSG_X, MSG_Y, MSG_W, MSG_H)`; at forty
+        columns `MSG_X` is 0, so every message wipes **rows 11..24 across the
+        whole width** -- LASERS, COMMAND, MAIN VIEWER, the badge and SYSTEMS
+        STATUS -- and the first message arrives before the player types
+        anything. Two boxes in the badge's 8 rows on the tactical page, four
+        on the chart page, `msg_clear_region` page-aware with the rest.
+      * **The title and setup screens draw at hardcoded 80-column
+        coordinates** and wrap. They do not come from `panels[]`, so the
+        layout swap does not reach them.
+      * **It still calls itself "C128-VDC PORT"** on the title screen.
+  59. **THE C64 HAS NOWHERE TO PUT THE MESSAGE LOG.** Raised 2026-09-13, and
+      it is the seam the C64 scope missed. `ui.c` keeps 2K of read/write
+      scratch (`LOG_SLOTS` 32 x `LOG_STRIDE` 64) in VDC RAM, and EVERY port
+      implements `vdc_set_address` -- it is a portable seam badly named after
+      one chip. **The C128's 40-column build gets away with it because the VDC
+      is still in the machine, just not driving the monitor.** A C64 has no
+      such chip. The scope said far memory was the one new seam; it is two,
+      and this one was invisible because every port so far had video RAM to
+      spare. Candidates: RAM under the KERNAL, RAM under BASIC beside the
+      7,380-byte pool in `$A000-$BFFF` (about 800 bytes spare, so not both),
+      or fewer/narrower log slots. **Nothing is measured yet.**
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
