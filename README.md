@@ -232,9 +232,17 @@ of them were settled by measurement in September 2026.
   work around each byte dwarfs the byte. It is 3.84 s now and is still the
   slowest of the seven; a dirty-cell scheme remains the structural fix. That
   port is **released as of v0.15.0**; see [`coco3/README.md`](coco3/README.md). The **stock Atari
-  800XL** stops at 40 columns; only VBXE brings it back. The 40-column colour
-  machines (C64, Plus/4, CBM-II) are viable but would need a paged UI, because
-  a nine-panel console does not fit in 40 columns.
+  800XL** stops at 40 columns; only VBXE brings it back — and that is a
+  **colour** failure, ANTIC's text modes, not a column one. **40 COLUMNS IS
+  RE-OPENED (2026-09-13, item 57)** and the sentence that used to sit here —
+  "a nine-panel console does not fit in 40 columns" — is wrong about the
+  geometry: laying the panel table on a grid shows **two of the three bands are
+  already exactly forty columns wide**, and the third misses by one. The LONG
+  RANGE CHART and the MESSAGE REGION become paged views, which `msgv_draw`
+  already does for messages. See "40 COLUMNS: what the layout already permits"
+  in [`NOTES.md`](NOTES.md), which also measures a **C64** port — SID driver,
+  toolchain, keyboard model and disk seam all reused from the C128 — and the
+  **CoCo 3's own GIME at 320×200×16, which is 40×25 with no SuperSprite.**
 
 ### The order, decided 2026-08-23, rewritten 2026-09-05
 

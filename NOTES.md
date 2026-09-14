@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and fifteen times on 2026-09-13 (1 open of 56 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and sixteen times on 2026-09-13 (2 open of 57 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -1860,6 +1860,23 @@ are the CoCo 3**, which is started and not released:
       including `far_load("MUSIC.DAT")`, the briefing, and every SAVE. **A
       machine that reaches the title screen and then has no words in it is
       this item**, not item 46 coming back.
+  57. **40 COLUMNS IS AN OPEN QUESTION AND THE DOCS ANSWER IT TWO WAYS.**
+      Raised 2026-09-13 when Jamie asked to explore it. `README.md` says the
+      40-column colour machines "are viable but would need a paged UI"; THE
+      TARGETS SECTION of this file says that assessment "is superseded -- the
+      80-column rule is the rule". **Both are recited, neither is derived**,
+      and they cannot both stand.
+      The derivation is now written up in "40 COLUMNS: what the layout already
+      permits" at the end of this file. Its finding is that **two of the three
+      panel bands are ALREADY exactly forty columns wide** and the third misses
+      by one, so the console does not have to be redesigned -- the LONG RANGE
+      CHART and the MESSAGE REGION become paged full-screen views, which is
+      what the founding note predicted and what `msgv_draw` already does.
+      **This item closes when a decision is made, not when a port ships.**
+      What rides on it: the CoCo 3's GIME does 320x200x16 = 40x25 with **no
+      SuperSprite**, which is the only route to item 55 on real hardware, and a
+      **C64** port reuses the SID driver, the toolchain, the keyboard model and
+      the disk seam verbatim. Nothing in either has been compiled or drawn.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
@@ -5045,8 +5062,13 @@ at 40 columns. Exactly the same split Uno hit, for the same reason.
   hi-res colour is artifacted down to about 140 real colour pixels.
 - **Everything at 40 columns or fewer**: C64, C64 OS, Plus/4, CBM-II 510,
   VIC-20, ZX Spectrum, TI-99/4A. An earlier version of this section listed the
-  40-column colour machines as "workable, needs a paged UI". **That is
-  superseded** -- the 80-column rule is the rule.
+  40-column colour machines as "workable, needs a paged UI", and a later one
+  called that superseded by "the 80-column rule is the rule".
+  **RE-OPENED 2026-09-13 (item 57), and the rule turns out to be wrong about
+  the geometry**: two of the three panel bands are ALREADY exactly forty
+  columns wide -- see "40 COLUMNS: what the layout already permits" at the end
+  of this file. What actually rules a machine out here is COLOUR, which is a
+  separate axis, and bundling the two is what produced the rule.
 - **DOS** -- the original's own platform, reference oracle only, not a build
   target. Its EGA mode 10h at 640x350x16 is where the console came from.
 
@@ -10779,3 +10801,134 @@ octave low. Trust the analysis below ~600Hz; the script prints the warning
 itself rather than leaving it in a comment. **The pre-fix references at 440 and
 880 both sat in the trustworthy range, which is what makes the x0.500 a
 finding and not an artifact of the same kind.**
+
+## 40 COLUMNS: what the layout already permits, and a C64 port (2026-09-13)
+
+Jamie asked to explore this. The trigger is concrete: **he has a real CoCo 3
+and no SuperSprite FM+**, so the seventh port cannot run on the machine it was
+written for (item 55). A 40-column mode is the only thing that changes that.
+
+**THE PROJECT'S OWN POSITION IS CONTRADICTORY AND THAT IS ITEM 57.** The
+founding note says *"On 40-column machines the presentation will likely end up
+SST-shaped (scrolling text reports, paged panels) since the nine-panel console
+will not fit. **Vary presentation freely; never vary logic.**"* The targets
+section later hardened to *"the 80-column rule is the rule"* and marked the
+40-column machines superseded -- while `README.md` still says they "are viable
+but would need a paged UI". Two live documents, opposite answers. Both are
+recited rather than derived, so what follows is the derivation.
+
+### The geometry is a table, and two of the three bands ALREADY fit
+
+`panels[]` in `c128/src/layout.c` plus `MSG_*` in `layout.h` is the whole
+console. `ui.c` carries no width constant but `BRIEF_LINE 80`, and every draw
+function positions from `p->x`/`p->y`. **A second layout is data plus content
+density, not a rewrite.**
+
+Laying the eight panels on a grid gives a result I did not expect:
+
+    rows 11..17   LASERS/COMMAND (0..20) + panel5 (21..39)   = cols 0..39  EXACTLY 40
+    rows 17..24   BADGE (0..19)  + SYSTEMS (20..39)          = cols 0..39  EXACTLY 40
+    rows  0..10   SCAN  (0..20)  + STATUS  (20..40)          = cols 0..40  ONE OVER
+
+**Two of the three bands are already exactly forty columns wide.** The third
+misses by a single column, and the slack to pay for it is visible in
+`ui_draw_scan`: the 8x8 grid is drawn at `x0 + col * 2`, so eight cells occupy
+fifteen columns. At one-column pitch the scan panel fits in about thirteen. The
+cost is the airy look, not the information.
+
+### What genuinely does not fit, and what it becomes
+
+Only the right half of the screen:
+
+* **LONG RANGE CHART** -- 8x8 of three-digit codes at four-column pitch
+  (`x0 + col * 4`), about 34 columns with labels and borders. It FITS a
+  40-column screen and consumes all of it.
+* **MESSAGE REGION** -- 40 wide by design (`MSG_W 40`).
+
+So both become full-screen paged views, which is exactly the SST-shaped
+presentation the founding note predicted. **One of the two already exists**:
+`msgv_draw` is a modal full-screen message reader, built for MSGS.
+
+### Costs, measured rather than estimated
+
+* **`BRIEF.TXT` is 80-column prose**: 12 pages, 227 lines, longest 71, and
+  **155 of the 227 exceed 40 columns**. It is generated by
+  `tools/gen_strings.py`, so a 40-column variant is a generator change landing
+  around 21 pages -- not a hand edit.
+* **13 pooled strings exceed 36 characters** (hall-of-fame headers, setup
+  prompts). A bounded, enumerable list.
+* `core/` is untouched. This is presentation.
+
+### COLOUR IS A SEPARATE AXIS FROM COLUMNS, and must not be bundled with it
+
+The core speaks EGA indices and each port maps them; `scr_put(x, y, glyph,
+colour)` carries **one foreground per cell and no per-cell background**. A
+target fails on colour or on width independently, and the stock Atari 800XL
+fails on COLOUR -- ANTIC's text modes -- not on columns. Bundling the two is
+what produced "the 80-column rule".
+
+### The CoCo 3 without the card
+
+The GIME's own **320x200 in 16 colours is exactly 40x25 cells of 8x8**, with no
+SuperSprite in the machine. Two consequences, and the second is the interesting
+one: it would run on Jamie's actual hardware, and **its VRAM is directly
+addressable memory rather than two I/O ports**, which is the entire reason that
+port's repaint was 12.24 seconds. The slowest of the seven could become one of
+the faster ones. NOT VERIFIED -- no mode has been set and nothing has been
+drawn; this is arithmetic and a datasheet claim.
+
+## A 40-COLUMN C64 PORT: measured, and it is a SIMPLER C128 (2026-09-13)
+
+Explored at Jamie's request, same day. **Almost every seam already exists**,
+because the C64 is the C128's smaller sibling and the C128 was the first port.
+
+| Seam | C64 answer | Cost |
+|---|---|---|
+| Colour | VIC-II colour RAM: **one foreground per cell from 16** | **exact match for `scr_put`** |
+| Sound | **SID at `$D400`** -- byte-identical to the C128's | `c128/src/sid.c` ports verbatim |
+| Toolchain | `llvm-mos/mos-platform/c64` is installed | free; same compiler as the C128 |
+| Keyboard | KERNAL GETIN, PETSCII | the C128's model, not the X16's ASCII |
+| Storage | KERNAL SETNAM/SETLFS/LOAD/OPEN | the C128 disk seam, minus banking |
+| Overlays | the shared machinery in `core/overlay.h` | already portable |
+| Far memory | **NEW** -- there is no bank 1 | see below |
+
+**FAR MEMORY IS THE ONE GENUINELY NEW MECHANISM, AND IT IS EASIER, NOT HARDER.**
+The C128 reaches bank 1 through the KERNAL's FETCH/STASH because switching banks
+changes what is visible at every address. The C64 has no bank 1 -- but with
+BASIC's ROM switched out, **`$A000-$BFFF` is eight kilobytes of plain RAM in the
+address space**. STRINGS.DAT is **7,380 bytes**. It fits with about 800 spare,
+and `plat_far_*` becomes a plain array the way the MEGA65's and the Amiga's are.
+
+A plausible map, for arguing with rather than building from:
+
+    $0400-$07E7  screen (VIC-II, movable)
+    $0801-$9EFF  program            ~38K   (C128's region is ~37.6K)
+    $A000-$BFFF  string pool         8K    BASIC ROM off; plain RAM
+    $C000-$CFFF  overlay window      4K    (C128's window is 4K at $AF00)
+    $D800-$DBE7  colour RAM (fixed)
+    $E000-$FFFF  KERNAL -- needed for disk
+
+The C128 resident is **36,174 bytes** with eleven overlay images, largest
+**3,892**. The budget above is within a few hundred bytes of the C128's, so the
+overlay split should transfer rather than be redesigned -- and a 40-column
+`ui.c` is unlikely to be larger than the 80-column one.
+
+**IT MAY ALSO BE FASTER THAN THE C128 DESPITE HALF THE CLOCK.** The VDC is
+reached through an address register and a data register with status polling;
+the C64's screen is `sta $0400,x`. Half the cells, direct writes, half the
+megahertz. **Unmeasured, and worth measuring before anyone repeats it.**
+
+### What is NOT known
+
+* **The C64 palette is not EGA's**, and two entries collide: LTCYAN onto CYAN
+  and LTMAGENTA onto MAGENTA. **Every colour that carries game information
+  survives** -- `EGA_MONGOL_*`, `EGA_CHART_MONGOL`, `EGA_VANDAL` all map
+  uniquely, and `EGA_CHART_BASE` is the manual's "orange", which the C64 HAS
+  and EGA renders as brown. The collisions land on decoration. **Checked by
+  reading `core/ega.h` against the Commodore palette, not by looking at a
+  screen.**
+* Whether the 40-column layout wants ONE table with a build switch or a second
+  `layout40.c`. `egavdc.h` already says the shared UI "has outgrown its name"
+  if a third target lands on it; a fourth plus a second geometry is the moment
+  to move `ui.c` out of `c128/src`.
+* Nothing here has been compiled, drawn or timed.
