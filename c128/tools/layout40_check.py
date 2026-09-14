@@ -17,7 +17,7 @@ broken, which is the kind of false red that teaches people to ignore a check.
 It also proves the thing the whole 40-column argument rests on: that every
 panel fits inside 40x25.
 """
-import os, re, sys
+import os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 C128 = os.path.dirname(HERE)
@@ -144,8 +144,87 @@ def main():
         print("  %-8s page: %d junction(s), recomputed from the geometry"
               % (name, len(got)))
 
+    check_text_width()
+
     print("layout40_check: the 40-column geometry is consistent")
     return 0
+
+
+CC   = os.path.expanduser("~/llvm-mos/bin/mos-c128-clang")
+CORE = os.path.join(os.path.dirname(C128), "core")
+POOL = os.path.join(C128, "src", "strings.txt")
+
+
+def pool_texts():
+    """id -> text, numbered exactly as tools/gen_strings.py numbers them."""
+    out, n = {}, 0
+    for line in open(POOL, encoding="utf-8").read().splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        out[n] = line.split("\t", 1)[1] if "\t" in line else line
+        n += 1
+    return out
+
+
+def check_text_width():
+    """No scr_puts may start far enough right that its own text runs off.
+
+    THIS IS NOT THE SAME CHECK AS THE PANELS ABOVE, and the difference is what
+    it caught. The geometry check proves every BOX fits in 40x25. It says
+    nothing about a string, and the three defects this found were all strings:
+    the farewell screen in main.c drew "MISSION ENDE" over "BASIC IS ON THE 4",
+    and ui_setup_briefing drew a ship's plate reading "U.S.S. LE" over "RCB-",
+    because x=28, x=23, x=31 and x=36 are eighty-column positions that were
+    never moved.
+
+    NONE OF THE THREE WAS IN THE SCREEN BENCH. tools/screens40.py cycles
+    fourteen screens; the farewell is drawn on the way out of main() and the
+    briefing question sits in the gap between two screens the bench DOES have.
+    A bench reaches the screens somebody listed. This reaches every call site.
+
+    THE C PREPROCESSOR DOES THE #ifdefs, because deciding by regex which side
+    of a TREK_40COL branch a line is on is how a checker ends up confidently
+    wrong. Only literal coordinates and literal or pooled text can be checked
+    -- a computed x is invisible here and is the checker's honest limit.
+    """
+    texts = pool_texts()
+    bad = []
+    for name in ("ui.c", "main.c"):
+        path = os.path.join(C128, "src", name)
+        cpp = subprocess.run(
+            [CC, "-E", "-P", "-DTREK_40COL", "-DTREK_OVERLAYS",
+             "-I", os.path.join(C128, "src"), "-I", CORE, path],
+            capture_output=True, text=True)
+        if cpp.returncode != 0:
+            die("could not preprocess %s:\n%s" % (name, cpp.stderr[-600:]))
+        src = cpp.stdout
+
+        # S_nnn has already expanded to a bare number by this point.
+        for m in re.finditer(
+                r"\bscr_puts\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*S\s*\(\s*(\d+)\s*\)", src):
+            x, y, sid = (int(g) for g in m.groups())
+            t = texts.get(sid)
+            if t is not None and x + len(t) > COLS:
+                bad.append((name, x, y, "S_%d" % sid, t))
+        for m in re.finditer(
+                r'\bscr_puts\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*"((?:[^"\\]|\\.)*)"', src):
+            x, y, t = int(m.group(1)), int(m.group(2)), m.group(3)
+            if x + len(t) > COLS:
+                bad.append((name, x, y, "literal", t))
+
+        # A row is off the screen entirely, whatever the text is.
+        for m in re.finditer(
+                r"\bscr_(?:puts|put)\s*\(\s*(\d+)\s*,\s*(\d+)", src):
+            x, y = int(m.group(1)), int(m.group(2))
+            if x >= COLS or y >= ROWS:
+                bad.append((name, x, y, "off-screen", ""))
+
+    for name, x, y, what, t in sorted(set(bad)):
+        print("  %s: x=%d y=%d %s runs to column %d -- %r"
+              % (name, x, y, what, x + len(t), t[:44]))
+    if bad:
+        die("%d drawing call(s) do not fit in %d columns" % (len(bad), COLS))
+    print("  text     width: every literal scr_puts fits in %d columns" % COLS)
 
 
 if __name__ == "__main__":

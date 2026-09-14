@@ -79,8 +79,13 @@ static uint8_t live = OVL_NONE;
    Both 0 -- the window and this file are in bank 0. farmem.c leaves the
    KERNAL set to bank 1 only for the duration of its own load, but setting it
    here costs three bytes and removes the ordering assumption entirely. */
+/* SHARED WITH THE C64, WHICH HAS NO SETBNK -- see the same guard in
+   storage.c. $FF68 is a C128 vector and lands in the middle of the C64's
+   KERNAL. */
 static void bank_for_data(void) {
+#ifdef __C128__
     __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x", "memory", "p");
+#endif
 }
 
 void ovl_load(uint8_t which) {

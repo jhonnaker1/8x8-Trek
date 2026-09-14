@@ -2129,9 +2129,25 @@ void ui_briefing(void) {
 OVL_CODE("title")
 uint8_t ui_setup_briefing(void) {
     scr_clear();
+#ifdef TREK_40COL
+    /* THE SAME PLATE AS ui_setup BELOW, AND IT WAS MISSED WHEN THAT ONE WAS
+       MOVED -- found 2026-09-14 by measuring x + strlen against 40 rather
+       than by looking at the screen. At 31 and 36 the driver clips to nine
+       and four columns, so this screen read "U.S.S. LE" over "RCB-", which
+       is precisely the failure a screenshot does not shout about: it is
+       still a ship's plate, just the wrong one.
+       tools/screens40.py has "setup" and "briefing" and not this, because
+       this is a THIRD screen between them -- the question that decides
+       whether the briefing runs at all. Two screens either side of a gap
+       both looked right. */
+    scr_puts(22, 1, S(S_89), COL_VALUE);
+    scr_puts(32, 2, S(S_174), COL_VALUE);
+    scr_puts(0,  5, S(S_96), COL_MSG);
+#else
     scr_puts(31, 1, S(S_89), COL_VALUE);
     scr_puts(36, 2, S(S_174), COL_VALUE);
     scr_puts(2,  5, S(S_96), COL_MSG);
+#endif
     return ask_yes(7, S(S_156));
 }
 

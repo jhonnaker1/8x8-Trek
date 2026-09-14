@@ -1,6 +1,14 @@
 #include "vdc.h"        /* the seam every caller sees -- see vic.h */
 #include "vic.h"
 
+/* THE VIC-II DRIVER, AND IT IS BOTH MACHINES'. This file was written for the
+ * C128's 40-column build and is linked unchanged into the C64 port, because
+ * a VIC-IIe in 40-column mode and a VIC-II ARE the same chip for everything
+ * here: screen memory at $0400, colour RAM at $D800, one global background,
+ * the same character ROM in the same place. The two `#ifdef __C128__` blocks
+ * below are the entire difference, and both are about the KERNAL rather than
+ * the video chip. See NOTES.md item 57. */
+
 #define VIC_RASTER  (*(volatile unsigned char *)0xD012)
 #define VIC_BORDER  (*(unsigned char *)0xD020)
 #define VIC_BGND    (*(unsigned char *)0xD021)
@@ -34,7 +42,9 @@ void vdc_init(void) {
        picture to look at. A 40-column C128 therefore runs at 1MHz, half what
        the 80-column port does, which is also an honest preview of C64 timing.
        See NOTES.md item 57. */
+#ifdef __C128__
     C128_CLKRATE &= (unsigned char)~0x01;
+#endif
 
     /* Video matrix at $0400, character generator at $1000 -- the UPPERCASE/
        GRAPHICS half of the ROM, which is where the box-drawing glyphs and the
@@ -55,7 +65,18 @@ void vdc_init(void) {
        throughout, which is EGA TREK. Only the font bank was wrong, which is
        exactly the failure that cannot report itself -- a screen full of the
        wrong letters looks like a screen. */
+    /* THE $0A2C STORE IS C128-ONLY AND WOULD BE FATAL ON A C64, which is
+       why the guard is here and not around a tidier line. On a C128 $0A2C is
+       the KERNAL's VM1. On a C64, BASIC text starts at $0801 -- so $0A2C is
+       INSIDE THIS PROGRAM'S OWN CODE, about 550 bytes in, and the store would
+       patch a byte of .text with $14 and leave nothing to say why. The C64
+       needs none of it: its KERNAL IRQ does not re-assert $D018 at all, and
+       $14 is already the value the machine boots with (screen $0400, the
+       uppercase/graphics character set at $1000), so the write below is
+       belt and braces rather than a correction. */
+#ifdef __C128__
     *((unsigned char *)0x0A2C) = 0x14;      /* VM1: what the IRQ re-asserts */
+#endif
     VIC_MEMPTR = 0x14;                      /* and now, for this frame */
 
     /* The console is drawn on black, like the original. The VIC-IIe has ONE

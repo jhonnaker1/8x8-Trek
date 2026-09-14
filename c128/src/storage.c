@@ -51,8 +51,15 @@ static char fname[24];
    Found 2026-08-23 during the migration. cbm_k_ckout is the same KERNAL
    vector and links clean. */
 
+/* SHARED WITH THE C64, WHICH HAS NO SETBNK AT ALL. $FF68 is a C128 KERNAL
+   vector; on a C64 that address is inside the KERNAL's own code, so calling
+   it would not fail, it would EXECUTE SOMETHING ELSE. The rest of this file
+   is the same KERNAL file I/O on both machines, which is why it is one file
+   with one guard rather than two files that drift. See c64/Makefile. */
 static void set_banks(void) {
+#ifdef __C128__
     __asm__ volatile("lda #0\n\tldx #0\n\tjsr $ff68" ::: "a", "x", "p");
+#endif
 }
 
 /* 2MHz WAS SUSPECTED AND IS INNOCENT.

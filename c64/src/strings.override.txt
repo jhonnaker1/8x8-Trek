@@ -1,0 +1,35 @@
+# Per-port text for the Commodore 64, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override c64/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, AND NOTHING ELSE -- the generator owns the numbering,
+# so this port builds the same strdata.h and the same STR_COUNT as every other.
+# See NOTES.md item 60 for what STR_COUNT is load-bearing for: the binary and
+# the STRINGS.DAT beside it are coupled by it, and a mismatch makes the game
+# run with every label blank rather than complain.
+#
+# Only the strings that NAME THE MACHINE differ. Same precedent, same shape as
+# mega65/src/strings.override.txt.
+
+# The title bar. The 40-column build draws S_330, not S_0 -- see ui_title().
+330	COMMODORE 64 PORT
+
+# S_0 is the 80-column title bar, which this port never compiles. Overridden
+# anyway so that nothing on this disk says C128 about a C64: a string that is
+# unreachable today is a string somebody reaches tomorrow.
+0	 COMMODORE 64 PORT 
+
+# The dedication line, drawn at x=0 on row 23 of the 40-column title.
+82	TO THE COMMODORE 64.
+
+# THE FAREWELL, AND THE C128'S WORDING IS WRONG HERE TWICE OVER. It says
+# "BASIC IS ON THE 40-COLUMN SCREEN", which is a C128 sentence about its OTHER
+# display -- this machine has one screen and no 80-column mode to have come
+# from. And plat_exit() on a C64 jumps through the reset vector, so what comes
+# back is a fresh boot, not the BASIC that started the game.
+#
+# It also names the keypress. main() waits for one here and the C128's wording
+# never says so, which leaves the player looking at a dead screen; the MEGA65
+# hit exactly this and its override says the same thing. main.c centres both
+# lines from strlen in the 40-column build, so this may be any length up to 40.
+10	HIT A KEY AND THE 64 RESTARTS.

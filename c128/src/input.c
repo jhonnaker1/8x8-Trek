@@ -5,7 +5,15 @@
 #define CIA1_PRA (*(volatile unsigned char *)0xDC00)
 #define CIA1_PRB (*(volatile unsigned char *)0xDC01)
 
-/* Why not the KERNAL.
+/* SHARED WITH THE C64, and the table below needs no guard at all: keymap rows
+ * 0-7 of a C128 ARE the C64 matrix, wired identically, and every entry here
+ * was checked against the C64 positions before this file was linked into the
+ * second machine. The ONE difference is the cursor keys, and it has its own
+ * #ifdef and its own explanation further down. RUN/STOP becomes ESC on a C64
+ * -- row 7 column 7 is the C128's ESC key and the C64's RUN/STOP -- which is
+ * the right key for "abort this prompt" on a machine that has no ESC.
+ *
+ * Why not the KERNAL.
  *
  * cgetc() blocks forever in this port: the console draws, the cursor
  * appears, and no key ever arrives. commodore-uno's own C128 port hit the
@@ -125,6 +133,7 @@ static unsigned char key_down(unsigned char i) {
  *
  * PRA must be driven high while this runs, or a normal column is still
  * selected and the read is the union of two keys. */
+#ifdef __C128__
 #define VIC_KBD (*(volatile unsigned char *)0xD02F)
 
 typedef struct {
@@ -157,6 +166,68 @@ static unsigned char key_down_ext(unsigned char i) {
 
     return pressed;
 }
+
+#else  /* __C64__ */
+
+/* THE C64 HAS TO DECODE SHIFT, AND THE PARAGRAPH ABOVE EXPLAINS WHY THAT WAS
+ * WORTH AVOIDING ON THE C128. There is no choice here: this machine has one
+ * CRSR key per axis -- down unshifted, up shifted -- and no $D02F, which reads
+ * $FF on a C64, so the C128 path would report every cursor key as not pressed
+ * and the message viewer would simply never scroll. That is the failure this
+ * block exists to prevent, and it is a silent one: nothing crashes, a panel
+ * just does not move.
+ *
+ * C64 matrix positions, from the standard table AND checked against the rows
+ * already in `keys` above (row 1 column 7 and row 6 column 4 are the two
+ * shifts, and every key in that table avoids them):
+ *
+ *     CRSR DOWN   row 0, column 7
+ *     LEFT SHIFT  row 1, column 7
+ *     RIGHT SHIFT row 6, column 4
+ *
+ * The shift read is a THIRD strobe inside the same SEI/CLI, not a separate
+ * call, for the reason key_down() gives: the KERNAL's 60Hz IRQ strobes CIA1
+ * for its own key repeat, and a shift sampled outside the atomic block can be
+ * the IRQ's column rather than ours.
+ */
+typedef struct {
+    unsigned char pra;     /* keymap row -- the column strobe */
+    unsigned char prb;     /* keymap column -- the line read back */
+    unsigned char shifted; /* 1 = only with shift held, 0 = only without */
+    char          ch;
+} ExtKey;
+
+static const ExtKey extkeys[] = {
+    { 0, 7, 1, KB_UP }, { 0, 7, 0, KB_DOWN },
+};
+
+#define EXT_COUNT (sizeof extkeys / sizeof extkeys[0])
+
+static unsigned char key_down_ext(unsigned char i) {
+    unsigned char save, pressed, shift;
+
+    SEI();
+    save = CIA1_PRA;
+
+    CIA1_PRA = (unsigned char)~(1 << extkeys[i].pra);
+    pressed  = (unsigned char)((CIA1_PRB & (1 << extkeys[i].prb)) == 0);
+
+    CIA1_PRA = (unsigned char)~(1 << 1);          /* left shift  */
+    shift    = (unsigned char)((CIA1_PRB & (1 << 7)) == 0);
+    CIA1_PRA = (unsigned char)~(1 << 6);          /* right shift */
+    shift   |= (unsigned char)((CIA1_PRB & (1 << 4)) == 0);
+
+    CIA1_PRA = save;
+    CLI();
+
+    /* BOTH DIRECTIONS ARE EXCLUSIVE, which is what makes one physical key
+       serve two entries: without this the unshifted entry would also fire
+       while shift was held and the viewer would scroll both ways at once,
+       scan() returning whichever index it reached first. */
+    return (unsigned char)(pressed && (shift != 0) == (extkeys[i].shifted != 0));
+}
+
+#endif
 
 /* One index space covers both tables: below KEY_COUNT is the CIA1 matrix,
    at or above it is `extkeys[i - KEY_COUNT]`. Callers never split them. */

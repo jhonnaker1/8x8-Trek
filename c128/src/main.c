@@ -2217,8 +2217,36 @@ int main(void) {
     snd_music(MUS_NONE);
 
     scr_clear();
+#ifdef TREK_40COL
+    /* THE FAREWELL SCREEN WAS BROKEN AT 40 COLUMNS AND SHIPPED THAT WAY,
+       found 2026-09-14 while porting to the C64. x=28 and x=23 centre two
+       strings of 23 and 33 characters on an EIGHTY-column screen; at forty
+       the driver clips at the right edge and the player's last sight of the
+       game is "MISSION ENDE" over "BASIC IS ON THE 4".
+       IT IS NOT IN THE SCREEN BENCH. tools/screens40.py cycles fourteen
+       screens and this is not one of them, because the bench pokes an entry
+       point and this screen is drawn by main() on the way OUT -- after the
+       loop it would have to break. A bench that reaches every screen the
+       player reaches is a different and harder tool; until then, the gap is
+       named here.
+       CENTRED FROM strlen, NOT FROM A COUNTED COLUMN, because the strings
+       differ per port -- the C64 overrides both ids (see
+       c64/src/strings.override.txt) and a hardcoded x would go wrong again
+       the moment somebody reworded one. */
+    {
+        const char *a = S(S_49);
+        scr_puts((unsigned char)((40 - strlen(a)) / 2), 10, a,
+                 EGA_TO_VDC(EGA_LTGREEN));
+    }
+    {
+        const char *b = S(S_10);
+        scr_puts((unsigned char)((40 - strlen(b)) / 2), 12, b,
+                 EGA_TO_VDC(EGA_LTCYAN));
+    }
+#else
     scr_puts(28, 10, S(S_49), EGA_TO_VDC(EGA_LTGREEN));
     scr_puts(23, 12, S(S_10), EGA_TO_VDC(EGA_LTCYAN));
+#endif
 
     snd_off();      /* a SID still gated would howl at BASIC forever */
 
