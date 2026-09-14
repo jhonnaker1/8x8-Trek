@@ -114,7 +114,7 @@ define OVL_IMAGES
 	done
 endef
 
-.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 game40 d64-40-debug monitor test verify music loadbench clean
+.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 game40 d64-40-debug play40 monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -407,6 +407,13 @@ $(DBG40_D64): $(DBG40_OUT) build/strings.dat build/music.dat Makefile
 	    c1541 -attach $(DBG40_D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \
 	done
 	@echo "40-column debug disk: $(DBG40_D64)"
+
+# DRIVE THE 40-COLUMN GAME PAST SETUP AND LEAVE IT RUNNING, so a person can
+# look at the console and then play it. The tedious part is the six line-editor
+# prompts; having typed them, hand the machine over rather than killing it --
+# which is what the first version of this did.
+play40: $(DBG40_D64)
+	@python3 tools/shot40game.py
 
 CON40_SRC = src/console40.c src/vic.c src/layout40.c
 

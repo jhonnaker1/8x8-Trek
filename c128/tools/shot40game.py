@@ -15,6 +15,13 @@ the port. kb_inject is a byte the port polls, compiled in only under
 THE ADDRESS IS READ FROM THIS BUILD'S MAP, never hardcoded: it has moved four
 times in the 80-column build's life, and a stale address injects into
 whatever now lives there and reports nothing wrong.
+
+IT LEAVES VICE RUNNING BY DEFAULT, and that is Jamie's correction: "your
+script kills it too fast". The first version SIGKILLed the emulator the
+instant the last capture was written, so the one thing worth having -- a
+person looking at the console, and then playing it -- was impossible. Driving
+past setup is the tedious part; having done it, hand the machine over.
+Pass --kill for an automated run that should clean up after itself.
 """
 import os, re, signal, subprocess, sys, time
 
@@ -58,7 +65,9 @@ def kb_inject_addr():
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(C128, "build")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    kill = "--kill" in sys.argv
+    out = args[0] if args else os.path.join(C128, "build")
     for p in (D64, MAP):
         if not os.path.exists(p):
             sys.exit("shot40game: missing %s -- run `make d64-40-debug`" % p)
@@ -70,14 +79,37 @@ def main():
          "-binarymonitoraddress", "ip4://127.0.0.1:6502", "-autostart", D64],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        time.sleep(24)                      # boot, autostart, load the pool
+        time.sleep(12)                      # KERNAL boot; the monitor needs a
+                                            # machine before it can connect
         import vice_mon
         mon = vice_mon.Mon()
+
+        def live():
+            return sum(1 for b in mon.mem_get(0x0400, 1000) if b not in (32, 0))
+
+        def settle_screen(timeout=25.0):
+            """Wait for the screen to STOP changing, not for a fixed time.
+
+            A fixed sleep is what made this flaky: the string-pool load takes
+            a variable time, so one run reached the console (364 live cells)
+            and the next stopped at the setup text (164). Polling what is
+            actually on screen removes the guess."""
+            last, stable, t0 = -1, 0, time.time()
+            while time.time() - t0 < timeout:
+                n = live()
+                stable = stable + 1 if n == last else 0
+                last = n
+                if stable >= 3:
+                    return n
+                time.sleep(0.4)
+            return last
+
+        settle_screen()                     # the title, however long it takes
         for name, keys in STEPS:
             for ch in keys:
                 mon.mem_set(addr, bytes([ord(ch)]))
                 time.sleep(SETTLE)
-            time.sleep(1.2)
+            settle_screen()
             path = os.path.join(out, "g40-%s.png" % name)
             w, h = vice_mon.screenshot(mon, path, use_vicii=1)
             # AND THE SCREEN RAM, because the PNG has lied. On 2026-09-13 the
@@ -85,12 +117,17 @@ def main():
             # cells, stable across twenty seconds -- Jamie was watching the
             # emulator window and saw the console perfectly well. A display
             # grab is one more instrument; screen RAM is the thing itself.
-            scr = mon.mem_get(0x0400, 1000)
-            live = sum(1 for b in scr if b not in (32, 0))
-            print("  %-16s %-42s  %4d live cells" % (name, path, live))
+            print("  %-16s %-42s  %4d live cells" % (name, path, live()))
     finally:
-        vice.send_signal(signal.SIGKILL)
-        vice.wait()
+        if kill:
+            vice.send_signal(signal.SIGKILL)
+            vice.wait()
+        else:
+            print()
+            print("  VICE IS STILL RUNNING (pid %d) -- the 40-column console is"
+                  " on its screen." % vice.pid)
+            print("  Play it. Type HELP at CMD: for the order list.")
+            print("  Close the window when you are done, or: kill %d" % vice.pid)
     return 0
 
 

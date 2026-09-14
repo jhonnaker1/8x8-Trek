@@ -11224,6 +11224,20 @@ other, which breaks the loop the game is built around. Three ways:
    `MSG_BOX_H` = 3 rows, so **two boxes fit exactly where the badge is**,
    borders included. Scanner, status, command line and what-just-happened stay
    visible together; all four messages live on page B. **RECOMMENDED.**
+
+   **AND AS OF 2026-09-13 IT IS NOT A PREFERENCE, IT IS THE FIX.** The
+   straight split was built and run, and the real game's console came up with
+   LASERS, COMMAND, MAIN VIEWER, the badge and SYSTEMS STATUS all MISSING the
+   moment the first message arrived. `msg_clear_region()` clears
+   `(MSG_X, MSG_Y, MSG_W, MSG_H)`; at eighty columns MSG_X is 40 and that is
+   the harmless right half, but at forty MSG_X is 0 and it is **rows 11..24
+   across the whole width** -- five panels, erased by every message. Read out
+   of live screen RAM: scanner, status and CMD: present, rows 14..24 empty but
+   for the prompt.
+   So the tactical page cannot share rows 11..24 with the full message region,
+   and SOMETHING has to change whatever anyone's taste says. Option 2 is the
+   change that costs least: two boxes in the badge's 8 rows, four on page B,
+   and `msg_clear_region` becomes page-aware along with the rest.
 3. **Regroup** into tactical and strategic pages rather than cutting down the
    middle. Most faithful per turn, but a genuinely new layout table rather than
    an offset -- more work, more risk.
