@@ -114,7 +114,7 @@ define OVL_IMAGES
 	done
 endef
 
-.PHONY: all run rund d64 vid40 vidcheck40 monitor test verify music loadbench clean
+.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -188,7 +188,7 @@ nolto: $(SRC) $(HDR) Makefile
 	        -DTREK_OVERLAYS -o $(NOLTO)/`basename $$f .c`.o $$f || exit 1; \
 	done
 
-verify: $(OUT) $(RES) $(MAP) nolto
+verify: $(OUT) $(RES) $(MAP) nolto layout40check
 	@# LOWRAM HEADROOM. Added 2026-08-27 after the save record was packed and
 	@# the 192 bytes it freed turned out to land in a pool NOBODY WAS
 	@# WATCHING: writable data lives in lowram, 0x1300..0x1C00, and it had 77
@@ -310,7 +310,7 @@ $(DEBUG_D64): $(DEBUG_OUT)
 # and VIC-IIe writes $0400/$D800 exactly as a C64's VIC-II does, so this
 # driver is the C64 port's driver too.
 VID40_SRC = src/vidtest40.c src/vic.c
-vid40: build/vidtest40.prg
+vid40: build/vidtest40.prg build/console40.prg
 
 build/vidtest40.prg: $(VID40_SRC) src/vic.h src/egavic.h src/layout.h src/vdc.h Makefile
 	@mkdir -p build
@@ -322,6 +322,26 @@ build/vidtest40.prg: $(VID40_SRC) src/vic.h src/egavic.h src/layout.h src/vdc.h 
 # KERNAL editor IRQ undoing $D018 every frame -- looks exactly like a screen.
 vidcheck40: build/vidtest40.prg
 	@python3 tools/vidcheck40.py
+
+# Needs no emulator, so it rides with the cheap structural checks in `verify`
+# rather than costing a minute of VICE. It recomputes all nine junction cells
+# from the panel table the way verify_prg.py does for the 80-column one.
+layout40check:
+	@python3 tools/layout40_check.py
+
+# The two pages as PNGs, because the message-placement decision is a
+# taste call and wants a picture. Writes build/c40-tactical.png and
+# build/c40-chart.png.
+shot40: build/console40.prg
+	@python3 tools/shot40.py
+
+CON40_SRC = src/console40.c src/vic.c src/layout40.c
+
+build/console40.prg: $(CON40_SRC) src/vic.h src/egavic.h src/layout40.h Makefile
+	@mkdir -p build
+	$(MOSCC) -Oz -I src -I ../core -Wall -Werror -Wl,-Map=build/console40.map \
+	    -o $@ $(CON40_SRC)
+	@ls -l $@
 
 monitor: $(DEBUG_D64)
 	x128 -binarymonitor -binarymonitoraddress ip4://127.0.0.1:6502 \
