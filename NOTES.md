@@ -11440,3 +11440,143 @@ this game for him ([[jamie-egatrek-connection]]), and this is the point where
   eleven overlays at that size. **No headroom should be assumed.**
 * **1 MHz.** A 40-column C128 build also drops to 1 MHz, so step 1 measures
   this before the C64 exists.
+
+## THE C64 PORT, BUILT -- and the scope above was wrong six ways (2026-09-14)
+
+It runs. Title, the 24-page streamed briefing, setup, the console with a real
+galaxy in it, SAVE, the detailed evaluation, the hall of fame, the farewell,
+and a clean exit to BASIC. `make ports` is 8 of 8. **Nobody has played it**,
+which on this project is the step that finds the faults.
+
+**SCORING "SCOPE: a 40-column C64 port" AGAINST WHAT HAPPENED** is the point of
+this section. The scope said *"Roughly 700 genuinely new lines, 750 adapted."*
+The real figure is **two files and about 215 lines of C**, plus a linker
+script. Six of its specifics were wrong, and the shape of the error is
+consistent: **it planned to write C64 versions of things that turned out to be
+the same thing.**
+
+| the scope said | what happened |
+|---|---|
+| `vic.c`/`vic.h` are NEW | **already written** -- they were step one, the C128's own 40-column build, and link into the C64 unchanged |
+| `layout40.c/h` are NEW | same -- already written for that step |
+| `storage.c`, `overlay.c`, `input.c` are ADAPTED, 746 lines | **not adapted: SHARED**, with four `#ifdef __C128__` blocks totalling nine lines |
+| `farmem.c`: *"a plain array at `$A000`"* | the pool is at **`$E000`, under the KERNAL**, and needs a bank switch to read |
+| *"the program region is ~38K... **no headroom should be assumed**"* | **46,847 bytes and 6,112 spare** |
+| `input.c`: *"GETIN/PETSCII"* | the CIA1 matrix scan, unchanged; the C128's own file already does that and GETIN is not involved |
+
+**THE ONE THAT MATTERS IS THE HEADROOM, and it was wrong in the good
+direction.** The scope assumed the C64 is the tighter machine because $0801 to
+$9FFF is 38K against the C128's 37.6K. That arithmetic is right and the
+conclusion is wrong, for two reasons that have nothing to do with the CPU:
+
+* **BASIC's 8K at `$A000` is plain RAM** once LORAM is cleared, which llvm-mos
+  does for free in `unmap-basic.o`. The program region runs to `$BEFF`.
+* **The overlay window moved OUT of the program's address space.** On the C128
+  those 4K are carved out of `ram` -- `trek128.ld` shrinks the region to make
+  them. On a C64 they are `$C000..$CFFF`, the page **no `$01` setting ever
+  covers**: no BASIC, no KERNAL, no I/O, no character ROM. Free.
+
+So the C64 is the ROOMIER machine for this port, by nearly 7K:
+
+    C128 40-column   39,591 resident of 39,935   304 spare
+    C64              40,735 resident of 46,847   6,112 spare
+
+That is what paid for the message log. **Item 57's scope said far memory was
+the one new seam; it is two**, and the second is the 2K log `ui.c` keeps
+outside the program through `vdc_set_address`. The C128's 40-column build
+still puts it in real VDC RAM -- the 8563 is in the machine even when it is not
+driving the monitor -- and a C64 has no such chip. With 6,112 bytes in hand the
+answer is a plain array in `.noinit`, which is no seam at all.
+
+### Far memory on a C64 is a memcpy, and two things nearly made it a trap
+
+**WRITES ALWAYS GO TO RAM on this machine; only reads see the ROMs.** So the
+KERNAL's own LOAD, executing from the KERNAL ROM at `$F4A5`, stores the file
+through `(EAL),Y` into the RAM underneath itself. One call, no banking, no
+chunking, nothing relocated. `c128/src/farmem.c` needs an INDFET call PER BYTE
+through `$FF74` and an assembly loop to make that affordable; here the read is
+a `for` loop.
+
+**THE MAP TO READ UNDER THE KERNAL IS 101, NOT "CLEAR HIRAM".** Going from 110
+to 100 gives RAM ONLY and **takes the I/O page with it** -- a string fetch on a
+machine with no VIC, no SID and no CIAs for the duration. The value is computed
+from whatever `$01` already holds so the datasette bits survive.
+
+**`SEI` DOES NOT MASK AN NMI, AND RESTORE IS WIRED TO ONE.** While the KERNAL
+is out the 6502 takes its vectors from RAM at `$FFFA`, so a player leaning on
+RESTORE during a string fetch would send the CPU to whatever two bytes of prose
+sat there. The vectors are written into RAM pointing at an `RTI` and the store
+stops six bytes short of the top. `verify_c64.py` fails if `FAR_LIMIT` is ever
+raised over them, because that failure would be one keypress, rarely, with
+nothing pointing back.
+
+### Three 40-column defects, all in SHARED code, all live in the C128's build
+
+Found by measuring `x + strlen(text)` against 40 at every literal `scr_puts`,
+not by looking at a screen:
+
+* `main.c`'s farewell drew **"MISSION ENDE"** over **"BASIC IS ON THE 4"**.
+* `ui_setup_briefing` drew a ship's plate reading **"U.S.S. LE"** over
+  **"RCB-"** -- `ui_setup` twenty lines below had been moved to x=22 and x=32
+  and this one had not.
+
+**NONE OF THE THREE IS IN THE SCREEN BENCH**, and that is the finding worth
+keeping. `tools/screens40.py` cycles fourteen screens. The farewell is drawn by
+`main()` on the way OUT, after the loop the bench would have to break; the
+briefing question sits in the GAP between "setup" and "briefing", two screens
+the bench does have and which both looked right. **A bench reaches the screens
+somebody listed.** `layout40_check.py` now reaches every call site instead,
+preprocessing with the real compiler so it never has to guess which side of a
+`#ifdef` a line is on. Proved red by putting one of them back.
+
+### A stale `music.dat` shipped a wrong tune, and only arithmetic caught it
+
+`c64/build/music.dat` was 414 bytes -- the C128's `music.pdat`, PRG header and
+all -- left by this directory's original probe rule and never replaced, because
+the make rule depended on `tools/make_music.py` and not on the file it copies.
+It then got a SECOND two-byte header on the way to the disk, so the far store
+held `00 40` where the first note belongs.
+
+**Nothing reported it.** The game loaded, `mus_ok` came up 1, a tune played.
+The only trace was `far_len = 7904` where 7,490 + 412 says 7,902, read out of
+the running machine while checking something else entirely. **A STALE ARTEFACT
+IMITATES A PASS** -- the same shape as a CoCo 3 test disk built from a binary
+five minutes older than its fix, and as `c1541 -write` leaving the old file in
+place. The rule names its source now and `cmp` guards the copy.
+
+### The save looked broken and was not, and the control is what said so
+
+After the first SAVE the host `.d64` listed `0 "egatrek.sav" *seq` -- a splat
+with no blocks -- and `c1541` answered `ERR = 62, FILE NOT FOUND`. A restore in
+a later run said NO SAVED GAME FOUND. That is about as conclusive as evidence
+gets.
+
+**Running the identical sequence against the C128's own 40-column disk produced
+the IDENTICAL splat**, on a port whose save and restore Jamie has played.
+`storage.c` has carried a note since 2026-08-23 saying the host image lags
+VICE's drive and that the answer is to **ask the drive** -- and it still took a
+measurement, because a directory entry that says FILE NOT FOUND is very
+persuasive. `c64/src/writetest.c` asks: 600 bytes written and read back through
+`plat_read_all` without the machine stopping, byte-identical.
+
+**Its first run failed for its own reason.** `plat_read_all` treats a buffer it
+filled EXACTLY as an error, deliberately -- it cannot tell a 600-byte file from
+a longer one truncated at 600. Sizing the read buffer at `NBYTES` produced
+STOR_ERROR beside a comparison that matched all 600 bytes: **a red result from
+a green machine, the probe's own rule misread as the port's.**
+
+### Two instruments failed before the port did
+
+**The screen dumper masked bit 7** and deleted the entire title screen.
+`G_BLOCK` is 160 -- a reverse space -- and the banner letters and the
+Lexington's artwork are made of nothing else, so `c &= 0x7F` turned all of them
+into code 32 and printed a blank screen over a screen that was drawing
+perfectly. **The live-cell count caught it**: 286 cells against a dump showing
+about 160 characters. That count is in the tool because of instrument #19, a
+black PNG reported as a blank screen Jamie had watched work, and it paid for
+itself on the first screen of the next port.
+
+**`play.py`'s change-detector fired on the ECHO of a typed password**, settled
+on the setup screen, and photographed it while the console was still four
+overlay loads away. Waiting for *a* change is not enough: an echo is a change
+followed immediately by stillness. It waits for five seconds of quiet now.
