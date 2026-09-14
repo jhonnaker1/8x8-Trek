@@ -114,7 +114,7 @@ define OVL_IMAGES
 	done
 endef
 
-.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 monitor test verify music loadbench clean
+.PHONY: all run rund d64 vid40 vidcheck40 layout40check shot40 game40 d64-40-debug monitor test verify music loadbench clean
 
 all: $(OUT)
 
@@ -360,6 +360,53 @@ $(OUT40): build/trek128-40.elf
 	    open('$(OUT40)','wb').write(bytes([0x01,0x1C]) + d)"
 	$(call OVL_IMAGES,build/trek128-40.elf)
 	@ls -l $@
+
+# THE 40-COLUMN DEBUG BUILD AND ITS DISK. Same relationship as
+# $(DEBUG_OUT)/$(DEBUG_D64) to the release pair: TREK_DEBUG_INPUT compiles in
+# the byte kb_inject tests, which is the only way scripted keys reach this
+# port -- VICE's KEYBOARD_FEED fills the KERNAL buffer and input.c scans CIA1
+# directly. A separate output so `make game40` can never be the instrumented
+# one.
+DBG40_ELF = build/trek128-40-debug.elf
+DBG40_OUT = build/trek128-40-debug.prg
+DBG40_D64 = build/trek128-40-debug.d64
+
+$(DBG40_ELF): $(SRC40) $(HDR) src/vic.h src/egavic.h src/layout40.h trek128.ld Makefile
+	@mkdir -p build
+	$(MOSCC) $(CFLAGS) -DTREK_40COL -DTREK_DEBUG_INPUT $(LDFLAGS) \
+	    -Wl,-Map=build/trek128-40-debug.map -o $@ $(SRC40) $(LDLIBS)
+
+$(DBG40_OUT): $(DBG40_ELF)
+	$(OBJCOPY) -O binary --remove-section=.ovl_* $< build/trek128-40-debug.res
+	@python3 -c "d = open('build/trek128-40-debug.res','rb').read(); \
+	    open('$(DBG40_OUT)','wb').write(bytes([0x01,0x1C]) + d)"
+	@ls -l $@
+
+# THE OVERLAY IMAGES ARE CUT HERE, IN THIS RULE, and that is not belt and
+# braces. build/ovl*.prg is shared by every build in this tree and whichever
+# linked last wins -- and because they are BYPRODUCTS of a link rule, an
+# up-to-date .prg means they are never re-cut at all. Both halves of that bit
+# on 2026-09-13: the first 40-column disk carried 80-column overlays under a
+# 40-column program, and the stamp check in overlay.c said so on screen.
+d64-40-debug: $(DBG40_D64)
+$(DBG40_D64): $(DBG40_OUT) build/strings.dat build/music.dat Makefile
+	$(call OVL_IMAGES,$(DBG40_ELF))
+	rm -f $(DBG40_D64)
+	c1541 -format "ega trek 40dbg,01" d64 $(DBG40_D64) >/dev/null
+	c1541 -attach $(DBG40_D64) -write $(DBG40_OUT) trek128 >/dev/null
+	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > build/trek.scr
+	c1541 -attach $(DBG40_D64) -write build/trek.scr trek.scr,s >/dev/null
+	c1541 -attach $(DBG40_D64) -write src/briefing.txt brief.txt,s >/dev/null
+	@python3 -c "d = open('build/strings.dat','rb').read(); \
+	    open('build/strings.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	c1541 -attach $(DBG40_D64) -write build/strings.pdat strings.dat >/dev/null
+	@python3 -c "d = open('build/music.dat','rb').read(); \
+	    open('build/music.pdat','wb').write(bytes([0x00,0x40]) + d)"
+	c1541 -attach $(DBG40_D64) -write build/music.pdat music.dat >/dev/null
+	@for o in $(OVERLAYS); do \
+	    c1541 -attach $(DBG40_D64) -write build/ovl$$o.prg ovl$$o >/dev/null; \
+	done
+	@echo "40-column debug disk: $(DBG40_D64)"
 
 CON40_SRC = src/console40.c src/vic.c src/layout40.c
 
