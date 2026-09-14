@@ -1839,6 +1839,12 @@ are the CoCo 3**, which is started and not released:
       the actual question: set `$FFD9`, read and verify a few hundred sectors,
       drop to `$FFD8`, leave a report somewhere `PEEK` can reach, and return to
       BASIC. That is the cheap experiment if this item is ever worth closing.
+      **AND THERE IS NOW A SECOND ROUTE, WHICH DOES NOT NEED A CARD AT ALL:**
+      the GIME's own 320x200x16 is 40x25, so **item 57's 40-column work makes
+      this item reachable** rather than closing it. The ordering there is
+      deliberate -- a card-less CoCo 3 needs THREE new seams (video, sound, and
+      far memory, because both the YM2149 and the far-memory VRAM are ON the
+      card), so it wants a layout that is already proven elsewhere first.
       Two things follow from the drive.
       **First, the drive is not the obstacle it looked like.** This port never
       calls DSKCON -- it drives the WD1773's registers -- which is precisely
@@ -1937,6 +1943,52 @@ are the CoCo 3**, which is started and not released:
       which `egavdc.h` has said is overdue since the THIRD port.
       **Step one is the C128 at 40 columns**, because it isolates the layout
       with zero new seams and produces the C64's video driver.
+
+      **DECIDED 2026-09-13: THE C64 IS THE FIRST SUB-80 PLATFORM, and the CoCo
+      3 is what makes that decisive rather than merely "easiest".**
+      The CoCo 3 is the strongest challenger on paper -- it is the one that
+      unblocks hardware Jamie actually owns (item 55), and the port is already
+      released with every seam working. **A CARD-LESS BUILD LOSES THREE SEAMS,
+      NOT ONE**, and I had two of them wrong until I read the files:
+      * video -- SuperSprite V9958 would become the GIME. Expected.
+      * **SOUND IS ON THE CARD.** `coco3snd.c` opens "Sound for the CoCo 3 +
+        SuperSprite FM+: the card's YM2149", at `$FF7C`/`$FF7D`. The CoCo's own
+        audio is a different chip, so this is a NEW DRIVER, not a port.
+      * **FAR MEMORY IS THE CARD'S VRAM.** `coco3farmem.c` reaches it through
+        `vdp_far_write_at`. Without the card the only candidate is the GIME
+        MMU -- **which is PARKED AS UNEXPLAINED in item 30: "MMUEN alone kills
+        disk access"**, already the cost of a bisection and two retractions.
+      So a card-less CoCo 3 is three new seams plus a known landmine. **The C64
+      has exactly ONE new seam and it is SIMPLER than the C128's.**
+
+      **THIS KEEPS THE CoCo 3 ALIVE RATHER THAN KILLING IT, and that is the
+      point of the ordering.** Once the 40-column layout exists and is proven,
+      a card-less CoCo 3 becomes "write three seams against a known-good
+      layout" instead of "invent a layout and three seams at once" -- and the
+      GIME MMU can be attacked when it is the ONLY unknown left rather than one
+      of four. Item 55 is not closed by this; it is made reachable.
+
+      **AND THE TEMPLATE IS NOT THE PORT.** Everything that makes the C64 cheap
+      -- SID at `$D400`, the KERNAL, PETSCII, VICE, `c1541`, llvm-mos -- is
+      COMMODORE-SPECIFIC and transfers to almost nothing else; even the Plus/4
+      and the CBM-II do not inherit it. What transfers is machine-independent:
+      the 40-column layout table, the paged-display answer, the reflowed
+      briefing, the shared-UI extraction out of `c128/src`, and
+      `tools/check_colours.py`. **So build the template on the C128 at 40
+      columns and make the C64 its first CONSUMER** -- crossing a machine
+      boundary is what proves a template is real. Build the C64 first and call
+      it the template, and which parts were C64-specific is discovered only
+      when the second machine arrives.
+
+      **OPEN, AND NOT TO BE BUILT ON SPECULATION**: whether the geometry is
+      fixed at 40x25 or GENERATED from `(cols, rows)`. The sub-80 world is
+      three families -- 40x25 (C64, C128 VIC-IIe, Plus/4, CoCo 3 GIME), 40x24
+      (Atari 800XL, Apple IIe), 32x24 (TI-99/4A, MSX1, ZX Spectrum) -- and a
+      hand-written `layout40.c` serves only the first. A `gen_layout.py` would
+      be the same idiom `gen_strings.py` already uses for the string pool.
+      **The 32-column family still fails `check_colours.py` on colour, so it
+      may never have a consumer.** Decide when there is a second family in
+      hand, not now.
   30. ~~**MMUEN alone breaks standalone DSKCON**, isolated by bisection and
       unexplained.~~ **CLOSED 2026-09-13 BY DECISION (Jamie's call): the
       banking code is DELETED and the MMU is not this port's problem.**
