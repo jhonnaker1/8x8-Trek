@@ -1,0 +1,215 @@
+                        U.S.S. LEXINGTON  RCB-92
+                          MISSION BRIEFING
+
+  Welcome aboard, Captain. Your commission is confirmed and the ship is
+  yours: the Lexington, a heavy Research/Battle Cruiser of the Class IX
+  line, fleet designation RCB-92.
+
+  She is fully crewed and battle ready. Four hundred and thirty souls
+  are aboard -- 43 officers and 387 enlisted -- and every one of them
+  is now your responsibility.
+
+  Before you take her out, Command has asked me to run through four
+  things: how the war stands, what this ship is, what you will be
+  looking at on the console, and every order you can give from it.
+
+  Press RETURN to go on. Press Q at any point and I will get out of
+  your way.
+                                                    Page 1 of 12                        U.S.S. LEXINGTON  RCB-92
+                        INTELLIGENCE REPORT
+
+  The Mongol Empire has declared war on the Union. The Vandals have
+  since thrown in with them -- not everywhere, and not in strength,
+  but their ships are in this sector and they are best left alone.
+
+  Your orders are to clear a sixty-four quadrant section of the galaxy
+  of Mongol forces. That is the mission, and you will be judged on it.
+  You may be asked to take on rescue work along the way; take it if you
+  can, but do not let it cost you the sector.
+
+  We know Mongol ships are here. We do not know where. The same is true
+  of our own StarBases -- several were assigned to this sector and are
+  still moving into position, so no one at Command can tell you today
+  where they will be tomorrow. You will have to find both yourself.
+
+  Scan as you go. An unscanned quadrant is a quadrant you are walking
+  into blind.
+                                                    Page 2 of 12                        U.S.S. LEXINGTON  RCB-92
+                        SPECIFICATIONS
+
+  RESEARCH/BATTLE CRUISER, CLASS IX -- authorized 2388
+
+     Deadweight, metric ................ 201,000 tonnes
+     Length / breadth / height ......... 951.2 / 398.9 / 210.1 feet
+     Standard range .................... 15 years at warp 6
+     Cruising speed .................... warp 6
+     Emergency speed ................... warp 8
+     Main lasers ....................... 3 banks, 2 emitters each
+     Energy torpedo tubes .............. 3
+     Complement ........................ 43 officers, 387 crew
+
+  A word about that emergency figure, Captain, because the helm will
+  accept more than it. You may set any speed up to warp 10. Above
+  warp 8 you are outside what the yard will certify, and on a long
+  run at those speeds the warp engines will be damaged. The ship will
+  do it. She will not thank you for it.
+                                                    Page 3 of 12                        U.S.S. LEXINGTON  RCB-92
+                        THE COMMAND CONSOLE
+
+  Nine panels, all live, all the time. You will not need to ask for
+  any of them.
+
+     SHORT RANGE SCAN   the eight-by-eight sectors of this quadrant
+     STATUS             stardate, energy, impulse, shields, torpedoes,
+                        warp speed, and Mongols left in the sector
+     CHART OF KNOWN     every quadrant you have scanned, as a three
+       GALAXY           digit word -- see the scanners page
+     LASERS             efficiency and heat
+     COMMAND            where you are, and the prompt
+     MAIN VIEWER        the nearest enemy, or the planet you orbit
+     SYSTEMS STATUS     the state of repair of all twelve systems
+     SHIP'S BADGE      her name, registry and crest
+
+  Messages arrive down the right-hand side, newest at the bottom.
+                                                    Page 4 of 12                        U.S.S. LEXINGTON  RCB-92
+                        NAVIGATION
+
+  The galaxy is 64 quadrants, eight by eight. Each quadrant is 64
+  sectors, eight by eight. Warp engines move you between quadrants;
+  impulse engines move you within one.
+
+  MOVE      Give the quadrant and the sector you want, vertical first:
+            6,2,3,5 takes you to sector 3,5 of quadrant 6,2. Two
+            numbers alone are a sector in this quadrant -- 3,5. You
+            may type it on the command line as m6235 or m35.
+
+  WARP      Sets the speed the engines will use between quadrants,
+            from 1 to 10, and w9 works on the command line. Speed
+            costs energy sharply: a fast crossing is an expensive one.
+
+  DOCK      Refuel and repair alongside a StarBase. You must be in a
+            sector directly adjacent to it. Visit them often.
+                                                    Page 5 of 12                        U.S.S. LEXINGTON  RCB-92
+                        ENGINEERING
+
+  Everything aboard runs on the Space Industries EnergyConverter. It
+  makes 400 units a day when it is undamaged and proportionally less
+  when it is not, so a wrecked converter cannot dig you out of a hole.
+
+  ENERGY    Move energy between the three pools -- main, impulse and
+            shields -- as you need it.
+
+  MAX       Fill the shield pool from main energy in one order.
+
+  REPAIR    A report on all twelve systems, with an estimated time to
+            repair for anything damaged. It costs you nothing.
+
+  FIX       Put the engineering crew on one system instead of spreading
+            them across everything damaged, or simply spend time making
+            repairs. Time is the price.
+                                                    Page 6 of 12                        U.S.S. LEXINGTON  RCB-92
+                        WEAPONS
+
+  Two systems, and they are good at opposite ranges.
+
+  TORPEDO   Three tubes. One energy torpedo will destroy a standard
+            Mongol ship outright, and they are devastating close in.
+            You carry a limited number and cannot manufacture more --
+            a StarBase or a supply depot is the only way to reload.
+            The tube officer will ask how many to fire and where.
+            t35 fires one at sector 3,5 without the questions.
+
+  LASERS    Your general-purpose weapon, and there is no ammunition to
+            run out of. Damage falls off with range, so lasers reward
+            closing. The banks overheat when worked hard and lose
+            efficiency until they cool. The laser officer will ask how
+            much energy to put into the shot.
+                                                    Page 7 of 12                        U.S.S. LEXINGTON  RCB-92
+                        DEFENCE
+
+  The shields will stop a great deal, but they are not free and they
+  are not always the right answer.
+
+  Raising them draws energy from the main banks, so do not raise them
+  out of habit. Travelling at warp with the shields up costs double
+  the energy of the same trip with them down. Firing a torpedo through
+  your own shields throws it off. And the shield generators wear as
+  they work: what stops a hit is also damaged by it.
+
+  SHUP      Shields up. The ship on the short range scan turns yellow.
+            The up arrow does the same thing.
+
+  SHDN      Shields down, and the ship returns to white. The down
+            arrow does the same thing.
+                                                    Page 8 of 12                        U.S.S. LEXINGTON  RCB-92
+                        SCANNERS AND THE CHART
+
+  Short range scanners run continuously and fill the scan panel with
+  this quadrant. Damage costs you resolution before it costs you the
+  panel: below 90 per cent you will lose the smaller objects and see
+  only stars, and below 50 per cent you see nothing at all.
+
+  Long range scanning happens as you travel and writes what it finds
+  into the chart, which is on screen permanently. Each scanned
+  quadrant reads as three digits:
+
+           the number of Mongol ships
+           the type of base -- 1 StarBase, 2 research, 3 supply
+           the number of stars
+
+  An unscanned quadrant shows as dots. A quadrant whose star has gone
+  supernova is marked and is no longer worth your time.
+                                                    Page 9 of 12                        U.S.S. LEXINGTON  RCB-92
+                        THE SHIP'S RECORDS
+
+  Three orders read out of the computer rather than the scanners.
+
+  CHART     Brings up the full chart of the known galaxy.
+
+  PLAN      Lists every planet found so far, with its quadrant, its
+            class and its name. Only quadrants you have scanned are
+            listed -- the list cannot know more than the chart does.
+
+  INFO      The command list, when you want reminding.
+
+  All three depend on the computer. Automatic navigation needs it at
+  full repair, and a badly damaged computer will lose parts of the
+  chart outright -- entries you will have to go back and scan again.
+  Repair it before you rely on it.
+                                                    Page 10 of 12                        U.S.S. LEXINGTON  RCB-92
+                        COMMUNICATIONS
+
+  Messages arrive constantly, from your own departments and from
+  outside. They stack down the right of the console, newest at the
+  bottom, and older ones scroll away as new ones come in.
+
+  MSGS      The message log, further back than the console shows.
+
+  ACK       Acknowledge and clear a message. A2 clears the second one
+            down; A on its own clears them all.
+
+  HAIL      Call a StarBase. The immediate answer only tells you the
+            frequencies are open -- the base itself replies later, and
+            the further away it is the longer you wait.
+
+  SAVE      Write the game to disk.  SND toggles sound.
+  QUIT      Leave.  SELF is the self-destruct, if it comes to that.
+                                                    Page 11 of 12                        U.S.S. LEXINGTON  RCB-92
+                        EXPLORATION
+
+  The Lexington was built for exploration and the fittings are still
+  aboard. There is no time for survey work with the Union under
+  attack, but the planets in this sector hold things worth having --
+  energium crystals above all, which will refill your energy banks.
+
+  ORBIT     Enter standard orbit around a planet in this quadrant.
+
+  LAND      Send a party down, by transporter or by shuttlecraft.
+            Both need their system at full repair, and neither will
+            launch with the shields up. Landing parties can be
+            attacked. Some of them do not come back.
+
+  USE       Put anything you have recovered to use.
+
+  That is the briefing, Captain. The sector is yours. Good hunting.
+                                                    Page 12 of 12

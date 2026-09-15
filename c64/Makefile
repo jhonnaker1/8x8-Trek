@@ -92,7 +92,7 @@ define MAKE_PRG
 	    open('$(2)','wb').write(bytes([0x01,0x08]) + d)"
 endef
 
-.PHONY: all game debug d64 d64-debug run rund verify probe logcheck writecheck clean
+.PHONY: all game debug d64 d64-debug release run rund verify probe logcheck writecheck clean
 
 all: $(OUT)
 game: $(OUT)
@@ -202,6 +202,19 @@ $(D64): $(OUT) build/strings.dat build/music.dat ../c128/src/briefing40.txt veri
 d64-debug: $(DEBUG_D64)
 $(DEBUG_D64): $(DEBUG_OUT) build/strings.dat build/music.dat ../c128/src/briefing40.txt Makefile
 	$(call MAKE_D64,$(DEBUG_D64),$(DEBUG_OUT),$(DEBUG_ELF))
+
+# THE RELEASE ARTEFACT IS THE .d64 ITSELF, plus the README beside it -- the
+# same shape as the C128's, because this machine mounts one image and a zip
+# would only be a wrapper around a wrapper.
+#
+# MUSIC.DAT IS THIS PORT'S OWN COMPOSITION, from tools/make_music.py. The
+# extracted note data tools/gen_music.py pulls out of EGATREK.EXE is
+# Anderson's creative work and must never reach a release. `verify` compares
+# this port's copy byte for byte against the composition, because a stale one
+# here already shipped a wrong tune once.
+release: $(D64)
+	@cp README-release.txt build/egatrek-c64.txt
+	@ls -l build/egatrek-c64.d64 build/egatrek-c64.txt
 
 # THE CHECKS THE COMPILER STRUCTURALLY CANNOT MAKE. `d64` depends on this so a
 # binary that cannot run can never reach a disk -- the same wiring the MEGA65

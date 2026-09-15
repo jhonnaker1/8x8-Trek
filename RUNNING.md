@@ -1,6 +1,6 @@
 # How to run each one
 
-Ten assets, seven machines. Every port plays the same game from the same
+Eleven assets, eight machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -8,7 +8,7 @@ image, a MEGA65 ROM, a CoCo 3 ROM — it is yours to supply. The one exception i
 the Falcon, where free [EmuTOS](https://emutos.sourceforge.io/) works and is in
 fact what this port was developed against.
 
-**Three assets are bare disk images, and their READMEs ship beside them** as
+**Four assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
 put one. The four `.zip` assets carry theirs inside as `README.txt`.
 
@@ -32,6 +32,31 @@ cell, which is what the VDC gives and the VIC-IIe does not.
 **JiffyDOS is assumed but not required** — the port was developed and timed
 with it. SAVE writes `EGATREK.SAV` back to this disk and the hall of fame lives
 on it too, so **the disk must not be write protected**.
+
+### `egatrek-c64.d64` — Commodore 64
+
+    x64sc -autostart egatrek-c64.d64:trek64
+
+or, on the machine, put the disk in drive 8 and:
+
+    LOAD "TREK64",8,1
+    RUN
+
+**Any C64 or 64C, PAL or NTSC.** The port counts raster lines to work out
+which it is on and tunes the SID to match — the same frequency word is nearly
+half a semitone apart on the two machines.
+
+**The console is in two halves, and `C` swaps between them.** Eighty columns
+do not fit, so the tactical page carries the scan, status, lasers, command
+line, viewer and messages, and the chart page carries the long range chart,
+the badge and the systems. `C` costs no turn.
+
+**A fastloader helps.** There are eleven code overlays on this disk and the
+game swaps them in as you change screens; JiffyDOS or an SD2IEC with fastload
+makes that noticeably quicker. Not required.
+
+SAVE writes `EGATREK.SAV` back to this disk and the hall of fame lives on it,
+so **the disk must not be write protected**.
 
 ### `egatrek-mega65.d81` — MEGA65
 

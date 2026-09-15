@@ -1,15 +1,13 @@
 # EGA Trek — Commodore 64
 
-Eighth port, started and running on **2026-09-14**. Every seam is real —
-video, keyboard, sound, storage (read *and* write), overlays and far memory —
-and the whole game has been driven end to end under VICE: title, the 24-page
-briefing, setup, the console, SAVE, the detailed evaluation, the hall of fame
-and the farewell.
+Eighth port, **built and released as v0.16.0 on 2026-09-14** — the same day it
+was started. Every seam is real: video, keyboard, sound, storage (read *and*
+write), overlays and far memory.
 
-**Nobody has played it yet.** That is the one thing between this and a
-release, and on this project it is the step that finds the faults: every one
-of the seven released ports had something real turned up by a person sitting
-in front of it.
+**It has been played**, which on this project is the step that finds the
+faults, and this sitting found none: *"its perfect."* Only the second sitting
+here to find nothing — the first was the C128, the port every other one is a
+diff against.
 
 ```sh
 make            # build/trek64.prg + the eleven overlay images
