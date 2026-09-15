@@ -21,8 +21,20 @@ READELF = os.path.expanduser("~/llvm-mos/bin/llvm-readelf")
 fails = []
 
 
-def check(ok, msg):
-    print("  %-5s %s" % ("ok" if ok else "FAIL", msg))
+def check(ok, msg, surface=False):
+    """`surface` marks a line the ROOT GATE should echo.
+
+    tools/check_ports.py surfaces a passing port's figures only when the line
+    carries a `verify:` prefix -- that is how it keeps the numbers that go
+    stale when nobody looks at them in front of somebody. **This port was in
+    the gate and contributing NOTHING**, because these lines were never
+    prefixed: `make ports` printed a bare "ok c64" while every other port
+    printed its resident and free figures. A port that passes silently is the
+    same shape as a port with no verify at all, which is what that gate exists
+    to prevent. Found 2026-09-14 by asking what the port list looked like.
+    """
+    print("  %-5s %s%s" % ("ok" if ok else "FAIL",
+                           "verify: " if surface else "", msg))
     if not ok:
         fails.append(msg)
 
@@ -82,8 +94,9 @@ def main():
               if not k.startswith(".ovl") and not k.startswith(".zp")
               and v["addr"] >= ram_o)
     check(top <= ram_o + ram_n,
-          "resident top $%04X is inside the region (ends $%04X, %d free)"
-          % (top, ram_o + ram_n - 1, ram_o + ram_n - top))
+          "resident $%04X..$%04X, %d of %d used, %d free below the stack guard"
+          % (ram_o, top - 1, top - ram_o, ram_n, ram_o + ram_n - top),
+          surface=True)
 
     # 3. THE STACK GUARD IS REAL. __stack sits at the window and grows DOWN,
     #    so the gap between the region's end and the window is all the room it
@@ -93,7 +106,9 @@ def main():
     stack = int(re.search(r"__stack\s*=\s*(0x[0-9A-Fa-f]+)", ld_text()).group(1), 16)
     guard = stack - (ram_o + ram_n)
     check(stack == win_o, "__stack is $%04X, the foot of the window" % stack)
-    check(guard >= 256, "stack guard is %d bytes (>= 256)" % guard)
+    check(guard >= 256,
+          "soft stack guard %d bytes at $%04X (measured demand 144)"
+          % (guard, ram_o + ram_n), surface=True)
 
     # 4. EVERY OVERLAY RUNS AT THE WINDOW AND FITS IT.
     ovl = {k: v for k, v in sec.items() if k.startswith(".ovl_")}
@@ -101,8 +116,9 @@ def main():
     bad = [k for k, v in ovl.items() if v["addr"] != win_o]
     check(not bad, "every overlay runs at $%04X" % win_o)
     big = [(k, v["size"]) for k, v in ovl.items() if v["size"] > win_n]
-    check(not big, "every overlay fits %d bytes (largest %d)"
-          % (win_n, max(v["size"] for v in ovl.values())))
+    big_n = max(v["size"] for v in ovl.values())
+    check(not big, "largest overlay %d of %d, %d spare"
+          % (big_n, win_n, win_n - big_n), surface=True)
 
     # 5. NO TWO OVERLAY IMAGES SHARE A PLACE IN THE FILE. When they did on the
     #    C128, objcopy dumped the same image under two names and the game ran
@@ -139,8 +155,8 @@ def main():
         if os.path.exists(p):
             have += os.path.getsize(p)
     check(have <= room,
-          "far store $%04X..$%04X holds %d bytes of %d (%d spare)"
-          % (far_base, far_limit - 1, have, room, room - have))
+          "far store $%04X..$%04X holds %d of %d, %d spare"
+          % (far_base, far_limit - 1, have, room, room - have), surface=True)
 
     # 8. THE FAR STORE DOES NOT REACH THE VECTORS. Stated separately from 7
     #    because it is a different claim: 7 is about today's files, this is

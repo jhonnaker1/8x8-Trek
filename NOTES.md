@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and eight times on 2026-09-14 (1 open of 64 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and nine times on 2026-09-14 (1 open of 65 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2848,6 +2848,25 @@ are the CoCo 3**, which is started and not released:
       same way.** Fixed to resolve `cd D && make X` against D; six hits left,
       all genuine prose about another port's target, none a defect.
       Raised 2026-09-14.
+
+  65. ~~**THE C64 WAS IN `make ports` AND CONTRIBUTING NO FIGURES.**~~
+      **RAISED AND CLOSED 2026-09-14.** Asked what the port list looked like,
+      and the gate printed a bare `ok    c64` where every other port printed
+      its resident and free numbers. `check_ports.py` surfaces a passing
+      port's figures only when the line carries a `verify:` prefix -- that is
+      how it keeps the numbers that go stale when nobody looks at them in
+      front of somebody -- and `verify_c64.py` never wrote one.
+      **A PORT THAT PASSES SILENTLY IS THE SAME SHAPE AS A PORT WITH NO
+      VERIFY AT ALL**, which is the defect this gate was built for and which
+      the CoCo 3 carried for its whole life. It makes the sentence "eight of
+      eight ok" true and, for one port, meaningless.
+      Four figures are surfaced now -- resident and free, the soft stack guard
+      against its MEASURED demand of 144, the largest overlay against the
+      window, and the far store against its 8,186 bytes. The last two are the
+      ones with real headroom questions behind them.
+      **FOUND BY ASKING FOR THE LIST, NOT BY CHECKING THE GATE.** Nothing was
+      failing; the output was simply one port short, and eight lines of green
+      read the same as seven plus a silence. Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the
