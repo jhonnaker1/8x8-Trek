@@ -258,11 +258,16 @@ overruns the 256 codes it has.
 **Not machines:** MS-DOS is the reference oracle and never a build target;
 C64 OS is the C64 again.
 
-**Live, cheapest first:**
+**Done.** The **Atari ST/STE** was top of this list and shipped in
+[v0.17.0](../../releases/latest) the same day. **The estimate held exactly**:
+one file, the video driver, four bitplanes interleaved by word. `vc +tos` was
+already the ST target, the sound was already the same YM2149 through the same
+XBIOS call, storage was already GEMDOS. 320×200 ÷ 8×8 is 40×25.
+
+**Still live, cheapest first:**
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
-| **Atari ST / STE** | **one file** — the video driver, four bitplanes interleaved by word | the Falcon port: vbcc's `+tos` target *is* the ST target, sound is the same YM2149 through the same XBIOS `Giaccess`, GEMDOS storage, no overlays, no banking. 320×200 ÷ 8×8 is exactly 40×25 |
 | **CoCo 3, no SuperSprite** | video, sound and far memory — the card carries all three | the CoCo 3 port's disk driver, first-stage loader, overlays and toolchain. **The route to hardware that is actually owned** |
 | **Commodore Plus/4** | video, a **new sound driver** (TED is not SID), a link script | the C64 port's storage, input, overlay and KERNAL model; TED gives 40×25 with all sixteen colours distinct |
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling |
