@@ -50,7 +50,82 @@ C64 = {
     "EGA_LTCYAN": 3, "EGA_LTMAGENTA": 4,
 }
 
-CANDIDATES = {"c64": C64}
+# ---------------------------------------------------------------------------
+# THE CANDIDATES THE 40-COLUMN TEMPLATE PUT BACK IN PLAY (added 2026-09-14).
+#
+# Two of these were ruled out ON WIDTH ALONE and that reason is gone: the Atari
+# ST line "320x200 in 16 colours (ONLY 40 COLUMNS)" and the Apple IIgs "320
+# mode is 16 colours and 40 columns, which fails the other hard rule". The
+# hard rule was 80 columns. There is no such rule any more, so they come back
+# here to be judged on the axis that actually does the work.
+#
+# A PROGRAMMABLE 16-ENTRY PALETTE IS THE IDENTITY MAPPING. Where a machine
+# lets the port choose all sixteen entries, there is nothing to check and the
+# table says so by being the identity -- that is a real answer, not a dodge.
+IDENTITY = {n: i for i, n in enumerate([
+    "EGA_BLACK", "EGA_BLUE", "EGA_GREEN", "EGA_CYAN", "EGA_RED", "EGA_MAGENTA",
+    "EGA_BROWN", "EGA_LTGRAY", "EGA_DKGRAY", "EGA_LTBLUE", "EGA_LTGREEN",
+    "EGA_LTCYAN", "EGA_LTRED", "EGA_LTMAGENTA", "EGA_YELLOW", "EGA_WHITE"])}
+
+# The CBM-II P500 has a REAL VIC-II, so its palette is the C64's exactly. What
+# differs on that machine is where the chip lives, not what it can show.
+P500 = dict(C64)
+
+# The Plus/4's TED: 121 colours as (luminance 0-7) x (hue 0-15), hue 0 black.
+# Encoded lum*16+hue purely so distinctness can be checked; the driver would
+# write the two nibbles. THE POINT IS THE HEADROOM -- unlike the C64 there is
+# no fold, because light and dark are separate luminances of the same hue
+# rather than separate palette entries that may or may not exist.
+def _ted(hue, lum): return lum * 16 + hue
+PLUS4 = {
+    "EGA_BLACK": _ted(0, 0),
+    "EGA_BLUE": _ted(6, 3),   "EGA_GREEN": _ted(5, 3),
+    "EGA_CYAN": _ted(3, 3),   "EGA_RED": _ted(2, 3),
+    "EGA_MAGENTA": _ted(4, 3),
+    "EGA_BROWN": _ted(9, 2),          # TED hue 9 is orange; brown is it, dim
+    "EGA_LTGRAY": _ted(1, 4), "EGA_DKGRAY": _ted(1, 2),
+    "EGA_LTBLUE": _ted(6, 6), "EGA_LTGREEN": _ted(5, 6),
+    "EGA_LTCYAN": _ted(3, 6), "EGA_LTRED": _ted(2, 6),
+    "EGA_LTMAGENTA": _ted(4, 6),
+    "EGA_YELLOW": _ted(7, 7), "EGA_WHITE": _ted(1, 7),
+}
+
+# The CoCo 3's GIME in 80-column TEXT with ATTR, and NO SuperSprite card --
+# the route to a port that runs on Jamie's actual machine (item 55).
+#
+# MEASURED, not read off a data sheet: a real CoCo 3 ROM booted in XRoar,
+# `WIDTH 80` then `ATTR f,b` across all eight foreground values with an
+# 80-character ruler. The capture holds EIGHT DISTINCT HUES -- the attribute
+# byte's three bits of foreground, indexing palette slots that are themselves
+# reprogrammable from 64.
+#
+# EIGHT SLOTS AND EIGHT INFORMATION-BEARING COLOURS. It fits with NOTHING TO
+# SPARE, which this tool reports as a pass and the decorative-collapse count
+# below reports as the cost. In 2026-09-05 this machine was dropped on the
+# claim that "the console uses FIFTEEN colours, not eight" -- true, and it
+# answers a different question: fifteen are USED, eight are LOAD-BEARING.
+GIME8 = {
+    "EGA_BLACK": -1,            # the background, not a foreground slot
+    "EGA_GREEN": 0,
+    "EGA_CYAN": 1,   "EGA_LTCYAN": 1,
+    "EGA_RED": 2,    "EGA_LTRED": 2,
+    "EGA_MAGENTA": 3, "EGA_LTMAGENTA": 3,
+    "EGA_BROWN": 4,  "EGA_YELLOW": 4,
+    "EGA_LTGRAY": 5, "EGA_WHITE": 5, "EGA_DKGRAY": 5,
+    "EGA_LTBLUE": 6, "EGA_BLUE": 6,
+    "EGA_LTGREEN": 7,
+}
+
+CANDIDATES = {
+    "c64": C64,                 # BUILT and released, v0.16.0
+    "plus4": PLUS4,             # TED, 40x25, 121 colours
+    "p500": P500,               # CBM-II, a real VIC-II in a bank
+    "atari-st": IDENTITY,       # 320x200x16, palette from 512 (4096 on an STE)
+    "msx2": IDENTITY,           # V9938 SCREEN 5, 16 from 512
+    "f256": IDENTITY,           # Vicky, 16-entry CLUT
+    "iigs": IDENTITY,           # 320 mode, 16 from 4096
+    "coco3-gime": GIME8,        # NO card: eight foreground slots, measured
+}
 
 
 def ega_indices():
@@ -125,6 +200,25 @@ def main():
             print("     all %d distinct -- the game's colour survives on %s"
                   % (len(needed), machine))
         bad += lost
+
+        # THE COST OF A PASS, which the pass itself hides. A machine can carry
+        # every GAME RULE and still fold colours the player can currently tell
+        # apart -- the C64 folds two (LTCYAN, LTMAGENTA), a machine with eight
+        # slots folds seven. That is not a failure and it is not nothing, so it
+        # is counted rather than either ignored or treated as fatal.
+        folds = {}
+        for n, native in sorted(table.items()):
+            if native < 0:
+                continue
+            folds.setdefault(native, []).append(n)
+        merged = [v for v in folds.values() if len(v) > 1]
+        if merged:
+            print("     COST: %d of the 16 fold -- %s"
+                  % (sum(len(v) for v in merged) - len(merged),
+                     "; ".join("=".join(x.replace("EGA_", "") for x in v)
+                               for v in merged)))
+        else:
+            print("     COST: none -- all sixteen stay distinct")
     if bad:
         print("\ncheck_colours: %d information-bearing colour(s) lost" % bad)
         return 1
