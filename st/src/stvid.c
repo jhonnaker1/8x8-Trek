@@ -58,6 +58,29 @@ __regsused("d0/d1/a0/a1/a2") void *linea_fonts(void) =
   "\tmove.l\ta1,d0\n"
   "\tmovem.l\t(sp)+,d2/a2\n";
 
+/* HIDE THE MOUSE, AND IT IS NOT COSMETIC TIDYING.
+ *
+ * The VBL mouse handler is still running while this program owns the screen,
+ * and the way it draws is to SAVE THE BACKGROUND under the cursor and restore
+ * it when the cursor moves. Whatever was under the pointer when the desktop
+ * handed over is what it restores -- so a block of stale desktop pixels
+ * appears over the console the first time the handler fires, in the middle of
+ * whatever the game had drawn there. On the title screen it landed across the
+ * word MONGOL as a solid green rectangle.
+ *
+ * Nothing in this port writes that block and no redraw prevents it: the game
+ * paints the cell, and then an interrupt paints over it again. $A00A is
+ * Line-A's HIDE_MOUSE, which stops the handler drawing at all.
+ *
+ * Cursconf() is NOT this -- that is the TEXT cursor, a different thing that
+ * this driver also turns off.
+ */
+__regsused("d0/d1/a0/a1/a2") void linea_hide_mouse(void) =
+  "\tmovem.l\td2/a2,-(sp)\n"
+  "\tdc.w\t$a000\n"
+  "\tdc.w\t$a00a\n"
+  "\tmovem.l\t(sp)+,d2/a2\n";
+
 struct fnthdr {
     short id, point;
     char  name[32];
@@ -266,6 +289,11 @@ void vdc_init(void)
         }
     }
 
+    /* Before the mode change, so the handler is already quiet when the screen
+       is cleared -- otherwise it has one more chance to stamp the old
+       background onto the new picture. */
+    linea_hide_mouse();
+
     old_rez = Getrez();
     for (i = 0; i < 16; i++) old_pal[i] = 0;
     Setscreen((void *)-1L, (void *)-1L, REZ_LOW);
@@ -285,9 +313,20 @@ void vdc_init(void)
 /* Deliberately does NOT clear: the farewell has to survive it. That is the
    C128's own rule and the bug the X16 and the Amiga both shipped in v0.13.0.
    The resolution goes back so the desktop is usable again. */
+/* $A009 is SHOW_MOUSE. The desktop needs its pointer back, and a program that
+   takes something from the machine gives it back -- the same rule that puts
+   the resolution and the palette back below. */
+__regsused("d0/d1/a0/a1/a2") void linea_show_mouse(void) =
+  "\tmovem.l\td2/a2,-(sp)\n"
+  "\tdc.w\t$a000\n"
+  "\tsub.l\ta2,a2\n"
+  "\tdc.w\t$a009\n"
+  "\tmovem.l\t(sp)+,d2/a2\n";
+
 void vdc_shutdown(void)
 {
     Cursconf(1, 0);
+    linea_show_mouse();
     if (old_rez >= 0)
         Setscreen((void *)-1L, (void *)-1L, old_rez);
     Setpalette(old_pal);

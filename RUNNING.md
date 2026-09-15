@@ -1,6 +1,6 @@
 # How to run each one
 
-Twelve assets, eight machines. Every port plays the same game from the same
+Thirteen assets, nine machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Four assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The four `.zip` assets carry theirs inside as `README.txt`.
+put one. The five `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -229,6 +229,37 @@ The game asks the machine which monitor it has and picks a mode: 640×480 in
 sixteen colours on VGA, 640×400 interlaced on RGB and on a television. **A TV
 will flicker** — the console needs 400 lines and 640×200 cannot hold it.
 **ST monochrome is refused in words** rather than painted unreadably.
+
+### `egatrek-st.zip` — Atari ST / STE
+
+    hatari --machine st --memsize 1 --gemdos-drive C -d egatrek-st \
+           --auto 'C:\EGATREK.PRG'
+
+or on the machine: unpack the folder anywhere and double-click `EGATREK.PRG`.
+**Quote the path** — an unquoted `C:\EGATREK.PRG` has the backslash eaten by
+the shell and Hatari is handed `C:EGATREK.PRG`, which it cannot open.
+
+**Any ST, Mega ST, STE or Mega STE with 1MB and a COLOUR display.** The game
+needs about 110K. It switches to low resolution itself and puts your desktop
+back when it quits; **in ST high resolution it says so and exits** rather than
+paint an unreadable screen, because the console needs sixteen colours and mono
+has none.
+
+**An STE gets a better picture for free.** The palette is written in the STE's
+four-bits-a-gun encoding, whose extra bit a plain ST ignores — the nearest of
+512 colours on an ST, of 4096 on an STE, from one code path.
+
+**No ROM is shipped.** Developed against free
+[EmuTOS](https://emutos.sourceforge.io/); a real TOS 2.06 works too and is
+yours to supply.
+
+**The console is in two halves** — `C` at the `CMD:` prompt shows the chart
+page and any key returns you. Both pages are drawn out in full under the
+Commodore 64 entry above; the layout is the same.
+
+The four files must stay together — the program opens them by name from the
+directory it runs from. SAVE writes `EGATREK.SAV` beside them, so the folder
+must not be read-only.
 
 ### `egatrek-coco3.zip` — Tandy Color Computer 3 **+ SuperSprite FM+**
 

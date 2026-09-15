@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and ten times on 2026-09-14 (1 open of 67 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and eleven times on 2026-09-14 (1 open of 68 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2905,6 +2905,26 @@ are the CoCo 3**, which is started and not released:
       than it looks. See [[measure-before-asserting]] -- verify by making it
       FAIL, and then check that it actually failed for the reason intended.
       Raised 2026-09-14.
+
+  68. ~~**RUNNING.md MISCOUNTED ITS OWN ASSETS AGAIN, ONE RELEASE LATER.**~~
+      **RAISED AND CLOSED 2026-09-14.** Item 63 was "the release page said
+      eleven assets and there are twelve", caused by changing "seven machines"
+      to "eight" in that sentence and leaving the other number alone. Adding
+      the ST, I wrote **"Fourteen assets"** and there are **THIRTEEN** -- nine
+      artefacts plus a `.txt` beside each of the four bare disk images. **The
+      same sentence, the same failure, the second release running**, and item
+      63 is four entries up this list.
+      **A COUNT ONLY A PERSON CHECKS IS A COUNT THAT DRIFTS**, and this one is
+      generated straight onto the release page. `tools/check_assets.py` now
+      derives both numbers -- RELEASE_PORTS out of the root Makefile, and the
+      `.txt` count from which ports build a bare `.d64`/`.d81`/`.atr` -- and
+      fails if RUNNING.md's opening sentence disagrees. Wired into
+      `make ports`.
+      **AND THE FIRST FAILURE TEST OF IT WAS A NO-OP**: a `sed` for
+      "Fourteen assets" against a file that already said "Thirteen", which
+      changed nothing and reported exit 0. The second test moved a real number
+      and went red. That is item 67's lesson twice in one session -- a break
+      that does not break proves nothing. Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the

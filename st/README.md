@@ -6,7 +6,14 @@ only thing it does not share.
 
 It boots on a **1MB ST under EmuTOS** and draws the whole nine-panel console:
 short range scan, status, lasers, the command line, the main viewer and the
-message log, in sixteen colours at 320×200. **Nobody has played it yet.**
+message log, in sixteen colours at 320×200.
+
+**It has been played**, the same day it was built, and the sitting found
+exactly one thing: **a green block across the word MONGOL on the title
+screen**. That was the GEM mouse handler, still running and still restoring
+the desktop pixels it had saved under the pointer — the game painted the cell
+and an interrupt painted over it. `$A00A` hides it; `$A009` gives it back on
+the way out. Fixed before the port shipped.
 
 ```sh
 make            # build/EGATREK.PRG + the three data files

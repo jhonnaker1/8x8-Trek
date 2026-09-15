@@ -98,7 +98,7 @@ tiers:
 running-section:
 	@sed '1s/^# /## /' RUNNING.md
 
-RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64
+RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64 st
 
 release:
 	@python3 tools/open_list.py
@@ -119,6 +119,7 @@ ports:
 	@python3 tools/open_list.py
 	@python3 tools/check_colours.py
 	@python3 tools/check_portcost.py
+	@python3 tools/check_assets.py
 	@python3 tools/check_ports.py $(P)
 
 # A VARIABLE USED IN A RULE'S PREREQUISITES MUST BE DEFINED ABOVE THAT RULE.
