@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and nine times on 2026-09-14 (1 open of 65 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and ten times on 2026-09-14 (1 open of 67 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2867,6 +2867,44 @@ are the CoCo 3**, which is started and not released:
       **FOUND BY ASKING FOR THE LIST, NOT BY CHECKING THE GATE.** Nothing was
       failing; the output was simply one port short, and eight lines of green
       read the same as seven plus a silence. Raised 2026-09-14.
+
+  66. ~~**THE ST'S GATE RAN THE FALCON'S CHECKS AND EXITED GREEN.**~~
+      **RAISED AND CLOSED 2026-09-14.** `st/tools/verify_st.py` is the
+      Falcon's checker IMPORTED rather than copied -- same glyph sweep, same
+      geometry rule, pointed at `layout40.c` and `stvid.c`. But
+      `falcon/tools/verify_prg.py` ended in a bare `sys.exit(main())` with no
+      `if __name__ == "__main__"` guard, so **importing it ran the FALCON's
+      checks against the FALCON's driver and killed the process on the way
+      out.** The ST's gate printed `console 80x25 cells of 8x16 = 640x400`
+      and `resident 108,574 bytes` and exited 0. Not one of its own checks
+      ran.
+      **IT WAS GREEN AND IT WAS ABOUT ANOTHER MACHINE**, which is worse than
+      red: a failing check gets looked at. What caught it was READING THE
+      OUTPUT rather than the exit status -- 80x25 of 8x16 is the Falcon's
+      console and this port is 40x25 of 8x8. The numbers were right for
+      somebody.
+      Guarded, and `verify_st.py` now (a) catches `SystemExit` during the
+      import and says exactly what is wrong, and (b) REFUSES TO RUN if the
+      geometry it is about to check is not 40 columns of 8-pixel cells.
+      Both proved by putting the bare `sys.exit` back: refused, named the
+      file, exit 1. Raised 2026-09-14.
+
+  67. ~~**A FAILURE TEST THAT DID NOT BREAK ANYTHING.**~~ **RAISED AND CLOSED
+      2026-09-14.** Proving the ST could fail the gate, I appended
+      `this is not C;` to a source file and `make ports` came back 9 of 9 ok.
+      The first reading was a hollow gate -- item 65 one hour earlier was
+      exactly that -- and it was wrong: **`this is not C;` IS VALID C.** It is
+      a K&R implicit-int declaration, vbcc warns twice and compiles it, and
+      this port deliberately does not use `-Werror` because vbcc's warning set
+      is not gcc's.
+      So THE GATE WAS RIGHT AND THE TEST WAS THE BUG. Re-run with `#error`,
+      which cannot be anything else: exit 2, `FAIL st`, `1 of 9 FAILED`.
+      **The lesson is about failure tests, not about vbcc**: a break that the
+      compiler can interpret as valid code proves nothing, and on a toolchain
+      without `-Werror` the set of things that quietly compile is much larger
+      than it looks. See [[measure-before-asserting]] -- verify by making it
+      FAIL, and then check that it actually failed for the reason intended.
+      Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the

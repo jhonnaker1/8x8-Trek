@@ -266,4 +266,11 @@ def main():
     return 0
 
 
-sys.exit(main())
+# GUARDED, because this module is IMPORTED as well as run. st/tools/verify_st.py
+# is this checker pointed at the ST -- same glyph sweep, same geometry rule,
+# different files -- and with a bare `sys.exit(main())` at the foot, importing
+# it ran the FALCON's checks and killed the process before the ST's could
+# start. The ST's gate printed "console 80x25 cells of 8x16" and exited 0: a
+# hollow pass reporting another machine's numbers. See NOTES.md item 66.
+if __name__ == "__main__":
+    sys.exit(main())

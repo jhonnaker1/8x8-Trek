@@ -1,0 +1,24 @@
+# Per-port text for the Atari ST and STE, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override st/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, AND NOTHING ELSE -- the generator owns the numbering,
+# so this port builds the same strdata.h and the same STR_COUNT as every other.
+# See NOTES.md item 60 for what STR_COUNT is load-bearing for.
+
+# The title bar. The 40-column build draws S_330, not S_0 -- see ui_title().
+330	ATARI ST PORT
+
+# S_0 is the 80-column title bar, which this port never compiles. Overridden
+# anyway so nothing on this disk says C128 about an ST.
+0	 ATARI ST PORT 
+
+# The dedication line, drawn at x=0 on row 23 of the 40-column title.
+82	TO THE ATARI ST.
+
+# THE FAREWELL. plat_exit() on this machine does nothing at all -- TOS gets its
+# process back and the desktop redraws itself -- so unlike the C64 there is no
+# reset to warn about, and unlike the C128 there is no other screen to send
+# anyone to. main.c centres both lines from strlen in the 40-column build, so
+# this may be any length up to 40.
+10	HIT A KEY TO RETURN TO THE DESKTOP.

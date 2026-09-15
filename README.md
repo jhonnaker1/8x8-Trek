@@ -42,6 +42,13 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > C128 has 304, because BASIC's 8K is plain RAM and the overlay window moved
 > into the 4K at `$C000` that nothing ever covers.
 > See [`c64/README.md`](c64/README.md).
+>
+> **A ninth port runs but is NOT released: the Atari ST and STE**, built
+> 2026-09-14 and **one file** — every seam but the video driver already
+> existed in the Falcon port. It is the first port here built against a rule
+> this project had already written down and then had to retire: the whole
+> Atari 16-bit line went out in August for being *"only 40 columns"*.
+> **Nobody has played it yet.** See [`st/README.md`](st/README.md).
 > Research and decisions are recorded in [`NOTES.md`](NOTES.md).
 
 ## The original, and why I'm doing this
@@ -207,6 +214,7 @@ eighth pages it across two 40-column halves.
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The port that **deletes the most**: no overlays, no banking, no filesystem of our own, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
 | **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **The slowest of the eight.** See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare**, more than any other 6502 port here. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
+| **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Built 2026-09-14, not released, not yet played.** **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
 
 
 ### How much colour the console actually needs
