@@ -30,15 +30,23 @@ or an SD2IEC with fastload makes the screen changes noticeably quicker.
 
 THE CONSOLE IS IN TWO HALVES
 
-EGA Trek's console is eighty columns wide. This machine has forty, so the
-console is split across two pages and PRESSING C SWAPS BETWEEN THEM:
+EGA Trek's console is eighty columns wide. This machine has forty, so it is
+the same console seen a half at a time.
 
-    tactical page   short range scan, status, lasers, the command line,
-                    the main viewer, and the message log
-    chart page      the long range chart, the ship's badge, and the state
-                    of every system
+You spend the game on the TACTICAL page:
 
-C costs no turn. Neither does looking at anything else.
+    short range scan, status, lasers, the command line, the main viewer,
+    and the message log
+
+PRESS C AT THE CMD: PROMPT and the CHART page replaces it:
+
+    the long range chart, the state of every system, and the ship's badge
+
+ANY KEY BRINGS YOU BACK. C costs no turn, and neither does looking.
+
+Nothing is lost, only moved -- every panel of the eighty-column console is on
+one page or the other. Messages arrive on the tactical page, which is where
+any key puts you back, so you will not miss one by looking at the chart.
 
 At the CMD: prompt, type HELP for the full list of orders. Every prompt in
 this game is a line editor -- type your answer and press RETURN, including

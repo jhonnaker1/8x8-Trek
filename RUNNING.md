@@ -46,10 +46,76 @@ or, on the machine, put the disk in drive 8 and:
 which it is on and tunes the SID to match — the same frequency word is nearly
 half a semitone apart on the two machines.
 
-**The console is in two halves, and `C` swaps between them.** Eighty columns
-do not fit, so the tactical page carries the scan, status, lasers, command
-line, viewer and messages, and the chart page carries the long range chart,
-the badge and the systems. `C` costs no turn.
+#### The console is in two halves — press `C` for the other one
+
+EGA Trek's console is **eighty columns wide and this machine has forty**, so it
+is the same console seen a half at a time. You spend the game on the **tactical
+page**; `C` at the `CMD:` prompt shows the **chart page**, and **any key brings
+you back**. `C` costs no turn, and neither does looking.
+
+**Tactical — where you give orders, and where messages arrive:**
+
+```
++-SHORT RANGE SCAN-+-STATUS------------+
+|   1 2 3 4 5 6 7 8|                   |
+| 1 E . . . . . . .| STARDATE 3500.0   |
+| 2 . * . . . . . .| ENERGY    5000    |
+| 3 . # . . . . . .| IMPULSE    500    |
+| 4 . * . . . . . *| SHIELDS   2500    |
+| 5 . . . * . . . .| TORPS        9    |
+| 6 . . . . . . . .| WARP       1.0    |
+| 7 . . . . . . . .| MONGOLS     18    |
+| 8 . . . . . . . .|                   |
++------------------+-------------------+
++-LASERS------------++-MAIN VIEWER-----+
+|EFF  ########  100 ||                 |
+|TEMP           0   ||                 |
++-COMMAND-----------+|   NO CONTACT    |
+| CMD: _            ||                 |
+| QUAD 5,7  SEC 1,1 ||                 |
++-------------------++-----------------+
++-------------------------------3500.0-+
+|HELM: AWAITING ORDERS CAPTAIN         |
++--------------------------------------+
+```
+
+**Chart — press `C`; any key returns you to the orders above:**
+
+```
++-CHART OF KNOWN GALAXY----------------+
+|  1   2   3   4   5   6   7   8       |
+|1... ... ... ... ... ... ... ...      |
+|2... ... ... ... ... ... ... ...      |
+|3... ... ... ... ... ... ... ...      |
+|4... ... ... ... ... 002 002 002      |
+|5... ... ... ... ... 002 014 002      |
+|6... ... ... ... ... 004 001 032      |
+|7... ... ... ... ... ... ... ...      |
+|8... ... ... ... ... ... ... ...      |
++-LEXINGTON IN QUAD 5,7----------------+
++-SYSTEMS STATUS----+------------------+
+|CNV #####IMP ##### | U.S.S. LEXINGTON |
+|SHD #####SRS ##### |      RCB-92      |
+|LIF #####LRS ##### |                  |
+|LAS #####CMP ##### |      #.##*##     |
+|TUB #####TRN ##### |                  |
+|WRP #####SHT ##### |  DEPT. OF SPACE  |
++-------------------+------------------+
+```
+
+**Nothing is lost, only moved.** Every panel of the 80-column console is on one
+page or the other — the tactical page carries the short range scan, status,
+lasers, the command line, the main viewer and the message log; the chart page
+carries the long range chart, the systems' state of repair and the ship's
+badge.
+
+**Messages arrive on the tactical page**, which is where `C` puts you back, so
+you will not miss one by looking at the chart.
+
+At the `CMD:` prompt, **type `HELP` for the full list of orders**. Every prompt
+in this game is a line editor — type your answer and press RETURN, including
+the ones that ask Y or N. **RUN/STOP is ESC**, which is what the self-destruct
+prompt wants when it offers you a way out.
 
 **A fastloader helps.** There are eleven code overlays on this disk and the
 game swaps them in as you change screens; JiffyDOS or an SD2IEC with fastload
