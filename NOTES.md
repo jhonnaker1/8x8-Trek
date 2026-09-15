@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and eleven times on 2026-09-14 (1 open of 68 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 (1 open of 69 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2925,6 +2925,36 @@ are the CoCo 3**, which is started and not released:
       changed nothing and reported exit 0. The second test moved a real number
       and went red. That is item 67's lesson twice in one session -- a break
       that does not break proves nothing. Raised 2026-09-14.
+
+  69. ~~**THE ST PORT HAD NO SOUND CHECK OF ANY KIND, AND SHIPPED.**~~
+      **RAISED AND CLOSED 2026-09-14.** Jamie reported the released ST as
+      silent. It is not -- the published `EGATREK.PRG` is byte-identical to a
+      build measured making sound, peak 5204 of 32767 across 98.4% of ten
+      seconds -- and WHAT SILENCED HIS SESSION IS NOT KNOWN AND IS NOT WORTH
+      INVENTING A CAUSE FOR.
+      **The defect this exposed is real and is mine: there was nothing that
+      could have caught it either way.** `tools/shot.py` runs Hatari with
+      `--sound off`, so EVERY automated verification this port had was a
+      verification about the picture. `make verify` checks geometry and
+      glyphs. The gate was green on a port nobody had listened to.
+      Two instruments now. `make sndtest` runs a probe that reports each link
+      of the chain -- MUSIC.DAT loaded, driver enabled, the 200Hz tick moving,
+      and then **READS THE PSG BACK through Giaccess**, which the YM2149
+      allows and the SID does not: period $341 (150Hz), mixer bit 0 clear,
+      volume 12. `make hearit` records Hatari to an AVI, extracts the audio
+      with ffmpeg and measures the peak, which is the only check that can
+      speak to a speaker. Same shape as the X16's octave-flat investigation.
+      **AND I ASSERTED A CAUSE I HAD NOT ESTABLISHED.** Between the silent
+      report and the next run I added `--sound 44100`, Jamie heard sound, and
+      I wrote "the one run he heard was the one that named a frequency" into
+      the Makefile and into RUNNING.md AS FACT. It was a correlation across
+      two runs with one difference I had noticed and an unknown number I had
+      not. **His own A/B killed it within the hour** -- no flag played,
+      `--sound 44100` played, `--sound off` did not, which is three runs
+      behaving correctly and no evidence for my sentence. Both copies removed
+      before either was committed. See [[measure-before-asserting]]: a cause
+      is not a thing you get to name because you noticed a difference.
+      Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the

@@ -58,7 +58,7 @@ PLATFORM = src/stvid.c src/stlog.c
 GAME_SRC = $(SHARED) $(FROM_FALCON) $(PLATFORM)
 GAME_OUT = build/EGATREK.PRG
 
-.PHONY: all game verify data music release run run-ste run-tos206 clean
+.PHONY: all game verify data music release run run-ste run-tos206 sndtest hearit clean
 
 all: game data
 
@@ -77,6 +77,25 @@ $(GAME_OUT): $(GAME_SRC) Makefile
 verify: $(GAME_OUT)
 	python3 ../c128/tools/layout40_check.py
 	python3 tools/verify_st.py
+
+# THE SOUND PROBE. This port shipped SILENT because every automated check ran
+# with `--sound off` -- a driver that writes no registers is indistinguishable
+# from a working one in a screenshot. It reports each link of the chain and
+# READS THE PSG BACK, which the YM2149 allows and the SID does not.
+SND_SRC = src/sndtest.c ../falcon/src/falconsnd.c ../falcon/src/falconfarmem.c \
+          ../falcon/src/falconstorage.c ../falcon/src/music_data.c
+# AND THE ONE THAT ANSWERS THE REAL QUESTION: does a speaker get anything?
+# sndtest proves the driver writes the right values; hearit records Hatari to
+# an AVI, extracts the audio and measures the peak. No ear required, and no
+# `--sound off` anywhere near it.
+hearit: all
+	@python3 tools/hearit.py
+
+sndtest: build/SNDTEST.PRG
+build/SNDTEST.PRG: $(SND_SRC) Makefile
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $(SND_SRC)
+	@ls -l $@
 
 data: build/STRINGS.DAT build/BRIEF.TXT build/MUSIC.DAT
 
@@ -144,21 +163,35 @@ release: game data verify
 # against. A real TOS is the player's to supply:
 #     make run-tos206
 #
-# Sound is ON here -- this is the target a person plays. tools/shot.py turns it
-# off for automated runs.
+# --sound 44100 is written out rather than left to a default. THE DEFAULT ALSO
+# WORKS -- that was measured, by Jamie listening to three runs: no flag and
+# `--sound 44100` both played, `--sound off` did not, which is all three
+# behaving correctly. So this flag is explicitness, NOT a fix.
+#
+# I BRIEFLY WROTE THE OPPOSITE HERE. The release came back reported as silent,
+# the next run I made passed a frequency, Jamie heard it, and I put "the one
+# run he heard was the one that named a frequency" into this comment as a
+# cause. It was a correlation across two runs with one difference I had
+# noticed and several I had not, and his A/B killed it an hour later.
+#
+# WHAT IS ESTABLISHED: the driver is correct. `make sndtest` reads the PSG
+# BACK through Giaccess -- the YM2149 allows that where the SID does not --
+# and finds a 150Hz note, mixer bit 0 clear, volume 12. What made the release
+# session silent is NOT KNOWN. tools/shot.py passes `--sound off`, which is
+# why no automated check here could ever have caught it either way.
 run: all
-	$(HATARI) --machine st --tos $(TOSIMG) --vdi off --memsize 1 \
+	$(HATARI) --machine st --tos $(TOSIMG) --vdi off --memsize 1 --sound 44100 \
 	    --fast-boot on --gemdos-drive C -d build --auto 'C:\EGATREK.PRG'
 
 run-ste: all
-	$(HATARI) --machine ste --tos $(TOSIMG) --vdi off --memsize 1 \
+	$(HATARI) --machine ste --tos $(TOSIMG) --vdi off --memsize 1 --sound 44100 \
 	    --fast-boot on --gemdos-drive C -d build --auto 'C:\EGATREK.PRG'
 
 # Real TOS 2.06 instead of EmuTOS, for checking the port is not leaning on one
 # ROM -- the Line-A font table is the part that could differ.
 run-tos206: all
 	$(HATARI) --machine st --tos $(HOME)/hatari/rom/tos206us.img --vdi off \
-	    --memsize 1 --fast-boot on --gemdos-drive C -d build \
+	    --memsize 1 --sound 44100 --fast-boot on --gemdos-drive C -d build \
 	    --auto 'C:\EGATREK.PRG'
 
 clean:
