@@ -19,7 +19,7 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > cannot call it), **a first-stage loader** for a 44K image `LOADM` will not
 > place, **far memory in the video card's spare VRAM**, and eleven overlays.
 > Its sound is the SuperSprite's YM2149, at a clock **read out of MAME's device
-> source rather than looked up**. It is the slowest of the seven and it is
+> source rather than looked up**. It is the slowest of the eight and it is
 > playable. See [`coco3/README.md`](coco3/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
@@ -150,7 +150,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all seven released ports. EGA
+**Colour per message is built** (2026-09-10) and ships on all eight released ports. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -187,8 +187,15 @@ part no build check could ever have answered.
 
 ## Targets
 
-**Tier 1 — 80 columns and 16 colours.** The console is a 80×25 grid of
-per-cell colour; anything that can hold that runs the game as designed.
+**Eight ports, and the rule that used to head this section is gone.** It said
+80 columns; the C64 shipped at 40 and the console is the same console seen a
+half at a time. What a machine actually has to carry is **enough colour** —
+and, as of 2026-09-14, that no longer separates the candidates either. See
+*What is left* below.
+
+**Released, in the order they shipped.** Seven of the eight put the console on
+an 80×25 grid of per-cell colour, which is the shape it was designed on; the
+eighth pages it across two 40-column halves.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
@@ -198,68 +205,89 @@ per-cell colour; anything that can hold that runs the game as designed.
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.15.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.15.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The cheapest port here: **no overlays, no banking, no filesystem of our own**, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
-| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **The slowest of the seven.** See [`coco3/README.md`](coco3/README.md) |
+| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **The slowest of the eight.** See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare**, more than any other 6502 port here. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
 
-**How much colour the console actually needs: fifteen.** Counted from the
-shared sources on 2026-09-05 rather than assumed — every EGA colour except
-black, which is the background. It distinguishes `RED` from `LTRED`, `BLUE`
-from `LTBLUE`, and so on, and it uses those pairs to mean different things:
-the four Mongol ship types are told apart by colour alone. An earlier version
-of this section claimed the console needed only eight. **It does not, and that
-claim is what had kept a machine on the list that cannot run it.**
 
-**Tier 3 and out.** Each of these was ruled out for its own reason, and three
-of them were settled by measurement in September 2026.
+### How much colour the console actually needs
 
-- **Tandy CoCo 3** — `WIDTH 80` plus `ATTR` gives **eight** foreground colours
-  per cell, and measured in MAME on an RGB monitor those eight are exact EGA
-  hues rather than approximations. Eight is still not fifteen: every
-  dark/bright pair would collapse, and with it the distinction between Mongol
-  ship types. Add a fourth CPU family (6809) whose only compiler, CMOC, is
-  non-conforming — it silently miscompiled a shift in the shared core, and
-  cannot evaluate the save-record static assert — and the cost stops being
-  worth it. (Both of those were found here and fixed for everyone; see
-  `NOTES.md`.)
-- **Foenix F256** — llvm-mos has no F256 platform, so the toolchain would have
-  to be built before the port could start, and cc65 is the only route today.
-  This project left cc65 in August with **210 bytes** of the C128's main
-  budget free, and llvm-mos bought about 6K back. Whether the game fits at all
-  under cc65 is genuinely unknown rather than merely tight.
-- **Apple IIgs** — measured in MAME on 2026-09-05. Its 640 mode shows sixteen
-  colours on a scanline but only **four** that can be placed at any x, because
-  the palette groups are bound to a pixel's position within a byte. Four
-  against fifteen.
-- **The whole Atari ST line** — 640×200 costs all but four colours (Jamie's
-  call). The **TT030 and Falcon030 do qualify** — 640×480 in 16 colours, and
-  68030 means `core/` already compiles for them; one binary would serve both,
-  with a machine check in `vdc_init()` because VIDEL is not TT-compatible, and
-  it would be **Falcon-first**. The verdict was never about capability — almost
-  nobody owns either — but **Jamie re-opened the Falcon on 2026-09-11 and it is
-  now a released port**; the installed-base argument still stands and is still
-  the argument against, and it was his call to make anyway. The TT remains a
-  branch nobody has built. **MSX2** has 80 columns but the colour collapses —
-  though its V9938's SCREEN 7 is a bitmap route nobody has benchmarked. A
-  **CoCo 3 with a SuperSprite FM+** carries the V9938's successor and **has
-  been benchmarked** (10.625 cycles a byte to the V9958) — and **that
-  arithmetic was not the repaint**: the blit cost is a third of a second and a
-  real 80×25 repaint measured **12.24 seconds**, because the per-character
-  work around each byte dwarfs the byte. It is 3.84 s now and is still the
-  slowest of the seven; a dirty-cell scheme remains the structural fix. That
-  port is **released as of v0.15.0**; see [`coco3/README.md`](coco3/README.md). The **stock Atari
-  800XL** stops at 40 columns; only VBXE brings it back — and that is a
-  **colour** failure, ANTIC's text modes, not a column one. **40 COLUMNS IS
-  RE-OPENED (2026-09-13, item 57)** and the sentence that used to sit here —
-  "a nine-panel console does not fit in 40 columns" — is wrong about the
-  geometry: laying the panel table on a grid shows **two of the three bands are
-  already exactly forty columns wide**, and the third misses by one. The LONG
-  RANGE CHART and the MESSAGE REGION become paged views, which `msgv_draw`
-  already does for messages. See "40 COLUMNS: what the layout already permits"
-  in [`NOTES.md`](NOTES.md), which also measures a **C64** port — SID driver,
-  toolchain, keyboard model and disk seam all reused from the C128 — and the
-  **CoCo 3's own GIME at 320×200×16, which is 40×25 with no SuperSprite.**
+**Fifteen are used, eight are load-bearing**, and the two numbers answer
+different questions. The console uses every EGA colour except black, which is
+the background — it tells `RED` from `LTRED` and `BLUE` from `LTBLUE` and means
+different things by them. But only **eight** carry a game rule: the four Mongol
+ship types, the chart's Mongol and base markers, the department colours and the
+message colour. Collapse one of those eight and the player can no longer tell a
+battleship from a command ship. Collapse one of the other seven and the screen
+is less pretty.
 
-### The order, decided 2026-08-23, rewritten 2026-09-05
+`tools/check_colours.py` **derives that set every run** — from `core/ega.h` and
+from `dept_color()` in `ui.c`, so adding a colour grows the requirement by
+itself and nothing has to be remembered. Hand it a machine's palette and it
+answers before anyone writes a line of a driver. It reports the **cost** of a
+pass as well as the pass: the C64 folds two decorative colours, a machine with
+eight slots folds seven.
+
+An earlier version of this section said the console needed only eight and gave
+no such distinction. **That sentence was load-bearing for exactly one decision**
+and it kept a machine on the list that could not run the game as designed.
+
+### What is left, and which axis rules the rest out
+
+Run on 2026-09-14 across [commodore-uno](https://github.com/jhonnaker1/commodore-uno)'s
+lineup, now that 40 columns is a shipped layout. **All eight remaining
+candidates pass the colour check**, so the discriminator is no longer the
+display — it is how much code already exists.
+
+**Out on width or memory:** PET (monochrome as well), **VIC-20** (22 columns,
+and 35K at most), **ZX Spectrum** (48K against the ~53K this game needs).
+
+**Out on colour, the same rule that excluded the PET:** **Apple IIe** — 40×24
+text is monochrome; **stock Atari 800XL** — ANTIC's text modes have no per-cell
+colour, which is what VBXE was for and is the cleanest illustration of why
+width and colour must not be bundled; **TI-99/4A** — the TMS9918A colours
+*groups of eight character codes*, so eight colours across this game's glyph set
+overruns the 256 codes it has.
+
+**Not machines:** MS-DOS is the reference oracle and never a build target;
+C64 OS is the C64 again.
+
+**Live, cheapest first:**
+
+| Candidate | What it would cost | What already exists |
+|---|---|---|
+| **Atari ST / STE** | **one file** — the video driver, four bitplanes interleaved by word | the Falcon port: vbcc's `+tos` target *is* the ST target, sound is the same YM2149 through the same XBIOS `Giaccess`, GEMDOS storage, no overlays, no banking. 320×200 ÷ 8×8 is exactly 40×25 |
+| **CoCo 3, no SuperSprite** | video, sound and far memory — the card carries all three | the CoCo 3 port's disk driver, first-stage loader, overlays and toolchain. **The route to hardware that is actually owned** |
+| **Commodore Plus/4** | video, a **new sound driver** (TED is not SID), a link script | the C64 port's storage, input, overlay and KERNAL model; TED gives 40×25 with all sixteen colours distinct |
+| **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling |
+| **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
+| **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
+
+**Two of these were ruled out on width alone, and that reason no longer
+exists.** The whole Atari 16-bit line went on 2026-08-22 because 320×200×16 is
+*"only 40 columns"*, and the **Apple IIgs** because *"320 mode is 16 colours and
+40 columns, which fails the other hard rule"*. Neither was ever judged on
+colour; both carry all sixteen distinctly. The IIgs's separate 640-mode failure
+— sixteen colours on a scanline but only four placeable at any x, measured in
+MAME — is real and is about a mode nothing now needs.
+
+**And the card-less CoCo 3's exclusion was answering the wrong question.** It
+was dropped on *"the console uses fifteen colours, not eight"*. True, and not
+the same claim as *eight is not enough*: `WIDTH 80` plus `ATTR` gives eight
+per-cell foreground hues — **measured against a real ROM in XRoar**, from a
+palette reprogrammable out of 64 — and those eight carry all eight
+information-bearing colours, Mongol ship types included. It fits with nothing to
+spare; seven decorative colours fold.
+
+**Nothing here is a decision.** The two most recent ports, the Falcon and the
+CoCo 3, were both re-opened against a written argument in this file and both
+shipped. A measurement settles how hard, never whether.
+
+
+### The order, decided 2026-08-23, rewritten 2026-09-05 — HISTORY
+
+> **All eight of these shipped, and the list below is kept for its reasoning
+> rather than as a plan.** Two of the machines it rules out have since been
+> re-opened and released. What is live is *What is left* above.
 
 The original split targets into "text-mode siblings first, the two bitmap ones
 last together". **Measuring them dissolved that grouping.** VBXE turned out to
@@ -350,8 +378,8 @@ make all                # the native tests, the audits, and `ports`
 verify to check -- and a port whose cross compiler is not
 installed is reported as a skip rather than a failure, naming the variable and
 path it looked for. So a fresh clone with no toolchains still gets a green
-`make all`; a machine with all seven toolchains gets **seven real gates in
-about ten seconds**. `make ports P=atari` for one.
+`make all`; a machine with every toolchain gets **eight real gates in about
+ten seconds**. `make ports P=atari` for one.
 
 **Use `rund`, not `run`.** A bare PRG has no drive, and the string pool, the
 music, the eleven code overlays and the twelve-page briefing all load from the
