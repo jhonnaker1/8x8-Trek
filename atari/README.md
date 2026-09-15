@@ -72,8 +72,10 @@ paged move code**. Both new windows work on the machine, not just in the link.
 
 **`src/stubs.c` is now empty of live code**, so `make early` measures the whole
 thing. The two extra overlays are committed and gated per port — see "The two
-levers that close it" — and the shipping link has **about 2,400 bytes free**,
-against 693 while DOS was on the disk — see "The margin, and where it came
+levers that close it" — and the shipping link has **room in three
+separate pools and `make verify` prints all three** -- it was about 2,400 bytes
+in the code pool when this was written and is smaller now, against 693 while
+DOS was on the disk — see "The margin, and where it came
 from". `make verify` prints the exact figure and is the only authority for it;
 it now prints **two** pools, because the program's data no longer lives in the
 same address space as its code.
@@ -604,14 +606,19 @@ an unlikely one.**
 
 ## The margin, and where it came from
 
-Run `make verify`; it is the only authority. It prints **two** pools now,
-because the program's data no longer shares an address space with its code:
+Run `make verify`; **it is the only authority, and this file no longer holds a
+copy.** It prints **three** pools, because the program's data no longer shares
+an address space with its code:
 
-```
-verify: code $3000..$A3B5, 2379 bytes free below the stack reserve at $AD00
-verify: low data $0A00..$19BB, 4027 of 5632 used, 1605 free (where DOS was)
-verify: lowram $0480..$06FF, 626 of 640 used, 14 free
-```
+    code       the program, below the stack reserve at $AD00
+    low data   $0A00..$19D7, where Atari DOS used to be
+    lowram     $0480..$06FF, 640 bytes and the tightest pool in the project
+
+~~A worked example used to sit here.~~ **It was 447 bytes out by 2026-09-14**
+-- pasted on the day it was measured, and every shared change since has moved
+it. The paragraph above it said "`make verify` is the only authority" while
+this block sat underneath contradicting it, which is the whole argument for
+deleting it rather than refreshing it.
 
 The shipping link had **62 bytes** free at its worst and 693 with DOS on the
 disk. Where the rest came from is "The DOS lever, SPENT", above.

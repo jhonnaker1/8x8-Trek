@@ -79,17 +79,22 @@ read *through*.
 **No disk image.** The X16 has no 1541, so `make release` ships a folder of
 files for the emulator's or a real machine's filesystem.
 
-## Live figures
+## Live figures — read them from `make verify`, not from here
 
-    verify: window 3968 bytes, linker script and Makefile agree
-    verify: low RAM ends $8F30, __stack $8F80 -- 80 bytes for the soft stack
-    verify: largest overlay msgs 3811 + 2 stamp of 3968, 155 spare
-    verify: 11 overlay images, each byte-identical to its ELF section -- ok
+`make verify` prints, on every build: the overlay window's size with the linker
+script and the Makefile agreeing about it, where low RAM ends against
+`__stack` and how many bytes that leaves the soft stack, the largest overlay
+against the window, and that all eleven images are byte-identical to their ELF
+sections.
 
-`make verify` prints them on every build; this file deliberately does not
-repeat them anywhere else. **The figures above were 140 and 157 when this
-section was written and are 80 and 155 now** — they moved under it, which is
-the argument for reading `verify` rather than this file.
+~~A copy of that output used to sit here.~~ **ALL THREE OF ITS NUMBERS HAD
+MOVED BY 2026-09-14, AND THE SECTION ALREADY KNEW IT COULD** — it carried the
+sentence "the figures above were 140 and 157 when this section was written and
+are 80 and 155 now — they moved under it, which is the argument for reading
+`verify` rather than this file", and then they moved again, to 184 and 75, and
+the window from 3968 to 3888. **A section that documents its own staleness is
+still stale.** Deleted rather than refreshed: the numbers have one home and it
+is the tool.
 
 ### THE SOFT STACK WAS OVERFLOWING ON SAVE -- MEASURED AND FIXED 2026-09-11
 

@@ -116,7 +116,7 @@ chop it.
 
 THINGS TO KNOW
 
-IT IS THE SLOWEST OF THE SEVEN PORTS. A full console repaint takes about four
+IT IS THE SLOWEST OF THE EIGHT PORTS. A full console repaint takes about four
 seconds, because every character is drawn a pixel-pair at a time across a card
 the 6809 reaches through two I/O ports. It is playable and it is not brisk.
 The game runs the CPU at 1.78 MHz, twice the CoCo 3's default, to help.

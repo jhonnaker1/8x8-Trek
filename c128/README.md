@@ -43,7 +43,11 @@ Three pools, and they are not interchangeable:
   below it and BASIC text starts above. It does not compete with code at all,
   which is why `io_buf` lives there.
 
-The C128 is the roomiest 6502 target in the project. That is worth saying
+~~The C128 is the roomiest 6502 target in the project.~~ **NOT SINCE
+2026-09-14: the C64 has 6,112 bytes spare against this port's 1,459**, because
+BASIC's 8K is plain RAM there and its overlay window sits in the 4K at $C000
+that nothing covers, rather than being carved out of the program's region.
+What follows is still true of this machine and no longer a superlative. That is worth saying
 plainly because it was not always true on paper: the figure sat at 211 bytes in
 three documents for four days while the real number was 1,589, because **this
 was the one port whose `make verify` did not print it.** A resource nobody

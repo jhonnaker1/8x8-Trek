@@ -309,8 +309,9 @@ confirms the driver's tick calibration -- the thing that once ran the music at
 double speed -- from a direction that has nothing to do with music.
 
 Against the measured original's 250.6ms this is 9.6% long, which is one tick of
-granularity and the nearest whole tick available. **The fix costs nothing: the
-port has 5,282 bytes free with it in, up 99.**
+granularity and the nearest whole tick available. **The fix cost nothing: the port had 5,282 bytes free with it in, up 99.**
+That figure is from 2026-09-10 and has moved with every shared change since --
+`make verify` prints the current one and is the only authority for it.
 
 **Colour per message was built on 2026-09-10** and ships here in v0.13.1 --
 a department map plus per-event exceptions, in the shared `c128/src/ui.c`, so

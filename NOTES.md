@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and seven times on 2026-09-14 (1 open of 63 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and eight times on 2026-09-14 (1 open of 64 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2807,6 +2807,47 @@ are the CoCo 3**, which is started and not released:
       fixing stale headings. Found by asking the release what it actually
       holds (`gh release view --json assets`) rather than by reading the
       sentence again. Raised 2026-09-14.
+
+  64. ~~**A FULL SWEEP: SEVEN STALE CLAIMS, ONE OF THEM INSIDE A SHIPPED
+      ZIP.**~~ **RAISED AND CLOSED 2026-09-14.** Swept by SHAPE rather than by
+      subject, which is what found them:
+      * **`coco3/README-release.txt` said "THE SLOWEST OF THE SEVEN PORTS"**
+        and that file ships INSIDE `egatrek-coco3.zip`. Re-cut and
+        re-uploaded; `TREK.DSK` came back byte-identical, which is what proves
+        it was a documentation change and not a silent new game build.
+      * **TWO "the cheapest port here" CLAIMS IN THE SAME FILE** -- README.md
+        said it of the C64 in the status block and of the Falcon in the table.
+        Both were defensible and they measure different things, so both are
+        now precise: the C64 took the LEAST NEW CODE, the Falcon DELETES THE
+        MOST. **A superlative is a claim about the whole set, so every new
+        port can falsify one without its file being touched.**
+      * **`c128/README.md` said "the roomiest 6502 target in the project"**,
+        which the C64 made false on the day it shipped -- 6,112 spare against
+        1,459 -- while the root README said the opposite four files away.
+      * **THREE PORTS QUOTED FREE-SPACE FIGURES THAT HAD MOVED**: the Atari by
+        447 bytes, the MEGA65 by 432, and the X16 in all three of its numbers.
+      **THE X16'S IS THE ONE WORTH KEEPING.** Its section is headed **"Live
+      figures"** and carried the sentence "the figures above were 140 and 157
+      when this section was written and are 80 and 155 now -- they moved under
+      it, which is the argument for reading `verify` rather than this file".
+      **They then moved again**, to 184 and 75. **A section that documents its
+      own staleness is still stale.** The Atari's was worse in kind: the
+      paragraph directly above its pasted block says "`make verify` is the
+      only authority" and the block sat underneath contradicting it.
+      Both blocks are DELETED rather than refreshed -- the numbers have one
+      home and it is the tool. **The C128's identical-looking block was
+      CHECKED AND LEFT**: all three of its lines match `make verify` exactly
+      today and it already carries the caveat "every number below moves", so
+      there was nothing to correct. Deleting it for symmetry would have been
+      tidying, not sweeping.
+      **AND THE SWEEP'S OWN INSTRUMENT FAILED FIRST.** The `make X` checker
+      resolved every target against the ROOT Makefile, so `cd c128 && make
+      verify` and a port README naming "the root `make ports` gate" both came
+      back missing -- 27 hits, all false. **That is the 80-false-positives
+      checker of 2026-09-13, rebuilt from scratch one day later and wrong the
+      same way.** Fixed to resolve `cd D && make X` against D; six hits left,
+      all genuine prose about another port's target, none a defect.
+      Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the
