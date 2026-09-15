@@ -262,6 +262,67 @@ C64 OS is the C64 again.
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
 
+### What a sub-80 port actually entails
+
+The C64 measured it, so this is arithmetic rather than an estimate.
+
+**What comes free: 10,522 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
+and `core/` entire — plus, on anything VIC-shaped, `vic.c`, `input.c`, `sid.c`,
+`storage.c` and `overlay.c` as well. **What the C64 wrote: 882 lines, of which
+222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 660 are a linker
+script, a Makefile and two verify tools.
+
+**The seams are 34 functions across six headers**, and a port fills every one
+of them somehow — by writing it, or by linking somebody else's:
+
+| Seam | Fns | What it is |
+|---|--:|---|
+| video | 13 | `vdc_init`, `scr_put` / `puts` / `clear` / `fill_rect` / `hline` / `vline`, `wait_vsync`, `vdc_shutdown`, `plat_exit` |
+| message log | 3 | `vdc_set_address`, `vdc_data_read` / `write` — 2K of scratch outside the program |
+| sound | 9 | `snd_init` / `beep` / `music` / `effect` / `poll` / `off` / `toggle` … |
+| storage | 5 | `plat_read_all` / `write_all`, and `plat_open` / `read` / `close` for the streamed briefing |
+| far memory | 3 | `far_load` / `size` / `read` — the ~7.9K string pool |
+| overlays | 2 | `ovl_load`, plus a linker script and image-cutting in the Makefile |
+
+Then, per port: an EGA→machine colour map, a `strings.override.txt` for the two
+or three strings that name the machine, a `verify` (**a port without one makes
+`make ports` true and meaningless**), two READMEs and a `RUNNING.md` entry.
+
+Against that, what each candidate would actually cost:
+
+**Atari ST/STE — one seam.** Video only. Everything else is the Falcon port
+unchanged. The new file is planar: four bitplanes **interleaved by word**
+against the Falcon's chunky 8bpp, which is the one thing that did not carry
+from the Amiga either. 320×200 ÷ 8×8 is exactly 40×25.
+
+**CoCo 3 with no card — three seams.** Video, sound and far memory, because the
+SuperSprite carries all three. The disk driver, the first-stage loader, the
+overlays and the toolchain carry over. The 512K MMU is the obvious new home for
+the string pool.
+
+**Plus/4 — three and a half, and it is the one that looks cheaper than it is.**
+The video driver is `vic.c` with two addresses changed: screen `$0C00`, colour
+`$0800`, 40×25, a `(luminance<<4)|hue` colour byte. RAM under ROM at
+`$FF3E`/`$FF3F` gives the far store the same way the C64's KERNAL RAM does.
+**But TED is not SID** — a genuinely new sound driver, two voices where the
+game expects three — **and the keyboard is not CIA1**, so `input.c` does not
+port either. Storage should, since the Plus/4's KERNAL jump table is
+C64-compatible; that half is reasoned rather than measured.
+
+**MSX2 — four seams and a fifth CPU family.** The V9938 is the V9958's sibling,
+so the CoCo 3's bitmap-with-a-software-font driver is the model rather than a
+rewrite. Z80 and SDCC, and a 64K window over paged RAM means overlays and far
+memory both need doing.
+
+**F256K — three seams.** SID at `$D400`, so `sid.c` ports verbatim, and Vicky's
+per-cell colour text is close to `vic.c`. The costs are the MMU for far memory
+and cc65 instead of llvm-mos — and whether the game fits under cc65 at all is
+genuinely unknown rather than merely tight.
+
+**CBM-II P500 — one seam, done badly.** A real VIC-II and a real SID, in a bank
+plain pointers cannot reach, so **every screen write goes through a banked
+accessor**. The cheapest-looking candidate with the most expensive hot path.
+
 **Two of these were ruled out on width alone, and that reason no longer
 exists.** The whole Atari 16-bit line went on 2026-08-22 because 320×200×16 is
 *"only 40 columns"*, and the **Apple IIgs** because *"320 mode is 16 colours and

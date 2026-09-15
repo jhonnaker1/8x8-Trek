@@ -118,6 +118,7 @@ release-clean:
 ports:
 	@python3 tools/open_list.py
 	@python3 tools/check_colours.py
+	@python3 tools/check_portcost.py
 	@python3 tools/check_ports.py $(P)
 
 # A VARIABLE USED IN A RULE'S PREREQUISITES MUST BE DEFINED ABOVE THAT RULE.
