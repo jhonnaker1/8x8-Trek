@@ -1569,7 +1569,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and six times on 2026-09-14 (1 open of 61 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and seven times on 2026-09-14 (1 open of 63 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2772,6 +2772,41 @@ are the CoCo 3**, which is started and not released:
       tolerates it is that 97 sectors read cleanly while every interrupt was
       vectoring into garbage. NOT YET MEASURED EITHER WAY -- and the root
       cause in item 37 stands regardless of which handler is right.
+
+  62. ~~**THE C64'S SOFT STACK HAS NEVER BEEN MEASURED, ON A RELEASED
+      PORT.**~~ **RAISED AND CLOSED 2026-09-14, by measuring it.**
+      `c64.ld` reserves 256 bytes below `__stack` at `$C000` and says in as
+      many words "re-measure here rather than assume the C128's number
+      transfers". Nobody had. **I WROTE THAT SENTENCE AND DID NOT FILE IT**,
+      which is this list's oldest failure mode: a caveat in a comment is not
+      a tracked item, and v0.16.0 shipped on an unchecked guard.
+      It is not theoretical. The C128 shipped **64** bytes in v0.9.0 on the
+      stated assumption that the soft stack is "for recursion and alloca,
+      neither of which this code uses" -- it is in constant use, the real
+      depth was 143, and the 79-byte overrun went into the OVERLAY WINDOW,
+      whose next load wrote 4K of code over the live return addresses.
+      Quitting BRKed into the monitor. Jamie reported it against a release.
+      **MEASURED: 144 BYTES, 112 SPARE.** `c64/tools/stackdepth.py` reads the
+      soft stack pointer out of `__rc0` at `$0002` (read, never assumed),
+      fills everything below it with `$A5`, drives to the hall of fame through
+      the evaluation -- the deepest path anyone has found -- and reports the
+      lowest byte disturbed. **AND THE INSTRUMENT WAS CONTROLLED**: the same
+      fill with NO keys sent reports 53 bytes, which is exactly the pointer at
+      the title, so the number tracks the PATH and is not an artefact of the
+      fill. 144 against the C128's 143 on the same call graph.
+      `make stackdepth` in `c64/`. Raised 2026-09-14.
+
+  63. ~~**THE RELEASE PAGE SAID ELEVEN ASSETS AND THERE ARE TWELVE.**~~
+      **RAISED AND CLOSED 2026-09-14.** `RUNNING.md` opens by counting
+      itself, the release body is generated from it, and adding the C64 made
+      the line wrong: eight machines with four bare disk images, each of which
+      ships its README beside it, is 8 + 4 = **twelve**. I changed "seven" to
+      "eight" in the same sentence and left the other number alone.
+      **A COUNT ONLY GOES STALE DOWNWARD, AND THIS ONE WENT STALE IN THE ACT
+      OF UPDATING IT** -- the same shape as writing a stale heading while
+      fixing stale headings. Found by asking the release what it actually
+      holds (`gh release view --json assets`) rather than by reading the
+      sentence again. Raised 2026-09-14.
 
 **THE SECOND RE-DERIVATION OF THE DAY RAISED THREE MORE, and two closed within
 the hour.** Asked "what's left" an hour after v0.14.0 went out, walking the

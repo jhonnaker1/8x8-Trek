@@ -1,6 +1,6 @@
 # How to run each one
 
-Eleven assets, eight machines. Every port plays the same game from the same
+Twelve assets, eight machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS

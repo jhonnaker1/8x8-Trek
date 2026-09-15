@@ -92,7 +92,7 @@ define MAKE_PRG
 	    open('$(2)','wb').write(bytes([0x01,0x08]) + d)"
 endef
 
-.PHONY: all game debug d64 d64-debug release run rund verify probe logcheck writecheck clean
+.PHONY: all game debug d64 d64-debug release run rund verify probe logcheck writecheck stackdepth clean
 
 all: $(OUT)
 game: $(OUT)
@@ -261,6 +261,14 @@ build/writetest.d64: build/writetest.prg
 	@c1541 -format "writetest,01" d64 $@ >/dev/null
 	@c1541 -attach $@ -write build/writetest.prg writetest >/dev/null
 	@echo "write probe disk: $@"
+
+# HOW DEEP THE SOFT STACK ACTUALLY GOES. c64.ld reserves 256 bytes below
+# __stack and the linker cannot see a runtime stack -- only a sentinel fill
+# can. The C128 shipped a 64-byte guard that the real path overran by 79,
+# straight into the overlay window. Needs the debug disk, because the drive
+# to the hall of fame goes through kb_inject.
+stackdepth: $(DEBUG_D64)
+	@python3 tools/stackdepth.py --kill
 
 writecheck: build/writetest.d64
 	@python3 tools/writecheck.py
