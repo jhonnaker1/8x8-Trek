@@ -314,6 +314,65 @@ static unsigned long file_len(unsigned char gran, unsigned int lastbytes)
     return 0;
 }
 
+/* ---------------------------------------------------------- random access
+ *
+ * RANDOM ACCESS, FOR A FAR STORE THAT LIVES ON THE DISK. core/storage.h is
+ * deliberately sequential -- plat_open/plat_read stream, and nothing in the
+ * shared code needs to seek -- but the card-less CoCo 3 has no VRAM to keep a
+ * string pool in and no MMU to bank one with, so its far_read has to reach
+ * into STRINGS.DAT at an arbitrary offset. See coco3gime/src/gimemem.c.
+ *
+ * NOT ADDED TO core/storage.h. That header is the portable contract and it
+ * must not learn about seeking for one machine's benefit; this is a CoCo 3
+ * filesystem operation that happens to be useful to a CoCo 3 far store, and
+ * it is declared in coco3storage.h beside the machine it belongs to.
+ *
+ * THE FAT WALK COSTS NO DISK ACCESS. The chain is already in RAM -- disk_ready
+ * reads it once -- so finding the granule for a byte offset is arithmetic,
+ * and only the sector itself is a read. A 7,483-byte pool is four granules
+ * and twenty-nine sectors.
+ */
+unsigned char plat_raw_open(const char *name, unsigned long *len)
+{
+    unsigned int lastbytes = 0;
+    unsigned char gran;
+
+    if (!disk_ready()) return 0xFF;
+    gran = find_file(name, &lastbytes);
+    if (gran == 0xFF) return 0xFF;
+    if (len) *len = file_len(gran, lastbytes);
+    return gran;
+}
+
+/* One 256-byte sector, by its index within the file, into `dst`. Returns
+   non-zero on success. The caller caches; this does not, because secbuf is
+   shared with every other operation here and a cache tag would have to be
+   invalidated by all of them. */
+unsigned char plat_raw_sector(unsigned char first, unsigned int index,
+                              unsigned char *dst)
+{
+    unsigned char g = first, trk, sec, guard = 0;
+    unsigned int within = index;
+    unsigned int i;
+
+    if (first == 0xFF || !disk_ready()) return 0;
+
+    /* Walk the chain nine sectors at a time. GRAN_SECS is the granule size in
+       sectors; the last granule is short and its count is in the FAT byte. */
+    while (within >= 9) {
+        unsigned char v = fat[g];
+        if ((v & 0xC0) == 0xC0) return 0;       /* past the end of the file */
+        within = (unsigned int)(within - 9);
+        g = v;
+        if (g >= NUM_GRAN || guard++ > NUM_GRAN) return 0;
+    }
+
+    gran_loc(g, &trk, &sec);
+    if (!read_sec(trk, (unsigned char)(sec + within))) return 0;
+    for (i = 0; i < SEC_SIZE; i++) dst[i] = secbuf[i];
+    return 1;
+}
+
 /* Forces the next call to re-run dskcon_init and re-read the FAT. Enabling
    the GIME's MMU appears to disturb something the disk driver set up, and
    because disk_ready() latches, nothing would ever re-establish it. */

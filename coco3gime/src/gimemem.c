@@ -1,49 +1,119 @@
-/* Far memory with no far memory: the string pool in ordinary RAM.
+/* Far memory on a machine with none: THE STRING POOL STAYS ON THE DISK.
  *
- * The SuperSprite carried this. Its 128K of VRAM was the pool's home on
- * [[coco3-port]] and it is not in this machine, and the GIME's own MMU is not
- * available either -- setting MMUEN permanently breaks disk access here
- * (NOTES.md item 30, unexplained, parked). So there is no banked store at all
- * and the pool has to live in the 64K the program already occupies, which
- * makes far_read a memcpy and far_load a whole-file read.
+ * The SuperSprite carried this. Its 128K of VRAM was the pool's home on the
+ * card-carrying port, and this machine has neither that nor a usable MMU --
+ * setting MMUEN permanently breaks disk access here (NOTES.md item 30,
+ * unexplained, parked). So there is no banked store to put 7,483 bytes in.
  *
- * THAT IS THE BUDGET QUESTION OF THIS PORT, and it is why this file exists
- * before the sound driver does: `make early` links the whole game with the
- * real array in it and prints what is left.
+ * AND THERE IS NO ROOM FOR IT IN RAM EITHER, which is measured rather than
+ * assumed. With the overlay split wired, the resident image and its bss reach
+ * $FB11, leaving 1,007 bytes under the I/O page for a 4,096-byte overlay
+ * window, a 4,000-byte screen, a 2,048-byte message log and a 1K stack. A
+ * `static unsigned char store[7936]` was 7,936 of the 10,161 that did not fit.
+ *
+ * SO far_read READS THE DISK. core/farmem.h allows exactly this -- "a platform
+ * with no far memory may implement this as a read into a static array; the
+ * contract does not care where the bytes live" -- and it says the other half
+ * too: READ IN CHUNKS, NOT BYTES. strpool.c already obeys that. It takes two
+ * bytes for the offset and then one slot's worth of text, so a string costs
+ * at most two of the reads below and usually zero disk access at all.
+ *
+ * ONE SECTOR OF CACHE, 256 BYTES, and that is what makes it affordable. The
+ * pool's text is 6,822 bytes -- twenty-seven sectors -- and strings average
+ * about twenty characters, so eight to twelve consecutive fetches land in the
+ * same sector. The offset table is 668 bytes at the front of the file and is
+ * hit constantly, which is why the cache is checked before anything else.
  */
 #include "../../core/farmem.h"
-#include "../../core/storage.h"
+#include "../../coco3/src/coco3storage.h"
 
-/* STRINGS.DAT is 7,483 bytes and MUSIC.DAT 412 -- 7,895 together. SIZED FROM
-   THE FILES AND NOT ROUNDED UP TO 8K, because this port had 161 bytes too
-   little and the 256 that rounding wasted were most of the difference. Growing
-   the pool past this is a build failure here rather than a truncated pool on
-   the disk. */
-#define FAR_SIZE 7936
+#define SEC_SIZE 256
 
-static unsigned char store[FAR_SIZE];
+/* THE TENANTS, and there are exactly two: STRINGS.DAT then MUSIC.DAT, in the
+   order main() loads them. far_load appends, so each gets a base offset and
+   far_read maps a flat offset back to a file. Two is not a general solution
+   and does not pretend to be -- core/farmem.h's contract is that the store
+   has more than one tenant, not that it has many. */
+#define MAX_TENANTS 2
+
+static struct {
+    unsigned char first;        /* first granule, 0xFF if absent */
+    unsigned int  base;         /* where this file starts in the flat store */
+    unsigned long len;
+} ten[MAX_TENANTS];
+
+static unsigned char ntenants = 0;
 static unsigned int far_len = 0;
+
+static unsigned char cache[SEC_SIZE];
+static unsigned char cache_first = 0xFF;    /* which file the cache holds */
+static unsigned int  cache_sec = 0xFFFF;    /* which sector of it */
 
 unsigned int far_load(const char *name)
 {
-    unsigned int base = far_len;
-    unsigned int got = 0;
+    unsigned long len = 0;
+    unsigned char first;
 
-    if (base >= FAR_SIZE) return FAR_NONE;
-    if (plat_read_all(name, store + base, (unsigned int)(FAR_SIZE - base), &got)
-        != STOR_OK)
-        return FAR_NONE;
-    if (got == 0) return FAR_NONE;
+    if (ntenants >= MAX_TENANTS) return FAR_NONE;
 
-    far_len = (unsigned int)(base + got);
-    return base;
+    first = plat_raw_open(name, &len);
+    if (first == 0xFF || len == 0) return FAR_NONE;
+
+    ten[ntenants].first = first;
+    ten[ntenants].base  = far_len;
+    ten[ntenants].len   = len;
+    ntenants++;
+
+    {
+        unsigned int base = far_len;
+        far_len = (unsigned int)(far_len + (unsigned int)len);
+        return base;
+    }
 }
 
 unsigned int far_size(void) { return far_len; }
+
+/* One byte, through the cache. Kept separate so far_read below is obviously
+   correct across a sector boundary rather than cleverly correct. */
+static unsigned char fetch(unsigned char t, unsigned long pos)
+{
+    unsigned int sec = (unsigned int)(pos >> 8);
+    unsigned char off = (unsigned char)(pos & 0xFF);
+
+    if (cache_first != ten[t].first || cache_sec != sec) {
+        if (!plat_raw_sector(ten[t].first, sec, cache)) {
+            /* A READ THAT FAILS RETURNS ZERO, NOT GARBAGE. strpool.c treats a
+               NUL as the end of a string, so a disk error shows as a short or
+               empty label -- the same failure the pool already plans for when
+               STRINGS.DAT is missing entirely. */
+            cache_first = 0xFF;
+            cache_sec = 0xFFFF;
+            return 0;
+        }
+        cache_first = ten[t].first;
+        cache_sec = sec;
+    }
+    return cache[off];
+}
 
 void far_read(unsigned int off, void *dst, unsigned char len)
 {
     unsigned char *d = (unsigned char *)dst;
     unsigned char i;
-    for (i = 0; i < len; i++) d[i] = store[off + i];
+    unsigned char t;
+
+    for (i = 0; i < len; i++) {
+        unsigned int at = (unsigned int)(off + i);
+
+        /* Which tenant. Two of them, so a loop is a branch. */
+        t = 0;
+        if (ntenants > 1 && at >= ten[1].base) t = 1;
+
+        if (t >= ntenants || at < ten[t].base ||
+            at >= (unsigned int)(ten[t].base + (unsigned int)ten[t].len)) {
+            d[i] = 0;
+            continue;
+        }
+        d[i] = fetch(t, (unsigned long)(at - ten[t].base));
+    }
 }

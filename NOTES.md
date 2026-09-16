@@ -11923,3 +11923,40 @@ the video faithfully displays whatever happens to be in it -- which is exactly
 how an earlier build painted a white screen out of memory nothing had written.
 A too-high address wraps harmlessly; a too-low one shows the wrong memory and
 looks like a broken driver.
+
+### THE DISK-BACKED POOL: 10,161 OVER BECOMES 1,608 OVER (2026-09-16)
+
+`coco3gime/src/gimemem.c` keeps the string pool ON THE DISK and reads it
+through a one-sector cache. core/farmem.h allows exactly this -- "a platform
+with no far memory may implement this as a read into a static array; the
+contract does not care where the bytes live" -- and it says the other half
+too: READ IN CHUNKS, NOT BYTES, which `strpool.c` already obeys. A string
+costs two far_reads and usually no disk access at all.
+
+    bss                 10,498  ->  2,832
+    over by             10,161  ->  1,608
+
+**256 BYTES OF CACHE DO THE WORK.** The pool's text is 6,822 bytes, twenty-
+seven sectors, and strings average about twenty characters -- so eight to
+twelve consecutive fetches land in the same sector, and the 668-byte offset
+table at the front of the file is hit constantly.
+
+**core/storage.h WAS NOT CHANGED.** It is the portable contract and it is
+deliberately sequential; nothing shared seeks. `plat_raw_open` and
+`plat_raw_sector` went into `coco3/src/coco3storage.c` and its own new header,
+because they are a CoCo 3 filesystem talking to a CoCo 3 far store. The FAT
+walk costs NO disk access -- the chain is already in RAM -- so only the sector
+itself is read. The card port pays 249 bytes for functions it never calls.
+
+### tools/fit.py, AND WHY IT EXISTS
+
+**Three budget answers were published and all three were wrong.** 7,841 over
+(wasted the gap above the screen), "it fits with room to spare" (compared an
+all-resident image against an overlay build's resident half), 10,161 over
+(had not counted bss). Every one came from two quantities sharing a name.
+
+**THE FILE SIZE, THE RESIDENT IMAGE, THE IMAGE PLUS BSS, AND THE RUN-TIME
+EXTENT INCLUDING THE FIXED TENANTS ARE FOUR DIFFERENT NUMBERS**, and only the
+fourth decides anything. `fit.py` reads build_ovl.py's own report -- which asks
+the linker for `bss_start`/`bss_end` -- and adds the window, the screen, the
+log and the stack, which live at fixed addresses and appear in no map at all.
