@@ -1073,6 +1073,13 @@ registers already held) and the task select is innocent. Setting bit 6 of
 INIT0 breaks standalone DSKCON, with the active map supposedly identical
 either way.
 
+> **WRONG, AND SUPERSEDED 2026-09-16 -- see "IT WAS NEVER THE MMU. IT IS MC2,
+> THE DISK CONTROLLER'S CHIP SELECT" below.** That step wrote
+> `INIT0 | 0x40` to a register that reads `$1B`, so what actually went in was
+> `$5B`, which clears MC2 -- the chip select for `$FF40-$FF5F`, where the
+> WD1773 is. MMUEN is already set under Disk BASIC and always was. Everything
+> in this subsection between here and that heading names the wrong bit.
+
 **RESTORING TR DOES NOT HELP** (Jamie's suggestion, tested): `bank_off` now
 puts BOTH control registers back to their boot values and the disk stays
 broken. Neither does re-running `dskcon_init` -- `plat_disk_reset()` changes
@@ -1088,7 +1095,10 @@ readable, this machine says otherwise, and the machine wins. Never
 read-modify-write these; keep a RAM shadow.
 
 **THE WAY ROUND IT IS TO NOT USE THE MMU, AND THE ORIGINAL SCOPE ALREADY SAID
-SO.** Everything the MMU was for has another home on this target:
+SO.** (Still the right call for the CARD build, which has the VRAM -- but the
+premise underneath it is wrong; the MMU was usable all along.)
+
+Everything the MMU was for has another home on this target:
 
   * **Overlays** become disk-loaded images in a fixed window, exactly the
     C128's design. A swap costs a seek instead of a store -- worse, but it is
@@ -1112,6 +1122,87 @@ BEFORE any `lds` moves S -- so `main`'s locals stay wherever the stack was,
 and passing `&got` to the disk code handed it a pointer into the window. **The
 rule is not "move the stack". It is NO AUTOMATIC STORAGE AT ALL in code that
 pages.**
+
+#### IT WAS NEVER THE MMU. IT IS MC2, THE DISK CONTROLLER'S CHIP SELECT (2026-09-16)
+
+**Two emulators, one probe, identical bytes.** `tools/coco3/bits3.c` under
+XRoar 1.12.1 and under MAME:
+
+    A5 00 00 00 00 00 01 01 00 00 01 00 FF FF FF 5A
+
+    r[0]  A5   armed
+    r[1]  00   baseline                                  STOR_OK
+    r[2]  00   after `sta $FFDF`, all-RAM mode           STOR_OK
+    r[3]  00   after writing the task-0 map $38..$3F     STOR_OK
+    r[4]  00   **after remapping MMU0[6] to page $30**   STOR_OK
+    r[5]  00   after putting MMU0[6] back                STOR_OK
+    r[6]  01   after INIT0 = $C8                         STOR_NOTFOUND
+    r[7]  01   after INIT0 = $CA                         STOR_NOTFOUND
+    r[8]  00   after INIT0 = $CC                         STOR_OK
+    r[9]  00   after INIT0 = $CE                         STOR_OK
+    r[10] 01   after INIT0 = $80                         STOR_NOTFOUND
+    r[11] 00   after INIT0 = $CC                         **STOR_OK -- IT COMES BACK**
+    r[15] 5A   completed
+
+**$C8, $CA, $CC, $CE. The bit that moves is bit 2, MC2 -- and MC2 is the
+GIME's standard SCS, the chip select that decodes `$FF40-$FF5F`. That is
+where the WD1773 lives.** Clear MC2 and the disk controller stops answering;
+the driver reads open bus and reports NOT FOUND. Set it again and the drive
+comes straight back, which is `r[11]` and which no amount of `plat_disk_reset`
+ever achieved, because a reset cannot re-decode an address.
+
+**EVERY MMU EXPERIMENT IN THIS PROJECT'S HISTORY CLEARED MC2 AND BLAMED THE
+MMU.** `bits.c` wrote `INIT0 | 0x40` against a register that reads `$1B`,
+which is `$5B` -- MC2 clear. `bits2.c` corrected the read-modify-write and
+then chose `$80` as "COCO alone: the control" -- MC2 clear. The control was
+never a control. It was four simultaneous changes wearing a tidy constant,
+which is precisely the mistake `bits2.c` was written to stop, made one level
+up from where it was looking.
+
+**THE VALUES ARE NOT GUESSWORK; THEY ARE THE ROM'S OWN.** `$FF90` does not
+read back, so the live value cannot be sampled -- but it can be READ OUT OF
+THE ROM THAT WROTE IT. Every `STA $FF90` in `coco3.rom`:
+
+    $8C1F  $0A      native-mode init, before BASIC
+    $8C30  $CC
+    $C024  $CE    $C0C4  $CA    $C11D  $C8    $C13C  $CA    $C18E  $CE
+
+**Every value BASIC runs under has bit 7 COCO, bit 6 MMUEN and bit 3 MC3
+already set.** MMUEN IS ALREADY ON under Disk BASIC. "MMUEN alone kills disk
+access" cannot be true in the direction it was stated: the disk works all day
+with MMUEN set, because that is the state DECB boots into and never leaves.
+This is the same instrument as "read constants, don't sample them", pointed at
+a machine instead of at a DOS binary -- when the register will not answer, the
+code that wrote it will.
+
+**WHAT THIS UNBLOCKS.** `r[3]`, `r[4]` and `r[5]` are the card-less port's
+actual question, asked with INIT0 never written at all: write the task map,
+swap the 8K block under `OVL_WINDOW` to a different physical page, read a file
+through the standalone driver. **All three STOR_OK.** The GIME MMU is usable
+for overlays and for far memory, and the landmine item 55's scoping warned
+about is not there. Item 30 is wrong, and now it is explained rather than
+parked.
+
+**THE RIG THAT FINALLY ANSWERED IT, because two of its three traps cost a run
+each.** `/tmp/rig/xroar_probe.py`, and the durable parts are in
+`tools/coco3/README.md`:
+
+  * XRoar's GDB stub takes **ONE connection per session** and **halts the
+    machine the moment that connection opens**. Everything goes down a single
+    socket and the client must send `c` before the emulator moves at all.
+  * **Do not drive it through BASIC.** `-type` parses its own backslash
+    escapes, so a real newline in the argument is swallowed and the whole
+    script arrives as one line; Jamie watched BASIC answer `?OM ERROR` to it.
+    `-run FILE` injects the binary and jumps to its exec address, and neither
+    that nor the dropped `E` in `EXEC` has anywhere to happen.
+  * **Dump the screen every time.** It is what caught both of those. The run
+    before it reported ten plausible bytes from a probe that had never been
+    reached -- and re-reading MAME's old `bits2` bytes afterwards, `r[8]` was
+    `FF` there too: that run never finished either, and I had read its numbers
+    as a result. `-no-ratelimit` turns a three-minute probe into ten seconds,
+    which is what made the difference between "wedged" and "slow" cheap enough
+    to ask.
+
 
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
@@ -1997,6 +2088,8 @@ are the CoCo 3**, which is started and not released:
         `vdp_far_write_at`. Without the card the only candidate is the GIME
         MMU -- **which is PARKED AS UNEXPLAINED in item 30: "MMUEN alone kills
         disk access"**, already the cost of a bisection and two retractions.
+        (**That landmine was not real.** Resolved 2026-09-16: it was MC2, not
+        MMUEN. The three seams stand; the fourth worry was a phantom.)
       So a card-less CoCo 3 is three new seams plus a known landmine. **The C64
       has exactly ONE new seam and it is SIMPLER than the C128's.**
 
@@ -2207,6 +2300,17 @@ are the CoCo 3**, which is started and not released:
       block, enabling MMUEN would swap that table out. That hypothesis did not
       exist when this was parked, because the vectors had not yet been learned
       to be load-bearing. It is testable in about one run, and nobody needs to.
+      **AND IT WAS WRONG TOO, ANSWERED 2026-09-16 AT JAMIE'S REQUEST FOR A
+      SECOND EMULATOR.** Not the vector table, not MMUEN, not the map: **MC2**,
+      INIT0 bit 2, the GIME's standard SCS -- the chip select that decodes
+      `$FF40-$FF5F`, where the WD1773 sits. Every probe that ever "enabled the
+      MMU" here cleared it as a side effect and blamed the bit it was named
+      after. `tools/coco3/bits3.c` gives byte-identical reports under XRoar and
+      MAME: the task map can be written and an 8K block swapped under
+      `OVL_WINDOW` with the disk still reading, and `$CC`/`$CE` are survivable
+      INIT0 values while `$C8`/`$CA` are not. **The GIME MMU is usable, and the
+      card-less port's one known landmine was never there.** Full working in
+      "IT WAS NEVER THE MMU. IT IS MC2, THE DISK CONTROLLER'S CHIP SELECT".
   38. ~~**THE SEAM RUNS ON THE MACHINE; THE GAME DOES NOT.**~~ **CLOSED
       2026-09-13: THE GAME BOOTS.** `make ovlrun` passes: the loader places
       all 42,680 bytes correctly, hands over, and the running game pages in

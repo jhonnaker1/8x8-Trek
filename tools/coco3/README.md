@@ -152,3 +152,40 @@ borrow**, and 80 columns in 512 pixels needs SIX-pixel cells, which no stock
 So the ASCII set has to be authored here -- about 96 glyphs at 6x8, on top of
 the 17 box and badge glyphs every port already draws for itself. That is a
 content task, not a coding one.
+
+## XROAR AS THE SECOND EMULATOR, and the three traps in driving it
+
+`bits3.c` is the probe that resolved the MMU blocker (NOTES.md, "IT WAS NEVER
+THE MMU. IT IS MC2"). It is worth keeping the rig that ran it, because a
+single-emulator answer was exactly what was in doubt.
+
+    export PKGDATADIR=$HOME/cmoc/share/cmoc
+    $HOME/cmoc/bin/cmoc --coco --org=2000 -O2 -fomit-frame-pointer \
+        --intdir=build -I../../coco3/src -I../../core \
+        -o BITS3.BIN bits3.c ../../coco3/src/coco3storage.c
+
+    xroar -machine coco3 -ram 128 -load-fd0 DISK.dsk -run BITS3.BIN \
+          -gdb -no-ratelimit
+
+XRoar has no headless screenshot, so the report comes back over the GDB remote
+protocol -- `m3f00,10` is the whole client. Three things cost a run each:
+
+  * **ONE CONNECTION PER SESSION, and connecting HALTS the machine.** The stub
+    stops answering after the first client disconnects, so everything happens
+    down a single socket; and the target is stopped from the moment the socket
+    opens, so the client must send `c` before the emulator moves at all.
+  * **DO NOT DRIVE IT THROUGH BASIC.** `-type` parses its own backslash
+    escapes: a real newline byte in the argument is swallowed and the whole
+    script arrives as one line. Jamie watched BASIC answer `?OM ERROR` to
+    `CLEAR 25,&H1FFF...` run together, and the retry dropped the `E` off
+    `EXEC`. `-run FILE` injects the segments and jumps to the exec address;
+    neither failure has anywhere to happen. (`CLEAR` is not needed either --
+    the probe sets its own stack and never returns.)
+  * **`-no-ratelimit`, and DUMP THE SCREEN.** Real CoCo speed makes a
+    failing-read probe take minutes, which is indistinguishable from wedged
+    unless you poll. And the screen dump at `$0400` -- 512 bytes, `v & 0x3F`,
+    `<$20` is `@A-Z` -- is what caught both traps above. Without it the rig
+    reported ten plausible bytes from a probe that had never been reached.
+
+Against MAME, the same probe goes on a disk with `coco3/tools/mkdisk.py` and
+in through `LOADM`/`EXEC`; both emulators return the identical sixteen bytes.
