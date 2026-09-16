@@ -255,8 +255,17 @@ WIDTH: the Spectrum is 32 columns and the narrowest layout that exists is
 which is the expensive part, not a driver. Worth recording because a 128K
 Spectrum would dissolve the stated reason and leave the real one standing.
 
-**Out on colour, the same rule that excluded the PET:** **Apple IIe** — 40×24
-text is monochrome; **stock Atari 800XL** — ANTIC's text modes have no per-cell
+**Out on colour, the same rule that excluded the PET:** **Apple IIe** — and it
+is over-determined rather than marginal, which is worth saying now that two
+rule-outs on this page have turned out to be expired. **Three independent
+blockers, none of which any 2026-09-16 finding touches:** its 40-column text is
+monochrome and its 80-column card is text-only monochrome, so the eight
+information-bearing colours have nowhere to go; it is **24 rows** against a
+console that needs 25 and uses row 24; and double hi-res colour is artifacted
+down to **~140 real colour pixels**, about 35 cells, which is below 40 before
+anything is drawn in them. Eight colours instead of sixteen does not help a
+display with none, an ASCII-only font does not help, and moving far memory to
+disk does not help; **stock Atari 800XL** — ANTIC's text modes have no per-cell
 colour, which is what VBXE was for and is the cleanest illustration of why
 width and colour must not be bundled; **TI-99/4A** — the TMS9918A colours
 *groups of eight character codes*, so eight colours across this game's glyph set
@@ -272,13 +281,17 @@ width rule and the IIgs's — so the rest were re-derived against the rules as
 they stand rather than as they were written. **No conclusion here changes; the
 REASONS do, and a reason is what a future pass will re-check.**
 
-**THE CONSOLE NEEDS 25 ROWS AND THIS SURVEY HAS NEVER SAID SO.** `layout40.h`
-is `SCR40_ROWS 25` and row 24 carries the briefing footer, so a 24-row machine
-needs a layout change — the expensive part, as the Spectrum's 32 columns are.
-The list discriminates on **width and colour only**. Its own entry for the
-Apple IIe reads *"40×24 text is monochrome"*: **the 24 was sitting in the text,
-independently disqualifying, uncounted.** Every candidate on the live table
-should be checked for rows before anything else about it is believed.
+**THE CONSOLE NEEDS 25 ROWS AND THIS SURVEY NEVER CARRIED IT.** `layout40.h`
+is `SCR40_ROWS 25` and row 24 holds the briefing footer, so a 24-row machine
+needs a layout that does not exist — the expensive part, as the Spectrum's 32
+columns are. **NOTES.md item 57 has had this all along**, and in the right
+shape: the sub-80 world is *three families* — **40×25** (C64, C128 VIC-IIe,
+Plus/4, CoCo 3 GIME), **40×24** (Atari 800XL, Apple IIe), **32×24** (TI-99/4A,
+MSX1, ZX Spectrum) — and *"a hand-written `layout40.c` serves only the first."*
+**This table discriminates on width and colour and never picked that up**,
+which is the more awkward defect of the two: not an unknown, a divergence.
+Its own Apple IIe entry reads *"40×24 text is monochrome"* with the 24 doing no
+work. Check rows on every live candidate before believing anything else.
 
 **The PET is filed under the wrong axis.** It sits under *out on width or
 memory* with *"monochrome as well"* — but a PET is 40×25, and an 8032 is 80×25.
