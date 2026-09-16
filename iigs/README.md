@@ -154,19 +154,25 @@ the whole platform seam, and read the map.
                                   the GAME's, not this port's)
 
     with the overlay split        resident  $0800..$89A5
-                                  headroom  9,819 bytes to the window
+                                  HEADROOM  13,915 bytes
                                   overlays  11, largest 3,800 of 4,096
 
-    and with the REAL video       resident  $0800..$A102
-    driver linked instead of      headroom  3,838 bytes
-    its stub                      video cost 5,981 bytes
+    + the real video driver       resident  $0800..$A102
+                                  HEADROOM  7,934        video   cost 5,981
+    + the real storage seam       resident  $0800..$AC0C
+                                  HEADROOM  5,108        storage cost 2,826
+    + far memory in bank $01      resident  $0800..$A99C
+                                  HEADROOM  5,732        far mem GAVE BACK 624
 
-    and with the real STORAGE     resident  $0800..$AC0C
-    seam as well                  headroom  1,012 bytes
-                                  storage cost 2,826 bytes
+**`make early` runs it at every stage; `tools/verify_gs.py` checks the
+invariants a link can break silently.**
 
-**`make early` runs it both ways; `tools/verify_gs.py` checks the invariants a
-link can break silently.**
+**And the headroom figure is the LOWER of two bounds, which the tool used to
+get wrong.** It reported "headroom to the window" — true while the window was
+the top of RAM, and false the moment the window moved into the language card,
+where it is a different mapping entirely. The figure jumped by 4,096 bytes the
+program could not use. It now reports the distance to `__stack` or the window,
+whichever is lower, and says which.
 
 **And the video number is the Falcon's lesson repeating almost exactly.**
 `gsvid.c` compiles to 1,962 bytes on its own and costs **5,981** when it is
@@ -174,8 +180,8 @@ linked — a factor of 3.05, against the Falcon's 4,636 for a 1,559-byte driver,
 a factor of 2.97. The callers grow: a stub is unfoldable only while nothing
 downstream is real.
 
-So the honest position is **1,012 bytes for four remaining seams** — keyboard,
-sound, far memory and the overlay loader — and that is not enough.
+So the position is **5,732 bytes for three remaining seams** — keyboard, sound
+and the overlay loader.
 The C64 shipped with 6,112 spare *after* its drivers were in. What this port
 has that the C64 did not is somewhere to put things: the **2,048-byte message
 log** is in bank 0 today and need not be, the **language card** at `$D000` is

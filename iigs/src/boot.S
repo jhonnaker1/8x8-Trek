@@ -162,6 +162,18 @@ nocarry:
         dec count
         bne rdloop
 
+; THE LANGUAGE CARD IN, BEFORE THE JUMP. The overlay window is at $D000, which
+; is ROM until the soft switches say otherwise -- so without this the first
+; ovl_load writes into ROM space, reads back what was already there, and the
+; game runs whichever overlay the ROM happens to resemble. Reading $C083 TWICE
+; is the sequence: RAM readable, RAM writable, $D000 bank 2.
+;
+; Interrupts are already off (the sei above), which matters because the 6502
+; vectors at $FFFA live in this RAM once it is switched in and nothing has put
+; anything there.
+        lda 0xC083
+        lda 0xC083
+
         jmp LOAD_ADDR
 
 ; A FAILED READ MUST NOT FALL THROUGH INTO WHAT IT DID NOT LOAD. The C128's

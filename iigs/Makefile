@@ -225,6 +225,12 @@ build/early.elf: $(SHARED) src/gsstub.c iigs.ld | build
 	$(CC) $(EARLYFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map \
 	  $(SHARED) src/gsstub.c -o $@ $(LDLIBS)
 
+build/earlyfar.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c src/gsfar.c iigs.ld | build
+	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO \
+	  -DGS_REAL_STORAGE -DGS_REAL_FAR $(LDFLAGS) \
+	  -Wl,-Map=build/earlyfar.map $(SHARED) src/gsstub.c src/gsvid.c \
+	  src/gsblk.c src/gsfar.c -o $@ $(LDLIBS)
+
 build/earlyfull.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c iigs.ld | build
 	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO \
 	  -DGS_REAL_STORAGE $(LDFLAGS) -Wl,-Map=build/earlyfull.map \
@@ -235,13 +241,15 @@ build/earlyvid.elf: $(SHARED) src/gsstub.c src/gsvid.c iigs.ld | build
 	  -Wl,-Map=build/earlyvid.map $(SHARED) src/gsstub.c src/gsvid.c \
 	  -o $@ $(LDLIBS)
 
-early: build/early.elf build/earlyvid.elf build/earlyfull.elf
+early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 	@echo "-- seam entirely stubbed"
-	python3 tools/verify_gs.py build/early.elf --window 0xB000 --org 0x0800
+	python3 tools/verify_gs.py build/early.elf --window 0xD000 --org 0x0800
 	@echo "-- with the REAL video driver"
-	python3 tools/verify_gs.py build/earlyvid.elf --window 0xB000 --org 0x0800
+	python3 tools/verify_gs.py build/earlyvid.elf --window 0xD000 --org 0x0800
 	@echo "-- with the REAL video driver AND the real storage seam"
-	python3 tools/verify_gs.py build/earlyfull.elf --window 0xB000 --org 0x0800
+	python3 tools/verify_gs.py build/earlyfull.elf --window 0xD000 --org 0x0800
+	@echo "-- and far memory too: the log and the pool leave bank 0"
+	python3 tools/verify_gs.py build/earlyfar.elf --window 0xD000 --org 0x0800
 
 verify: colours bootcheck failcheck early sheet sheetfail files filesfail
 

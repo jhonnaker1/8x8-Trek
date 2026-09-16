@@ -7797,3 +7797,48 @@ the overlay loader. Not enough, and the answers are known rather than hoped
 for: the 2,048-byte message log and gsblk.c's two 512-byte block buffers are
 3,072 bytes of bank 0 that could live in bank $01 or $E0, and the language
 card is 12,288 bytes of EXECUTABLE space in bank 0 that nothing has claimed.
+
+## Apple IIgs: far memory, and the language card as overlay window (2026-09-16)
+
+### WHERE far memory can live, measured rather than reasoned about
+
+`iigs/src/gsfarp.c` filled eight candidate regions, DREW A WHOLE SCREEN
+through the real driver, and counted what survived (pages of 16):
+
+    $01/1000  16/16     $E0/6000  16/16
+    $01/6000  16/16     $E0/A000  16/16
+    $01/A000  16/16     $E1/A000  16/16
+    $01/E000   0/16     $E1/B000  16/16
+
+Seven of eight untouched by drawing. The one that fails is under the AUX
+LANGUAGE CARD -- the biggest contiguous-looking run in the bank, and the one a
+guess would most likely have picked. `$01/6000..$01/BFFF` is the home: 24,576
+bytes against the ~7,900 of STRINGS.DAT and MUSIC.DAT, where the C64's far
+store had 282 bytes left over.
+
+### The budget, stage by stage
+
+    with the overlay split               HEADROOM 13,915
+    + the real video driver               HEADROOM  7,934   cost 5,981
+    + the real storage seam               HEADROOM  5,108   cost 2,826
+    + far memory in bank $01              HEADROOM  5,732   GAVE BACK 624
+
+**Far memory gave back 624, not 2,048.** Moving the log out removes a
+2,048-byte array and adds 1,424 bytes of code and buffers to reach it. The
+seam costs more than the thing it replaces -- the third time measured here.
+
+### The overlay window in the language card: 4,096 bytes, exactly
+
+It was at `$B000`, the top of RAM, and every byte came out of the program's
+region. `$D000..$DFFF` is RAM once the soft switches say so, it is OUTSIDE
+`ram`, and code there runs with ordinary 16-bit calls because it is still
+bank 0. boot.S reads `$C083` twice before jumping. `make files` then proves
+the block driver still works with the card in, which was the risk.
+
+### AND THE HEADROOM FIGURE WAS WRONG UNTIL THE WINDOW MOVED
+
+verify_gs.py reported "headroom to the window" -- true while the window was
+the top of RAM, false once it was in a different mapping. The number jumped by
+4,096 bytes the program cannot use. It reports the LOWER of `__stack` and the
+window now, and says which is binding. **A derived figure can be correct for
+one layout and become a lie when the layout changes under it.**

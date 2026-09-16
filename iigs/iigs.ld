@@ -31,17 +31,27 @@ MEMORY {
        sources, which is the cross-check that the figure is the game's and not
        this port's. Six kilobytes does not close that, so the port takes the
        overlay split every other 8-bit target here takes. */
-    ram (rw) : ORIGIN = 0x0800, LENGTH = 0xA800
+    ram (rw) : ORIGIN = 0x0800, LENGTH = 0xB800
 
-    /* THE OVERLAY WINDOW, and its address is forced rather than chosen.
+    /* THE OVERLAY WINDOW, IN THE LANGUAGE CARD, and that is worth 4,096
+       bytes of resident space rather than being tidy.
+
        The C64 puts its window at $C000 because that is the 4K its $01 never
-       covers; on a IIgs $C000..$CFFF is I/O in every configuration, so the
-       window cannot go there. It sits at the TOP of RAM instead, which costs
-       nothing: the resident image grows upward from $0800 and the window is
-       the ceiling.
+       covers. On a IIgs $C000..$CFFF is I/O in every configuration, so the
+       window was at $B000 -- the top of RAM -- and every byte of it came out
+       of the program's own region. $D000..$DFFF is RAM once the language card
+       soft switches say so (measured: src/gsram.c writes and reads both
+       $D000 banks and proves them separate), it is OUTSIDE `ram`, and code
+       there executes with ordinary sixteen-bit calls because it is still
+       bank 0. So `ram` grows from $0800..$AFFF to $0800..$BFFF and the window
+       costs the program nothing at all.
+
+       src/boot.S switches the card in before it jumps, so the window is RAM
+       from the first instruction the game runs.
+
        Exactly 4K, so an overlay that outgrows it is a LINK ERROR rather than
        something that quietly overwrites resident code. */
-    window (rwx) : ORIGIN = 0xB000, LENGTH = 0x1000
+    window (rwx) : ORIGIN = 0xD000, LENGTH = 0x1000
 
     /* ONE STAGING REGION PER OVERLAY. A single shared AT> region does not
        advance its pointer when the section also carries an explicit run
@@ -113,4 +123,9 @@ __ovl_start = ORIGIN(window);
    program -- both halves of [[llvm-mos-soft-stack]], the second of which cost
    the Plus/4 an hour of blaming a BASIC header. verify_gs.py asserts it lies
    outside every loaded section. */
-__stack = ORIGIN(window);
+/* $C000, NOT ORIGIN(window), AND THE DIFFERENCE IS HARDWARE. The stack grows
+   DOWN from here; with the window at $D000 it would descend through
+   $CFFF..$C000, which is I/O in every configuration -- so a deep enough call
+   chain would not corrupt memory, it would hit slot registers. $C000 is the
+   top of `ram` and the stack grows down into the gap above the image. */
+__stack = 0xC000;

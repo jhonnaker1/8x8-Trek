@@ -66,8 +66,7 @@ def main(argv):
         top = org
     else:
         top = max(s["addr"] + s["size"] for s in resident.values())
-        notes.append(f"resident ${org:04X}..${top:04X}  "
-                     f"headroom to window {window - top} bytes")
+        notes.append(f"resident ${org:04X}..${top:04X}")
 
     # 1. The entry cell really is a JMP, and it points at the C runtime.
     ent = secs.get(".entry")
@@ -107,7 +106,16 @@ def main(argv):
             fails.append(f"__stack ${stack:04X} is INSIDE {', '.join(inside)} "
                          f"-- the first call overwrites the program")
         else:
-            notes.append(f"__stack ${stack:04X}, {stack - top} bytes below it")
+            # WHICHEVER BOUND IS LOWER IS THE REAL ONE, and saying "headroom
+            # to the window" stopped being true the moment the window moved
+            # into the language card: it is then in a different mapping
+            # entirely and the figure jumped by 4,096 bytes that the program
+            # cannot use. The stack is what the image actually runs into.
+            bound, which = (stack, "__stack") if stack < window \
+                else (window, "the window")
+            notes.append(f"__stack ${stack:04X}")
+            notes.append(f"HEADROOM {bound - top} bytes -- to {which} at "
+                         f"${bound:04X}, the lower of the two")
 
     # 3. Nothing resident runs into the overlay window.
     if top > window:

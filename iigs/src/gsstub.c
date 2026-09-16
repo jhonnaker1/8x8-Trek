@@ -54,6 +54,11 @@ void plat_exit(void) { for (;;) ; }
 
 #endif  /* GS_REAL_VIDEO */
 
+/* ---- the message log and far memory ----
+   GS_REAL_FAR links src/gsfar.c instead, which puts BOTH in bank $01 and
+   takes the 2,048-byte array below out of bank 0 entirely. */
+#ifndef GS_REAL_FAR
+
 /* ---- the message log, and this one is NOT a stub ----
    ui.c keeps a 32-entry log outside the program through three functions whose
    names are the C128's, because that is where the seam was first cut. Every
@@ -68,6 +73,8 @@ void vdc_data_write(unsigned char value)
 { if (gs_logp < sizeof gs_log) gs_log[gs_logp++] = value; }
 unsigned char vdc_data_read(void)
 { return (gs_logp < sizeof gs_log) ? gs_log[gs_logp++] : 0; }
+
+#endif  /* GS_REAL_FAR -- the log half */
 
 /* ---- keyboard ---- */
 uint16_t kb_entropy;
@@ -89,9 +96,12 @@ void snd_poll(void) { gs_sink = 11; }
 uint8_t snd_enabled(void) { return gs_sink; }
 
 /* ---- far memory (the string pool) ---- */
+#ifndef GS_REAL_FAR
 uint16_t far_load(const char *name) { gs_sink = (unsigned char)*name; return 0; }
 void far_read(uint16_t off, void *dst, uint8_t len)
 { gs_sink16 = off; gs_sink = len; *(volatile unsigned char *)dst = 0; }
+
+#endif  /* GS_REAL_FAR */
 
 /* ---- overlays ---- */
 void ovl_load(uint8_t which) { gs_sink = which; }
