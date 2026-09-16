@@ -11849,18 +11849,25 @@ no attribute bit for it. That is the one visible compromise of this port.
 pool in it and reads the overflow, which is the staging rule every port here
 starts with.
 
-    all-resident program                61,208
-    $2800..$FEFF, everything            54,528
-    screen 4,000 + log 2,048 + pool 7,895   13,943
-    so the program may be              40,585
-    the CARD-carrying port's resident   45,729   (eleven overlays already)
-    ------------------------------------------
-    MORE THAT MUST PAGE OUT              5,144
+~~    MORE THAT MUST PAGE OUT              5,144~~
 
-**So this port needs the existing overlay machinery AND about 5K more paged
-than the port that has a card.** That is the price of the SuperSprite's 128K
-of VRAM: the string pool lived there and here it has to live in the 64K the
-program is already in.
+**THAT FIGURE WAS WRONG AND THE MISTAKE IS THE USEFUL PART: I COMPARED MY
+ALL-RESIDENT BUILD AGAINST THE CARD PORT'S OVERLAY BUILD.** `make -C coco3
+verify` prints 45,729 and it measures `build/egatrek-ovl.bin`, the RESIDENT
+HALF of the overlay build. The all-resident binary that belongs beside mine is
+`build/egatrek.bin`, and it is **63,426**. Apples against oranges, and the
+answer came out pessimistic by thousands.
+
+    coco3 + card   all-resident 63,426 -> resident 45,739   PAGES 17,687
+    coco3gime      all-resident 61,218 -> resident ~44,352  PAGES ~16,866
+
+**SO IT FITS, AND WITH LESS PAGING THAN THE PORT THAT HAS A CARD.** This port's
+all-resident image is 2,208 bytes SMALLER than the card port's, because it
+deletes a 6x8 software font and a V9958 blitter and adds an 8K pool -- and the
+GIME's character generator is free.
+
+The tenants of $2800..$FEFF are the screen (4,000), the message log (2,048)
+and the overlay window (4,096), which leaves the resident image 44,352.
 
 **THE FIRST ARITHMETIC SAID 7,841 AND IT WAS WRONG IN A USEFUL WAY.** It
 assumed the program had to end below the screen at `$E000`, which wastes the
