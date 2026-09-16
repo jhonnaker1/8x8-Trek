@@ -1,0 +1,29 @@
+# Per-port text for the CARD-LESS CoCo 3, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override coco3gime/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, and nothing else -- the generator owns the numbering,
+# so every port builds the same strdata.h and the same STR_COUNT. Never hand-
+# assign an id here; a hand-appended duplicate once silently stole another
+# string's. See amiga/src/strings.override.txt, and NOTES.md item 60 for what
+# STR_COUNT is load-bearing for: a binary and the STRINGS.DAT beside it are
+# coupled by it, and a mismatch plays with every label blank rather than
+# complain.
+
+# THE TITLE BAR, AND IT HAS TO SAY WHICH COCO 3 PORT THIS IS. There are two
+# disks now: coco3/ needs a SuperSprite FM+ and this one needs nothing but the
+# machine and a drive. A player holding both should be able to tell from the
+# screen which one booted, and "COCO 3 PORT" on each would make that
+# impossible. GIME is the chip that gives this build its 80 columns and its
+# eight colours without any card at all.
+0	 COCO 3 GIME PORT 
+
+# The dedication line.
+82	TO THE COLOR COMPUTER 3.
+
+# The shared line 10 is the C128's -- "BASIC IS ON THE 40-COLUMN SCREEN." --
+# and this port takes the machine out of ROM mode entirely, so there is no
+# BASIC left to return to. Same wording as the card port's, for the same
+# reason. The X16 and the Amiga both shipped that wrong line for months
+# because their quit path ERASED it before anyone could read it.
+10	HIT A KEY, THEN RESET THE MACHINE.

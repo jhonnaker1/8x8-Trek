@@ -1342,6 +1342,59 @@ counting as free and which holds `$FEF7` (this driver's IRQ slot) and `$FEFD`
 just above the image it left the image no room, and the image grew 1,314 bytes
 the day this landed.
 
+#### THE WHOLE GAME BOOTS -- AND MAME WILL NOT RUN IT (2026-09-16)
+
+`make -C coco3gime disk` builds `build/trek.dsk`, and **Jamie played it under
+XRoar.** Every seam of the card-less port is now exercised by the actual game
+rather than by a bench.
+
+**THE LOADER IS THE CARD PORT'S, UNCHANGED**, and that it suits this map at all
+was checked rather than assumed: the body is 4,665 bytes at `$E400`, so it
+occupies `$E400..$F658` -- inside this port's bss, its overlay window and the
+bottom of its message log. Every one of those is dead at load time and none is
+read before the loader jumps. What matters is that it clears the image, which
+ends at `$DB92`. Boot report: `A1 A2 00 ... B2 0A 5A` -- **45,578 bytes placed,
+STOR_OK.**
+
+**TWO REAL BUGS FOUND BY THE FIRST FULL RUN, both of which a bench could not
+have shown.**
+
+  1. **`ovl_load` WAS STILL THE EMPTY STUB.** `gimeovl.c` existed because the
+     card port's loader includes a generated `ovlmap.h` that did not exist
+     before the overlay build ran -- a good reason that had been spent for
+     days. The port had an overlay SPLIT and no overlay LOADER, so the game
+     cleared the screen and called into a window full of nothing. It links
+     `../coco3/src/coco3ovl.c` now and `gimeovl.c` is deleted rather than left
+     sitting there with a stale rationale.
+  2. **`OVL_SIZE` WOULD HAVE READ AN IMAGE THROUGH THE MESSAGE LOG.**
+     `build_ovl.py` derived it as "everything up to the stack reserve", which
+     is right for the card port and wrong here: this port keeps 2K of log at
+     `$F200`. It is the bound handed to `plat_read_all`, so the first overlay
+     to outgrow the gap would have been read straight through the log with no
+     symptom but corrupted messages. There is a `--ceiling` now; this port
+     passes `F200` and gets 2,816.
+
+**AND ONE THING THAT IS NOT OURS: MAME HANGS THIS PORT'S DISK AND XROAR DOES
+NOT.** Under MAME the game reads 45 sectors perfectly and wedges inside
+`dskcon_processSector` on the 46th -- track 21, sector 10, which is granule 41
+and `MUSIC.DAT`'s first data sector. The WD1773 reads `$01`, BUSY, with the
+track and sector registers holding exactly the right values and no DRQ ever
+arriving. The same disk under XRoar plays.
+
+Everything isolated passes under both: `src/sndbisect.c` walks every register
+`snd_init` writes with a read after each; `src/farbis.c` does `far_load` and
+`far_read` on both tenants through the port's own disk-backed store, on a disk
+whose layout puts `MUSIC.DAT` at the same granule 41. All STOR_OK. Stubbing
+`snd_init` entirely changes nothing, so the interrupt source is not implicated
+either. **It is MAME's FDC, and the second emulator is what said so** -- the
+third time today, after item 30 and the low-RAM screen.
+
+**AND THE INSTRUMENT WAS AMBIGUOUS WHILE I READ IT.** `STOR_TRACE`'s counters
+were single bytes, so "46 attempted" could have been 302 or 558 and the read I
+was chasing might not have been the one I named. They are sixteen bits now,
+and the widened count confirmed 46 -- which is the point: it was checked, not
+assumed.
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window

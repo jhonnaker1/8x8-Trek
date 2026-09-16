@@ -114,12 +114,48 @@ static void gran_loc(unsigned char g, unsigned char *trk, unsigned char *sec)
 #define TR ((unsigned char *)0x2010)
 #endif
 
+/* IRQ OFF ACROSS EVERY DSKCON CALL, AND IT IS NOT DEFENSIVE TIDINESS.
+   The CoCo's WD1773 transfers a sector in HALT MODE: the controller holds the
+   CPU between bytes and releases it exactly when the next one is ready. An
+   interrupt taken in that window costs the byte, the sector never completes,
+   and DSKCON then waits for ever for an NMI that is not coming. It presents
+   as a hang inside dskcon_processSector with the drive idle.
+   MEASURED: the card-less port's sound driver is this project's first
+   interrupt source, and the game hung on the 46th sector of its startup --
+   forty-five read perfectly, and the forty-sixth was the first one after
+   snd_music() armed the timer. Disk BASIC's own DSKCON masks for the same
+   reason; nothing here had to until now.
+   THE CALLER'S FLAGS ARE PRESERVED rather than blindly re-enabled, because
+   the first-stage loader runs with interrupts masked and no handler
+   installed -- turning them on underneath it would be a different hang. And
+   the save goes in a STATIC, not on the stack: cmoc addresses locals
+   relative to S with -fomit-frame-pointer, so a `pshs cc` here would move
+   every one of them out from under the function. */
+static unsigned char dsk_cc;
+
+static void dsk_mask(void)
+{
+    asm { tfr cc,a
+          sta _dsk_cc
+          orcc #$10 };
+}
+
+static void dsk_unmask(void)
+{
+    asm { lda _dsk_cc
+          tfr a,cc };
+}
+
 static unsigned char read_sec(unsigned char trk, unsigned char sec)
 {
 #ifdef STOR_TRACE
     TR[0] = trk;
     TR[1] = sec;
-    TR[2] = (unsigned char)(TR[2] + 1);      /* sectors attempted */
+    /* SIXTEEN BITS, because eight was ambiguous and I misread it. A byte
+       counter said "46 attempted" and I took that as the 46th sector; the
+       string pool alone does hundreds, so 46 could have been 302 or 558 and
+       the read I was chasing might not have been the one I named. */
+    if (++TR[2] == 0) TR[6]++;               /* sectors attempted, lo/hi */
     TR[3] = 0xB1;                            /* about to call DSKCON */
 #endif
     DCOPC = 2;
@@ -127,11 +163,13 @@ static unsigned char read_sec(unsigned char trk, unsigned char sec)
     DCTRK = trk;
     DCSEC = sec;
     DCBPT = secbuf;
+    dsk_mask();
     dskcon_processSector();
+    dsk_unmask();
 #ifdef STOR_TRACE
     TR[3] = 0xB2;                            /* DSKCON returned */
     TR[4] = DCSTA;
-    TR[5] = (unsigned char)(TR[5] + 1);      /* sectors completed */
+    if (++TR[5] == 0) TR[7]++;               /* sectors completed, lo/hi */
 #endif
     return (unsigned char)(DCSTA == 0);
 }
@@ -208,7 +246,9 @@ static unsigned char write_sec(unsigned char trk, unsigned char sec)
     DCTRK = trk;
     DCSEC = sec;
     DCBPT = secbuf;
+    dsk_mask();                              /* same reason as read_sec */
     dskcon_processSector();
+    dsk_unmask();
     return (unsigned char)(DCSTA == 0);
 }
 
