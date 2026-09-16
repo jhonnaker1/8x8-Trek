@@ -11763,3 +11763,60 @@ itself on the first screen of the next port.
 on the setup screen, and photographed it while the console was still four
 overlay loads away. Waiting for *a* change is not enough: an echo is a change
 followed immediately by stillness. It waits for five seconds of quiet now.
+
+## THE CARD-LESS COCO 3 IS AN 80-COLUMN PORT (measured 2026-09-15)
+
+Started as the cheapest remaining sub-80 candidate and **it is not a sub-80
+port at all.** The GIME does **80x25 text with eight per-cell foreground
+colours on a bare machine**, so this port uses `layout.c` and the console
+Anderson drew, not `layout40.c`. Measured, on screen, not read off a
+datasheet: `coco3gime/src/gimeprobe.c` draws a numbered ruler on every row and
+the picture shows rows **00 through 24** with marks out to **80 columns**, each
+row in a different colour.
+
+    $FF90 INIT0  = $00     COCO=0 selects the GIME's modes; MMUEN stays 0
+    $FF98 VMODE  = $03     alphanumeric, LPR=011 -> 8 scanlines a row
+    $FF99 VRES   = $35     LPF=01 -> 200 lines -> 25 rows; HRES=101 -> 80
+                           columns; CRES=01 -> the attribute byte is live
+    $FF9D/$FF9E            video start, in EIGHT-BYTE UNITS of a PHYSICAL
+                           address
+    $FFB0-$FFBF            sixteen palette entries, six bits of RGB
+
+**THE ATTRIBUTE BYTE'S FGND FIELD INDEXES PALETTE 8-15, NOT 0-7.** Bits 5-3
+are foreground, 2-0 background, and the two halves index different ends of the
+palette. The first picture that worked came out UNIFORMLY WHITE because I had
+filled 8-15 with white and put the colours in 0-7 -- a working driver and an
+unreadable screen.
+
+### THE MMU IS NOT NEEDED, WHICH IS THE WHOLE POINT
+
+`$FF9D/$FF9E` aim the video at PHYSICAL memory, so **the port points it at a
+buffer inside its own 64K** and never sets MMUEN -- the parked, unexplained
+blocker that permanently breaks disk access on this machine (item 30). The
+screen costs 4,000 bytes of address space and no banking at all.
+
+**PHYSICAL, NOT CPU, AND THE MACHINE'S RAM SIZE DECIDES IT.** With the MMU off
+the CPU's 64K is the TOP 64K of whatever is fitted, so CPU `$4000` is physical
+`$14000` on a 128K machine and `$74000` on a 512K one. The first run assumed
+128K and painted a white screen from memory nothing had written. One constant,
+two machines, and only the picture can tell you which.
+
+### WHAT BASIC CANNOT DO FOR US, MEASURED BEFORE THE DRIVER
+
+`WIDTH 80` works and sets the mode correctly, and the obvious shortcut is to
+let it. **It does not survive contact:** a search of all 64K for a string
+BASIC had just printed found it ONLY in the input buffer at `$02DF`. BASIC's
+80-column screen is not in the CPU's address space -- it pages it in to write
+to it -- so a port that cannot page has to bring its own screen. That is one
+probe's worth of work and it removed a design that would have failed later.
+
+`WIDTH 80` also gives **24 rows**; 25 comes from LPF, which is why the port
+programs `$FF99` itself rather than inheriting whatever BASIC left.
+
+### WHAT IS LEFT
+
+Video is understood. **Sound and far memory are the two genuinely new seams** --
+both the YM2149 and the far-memory VRAM are ON the SuperSprite, so this machine
+has neither. Sound is the CoCo's own 6-bit DAC; far memory has to fit the
+string pool somewhere in 64K that also holds a 45K program and a 4,000-byte
+screen.
