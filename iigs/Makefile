@@ -59,11 +59,53 @@ pagemap: build/gsmap.bin
 	  GS_DUMP='0xE12000:125:0x100' $(MAME) apple2gs $(MAMEOPT) \
 	  -video none -autoboot_script tools/run.lua -seconds_to_run 22
 
-verify: colours
+# THE BOOT CHAIN, which is the half the Plus/4 never got. Block 0 is ours, it
+# reads the payload off the disk through the slot's ProDOS block driver, and
+# jumps to $2000. No ProDOS anywhere.
+build/boot.bin: src/boot.S boot.ld | build
+	$(CC) -mcpu=mosw65816 -nostdlib -T boot.ld -Wl,--no-check-sections \
+	  src/boot.S -o build/boot.elf
+	$(OBJCOPY) -O binary build/boot.elf $@
+
+# The same block, asking for a block one past the end of the disk -- the only
+# way to make the drive say no, and therefore the only way to execute the
+# failed-read path at all.
+build/bootbad.bin: src/boot.S boot.ld | build
+	$(CC) -mcpu=mosw65816 -nostdlib -DSTART_BLOCK=1600 -T boot.ld \
+	  -Wl,--no-check-sections src/boot.S -o build/bootbad.elf
+	$(OBJCOPY) -O binary build/bootbad.elf $@
+
+build/egatrek.po: build/boot.bin build/gsprobe.bin tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin --payload build/gsprobe.bin
+
+build/badread.po: build/bootbad.bin build/gsprobe.bin tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/bootbad.bin --payload build/gsprobe.bin
+
+disk: build/egatrek.po
+
+# Boot the disk and count the colours. This is the whole chain: disk -> our
+# block 0 -> block reads through the slot firmware -> compiled C at $2000 ->
+# Super Hi-Res.
+bootcheck: build/egatrek.po
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	GS_SHOT=1 $(MAME) apple2gs $(MAMEOPT) -flop3 build/egatrek.po \
+	  -snapshot_directory build/snap -autoboot_script tools/bootrun.lua \
+	  -seconds_to_run 30
+	python3 tools/count_colours.py build/snap/apple2gs/0000.png --expect 16
+
+# And the failure path, which is a comment until something has executed it.
+failcheck: build/badread.po
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	GS_SHOT=1 $(MAME) apple2gs $(MAMEOPT) -flop3 build/badread.po \
+	  -snapshot_directory build/snap -autoboot_script tools/bootrun.lua \
+	  -seconds_to_run 30
+	python3 tools/count_colours.py build/snap/apple2gs/0000.png --expect 1
+
+verify: colours bootcheck failcheck
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck verify clean
 
 .PRECIOUS: build/%.elf

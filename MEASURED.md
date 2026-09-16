@@ -7663,3 +7663,31 @@ Same program, one line different (`$C029 = $C1` at the end). With the display
 enabled, a readback of `$E1/2000..` returns every written page TWICE:
 `20 20 21 21 22 22 ...`. **A dump of SHR taken while SHR is on is not a
 picture of what the program wrote.** Use the snapshot; dump only with it off.
+
+## Apple IIgs: the boot chain, ours end to end (2026-09-16)
+
+No ProDOS on the disk. Block 0 is our own loader; it reads the payload through
+the slot's ProDOS block driver and jumps to `$2000`.
+
+    AT0800   01 78 D8 86 43 8A 4A 4A 4A 4A 09 C0 85 3D A9 FF   our block 0
+    AT2000   4C 03 20 38 FB 4B AB A9 00 85 02 A9 BF 85 03 20   = gsprobe.bin
+    PC       $2151, E=1, C029=$C1                              the C ran
+    colours  16 distinct, identical to the poked-in run
+
+The driver interface, which is in ROM and is what ProDOS itself calls: `$CnFF`
+holds the driver's offset within `$Cn00`; command in `$42`, unit in `$43`,
+buffer in `$44/$45`, block in `$46/$47`; carry clear on success. The boot
+firmware hands the unit number in X, and it is the only thing that says which
+drive the machine came from.
+
+### The failed-read path, executed
+
+`START_BLOCK=1600` on a 1,600-block disk -- the only block the drive cannot
+deliver is one past the end. Carry comes back set, the loader stops, and the
+screen is **#aa00aa across all 128,000 content pixels**.
+
+**The first control was not one.** Block 1598 of a 1,600-block disk READ FINE;
+the loader jumped into a page of zeros, the machine ended in ROM at `$FE/00F2`
+and the screen stayed dark -- which reads exactly like the failure path
+failing. Asking for a block that exists cannot test what happens when one does
+not.

@@ -102,16 +102,55 @@ it at the end is the right instinct on every other machine here, and it is
 what the first three forms of the probe did. The working 2026-09-05
 measurement turned SHR on first; so does this one.
 
+## The boot chain, and it is ours end to end
+
+**A disk we wrote boots this machine and runs our code, with no ProDOS on it.**
+
+A ProDOS-order block device boots by reading **block 0** into `$0800` and
+jumping to `$0801` with X holding slot×16. So block 0 is 512 bytes of whatever
+we put there, and `src/boot.S` puts a loader there: it reads the payload off
+the disk through the **slot's own ProDOS block driver** — the byte at `$CnFF`
+is the driver's offset within `$Cn00`, and the call takes command in `$42`,
+unit in `$43`, buffer in `$44/$45` and block in `$46/$47` — and jumps to
+`$2000`.
+
+That is the same argument that got the Atari VBXE port its own boot record and
+SIO seam: **the disk is ours to give away.** No system file of Apple's is
+redistributed, there is no MLI, and `$BF00` is not a global page.
+
+    make disk        build/egatrek.po -- 800K, block 0 ours, payload from block 1
+    make bootcheck   boot it and count the colours (the whole chain)
+    make failcheck   boot a disk whose first read cannot succeed
+
+`make verify` runs all three.
+
+### The failed-read path is executed, not merely written
+
+`a failed load must not RETURN` is the C128 overlay seam's rule and it applies
+to a first-stage loader more than anywhere: there is nothing to return *to*.
+So a failed read paints the screen flat magenta and stops — measured as
+`#aa00aa` across all 128,000 content pixels, a colour the console never draws.
+
+**And the first attempt to test it was not a test.** Asking for block 1598 of
+a 1,600-block disk *read fine*; the loader jumped into a page of zeros, the
+machine ended in ROM at `$FE/00F2`, and the screen stayed dark — which looked
+exactly like the failure path failing. The control was what failed: on a
+1,600-block image the only block the drive cannot deliver is one past the end.
+`START_BLOCK=1600` makes the driver return carry set, and then the path runs.
+
 ## What has NOT been established
 
-* **ProDOS 8, and every consequence of it.** The shipping shape is a `SYS`
-  file — ProDOS loads it at `$2000`, enters it there, and there is no BASIC
-  and nothing to type. Nothing here has run under ProDOS at all.
-* **Zero page.** `iigs.ld` carries `__basic_zp_start = 0x0002` inherited from
-  `c64.ld` through `plus4.ld`, where that inheritance went unexamined and
-  became the Plus/4's open question. **ProDOS 8's MLI uses zero page during a
-  call and a `SYS` program does not own all of it.** Written down as a
-  question on day one this time; measure it before the first MLI call.
+* **A filesystem.** The loader reads a flat run of blocks. The game needs
+  named files — `STRINGS.DAT`, the music, eleven overlays — so either this
+  disk grows a directory of its own (the CoCo 3 and Atari ports both wrote
+  one) or the layout is fixed extents the build computes. Not decided.
+* **Zero page — and the question CHANGED when ProDOS went away.** `iigs.ld`
+  carries `__basic_zp_start = 0x0002`, inherited from `c64.ld` through
+  `plus4.ld`, where that inheritance went unexamined and became the Plus/4's
+  open question. With no MLI there is no ProDOS to collide with, but **the
+  slot firmware's block driver has its own zero-page use** (`$42`..`$47` at
+  minimum, and the screen holes) and the loader calls it. Measure what the
+  driver touches before the game's data lands anywhere near it.
 * **Keyboard, sound, storage, and the console itself.** None attempted.
 * **Whether the image fits.** `$2000..$BEFF` is 40,191 bytes against the C64's
   `$0801..$CFFF`. The survey's claim that the machine needs *no overlays and
