@@ -51,6 +51,24 @@ def main():
     if sysno != entry:
         bad.append("header says SYS %d, the code starts at %d" % (sysno, entry))
 
+    # AND WHAT IS AT THAT ADDRESS, WHICH THE CHECK ABOVE CANNOT SEE. The SYS
+    # number matching `load + header length` is arithmetic, and it stayed true
+    # while $100D held the first byte of kernal_load_raw -- RUN jumped into the
+    # middle of the KERNAL banking assembly and nothing started. The entry must
+    # be a JMP, and it must go where the C runtime actually begins.
+    off = 2 + len(hdr)
+    if d[off] != 0x4C:
+        bad.append("the SYS address holds $%02X, not a JMP ($4C) -- RUN would "
+                   "land in whatever section was placed there" % d[off])
+    else:
+        target = d[off + 1] | (d[off + 2] << 8)
+        runtime = min((v[0] for n, v in s.items()
+                       if n in (".text",) and v[1]), default=0)
+        print("  entry               JMP $%04X" % target)
+        if runtime and target != runtime:
+            bad.append("the entry jumps to $%04X but .text starts at $%04X"
+                       % (target, runtime))
+
     # THE WHOLE MEMORY-MAP ARGUMENT IN TWO LINES. Above $8000 the ROM hides the
     # program during a KERNAL call; .lowtext makes the call and .lowbss holds
     # its operands, so both must stay visible or the call returns into shadow.

@@ -115,9 +115,38 @@ What the link asked for on the way, all of it real work a platform package
 would normally supply: the KERNAL jump table as linker symbols, `plat_exit`,
 and `__ovl_start`.
 
-## The one design question left, stated precisely
+## The KERNAL vectors are proved, and so is the banking window
 
-**The soft stack is the problem, and nothing else is.** Above `$8000` the ROM
+`src/loadprobe.c`, against a real d64 under `xplus4`:
+
+    far_load       ok, base 0
+    far_size       7496          exactly strings.dat's size
+    first 4 bytes  4E 01 00 00   the string count, 334
+
+So `SETLFS $FFBA`, `SETNAM $FFBD` and `LOAD $FFD5` are right, the whole banked
+window works — ROM in, three calls, ROM out, and a return into code that was
+invisible throughout — and `far_read` reads it back. That was the largest
+remaining risk in the port and it is retired.
+
+**AND THE PROBE FOUND SOMETHING WORSE ON THE WAY.** It reported nothing at all
+the first time, because **the BASIC header's SYS pointed into the middle of
+`kernal_load_raw`.** The header sends `RUN` to `$100D`, which is whatever
+section follows it — and the moment `.lowtext` was placed there to keep it
+below `$8000`, `RUN` jumped into the KERNAL banking assembly. Every build in
+this port had that, including the game.
+
+`verify_p4.py` **passed it**, and the reason is the useful part: it checked
+that the SYS number equals the load address plus the header's length. That is
+arithmetic, and it stayed true while pointing at the wrong code. The entry is
+now three bytes of `JMP` emitted by the link script, and the gate checks the
+cell holds `$4C` and that the address after it is where `.text` really starts
+— a check about the machine rather than about a sum.
+
+## The design question that was left, and how it went
+
+**The soft stack was the problem, and nothing else was.** Resolved by option 3
+below: `kernal_load_raw` is assembly and touches no C local between the stores
+to `$FF3E` and `$FF3F`, so the soft stack can live anywhere. Above `$8000` the ROM
 hides the program during a KERNAL call — which is fine for code, because the
 only code executing then is `.lowtext`, and fine for a return address, because
 it becomes visible again the moment the ROM goes out. It is NOT fine for

@@ -99,9 +99,23 @@ SECTIONS {
        translation unit becomes one `.lto.o` and `*p4mem.o(.text*)` would
        match nothing. verify_p4.py asserts the section really did end below
        $8000 rather than trusting the ordering. */
+    /* A JMP AT THE SYS ADDRESS, AND IT IS NOT DECORATION. The BASIC header
+       sends RUN to $100D, which is whatever section follows it -- and the
+       moment .lowtext was placed there, RUN jumped into the middle of the
+       KERNAL banking assembly and the program never started. It looked
+       exactly like a probe that had not been written to.
+       So the entry is three bytes that say where the C runtime really is,
+       and .lowtext keeps its low placement without owning the entry point.
+       verify_p4.py checks this cell is a $4C and that the address after it
+       matches the runtime, because the old check -- "the SYS number equals
+       the load address plus the header length" -- was arithmetic that stayed
+       true while pointing at the wrong code. */
+    .entry : { BYTE(0x4C); SHORT(__p4_start); } >ram
+
     .lowtext : { *(.lowtext) } >ram
     .lowbss  : { *(.lowbss)  } >ram
 
+    __p4_start = .;
     INCLUDE c.ld
 
     .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
