@@ -11873,3 +11873,24 @@ Not attempted yet: the overlay split. `coco3/tools/build_ovl.py` and
 `ovl.link` are a working design -- one link, a `code` section renamed and
 placed at the window -- and the question is whether another 5K of the shared
 UI can be paged without breaking core/overlay.h's rule 4.
+
+### NO RAM UPGRADE IS NEEDED, AND THE VIDEO ADDRESS WORKS ON BOTH (2026-09-16)
+
+**A 512K CoCo 3 gives this port not one byte more than a stock 128K one.**
+Without the MMU the CPU sees 64K whatever is fitted, and MMUEN is the parked
+blocker that permanently breaks disk access -- so the extra RAM is
+unreachable. The 5,144-byte gap is the same on both machines.
+
+The only thing that could have needed the upgrade is the VIDEO START register,
+which is a PHYSICAL address, and `$70000` is what the driver writes.
+**MEASURED under MAME with `-ramsize 128k`: identical picture.** On a 512K
+machine $70000 is the top 64K; on a 128K machine it is past the end and the
+GIME ALIASES it down to $10000, which is that machine's top 64K. One constant,
+both machines.
+
+**THE ASYMMETRY IS THE PART WORTH KEEPING.** The reverse does not work: a
+too-LOW address is real, addressable RAM that the CPU is not looking at, so
+the video faithfully displays whatever happens to be in it -- which is exactly
+how an earlier build painted a white screen out of memory nothing had written.
+A too-high address wraps harmlessly; a too-low one shows the wrong memory and
+looks like a broken driver.

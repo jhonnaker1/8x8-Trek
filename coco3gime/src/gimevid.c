@@ -94,14 +94,20 @@ void vdc_init(void)
 {
     unsigned int i;
 
-    /* 512K OR 128K, ASKED RATHER THAN ASSUMED. Write a marker through the CPU
-       window and see which physical base the video would have to use; the
-       cheap proxy is that a 128K machine aliases the top 64K, so the byte at
-       CPU $0000 and the byte 64K below it in physical terms are the same
-       cell. There is no way to read that without the MMU, so this uses the
-       simpler fact: the GIME reports nothing, and a wrong base shows on
-       screen immediately. 512K is the default because that is what the
-       machine this was developed against has; RAMTOP below overrides it. */
+    /* $70000 IS CORRECT ON BOTH A 512K AND A STOCK 128K COCO 3, and that was
+       MEASURED, not reasoned. On a 512K machine it is the top 64K -- the
+       window the CPU sees with the MMU off. On a 128K machine it is past the
+       end of RAM and the GIME ALIASES it down to $10000, which is that
+       machine's top 64K. One constant, both machines, and no RAM upgrade
+       required.
+       The asymmetry is worth knowing because it is not obvious: the reverse
+       does NOT work. $10000 on a 512K machine is real, addressable RAM that
+       the CPU is not looking at, so the video faithfully displays whatever is
+       in it -- which is how an earlier build painted a white screen out of
+       memory nothing had written. A too-HIGH address wraps; a too-LOW one
+       silently shows the wrong memory.
+       Verified by running the console test under MAME with `-ramsize 128k`:
+       identical picture. */
     phys_base = 0x70000UL;
 
     INIT0 = 0x00;                 /* COCO=0, MMUEN=0 -- never set MMUEN */
