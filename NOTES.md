@@ -12104,3 +12104,44 @@ SAME THING IN IT**, which is the control saying the rig is wrong and the probe
 is not. The documented invocation uses `-ext multi` with the FDC in slot 4 and
 the card in slot 1, and slot order is recorded elsewhere here as load-bearing.
 That is the next thing to fix, before either emulator is believed.
+
+### THE RIG IS FIXED, AND ITEM 30'S CONCLUSION IS WRONG (2026-09-16)
+
+**Two rig faults, both found by the control rather than by reasoning.**
+
+The Lua rig that pokes a binary in and sets PC returns `A5 FF FF...` -- armed,
+then nothing -- **and the ORIGINAL bits.c returns the same in it.** That is the
+control saying the rig is wrong, not the probe. Switching to the
+`LOADM`/`EXEC` rig that has worked all day fixed it.
+
+Then the baseline read came back `02`, STOR_ERROR, before any register was
+touched. **I had substituted a 1,709-byte file for `OVLDEMO.BIN`, and the
+probe's buffer is 512** -- `plat_read_all` treats a filled buffer as an error
+ON PURPOSE, because it cannot tell a full read from a truncated one. NOTES.md
+records the original as "5 bytes with first byte `E6`". Rebuilt at that size,
+the baseline is `00`.
+
+**WITH A WORKING RIG, `tools/coco3/bits2.c` SAYS:**
+
+    r[1]  baseline                              STOR_OK
+    r[9]  after `sta $FFDF` (all-RAM mode)      STOR_OK
+    r[2]  after INIT0 = $80  (COCO alone)       NOT FOUND
+          after INIT0 = $00  (a "clean" value)  NOT FOUND
+
+**ALL-RAM MODE IS INNOCENT. ANY WRITE TO INIT0 BREAKS THE DISK, WHATEVER THE
+VALUE** -- before MMUEN, before MC3, before the task map, before the ROM map
+bits change anything. `$00` and `$80` differ in five bits and fail identically.
+
+**SO "IT IS MMUEN ALONE" IS WRONG.** It was drawn from a probe whose one
+relevant line read-modify-writes a register that does not read back, and the
+real behaviour is coarser and stranger than the bit it named.
+
+**WHAT IS STILL NOT KNOWN**: why writing INIT0 at all disturbs a standalone
+WD1773 driver. The candidates left are the GIME's own interrupt enables
+(IEN/FEN in that same register), a latch the write resets, or MAME's GIME
+model. **That last one is why this wanted a second emulator in the first
+place, and it still does.**
+
+**WHAT IT MEANS FOR THE PORT.** The MMU is not ruled back in -- enabling it
+requires writing INIT0 -- but the REASON is not the bit anyone thought, and
+the door is no longer closed on the evidence that closed it.
