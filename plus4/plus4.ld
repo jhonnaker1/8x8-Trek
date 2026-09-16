@@ -131,18 +131,32 @@ SECTIONS {
     .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
 }
 
-/* THE SOFT STACK MUST BE BELOW $8000 and this is the reason, not tidiness:
-   a KERNAL call made from .lowtext pushes its return address and locals here,
-   and if the stack were above $8000 those pushes would go into ROM shadow
-   while the call ran. $7F00 leaves 256 bytes of guard below the ROM boundary;
-   measure the real depth with a sentinel fill before trusting it, exactly as
-   the C64 and X16 had to. */
 /* overlay.c takes the window address from here rather than repeating $CC00. */
 __ovl_start = ORIGIN(window);
 
-__stack = 0x7F00;
+/* $CC00, JUST BELOW THE OVERLAY WINDOW, GROWING DOWN INTO THE GAP ABOVE BSS.
+   It was $7F00 -- chosen when `ram` was a 16K scoping region and never
+   revisited once the image grew past $8000. .text runs $1055..$9908, so the
+   soft stack was INSIDE THE PROGRAM'S OWN CODE and the first call overwrote
+   it. The symptom was `?SYNTAX ERROR` from BASIC: SYS jumped in, the program
+   destroyed itself before it could draw anything, and control fell back into
+   BASIC's parser mid-statement. It looked like a bad BASIC header for an hour.
 
-OUTPUT_FORMAT {
-    SHORT(ORIGIN(ram))
-    TRIM(ram)
-}
+   ABOVE $8000, AND THAT IS ALLOWED HERE BY DESIGN. The soft stack is hidden
+   while the ROM is banked in -- which would be fatal if anything in that
+   window spilled a C local to it, and nothing does: kernal_load_raw is
+   assembly and touches only the 6502's hardware stack and eight bytes of
+   .lowbss. Making that true is what bought the freedom to put the stack
+   anywhere, and this is the payment.
+
+   It grows down from $CC00 into the gap between .noinit's end and the window
+   -- about 6K today. verify_p4.py checks it is not inside a loaded section,
+   which is the check that was missing. */
+__stack = 0xCC00;
+
+/* NO OUTPUT_FORMAT, AND THAT IS DELIBERATE. The platform templates end with a
+   SHORT/TRIM block that makes the linker emit a finished PRG -- convenient,
+   and it leaves NO ELF for llvm-objcopy to cut the overlay images out of.
+   c64.ld has none for the same reason. The link produces an ELF; the Makefile
+   strips it to a body, prepends the $1001 load address, and dumps each
+   .ovl_* section separately. */

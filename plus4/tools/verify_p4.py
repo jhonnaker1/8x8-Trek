@@ -44,8 +44,8 @@ def main():
     # THE BASIC HEADER'S SYS IS TEXT AND THE ENTRY IS ARITHMETIC. Nothing ties
     # them together but this check: change the header's length and the number
     # inside it silently stops pointing at the code.
-    hdr = d[2:14]
-    sysno = int(bytes(hdr[5:9]).decode("latin1"))
+    hdr = d[2:15]
+    sysno = int(bytes(hdr[6:10]).decode("latin1"))
     entry = LOAD + len(hdr)
     print("  BASIC header SYS    %d, entry $%04X (%d)" % (sysno, entry, entry))
     if sysno != entry:
@@ -93,6 +93,25 @@ def main():
                    % (top, WINDOW))
     else:
         print("  spare               %d bytes" % (WINDOW - top))
+
+    # THE SOFT STACK MUST NOT BE INSIDE A LOADED SECTION, and nothing but this
+    # check can see it. __stack was $7F00 while .text ran $1055..$9908: the
+    # stack grew down into the program's own code and killed it on the first
+    # call. The link succeeded, every size fitted, and the failure surfaced as
+    # `?SYNTAX ERROR` from BASIC.
+    stk = None
+    for line in open("plus4.ld"):
+        m = re.search(r"__stack\s*=\s*0x([0-9A-Fa-f]+)", line)
+        if m:
+            stk = int(m.group(1), 16)
+    if stk is None:
+        bad.append("plus4.ld defines no __stack")
+    else:
+        print("  __stack             $%04X" % stk)
+        for n, (vma, size) in s.items():
+            if size and not n.startswith(".ovl") and vma <= stk < vma + size:
+                bad.append("__stack $%04X is inside %s ($%04X..$%04X) -- it grows "
+                           "DOWN into it" % (stk, n, vma, vma + size - 1))
 
     for b in bad:
         print("verify_p4: %s" % b)
