@@ -1,6 +1,26 @@
 #ifndef EGAGIME_H
 #define EGAGIME_H
 
+/* THE ONE INIT0 VALUE THIS PORT RUNS UNDER, in one place because two files
+   write it and $FF90 DOES NOT READ BACK -- there is no way to OR a bit in
+   safely, so both writers must write the whole thing.
+
+       bit 7  COCO   0   the GIME's own text mode, not CoCo compatibility
+       bit 6  MMUEN  0   the MMU is usable (see NOTES.md) but unused here
+       bit 5  IEN    1   the GIME may assert /IRQ -- the sound timer needs it
+       bit 4  FEN    0   nothing uses FIRQ; cmoc's `interrupt` saves no
+                         registers, which FIRQ does not stack either
+       bit 3  MC3    1   the RAM vector page at $FE00, where $FEF7 is the IRQ
+                         slot the sound driver takes
+       bit 2  MC2    1   **the standard SCS -- the WD1773's chip select.**
+                         Clearing this is what "MMUEN breaks the disk" really
+                         was, and what made a screen at $1000 look fatal.
+       bits 1-0     00   ROM map; meaningless in all-RAM mode
+
+   Measured against the disk: $04, $0C, $2C and $8C all read files; $00, $C8
+   and $CA do not. src/lowinit.c and tools/coco3/bits3.c. */
+#define GIME_INIT0 0x2C
+
 /* EGA colour -> the GIME's eight text foregrounds.
  *
  * THE MAP IS A FOLD, AND WHICH EIGHT SURVIVE IS DERIVED RATHER THAN CHOSEN.

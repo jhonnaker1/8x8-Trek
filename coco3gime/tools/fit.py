@@ -27,7 +27,14 @@ WIDTH      = int(os.environ.get("WIDTH", "80"))
 SCREEN     = 0                # $1000..$1F9F, below the image, not above it
 LOG        = 2048     # ui.c: LOG_SLOTS 32 x LOG_STRIDE 64, at $F200
 STACK      = 1024     # what cmoc's crt assumes
-IO         = 0xFF00
+# $FE00, NOT $FF00, AND THE 256 BYTES MATTER. The I/O page starts at $FF00,
+# but the page below it is MC3's RAM VECTOR PAGE and it is occupied: $FEF7 is
+# the IRQ slot the sound driver takes and $FEFD is the one standalone DSKCON
+# takes for its per-sector NMI. Counting it as free made this tool report 837
+# bytes spare where early.py, which places the window for real, could only
+# find 581 -- and the difference was exactly this page. Two instruments, one
+# of them wrong, and the gap between them is what said so.
+IO         = 0xFE00
 
 
 def main():
@@ -58,7 +65,7 @@ def main():
     have = IO - top
     print("  ------------------------")
     print("  still to place   %6d" % need)
-    print("  room to $FF00    %6d" % have)
+    print("  room to $FE00    %6d" % have)
     if need > have:
         print("\nfit: OVER BY %d bytes" % (need - have))
         return 1

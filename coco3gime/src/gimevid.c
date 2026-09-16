@@ -36,6 +36,7 @@
 #include "../../c128/src/vdc.h"
 #include "../../core/ega.h"
 #include "../../c128/src/layout.h"
+#include "egagime.h"        /* GIME_INIT0 -- gimesnd.c writes the same register */
 
 #define INIT0     (*(unsigned char *)0xFF90)
 #define VMODE     (*(unsigned char *)0xFF98)
@@ -132,9 +133,10 @@ void vdc_init(void)
        disk -- two variables changed between that probe's control and its test,
        and the fill took the blame for vdc_init.
        Measured, src/lowinit.c: $00 NOT FOUND, $04/$0C/$8C all STOR_OK with
-       this same mode set and 4,000 bytes written at $1000. COCO=0 for the
-       GIME's own text mode, MMUEN off, MC2 KEPT. */
-    INIT0 = 0x04;
+       this same mode set and 4,000 bytes written at $1000. The value itself
+       lives in egagime.h, because gimesnd.c writes the same register and it
+       cannot be read back to OR a bit into. */
+    INIT0 = GIME_INIT0;
     VMODE = 0x03;                 /* alphanumeric, 8 scanlines a row */
     #ifdef TREK_40COL
     /* HRES=001 is 40 characters; CRES=01 keeps the attribute byte. */

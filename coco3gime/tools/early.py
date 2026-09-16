@@ -9,9 +9,17 @@ import os, sys
 
 ORG = 0x2800          # where the program loads, from the Makefile's --org
 LOG = 0xF200          # 2,048, from src/gimelog.c
-SCREEN = LOG - 4000   # the 80x25 text buffer, from src/gimevid.c
-SCREEN_END = LOG
+LOG_END = LOG + 2048
+STACK = 1024          # what cmoc's crt assumes, reserved below the vector page
+VECTORS = 0xFE00      # MC3's RAM vector page; $FEF7 is the sound driver's slot
 IO = 0xFF00           # the I/O page: nothing of ours may reach it
+
+# THE SCREEN IS NOT UP HERE ANY MORE. It used to be modelled as `LOG - 4000`,
+# a 4,000-byte tenant wedged under the message log, and that was true until
+# the day it was measured that low RAM is safe -- it lives at $1000 now, below
+# the load address, and costs this budget nothing. See src/gimevid.c and
+# src/lowinit.c. The window size is no longer a hardcoded 4,096 either; it is
+# whatever the caller reserved.
 
 
 def main():
@@ -21,16 +29,22 @@ def main():
     win = None
     if "--window" in sys.argv:
         win = int(sys.argv[sys.argv.index("--window") + 1], 0)
-    ceiling = win if win else SCREEN
+    winlen = 0
+    if "--window-len" in sys.argv:
+        winlen = int(sys.argv[sys.argv.index("--window-len") + 1], 0)
+    ceiling = win if win else LOG
     n = os.path.getsize(path)
     # A DECB binary carries a 5-byte header per segment and a 5-byte trailer.
     body = n - 10
     end = ORG + body
     print("  program   $%04X..$%04X   %d bytes" % (ORG, end - 1, body))
-    print("  screen    $%04X..$%04X   %d bytes" % (SCREEN, SCREEN_END - 1,
-                                                   SCREEN_END - SCREEN))
+    print("  screen    $1000..$1F9F   4000 bytes   (low RAM, below $%04X)" % ORG)
     if win:
-        print("  window    $%04X..$%04X   4096 bytes" % (win, win + 4095))
+        wl = winlen if winlen else (LOG - win)
+        print("  window    $%04X..$%04X   %d bytes" % (win, win + wl - 1, wl))
+    print("  log       $%04X..$%04X   2048 bytes" % (LOG, LOG_END - 1))
+    print("  stack     $%04X..$%04X   %d bytes" % (VECTORS - STACK,
+                                                   VECTORS - 1, STACK))
     if end > ceiling:
         print("  OVERLAP   the image runs %d bytes PAST $%04X"
               % (end - ceiling, ceiling))

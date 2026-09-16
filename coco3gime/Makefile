@@ -89,12 +89,20 @@ clean:
 # resolves calls in both directions and an overlay is ordinary C rather than a
 # jump-table dialect. Images are cut out as .OVL files and read from disk.
 #
-# THE WINDOW IS $D740 BECAUSE THE MAP SAYS SO, not because it is round. The
-# three fixed tenants are packed hard under the I/O page -- log $F700, screen
-# $E740, window $D740 -- which leaves the resident image $2800..$D73F. A
-# rounder $E000 screen would waste 1,792 bytes in the gap above it, and this
-# port does not have 1,792 to spare.
-OVL_WINDOW ?= D260
+# THE WINDOW GOES AS HIGH AS IT CAN, WHICH IS A CHANGE. It used to be packed
+# hard under a screen that lived at $E260 -- three tenants stacked below the
+# I/O page with the image ending beneath all of them. THE SCREEN IS AT $1000
+# NOW, below the load address entirely (src/gimevid.c says why), so the only
+# things left up here are the message log at $F200 and the 1K stack under
+# $FE00. That leaves $D8EC..$F1FF, and the split is:
+#
+#     window   $E800..$F1FF   2,560 for the largest overlay image (2,500 today)
+#     free     image end..$E5FF     for the resident half to grow into
+#
+# Putting the window at the TOP rather than the bottom of that gap is the
+# whole point: a window pinned just above the image leaves the image no room
+# at all, and this one grew 1,314 bytes the day the sound driver landed.
+OVL_WINDOW ?= E800
 
 # Same split as the card port's, for the same reason its Makefile gives: whole
 # files, because cmoc has no per-function section placement, and the index is

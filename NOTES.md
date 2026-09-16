@@ -1266,6 +1266,82 @@ because `vdc_init()` sat between the control and the test and was never
 counted as a variable at all. **Everything between the control and the
 measurement is a variable, including the setup.**
 
+#### THE LAST SEAM: SOUND OUT OF A BARE DAC (2026-09-16)
+
+`coco3gime/src/gimesnd.c`, 440.0 / 1000.0 / 200.2 Hz measured off a recording,
+and the drive still reads while it plays.
+
+**ONE VOICE, AND THAT IS THE MACHINE.** Every other port here has a chip that
+holds a pitch in a register, so music and effects get a voice each. This one
+has a 6-bit DAC at `$FF20` and a tone exists only while something toggles it.
+Two tones would mean summing them in the interrupt at ~16 kHz, which costs
+better than a third of a 1.79 MHz 6809 on the slowest port here to repaint.
+So the DAC carries one note and an effect preempts the music -- which is what
+the original's single PC speaker did.
+
+**THE CLOCK IS 3.58 MHz AND I BUILT IT AGAINST 1.79.** INIT1 bit 5 (TINS)
+selects 14.31818 / **4**, not / 8. Every note came out an OCTAVE SHARP --
+880, 2000 and 400 where 440, 1000 and 200 were wanted -- and the three-point
+calibration is the only reason that is a sentence in the past tense. A single
+point would have had a one-in-three chance of being the one I listened to and
+shrugged at. `coco3gime/tools/hearit.py` reads the pitch out of a `-wavwrite`
+recording by counting zero crossings, which suits a square wave exactly, and
+checks bursts IN ORDER against expected values.
+
+**FOUR THINGS ABOUT THIS MACHINE'S INTERRUPTS, each of which cost a run.**
+
+  1. **A GIME source latches its flag from the ENABLE MASK alone.** `$FF92` is
+     two registers at one address -- write the mask, read the pending set and
+     clear it -- and IEN/FEN in INIT0 only gate the CPU line. `dactest.c`
+     polled for a timer flag that could never arrive because nothing had ever
+     written the mask. It also means tempo can be polled off V-BORD armed in
+     `$FF93` with FEN clear, where the handler's read of `$FF92` cannot steal
+     it.
+  2. **cmoc's `interrupt` functions end in RTI and SAVE NOTHING.** Safe on
+     IRQ, which stacks the whole register set; silent corruption on FIRQ,
+     which stacks only PC and CC. That is what picked IRQ.
+  3. **THE PIAs DRIVE /IRQ DIRECTLY AND IEN DOES NOT GATE THEM.** Disk BASIC
+     leaves PIA0's 60 Hz field-sync interrupt enabled, so clearing the CPU's I
+     flag takes a PIA interrupt that reading `$FF92` does nothing about --
+     immediately, and for ever. `tmr5.c` proved the handler was being ENTERED
+     and the machine still wedged, which is what ruled out the vector chain.
+     Disabling the enables is not enough: a latched flag holds the line down,
+     so the DATA registers have to be read. (`tmr5.c` also showed `$FFF8`
+     holds `$FEF7` and `$FEF7` holds `$16`, an LBRA -- the CoCo 3's vector
+     page is long branches, and a `$7E` JMP written over one works.)
+  4. **WRITING 0 TO THE TIMER DOES NOT STOP IT.** `snd_init` left a zero count
+     armed and the machine wedged in an interrupt storm before it returned.
+     The source is armed in `$FF92` only while a note sounds.
+
+**MUSIC.DAT IS LIFTED INTO RAM ONCE**, because this port's far memory IS THE
+DISK and two bytes a note would seek the drive several times a second under a
+live interrupt. `tools/make_music.py` now emits **`MUS_BYTES`** so the buffer
+cannot go stale behind the data, and fails if its own constant disagrees with
+the blob it wrote.
+
+**AND THE DRIVE SURVIVES IT**, which is the measurement that mattered most:
+this is the first thing in the port to enable interrupts, over a standalone
+DSKCON that takes an NMI per sector. `src/sndtest.c` reads a file three times
+with a tone sounding and the timer interrupt live -- all STOR_OK, and STOR_OK
+again after the refusal beep.
+
+**THE BUDGET, AND TWO INSTRUMENTS DISAGREEING IS WHAT FOUND THE BUG IN ONE.**
+
+    resident image   45,293   $2800..$D8EC      window   2,560
+    bss               3,263   $D8FC..$E5BA      log      2,048
+    room to $FE00     6,213                     stack    1,024
+                                                screen       0
+
+    fit: IT FITS, 581 bytes spare
+
+The driver cost 1,555 bytes of the 2,392 that were spare. `fit.py` said 837
+and `early.py`, which places the window for real, could only find 581 -- the
+difference was exactly `$FE00`, **MC3's RAM vector page**, which `fit.py` was
+counting as free and which holds `$FEF7` (this driver's IRQ slot) and `$FEFD`
+(DSKCON's NMI). The window also moved to the TOP of the gap at `$E800`: pinned
+just above the image it left the image no room, and the image grew 1,314 bytes
+the day this landed.
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window
