@@ -10,12 +10,17 @@
    fell into. */
 ENTRY(_boot)
 
-MEMORY { blk (rwx) : ORIGIN = 0x0800, LENGTH = 512 }
+/* $0300, NOT $0800, and the block still LOADS at $0800. The firmware puts
+   block 0 at $0800 and jumps there; the first thing the code does is copy its
+   own page down to $0300 and continue, because the game image wants $0800.
+   Assembling for $0300 is what makes the `jmp` after the copy land in the
+   copy. See the head of src/boot.S. */
+MEMORY { blk (rwx) : ORIGIN = 0x0300, LENGTH = 512 }
 SECTIONS {
-    .boot 0x0800 : {
+    .boot 0x0300 : {
         BYTE(0x01);          /* block count, and it is also the byte the boot
                                 firmware SKIPS -- entry is $0801 */
         KEEP(*(.boot))
-        . = 0x0800 + 512;
+        . = 0x0300 + 512;
     } >blk
 }

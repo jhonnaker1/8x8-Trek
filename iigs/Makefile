@@ -101,11 +101,29 @@ failcheck: build/badread.po
 	  -seconds_to_run 30
 	python3 tools/count_colours.py build/snap/apple2gs/0000.png --expect 1
 
-verify: colours bootcheck failcheck
+# THE SIZE QUESTION, answered the way the Plus/4 answered it: link the real
+# game against a stubbed seam and read the map. The number is a FLOOR -- every
+# stub costs a handful of bytes where a driver costs hundreds, and the Falcon
+# measured video at 4,636 bytes for a 1,559-byte driver because THE CALLERS
+# GROW. Read it as "not less than", never as "about".
+SHARED = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
+         ../c128/src/strpool.c ../core/trek.c ../core/planet.c \
+         ../core/hof.c ../core/serial.c
+EARLYFLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
+             -DTREK_40COL -DTREK_OVERLAYS -T iigs.ld
+
+build/early.elf: $(SHARED) src/gsstub.c iigs.ld | build
+	$(CC) $(EARLYFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map \
+	  $(SHARED) src/gsstub.c -o $@ $(LDLIBS)
+
+early: build/early.elf
+	python3 tools/verify_gs.py $< --window 0xB000 --org 0x0800
+
+verify: colours bootcheck failcheck early
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early verify clean
 
 .PRECIOUS: build/%.elf

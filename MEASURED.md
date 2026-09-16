@@ -7691,3 +7691,30 @@ the loader jumped into a page of zeros, the machine ended in ROM at `$FE/00F2`
 and the screen stayed dark -- which reads exactly like the failure path
 failing. Asking for a block that exists cannot test what happens when one does
 not.
+
+## Apple IIgs: does the game fit? (2026-09-16)
+
+`iigs/src/gsstub.c` implements the twenty-six symbols that are the whole
+platform seam -- video, keyboard, sound, storage, far memory, overlays and the
+message log -- and the real shared sources link against it.
+
+    all-resident, no overlays   overflows $2000..$BEFF by 16,098 bytes
+    Plus/4, same sources        overflowed by 16,497   <- the cross-check
+    with the overlay split      resident $0800..$89A5
+                                headroom 9,819 bytes to the window at $B000
+                                11 overlays, largest 3,800 of 4,096
+
+A FLOOR, AND A SOFT ONE. Every stub costs a handful of bytes where a driver
+costs hundreds; the Falcon measured video at 4,636 bytes for a 1,559-byte
+driver because the CALLERS grow. Not less than -- never "about".
+
+The image moved from $2000 to $0800 and the region from $BEFF to $AFFF. Both
+of the old numbers were ProDOS's ($2000 is where a SYS file is entered, $BF00
+is the global page) and there is no ProDOS on this disk. Worth 6,144 bytes,
+and it does not close a 16,098-byte gap: the overlay split does that.
+
+`iigs/tools/verify_gs.py` checks what the linker will not -- the entry cell is
+a $4C pointing at _start, __stack is outside every loaded section, nothing
+resident runs into the window, every overlay fits it and no two share a file
+offset. ARMED: with `__stack = 0x4000` the link succeeds, exit 0, produces a
+file, and the checker says `__stack $4000 is INSIDE .text`.

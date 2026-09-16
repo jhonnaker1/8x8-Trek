@@ -10,7 +10,10 @@
 -- semicolon separated), GS_DONE=addr (completion byte -- see below).
 
 local BIN  = os.getenv("GS_BIN")  or "build/gsprobe.bin"
-local ORG  = tonumber(os.getenv("GS_ORG") or "0x2000")
+-- $0800, matching iigs.ld's ORIGIN(ram). It was $2000 while the port still
+-- expected to be a ProDOS SYS file; with our own boot block the image goes
+-- as low as an Apple II program can.
+local ORG  = tonumber(os.getenv("GS_ORG") or "0x0800")
 local WAIT = tonumber(os.getenv("GS_WAIT") or "6")
 
 emu.wait(3.0)                       -- let the ROM finish booting

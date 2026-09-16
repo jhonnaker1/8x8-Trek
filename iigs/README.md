@@ -121,8 +121,9 @@ redistributed, there is no MLI, and `$BF00` is not a global page.
     make disk        build/egatrek.po -- 800K, block 0 ours, payload from block 1
     make bootcheck   boot it and count the colours (the whole chain)
     make failcheck   boot a disk whose first read cannot succeed
+    make early       link the real game against a stubbed seam and size it
 
-`make verify` runs all three.
+`make verify` runs all four.
 
 ### The failed-read path is executed, not merely written
 
@@ -137,6 +138,57 @@ machine ended in ROM at `$FE/00F2`, and the screen stayed dark — which looked
 exactly like the failure path failing. The control was what failed: on a
 1,600-block image the only block the drive cannot deliver is one past the end.
 `START_BLOCK=1600` makes the driver return carry set, and then the path runs.
+
+## Does the game fit? Measured, with the seam stubbed
+
+The Plus/4's `make early`, asked here on day one. Link the real shared
+sources — `main.c`, `layout40.c`, `ui.c`, `strpool.c` and `core/` entire —
+against `src/gsstub.c`, which implements the **twenty-six symbols** that are
+the whole platform seam, and read the map.
+
+    all-resident, no overlays     overflows $2000..$BEFF by 16,098 bytes
+                                  (the Plus/4 overflowed by 16,497 on the same
+                                  sources -- the cross-check that the number is
+                                  the GAME's, not this port's)
+
+    with the overlay split        resident  $0800..$89A5
+                                  headroom  9,819 bytes to the window
+                                  overlays  11, largest 3,800 of 4,096
+
+**`make early` runs it; `tools/verify_gs.py` checks the invariants a link can
+break silently.** Against the C64's 6,112 bytes spare at completion, 9,819 is
+a comfortable start — but it is a **floor and a soft one**. Every stub costs a
+handful of bytes where a driver costs hundreds, and the Falcon measured its
+video seam at 4,636 bytes for a 1,559-byte driver, because *the callers grow*.
+Read it as "not less than", never "about".
+
+### $0800, not $2000, and that was ProDOS's answer to a question this port
+### no longer asks
+
+The image loaded at `$2000` and stopped at `$BEFF` because that is where
+ProDOS 8 puts a `SYS` file and where its global page starts. With our own boot
+block neither applies, so the image goes as low as an Apple II program can and
+the port keeps the **6,144 bytes the convention was costing**. It does not
+close a 16,098-byte gap — that needs the overlay split every other 8-bit
+target here takes — but it is free.
+
+The overlay window is at `$B000`, the top of RAM, and that address is forced
+rather than chosen: the C64 puts its window at `$C000` because that is the 4K
+its `$01` never covers, and on a IIgs `$C000..$CFFF` is I/O in every
+configuration.
+
+### The loader relocates itself, and the first version broke its own rule
+
+Block 0 is loaded at `$0800` by the firmware and the game image also starts at
+`$0800`, so the loader copies its own page down to `$0300` and continues
+there. One page, not all 512 bytes: `$0400..$07FF` is text page 1 and the slot
+firmware keeps its **screen holes** in it, which the block driver we are about
+to call reads and writes.
+
+`src/boot.S` carried a comment saying the unit number in X *"is the only thing
+that says which drive we came from"*. The relocation loop was added after that
+comment was written and **destroyed X in the same edit**. The machine ended in
+ROM at `$FF/BD53` with unit 0. `stx unit` now happens before the copy.
 
 ## What has NOT been established
 

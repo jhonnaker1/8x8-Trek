@@ -28,6 +28,15 @@
 #define START_BLOCK 1
 #endif
 
+/* WHERE THE IMAGE GOES, AND IT IS $0800 BECAUSE NOTHING SAYS OTHERWISE.
+   ProDOS 8 enters a SYS file at $2000; there is no ProDOS here, so the image
+   goes as low as an Apple II program can and the port keeps the 6,144 bytes
+   the convention was costing. It must match iigs.ld's ORIGIN(ram) -- and
+   nothing enforces that, which is why both say so out loud. */
+#ifndef LOAD_ADDR
+#define LOAD_ADDR 0x0800
+#endif
+
         .section .boot,"ax",@progbits
         .globl _boot
 
@@ -43,17 +52,45 @@
         enthi   = 0x3D
         count   = 0x3E
 
+; RELOCATE FIRST, BECAUSE THE IMAGE WANTS THE GROUND THIS CODE IS STANDING ON.
+; The firmware loads block 0 to $0800 and the game image also starts at $0800,
+; so a loader that stays where it was put overwrites itself halfway through
+; the first block. It copies its own page down to $0300 and continues there.
+;
+; THE WHOLE BLOCK IS ASSEMBLED FOR $0300 and the copier still works while
+; running at $0801, because every instruction in it is absolute or relative --
+; neither cares where it is executing. Only the `jmp` at the end needs the
+; assembled address, and by then the copy exists.
+;
+; ONE PAGE, NOT ALL 512 BYTES. $0400..$07FF is text page 1, and the slot
+; firmware keeps its SCREEN HOLES in it ($0478..$07F8) -- the block driver we
+; are about to call reads and writes them. Copying 512 bytes from $0800 would
+; land on top of the driver's own state.
 _boot:
         sei
         cld
 
-; THE UNIT NUMBER IS IN X AND IT IS THE ONLY THING THAT SAYS WHICH DRIVE WE
-; CAME FROM. Losing it means guessing a slot, and a guess that happens to be
-; right on the machine it was written on is the worst kind.
+; THE UNIT NUMBER IS IN X AND THE RELOCATION LOOP IS ABOUT TO DESTROY IT.
+; Stored first, into zero page, which the copy below does not touch. The
+; comment twenty lines down says X "is the only thing that says which drive we
+; came from" -- and the relocation was added after that comment was written and
+; broke it in the same edit. The machine ended in ROM at $FF/BD53 with unit 0.
         stx unit
 
-; Driver entry: high byte is $C0 + slot, low byte comes from $CnFF.
-        txa
+        ldx #$00
+reloc:
+        lda 0x0800,x
+        sta 0x0300,x
+        inx
+        bne reloc
+        jmp relocated
+relocated:
+
+; Driver entry: high byte is $C0 + slot, low byte comes from $CnFF. The slot
+; comes back out of the unit number saved above -- losing it means guessing a
+; slot, and a guess that happens to be right on the machine it was written on
+; is the worst kind.
+        lda unit
         lsr
         lsr
         lsr
@@ -67,9 +104,9 @@ _boot:
         sta entlo               ; entlo/enthi now point at the driver
 
 ; Read PAYLOAD_BLOCKS blocks from block 1 to $2000 upward.
-        lda #$00
+        lda #(LOAD_ADDR & 0xFF)
         sta buflo
-        lda #$20
+        lda #(LOAD_ADDR >> 8)
         sta bufhi
         lda #(START_BLOCK & 0xFF)
         sta blklo
@@ -92,7 +129,7 @@ nocarry:
         dec count
         bne rdloop
 
-        jmp 0x2000
+        jmp LOAD_ADDR
 
 ; A FAILED READ MUST NOT FALL THROUGH INTO WHAT IT DID NOT LOAD. The C128's
 ; overlay seam learned this: a load that fails and returns runs whatever was in
