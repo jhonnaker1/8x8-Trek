@@ -12035,3 +12035,35 @@ a shared constant in ui.c) frees 1,024:
 
 So the only combination measured to fit is **40 columns AND a 16-entry log**,
 and the 602 spare still has to cover a sound driver that is not written.
+
+### THE MMU BLOCKER IS SINGLE-EMULATOR AND HAS NEVER BEEN CROSS-CHECKED
+
+Asked whether MAME can emulate a CoCo 3 with more RAM and an MMU. It can --
+`-ramsize` takes 128k, 512k, 1m and 2m, and the GIME it emulates is a
+`TCC1014`, which CONTAINS the MMU. **The MMU is not an upgrade**: every CoCo 3
+has one, and nothing about this port needs a bigger machine.
+
+**BUT THE QUESTION EXPOSES SOMETHING WORSE.** Item 30's blocker -- "setting
+MMUEN alone permanently breaks standalone DSKCON" -- was bisected under MAME,
+and:
+
+  * it has **never been run on real hardware** (nobody has run this port on a
+    real CoCo 3 at all -- that is item 55);
+  * it has **never been run under a second emulator**, although XRoar is
+    installed and has been used on this project before.
+
+**AND THE WHOLE CARD-LESS PORT IS DESIGNED AROUND IT.** No MMU means no banked
+far memory, which means the string pool goes on the disk, which is why the
+budget is 422 bytes over at 40 columns and 1,608 at 80. **If MMUEN works on
+real silicon, eight spare 8K blocks are 64K of far memory and the entire
+problem disappears** -- the pool moves out, the 80-column console stays, and
+there is room to spare.
+
+A blocker that decides a port's whole architecture should not rest on one
+emulator. **XRoar has a GDB target** (`-gdb`), which is a rig-independent way
+to read `tools/coco3/bits.c`'s result bytes out of a running machine, and
+`-debug-fdc` reports controller activity directly. That is the cheap
+cross-check and it has not been done.
+
+The expensive one is better: **Jamie has a CoCo 3 and an SDC.** `bits.c` needs
+no card, exactly as `speedtst.dsk` does not -- see `coco3/hardware/`.
