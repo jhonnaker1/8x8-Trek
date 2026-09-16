@@ -58,13 +58,53 @@ Plus/4 that holds `4C 1C 99`, a live system jump vector, and the probe read the
 KERNAL's own bytes back. A linker-placed array cannot be wrong about what is
 free.
 
+## The video seam works
+
+`src/ted.c` (112 lines) plus `src/ted.h` and `src/egated.h`, and the **real
+`layout40.c`** draws the console frame through it under `xplus4`:
+
+     0|##STATUS#############LONG RANGE CHART###|
+     1|#                  #                   #|
+    10|########################################|
+    11|##BADGE################COMMAND##########|
+    14|##LASERS##############                 #|
+
+224 non-space cells, two hues live. `tools/screen_p4.py` decodes `$0C00`
+without masking bit 7 — masking it is how a screenshot of a working C64 title
+screen came back blank (instrument #22).
+
+**It is the same shape as `vic.c` on purpose**, because everything above it is
+shared and the C64 proved the shape. Three things differ and they are all in
+`ted.h`: the screen is `$0C00`, the colour is `$0800`, and **a colour cell is a
+whole BYTE — luminance in bits 6-4, hue in bits 3-0** — not a nybble index.
+`__attribute__((noinline))` is on every primitive, carried over from `vic.c`
+with its measured reason: inlined there, the same code made the 40-column
+build 1,817 bytes bigger and overflowed its region.
+
+**THIS PORT FOLDS NO COLOURS.** The C64 collapses two pairs because its
+sixteen fixed entries do not contain everything EGA has; on TED light blue is
+blue turned up, so all sixteen survive distinctly. `src/egated.h` was checked
+against `tools/check_colours.py`'s `PLUS4` table — which predates this port and
+is what `make ports` runs — and **all sixteen agree**.
+
+**And a frame bench proves the video seam and nothing else.** Every defect
+Jamie found in the card-less CoCo 3 lived in `ui.c` with live game state, which
+no bench here reaches.
+
 ## What is next, in order
 
-1. **Decide the map against the ROM constraint above** — where `ram`, the
-   overlay window and the far store go, and what must stay under `$8000`.
-   `$1001..$FCFF` is 60,671 bytes against the C64's 46,847, so there is room;
-   the question is which parts can be hidden during a KERNAL call.
-2. Video (TED, 40×25, screen `$0C00` and colour `$0800`), sound (TED's two
-   voices — **not** SID), `strings.override.txt`, a `verify`.
-3. What comes free: `layout40.c`, `ui.c`, `main.c`, `strpool.c`, `core/`, and
-   the C64 port's storage, input and overlay model.
+1. **Decide the map against the ROM constraint.** `$1001..$7FFF` is 28,671
+   bytes and always visible; `$8000..$FCFF` is 32,000 more that the ROM hides
+   during a KERNAL call. The resident image is about 40K, so it MUST span
+   `$8000` — which is fine for code that is not executing then, and fine for
+   the far store because **writes pass through**. What must be forced below
+   `$8000`: the storage layer, the soft stack, anything live across a call,
+   and the overlay window (overlay code can call storage).
+2. **Sound: TED's two voices, not SID.** `sid.c` cannot be linked here the way
+   the C64 links it.
+3. `p4mem.c` (far memory, `$FF3E`/`$FF3F` where `c64mem.c` uses `$01`),
+   `p4log.c`, `strings.override.txt`, a `verify`.
+4. What comes free, and it is most of the game: `layout40.c`, `ui.c`,
+   `main.c`, `strpool.c`, `core/`, and the C64's `input.c`, `storage.c` and
+   `overlay.c` — the Plus/4 keeps the CBM KERNAL jump table where the C64 has
+   it, which is why that transfer is plausible rather than hopeful.
