@@ -246,7 +246,14 @@ candidates pass the colour check**, so the discriminator is no longer the
 display — it is how much code already exists.
 
 **Out on width or memory:** PET (monochrome as well), **VIC-20** (22 columns,
-and 35K at most), **ZX Spectrum** (48K against the ~53K this game needs).
+and 35K at most), **ZX Spectrum** — and its recorded reason was the weaker of
+its two. The memory figure (48K against the ~53K this game needs) is the one
+that gets cited, and the CoCo 3 GIME port has since taken ~7.9K off that by
+putting the string pool on the disk. **The blocker that does not move is
+WIDTH: the Spectrum is 32 columns and the narrowest layout that exists is
+`layout40.c`.** A Spectrum port needs a `layout32.c` — a new console layout,
+which is the expensive part, not a driver. Worth recording because a 128K
+Spectrum would dissolve the stated reason and leave the real one standing.
 
 **Out on colour, the same rule that excluded the PET:** **Apple IIe** — 40×24
 text is monochrome; **stock Atari 800XL** — ANTIC's text modes have no per-cell
@@ -264,11 +271,33 @@ one file, the video driver, four bitplanes interleaved by word. `vc +tos` was
 already the ST target, the sound was already the same YM2149 through the same
 XBIOS call, storage was already GEMDOS. 320×200 ÷ 8×8 is 40×25.
 
+### Two constraints the card-less CoCo 3 loosened (2026-09-16)
+
+Neither is about colour, which stopped discriminating in September and which
+the GIME port merely *proved* by shipping eight colours and being played.
+
+**FAR MEMORY CAN BE THE DISK.** `core/farmem.h` always allowed it — "the
+contract does not care where the bytes live" — but no port had done it.
+`coco3gime/src/gimemem.c` reads the ~7.9K string pool a sector at a time
+through a two-way cache, which is **7.9K off the RAM a candidate needs**. It
+costs a drive that works while the console draws, and a one-entry cache turns
+that into two disk reads per label, which is not a theoretical hazard: it made
+the port unplayable until it was measured.
+
+**AN ASCII-ONLY FONT IS ENOUGH.** The console was drawn with C128 box-drawing
+glyphs, a solid block and reverse video, and nothing recorded whether those
+were required or merely convenient. They are convenient. The GIME has none of
+them: panel rules are **underlines**, which join across cells where a `-`
+leaves a gap at every boundary; solid cells are **spaces in a background
+colour**; verticals are `|` and read as dotted. **A machine with a fixed ASCII
+charset and per-cell colour can draw this console**, which was never certain
+before and quietly widens every remaining candidate.
+
 **Still live, cheapest first:**
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
-| **CoCo 3, no SuperSprite** | video, sound and far memory — the card carries all three | the CoCo 3 port's disk driver, first-stage loader, overlays and toolchain. **The route to hardware that is actually owned** |
+| ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
 | **Commodore Plus/4** | video, a **new sound driver** (TED is not SID), a link script | the C64 port's storage, input, overlay and KERNAL model; TED gives 40×25 with all sixteen colours distinct |
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
