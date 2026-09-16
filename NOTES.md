@@ -1494,6 +1494,43 @@ defines and insists they land on a `G_*`, and it knows `scr_hline`'s glyph is
 its FOURTH argument -- it had been reading the length of every panel rule and
 calling it a glyph.
 
+#### THE TITLE SCREEN HAD NO TITLE ON IT (2026-09-16)
+
+Jamie: *"the main screen doesn't say egatrek."*
+
+**EVERY SOLID CELL ON THIS PORT WAS BLACK ON BLACK.** `scr_put` draws G_BLOCK
+as a space with its BACKGROUND set -- the right idea for a font with no block
+glyph, and it comes out better than a glyph would -- but `vdc_init` loaded all
+eight background palette entries with black:
+
+    for (i = 0; i < 8; i++) PALETTE[i] = 0x00;   /* backgrounds: black */
+
+So the background half of the palette, which is the only thing that makes a
+solid cell visible, was eight copies of the screen colour. `ui.c` draws the
+**entire "EGA TREK" banner out of G_BLOCK and nothing else** -- a 5x5
+block-letter font, because the original's logo is a bitmap and this is the
+honest text-mode equivalent. It had never once been visible.
+
+**AND THE WRONG GLYPH WAS HIDING IT.** The badge disc used the same mechanism
+and DID show -- as `?????`, because its code was unmapped and fell through to
+the `?` marker. So the one place a solid cell appeared on screen appeared as
+something, and fixing the glyph turned visible-and-wrong into
+correct-and-invisible. **A defect that only becomes findable once a different
+defect is fixed**, and the second one was mine, made three hours earlier.
+
+Entry 0 stays black -- it is the background of every ordinary text cell and of
+`scr_clear` -- so seven of the eight colours are reachable as a background.
+Green, index 0, is not, and `SOLID_BG` substitutes light green for it: a
+visible near-miss rather than an invisible cell.
+
+Verified by reading the ATTRIBUTE bytes out of the running game rather than
+the characters, because the characters are spaces either way:
+
+    cells with a coloured background: 127
+     3|               #####  ####  ###     ##### ####  ##### #   #|
+     5|               ####  # ### #####      #   ####  ####  ###|
+     7|               #####  ###  #   #      #   #   # ##### #   #|
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window

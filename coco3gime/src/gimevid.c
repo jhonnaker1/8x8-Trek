@@ -88,6 +88,10 @@ static unsigned long phys_base = 0x70000UL;
    into 0-7. */
 #define ATTR(fg, bg) ((unsigned char)((((fg) & 7) << 3) | ((bg) & 7)))
 
+/* Background entry 0 is black, so colour 0 cannot be a solid. Light green is
+   the nearest thing to green this palette has; see vdc_init. */
+#define SOLID_BG(c) ((unsigned char)(((c) & 7) ? ((c) & 7) : 7))
+
 
 
 /* EGA's eight information-bearing colours in the GIME's two-bits-a-gun RGB,
@@ -156,7 +160,20 @@ void vdc_init(void)
         VSTART_LO = (unsigned char)(v & 0xFF);
     }
 
-    for (i = 0; i < 8; i++) PALETTE[i] = 0x00;        /* backgrounds: black */
+    /* THE BACKGROUND HALF OF THE PALETTE CARRIES COLOURS, NOT EIGHT BLACKS.
+       It held black in all eight entries, which made every SOLID CELL on this
+       port black-on-black -- and a solid cell here is a space with its
+       background set, so that is the badge disc and, worse, the entire
+       "EGA TREK" banner: ui.c draws those block letters out of G_BLOCK and
+       nothing else. The title screen had no title on it and I had not
+       noticed, because the badge was rendering the WRONG GLYPH in the
+       foreground colour and looked like something.
+       Entry 0 stays black -- it is the background of every ordinary text cell
+       and of scr_clear -- so seven of the eight colours are reachable as a
+       background and green, index 0, is not. SOLID_BG substitutes light green
+       for it: a visible near-miss rather than an invisible cell. */
+    for (i = 0; i < 8; i++) PALETTE[i] = pal_fg[i];
+    PALETTE[0] = 0x00;
     for (i = 0; i < 8; i++) PALETTE[8 + i] = pal_fg[i];
 
     scr_clear();
@@ -209,7 +226,7 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
        visible difference from the other ports, and the honest one. */
     if (ch == G_BLOCK || ch == G_HALF_LO || ch == G_HALF_HI) {
         gime_screen[o]     = ' ';
-        gime_screen[o + 1] = ATTR(0, color & 7);
+        gime_screen[o + 1] = ATTR(0, SOLID_BG(color));
         return;
     }
 
