@@ -1987,7 +1987,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 (1 open of 69 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 (0 open of 69 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -2236,7 +2236,36 @@ are the CoCo 3**, which is started and not released:
       and take about a minute. A gate nobody runs because it takes six
       minutes is worse than no gate, so `verify` probably wants the cheap
       structural checks and a separate `make check-all` for the MAME ones.
-  55. **DOUBLE SPEED IS UNTESTED ON REAL HARDWARE.** Split out of item 53 on
+  55. ~~**DOUBLE SPEED IS UNTESTED ON REAL HARDWARE.**~~ **CLOSED 2026-09-16,
+      RE-SCOPED AND THEN ANSWERED NO.** Jamie asked the question this item
+      could not answer for itself: *"why are we measuring this?"*
+      **THE ITEM'S PREMISE HAD QUIETLY DIED.** It is about the CARD port,
+      which writes `CPU_FAST` in `coco3vid.c` and runs every overlay load and
+      every SAVE at 1.78 MHz -- and that port needs a SuperSprite nobody here
+      has, so the hazard belonged to a build with no machine to run on. The
+      CARD-LESS port, which does run on real hardware, defines only `CPU_SLOW`
+      and never touches `$FFD9`. We were measuring a risk in one port using a
+      machine that can only run the other.
+      **RE-SCOPED TO THE LIVE QUESTION -- would double speed make the
+      card-less port faster? -- AND MEASURED RATHER THAN ARGUED.** A build
+      with `CPU_FAST = 0` added, A/B against the shipped one under XRoar,
+      timed from `scr_clear` to a settled title screen:
+
+          0.89 MHz   13.4s
+          1.78 MHz   12.2s
+
+      **About nine per cent, one run each, for a known hardware hazard.** The
+      work is disk-bound; a faster CPU does not spin the drive. Not a trade
+      worth making, and the port ships at 0.89 MHz where it demonstrably
+      works.
+      **AND THE PORT RUNS ON REAL HARDWARE NOW**, which is what the item was
+      really standing in for: Jamie booted it from a CoCo SDC on his own
+      CoCo 3 the same day -- *"runs fine from the coco sdc, loads a bit faster
+      than the emulator"*. Faster than the emulator's floppy model, so the
+      disk share is smaller there still.
+      *The original text follows.*
+
+      **DOUBLE SPEED IS UNTESTED ON REAL HARDWARE.** Split out of item 53 on
       2026-09-13 -- it was a paragraph inside another item, which is the
       defect items 43 and 48 already are. `vdc_init()` now writes `$FFD9` and
       the machine runs at 1.78 MHz from the title screen on, INCLUDING every
