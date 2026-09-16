@@ -30,18 +30,32 @@ def ports():
     return m.group(1).split()
 
 
+def bare_images(ps):
+    """Which ports ship a BARE disk image, read out of their `release:` rules.
+
+    THE FIRST VERSION LOOKED IN build/, AND THAT MADE THE CHECK DEPEND ON
+    HAVING BUILT. `make release-clean` wipes every build/ -- which is exactly
+    when a release is being cut and exactly when this check matters most --
+    and it then found zero bare images and failed with "there are 9". It would
+    have failed the same way on a fresh clone.
+    A check that only passes on a tree somebody has already built is not
+    checking the repository, it is checking the last thing that ran.
+    """
+    out = []
+    for p in ps:
+        mk = os.path.join(ROOT, p, "Makefile")
+        if not os.path.exists(mk):
+            continue
+        if re.search(r"egatrek-%s\.(d64|d81|atr)\b" % p, open(mk).read()):
+            out.append(p)
+    return out
+
+
 def main():
     ps = ports()
-    # A port ships a .txt beside its artefact exactly when it has a
-    # README-release.txt AND its artefact is a bare image rather than a zip.
-    bare = []
-    for p in ps:
-        d = os.path.join(ROOT, p, "build")
-        if not os.path.isdir(d):
-            continue
-        for f in os.listdir(d):
-            if re.fullmatch(r"egatrek-%s\.(d64|d81|atr)" % p, f):
-                bare.append(p)
+    # A port ships a .txt beside its artefact exactly when that artefact is a
+    # bare image -- a .d64, .d81 or .atr has nowhere to put a README inside.
+    bare = bare_images(ps)
     assets = len(ps) + len(bare)
 
     text = open(RUNNING).read()

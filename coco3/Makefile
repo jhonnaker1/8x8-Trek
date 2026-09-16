@@ -366,7 +366,20 @@ $(PERF_OUT): $(PERF_SRC) src/font6x8.h Makefile
 # --org=7000 so `CLEAR 25,&H6FFF` (the same line the game already asks for)
 # leaves room for it, and the report sits at $7F00 above the ceiling.
 SPEED_OUT = build/SPEEDTST.BIN
-SPEED_DSK = build/speedtst.dsk
+
+# THE DISK LANDS OUTSIDE build/, AND THAT IS THE WHOLE POINT OF hardware/.
+#
+# `make release-clean` wipes every port's build/ before a release is cut --
+# deliberately, because ALWAYS REBUILD is the rule that stops a stale artefact
+# shipping. It also deleted this disk, twice, and this one is not a build
+# artefact in the sense that rule means: **it is a deliverable to a machine on
+# Jamie's desk**, the only way item 55 can ever be answered, and rebuilding it
+# needs a working 6809 toolchain that was itself unavailable for a morning
+# when an Xcode update revoked the licence agreement.
+#
+# So it goes in hardware/, which release-clean does not touch. The .BIN stays
+# in build/ because it IS an intermediate. Jamie's call, 2026-09-15.
+SPEED_DSK = hardware/speedtst.dsk
 
 speedtest: $(SPEED_DSK)
 
@@ -377,6 +390,7 @@ $(SPEED_OUT): src/speedtest.c Makefile
 	@ls -l $@
 
 $(SPEED_DSK): $(SPEED_OUT) tools/mkdisk.py
+	@mkdir -p hardware
 	@python3 tools/mkdisk.py $@ $(SPEED_OUT)
 
 # CHECKS THE PROBE, NOT THE CLAIM. MAME cannot answer item 55 -- the hazard is

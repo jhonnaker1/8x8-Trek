@@ -52,6 +52,12 @@ coco3/src/music_data.c
 
 # Build output
 build/
+
+# BUT NOT coco3/hardware/ -- disks written for a real machine live there
+# precisely because `make release-clean` wipes every build/. The .dsk itself
+# is still a build product and stays out of git; the directory and its README
+# are tracked so the path is not something somebody has to rediscover.
+coco3/hardware/*.dsk
 *.o
 *.prg
 *.xex
