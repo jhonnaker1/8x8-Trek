@@ -302,6 +302,20 @@ before and quietly widens every remaining candidate.
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
+| **Apple IIgs** | a hand-built linker config, an Ensoniq 5503 sound driver, ProDOS storage, and **cross-bank writes** — SHR lives in bank `$E1` and llvm-mos's 65816 is a fast 6502 in 16-bit address space, so the video seam needs long addressing by hand | `layout40.c`, and SHR's 4bpp **packed** 2-pixels-per-byte format is the CoCo 3 card port's V9958 GRAPHIC6 shape, not the ST's planar one — **no far memory and no overlays at all**, the machine starts at 256K |
+
+**The IIgs's exclusion expired on 2026-09-05 and this table did not notice for
+eleven days.** It went on the width rule — *"320 mode is 16 colours and 40
+columns, which fails the other hard rule"* — and that rule died when the ST
+shipped 40 columns in v0.17.0. Its separate 640-mode failure (sixteen colours
+on a scanline, only four placeable at any x, measured in MAME) is real and is
+about a mode nothing now needs. **Both of the other recorded blockers have also
+gone, checked 2026-09-16 rather than recalled:** `mame apple2gs -verifyroms`
+answered *"romset is not present"* in September and answers **`romset apple2gs
+is good`** now, so the rig exists; and `mosw65816` is a supported CPU in the
+llvm-mos already installed here. What it generates is 6502 code with the
+65816's extra opcodes and **no `rep`/`sep`, no long addressing** — which is why
+the bank-`$E1` video seam is listed as a cost rather than assumed away.
 
 ### What a sub-80 port actually entails
 
