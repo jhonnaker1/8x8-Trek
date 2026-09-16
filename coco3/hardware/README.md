@@ -25,7 +25,15 @@ Mount as drive 0, then:
 
     CLEAR 25,&H6FFF
     LOADM"SPEEDTST"
+    POKE &H7F00,0
     EXEC
+
+**THE `POKE` MAKES A STALE REPORT VISIBLE.** The report has no run identity in
+it, so one left over from a previous run reads exactly like a fresh one --
+which is not hypothetical: a corrupted byte was reported twice, identically,
+and there was no way to tell a second run from a second look at the first.
+Zero it before `EXEC` and `$7F00` reading `161` afterwards means this run
+wrote it.
 
 **THE `CLEAR` IS NOT OPTIONAL AND THIS FILE USED TO OMIT IT.** Without it
 BASIC's memory top is the top of RAM, cmoc's runtime puts the program's stack
