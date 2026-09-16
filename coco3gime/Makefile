@@ -139,6 +139,22 @@ disk: overlays data boot
 	python3 ../coco3/tools/checkdisk.py build/trek.dsk build/TREKLDR.BIN build/EGATREK.RAW \
 	    build/img/*.OVL build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT
 
+# `verify` is everything that needs no emulator: it builds the overlay split,
+# checks the whole port fits the address space with its fixed tenants, and
+# round-trips every file on the diskette through coco3storage.c's own reader.
+verify: disk
+	@WIDTH=$(WIDTH) python3 tools/fit.py
+
+REL = build/release
+
+release: verify
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco3gime
+	@cp build/trek.dsk $(REL)/egatrek-coco3gime/TREK.DSK
+	@cp README-release.txt $(REL)/egatrek-coco3gime/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-coco3gime.zip egatrek-coco3gime
+	@echo "release: build/egatrek-coco3gime.zip"
+	@unzip -l build/egatrek-coco3gime.zip | tail -n +4
+
 clean:
 	rm -f build/*.bin build/*.BIN build/*.dsk build/*.o build/*.s
 

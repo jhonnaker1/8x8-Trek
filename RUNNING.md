@@ -1,6 +1,6 @@
 # How to run each one
 
-Thirteen assets, nine machines. Every port plays the same game from the same
+Fourteen assets, ten machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Four assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The five `.zip` assets carry theirs inside as `README.txt`.
+put one. The six `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -286,6 +286,41 @@ CoCo 3's own video gives eight colours in 80 columns; this wants sixteen per
 pixel and a 512-wide bitmap, and the SuperSprite's V9958 is what provides them.
 Everything here was measured under MAME's `ssfm` emulation. **It is the slowest
 of the seven** and it is playable.
+
+### `egatrek-coco3gime.zip` — Tandy Color Computer 3, **stock**
+
+**This is the one a plain CoCo 3 runs.** No card, no expansion: 128K, a disk
+drive, and nothing else. `egatrek-coco3.zip` above needs a SuperSprite FM+;
+this one uses the machine's own GIME for 80x25 text in eight colours and its
+own 6-bit DAC for sound.
+
+Unzip and write `TREK.DSK` to a floppy, or mount it on a CoCo SDC. Then:
+
+    CLEAR 25,&H6FFF
+    LOADM"TREKLDR"
+    EXEC
+
+**Then wait.** The loader reads 45K with no progress bar — about a minute on a
+real floppy, much quicker on an SDC — and the title screen appears when it is
+done.
+
+Under **XRoar**, with a CoCo 3 ROM:
+
+    xroar -machine coco3 -ram 128 -load-fd0 TREK.DSK
+
+**XRoar and not MAME, and that is measured rather than preferred.** MAME's
+CoCo 3 floppy model wedges this port partway through startup — the WD1773 goes
+busy on a sector whose track and sector registers are both correct and never
+raises DRQ — where XRoar plays it. Every probe behind this port was run under
+both; only the whole game tells them apart.
+
+**What is different to look at.** The GIME's text font has no box-drawing
+characters, no block and no reverse video, so panel rules are underlines (which
+join across cells), solid cells are spaces in a background colour, and vertical
+rules are dotted. The badge is a filled rectangle rather than a rounded disc.
+Sound is ONE voice — the CoCo has a DAC, not a sound chip, so an effect
+interrupts the music exactly as the original's PC speaker did. And the string
+pool lives on the diskette, so the drive works while the console draws.
 
 ---
 

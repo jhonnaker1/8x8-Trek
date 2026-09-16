@@ -70,6 +70,7 @@ PORTS = (
     ("amiga",  None,     "CC"),
     ("falcon", "verify",  "CC"),
     ("coco3",  "verify",  "CMOC"),
+    ("coco3gime", "verify", "CMOC"),
     ("c64",    "verify",  "CC"),
     ("st",     "verify",  "CC"),
 )
