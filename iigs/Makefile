@@ -101,6 +101,53 @@ failcheck: build/badread.po
 	  -seconds_to_run 30
 	python3 tools/count_colours.py build/snap/apple2gs/0000.png --expect 1
 
+# THE CONSOLE. gsvid.c draws c128/src/vdc.h's 40x25 grid into Super Hi-Res,
+# and gssmoke.c is the proof sheet: every text code, the box set, a drawn
+# panel, sixteen colours and reverse video, on a real machine. The host-side
+# sheet coco3/tools/gen_font.py renders is the other half -- a font that looks
+# right there and wrong here is a bug in gsvid.c, and one picture cannot tell.
+VIDFLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
+           -DTREK_40COL -DTREK_COLOUR_IS_EGA -T iigs.ld
+
+build/gssmoke.bin: src/gssmoke.c src/gsvid.c iigs.ld | build
+	$(CC) $(VIDFLAGS) $(LDFLAGS) src/gssmoke.c src/gsvid.c \
+	  -o build/gssmoke.elf $(LDLIBS)
+	$(OBJCOPY) -O binary build/gssmoke.elf $@
+
+# The same sheet with the box glyphs SHIFTED like the text instead of authored
+# at eight wide -- the obvious wrong answer, kept buildable so the gate can be
+# shown to catch it.
+build/gssmokebad.bin: src/gssmoke.c src/gsvid.c iigs.ld | build
+	$(CC) $(VIDFLAGS) -DGS_BOX_NAIVE $(LDFLAGS) src/gssmoke.c src/gsvid.c \
+	  -o build/gssmokebad.elf $(LDLIBS)
+	$(OBJCOPY) -O binary build/gssmokebad.elf $@
+
+build/smoke.po: build/boot.bin build/gssmoke.bin tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin --payload build/gssmoke.bin
+
+build/smokebad.po: build/boot.bin build/gssmokebad.bin tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin --payload build/gssmokebad.bin
+
+define BOOT_AND_SHOT
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	GS_SHOT=1 $(MAME) apple2gs $(MAMEOPT) -flop3 $(1) 	  -snapshot_directory build/snap -autoboot_script tools/bootrun.lua 	  -seconds_to_run 35
+endef
+
+sheet: build/smoke.po
+	$(call BOOT_AND_SHOT,build/smoke.po)
+	python3 tools/check_sheet.py build/snap/apple2gs/0000.png
+
+# ARM-CHECK: the gate must catch the wrong box glyphs, or it is decoration.
+# Inverted, because here a PASS is the failure.
+sheetfail: build/smokebad.po
+	$(call BOOT_AND_SHOT,build/smokebad.po)
+	@if python3 tools/check_sheet.py build/snap/apple2gs/0000.png; then \
+	  echo "ARM-CHECK FAILED: check_sheet passed the naive box glyphs"; \
+	  exit 1; \
+	else \
+	  echo "arm-check ok: check_sheet rejected the naive box glyphs"; \
+	fi
+
 # THE SIZE QUESTION, answered the way the Plus/4 answered it: link the real
 # game against a stubbed seam and read the map. The number is a FLOOR -- every
 # stub costs a handful of bytes where a driver costs hundreds, and the Falcon
@@ -116,14 +163,22 @@ build/early.elf: $(SHARED) src/gsstub.c iigs.ld | build
 	$(CC) $(EARLYFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map \
 	  $(SHARED) src/gsstub.c -o $@ $(LDLIBS)
 
-early: build/early.elf
-	python3 tools/verify_gs.py $< --window 0xB000 --org 0x0800
+build/earlyvid.elf: $(SHARED) src/gsstub.c src/gsvid.c iigs.ld | build
+	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO $(LDFLAGS) \
+	  -Wl,-Map=build/earlyvid.map $(SHARED) src/gsstub.c src/gsvid.c \
+	  -o $@ $(LDLIBS)
 
-verify: colours bootcheck failcheck early
+early: build/early.elf build/earlyvid.elf
+	@echo "-- seam entirely stubbed"
+	python3 tools/verify_gs.py build/early.elf --window 0xB000 --org 0x0800
+	@echo "-- with the REAL video driver linked"
+	python3 tools/verify_gs.py build/earlyvid.elf --window 0xB000 --org 0x0800
+
+verify: colours bootcheck failcheck early sheet sheetfail
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail verify clean
 
 .PRECIOUS: build/%.elf

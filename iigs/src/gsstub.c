@@ -25,7 +25,12 @@
 volatile unsigned char gs_sink;
 volatile unsigned int  gs_sink16;
 
-/* ---- video ---- */
+/* ---- video ----
+   GS_REAL_VIDEO links src/gsvid.c instead of these, which is what turns the
+   size measurement from a floor into a figure for one real seam. The Falcon
+   measured video at 4,636 bytes for a 1,559-byte driver because THE CALLERS
+   GROW; this is the same subtraction done on this machine. */
+#ifndef GS_REAL_VIDEO
 void vdc_init(void) { gs_sink = 1; }
 void scr_clear(void) { gs_sink = 2; }
 void scr_put(unsigned char x, unsigned char y, unsigned char ch,
@@ -46,6 +51,8 @@ void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w,
 void vdc_shutdown(void) { gs_sink = 7; }
 void wait_vsync(void) { gs_sink = 8; }
 void plat_exit(void) { for (;;) ; }
+
+#endif  /* GS_REAL_VIDEO */
 
 /* ---- the message log, and this one is NOT a stub ----
    ui.c keeps a 32-entry log outside the program through three functions whose

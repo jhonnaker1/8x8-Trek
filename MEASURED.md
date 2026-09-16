@@ -7718,3 +7718,49 @@ a $4C pointing at _start, __stack is outside every loaded section, nothing
 resident runs into the window, every overlay fits it and no two share a file
 offset. ARMED: with `__stack = 0x4000` the link succeeds, exit 0, produces a
 file, and the checker says `__stack $4000 is INSIDE .text`.
+
+## Apple IIgs: the console draws, and the video seam costs 5,981 bytes (2026-09-16)
+
+`iigs/src/gsvid.c` puts c128/src/vdc.h's 40x25 grid into Super Hi-Res.
+320x200 is 40x25 cells of 8x8 exactly -- no margin, no centring.
+
+Measured off `make sheet`'s snapshot by `iigs/tools/check_sheet.py`:
+
+    horizontal rule    0 black pixels in 160 across 20 cells -- CONTINUOUS
+    text codes         64 drawn; 28 and 32 blank, both expected
+    colours            16 distinct, and EGA's OWN values
+    row 24             drawn, 193 lit pixels
+
+    #000000 #0000aa #00aa00 #00aaaa #aa0000 #aa00aa #aa5500 #aaaaaa
+    #555555 #5555ff #55ff55 #55ffff #ff5555 #ff55ff #ffff55 #ffffff
+
+**$aa5500 is EGA BROWN** -- the one colour egavdc.h records this project as
+unable to have on the C128, where a fixed RGBI chip renders it olive. A
+programmable palette plus EGA's duplicated-nibble levels ($00/$55/$AA/$FF)
+makes it exact rather than approximate.
+
+### THE ARM-CHECK, because a gate nobody has seen fail is decoration
+
+`make sheetfail` builds the same sheet with the box glyphs SHIFTED like the
+text -- the obvious wrong answer -- and the gate rejects it: **40 black pixels
+in a 160-pixel rule**, a two-pixel gap at each of twenty cell boundaries. The
+other three checks still pass, which is the right behaviour.
+
+### AND THE FALCON'S RATIO HOLDS ALMOST EXACTLY
+
+    gsvid.c compiled alone                  1,962 bytes
+    headroom with the video seam stubbed    9,819
+    headroom with gsvid.c linked            3,838
+    so the video seam costs                 5,981     = 3.05x the driver
+
+    Falcon, for comparison                  4,636 for a 1,559-byte driver
+                                                      = 2.97x
+
+THE CALLERS GROW. Two machines, two toolchains, two CPU families, the same
+factor of three. That is now a number to estimate WITH rather than a caution.
+
+**3,838 bytes remain for five seams** -- keyboard, sound, storage, far memory
+and the overlay loader -- and that is not enough. What this port has that the
+C64 did not is somewhere to put things: the 2,048-byte message log need not
+be in bank 0, the language card at $D000 is 16K nothing has claimed, and bank
+$01 is another 64K. None attempted.
