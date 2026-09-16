@@ -41,7 +41,7 @@ export PKGDATADIR
 # cmoc hands the host cc a <stdint.h> include and on an arm64 Mac that fails
 # with "architecture not supported" -- a host error for a 6809 compile.
 CFLAGS = --coco --org=2800 -O2 -fomit-frame-pointer --intdir=build \
-         -DTREK_COLOUR_IS_EGA $(WIDTH_FLAG) -Isrc -I../coco3/src -I../core -I../c128/src
+         -DTREK_COLOUR_IS_EGA -DSTOR_TR_AT=0x1FB0 $(WIDTH_FLAG) -Isrc -I../coco3/src -I../core -I../c128/src
 
 # src/gimevid.c FIRST, the same rule coco3/Makefile records: vdc_init() runs
 # while the ROM is still mapped and has to be reachable below $8000.
@@ -125,7 +125,7 @@ boot: $(BOOT_OUT)
 $(BOOT_OUT): $(BOOT_SRC) Makefile
 	@mkdir -p build
 	$(CMOC) --coco --org=E400 -O2 -fomit-frame-pointer --intdir=build \
-	    -Isrc -I../coco3/src -I../core -o $@ $(BOOT_SRC)
+	    -DBOOTR_AT=0x1FA0 -Isrc -I../coco3/src -I../core -o $@ $(BOOT_SRC)
 	@ls -l $@
 
 # THE DISKETTE, and the round-trip that proves it. mkdisk.py writes the Disk
@@ -163,7 +163,7 @@ clean:
 # -- "everything up to the stack" -- an overlay that outgrew the gap would be
 # read straight through the log with no symptom but corrupted messages.
 OVL_WINDOW  ?= E600
-OVL_CEILING ?= F200
+OVL_CEILING ?= FA00   # the stack; the log is in low RAM now
 
 # Same split as the card port's, for the same reason its Makefile gives: whole
 # files, because cmoc has no per-function section placement, and the index is
@@ -187,6 +187,6 @@ overlays:
 	python3 ../coco3/tools/build_ovl.py --org 2800 --window $(OVL_WINDOW) \
 	    --ceiling $(OVL_CEILING) \
 	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
-	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../coco3/src -I../core -I../c128/src -DTREK_COLOUR_IS_EGA $(WIDTH_FLAG)" \
+	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../coco3/src -I../core -I../c128/src -DTREK_COLOUR_IS_EGA -DSTOR_TR_AT=0x1FB0 $(WIDTH_FLAG)" \
 	    --resident $(RES_SRC) --overlay $(OVL_SRC) --split
 	@python3 tools/early.py build/egatrek-ovl.bin --window 0x$(OVL_WINDOW)

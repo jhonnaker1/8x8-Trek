@@ -15,7 +15,19 @@
  */
 #define LOG_ORIGIN  0x1000                    /* ui.c's LOG_BASE */
 #define LOG_BYTES   (32 * 64)
-#define LOGSTORE    ((unsigned char *)0xF200) /* below the stack reserve */
+/* THE LOG MOVES INTO LOW RAM, and it buys the overlay window 2,048 bytes.
+   It sat at $F200, directly above the window, so every byte bss grew squeezed
+   the window -- and when it reached 2,048 the 2,500-byte MSGS.OVL stopped
+   loading and the game said so on screen. Jamie found that; build_ovl refuses
+   it now.
+   $2000..$27FF is below the load address, above the 4,000-byte screen at
+   $1000, and src/lowbisect.c filled and restored every 512-byte block of
+   $0200..$27FF with the disk reading STOR_OK throughout. It is pure data --
+   nothing here is ever executed -- and the loader has finished with the whole
+   region before the game starts.
+   The boot report and the storage trace lived at $2000/$2010 and move to
+   $1FA0/$1FB0, in the gap between the screen and here; see coco3boot.c. */
+#define LOGSTORE    ((unsigned char *)0x2000)
 
 static unsigned int log_cursor = 0;
 

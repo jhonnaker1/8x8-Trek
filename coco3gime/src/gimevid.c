@@ -201,7 +201,13 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
     /* A SOLID CELL IS A SPACE WITH A BACKGROUND, not a glyph. This font has
        no block, and doing it this way is better than one would be: the badge
        and the laser bars come out as true flat colour. */
-    if (ch == G_BLOCK) {
+    /* THE BADGE DISC'S ROUNDED ENDS BECOME SQUARE ONES. G_HALF_LO and
+       G_HALF_HI are half-filled cells on a C128, and they round the disc's top
+       and bottom; this font has no half block and no overline, so there is
+       nothing to round with. They draw solid, which makes the badge a filled
+       rectangle with its star in the middle rather than a filled disc -- a
+       visible difference from the other ports, and the honest one. */
+    if (ch == G_BLOCK || ch == G_HALF_LO || ch == G_HALF_HI) {
         gime_screen[o]     = ' ';
         gime_screen[o + 1] = ATTR(0, color & 7);
         return;

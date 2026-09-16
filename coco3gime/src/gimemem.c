@@ -45,9 +45,23 @@ static struct {
 static unsigned char ntenants = 0;
 static unsigned int far_len = 0;
 
-static unsigned char cache[SEC_SIZE];
-static unsigned char cache_first = 0xFF;    /* which file the cache holds */
-static unsigned int  cache_sec = 0xFFFF;    /* which sector of it */
+/* TWO WAYS, AND ONE WAS THE WHOLE PROBLEM. strpool.c fetches a string in two
+   far_reads that are ALWAYS in different parts of the file: the index, in the
+   668-byte offset table at the front, and then the text, hundreds of sectors
+   later. A single sector cache cannot hold both, so it evicted one for the
+   other twice per string, for ever -- TWO DISK READS FOR EVERY LABEL ON THE
+   SCREEN. Measured on the machine at real CoCo speed: the title screen drew
+   about fifteen cells every twenty seconds and every sampled PC was inside
+   plat_raw_sector or dskcon_processSector. Jamie's words were "loading
+   extremely slow", and it was not loading -- that was the game running.
+   Two ways with a one-bit LRU fixes it exactly, because the pattern is
+   exactly two streams: the index sector settles in one way and the text
+   sector rotates through the other. 256 bytes. */
+#define WAYS 2
+static unsigned char cache[WAYS][SEC_SIZE];
+static unsigned char cache_first[WAYS] = { 0xFF, 0xFF };
+static unsigned int  cache_sec[WAYS] = { 0xFFFF, 0xFFFF };
+static unsigned char lru = 0;               /* the way to evict next */
 
 unsigned int far_load(const char *name)
 {
@@ -80,20 +94,28 @@ static unsigned char fetch(unsigned char t, unsigned long pos)
     unsigned int sec = (unsigned int)(pos >> 8);
     unsigned char off = (unsigned char)(pos & 0xFF);
 
-    if (cache_first != ten[t].first || cache_sec != sec) {
-        if (!plat_raw_sector(ten[t].first, sec, cache)) {
-            /* A READ THAT FAILS RETURNS ZERO, NOT GARBAGE. strpool.c treats a
-               NUL as the end of a string, so a disk error shows as a short or
-               empty label -- the same failure the pool already plans for when
-               STRINGS.DAT is missing entirely. */
-            cache_first = 0xFF;
-            cache_sec = 0xFFFF;
-            return 0;
+    unsigned char w;
+
+    for (w = 0; w < WAYS; w++)
+        if (cache_first[w] == ten[t].first && cache_sec[w] == sec) {
+            lru = (unsigned char)(w ^ 1);    /* the other way is the older */
+            return cache[w][off];
         }
-        cache_first = ten[t].first;
-        cache_sec = sec;
+
+    w = lru;
+    lru = (unsigned char)(w ^ 1);
+    if (!plat_raw_sector(ten[t].first, sec, cache[w])) {
+        /* A READ THAT FAILS RETURNS ZERO, NOT GARBAGE. strpool.c treats a
+           NUL as the end of a string, so a disk error shows as a short or
+           empty label -- the same failure the pool already plans for when
+           STRINGS.DAT is missing entirely. */
+        cache_first[w] = 0xFF;
+        cache_sec[w] = 0xFFFF;
+        return 0;
     }
-    return cache[off];
+    cache_first[w] = ten[t].first;
+    cache_sec[w] = sec;
+    return cache[w][off];
 }
 
 void far_read(unsigned int off, void *dst, unsigned char len)

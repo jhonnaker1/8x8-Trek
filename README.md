@@ -278,7 +278,7 @@ XBIOS call, storage was already GEMDOS. 320×200 ÷ 8×8 is 40×25.
 
 The C64 measured it, so this is arithmetic rather than an estimate.
 
-**What comes free: 10,522 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
+**What comes free: 10,527 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
 and `core/` entire — plus, on anything VIC-shaped, `vic.c`, `input.c`, `sid.c`,
 `storage.c` and `overlay.c` as well. **What the C64 wrote: 882 lines, of which
 222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 660 are a linker

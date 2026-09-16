@@ -338,9 +338,14 @@ void ui_draw_status(void) {
    228 is a full block less its bottom pixel row, 98 fills the bottom half of a
    cell and 226 the top half. Rounding the disc that way costs nothing and is
    the difference between a crest and a rectangle. */
-#define BADGE_DISC_TOP     98    /* lower half filled -- rounds the top edge */
-#define BADGE_DISC_BOTTOM 226    /* upper half filled -- rounds the bottom   */
-#define BADGE_DISC_BODY   160    /* solid                                    */
+/* NAMED IN layout.h, NOT HERE, and that distinction is the whole bug. These
+   were local #defines, so check_glyphs saw a name and passed -- but a port
+   translating this console's glyphs reads layout.h and has no reason to look
+   in ui.c, which is exactly as invisible as a bare number. The card-less CoCo
+   3 drew the badge disc as two rows of question marks. */
+#define BADGE_DISC_TOP    G_HALF_LO
+#define BADGE_DISC_BOTTOM G_HALF_HI
+#define BADGE_DISC_BODY   G_BLOCK
 
 void ui_draw_badge(void) {
     ON_PAGE(P_BADGE);

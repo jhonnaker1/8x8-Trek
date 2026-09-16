@@ -588,6 +588,25 @@ def main():
         print("  window       $%04X, largest image %d bytes"
               % (win, max(len(d) for _, d in images)))
     biggest = max((len(d) for _, d in images), default=0)
+
+    # THE CHECK THAT WAS MISSING, AND IT SHIPPED A BROKEN DISK. OVL_SIZE is
+    # the bound ovl_load hands plat_read_all, and plat_read_all treats a
+    # filled buffer as an error -- so an image larger than the window does not
+    # truncate, it FAILS, and the game stops with "OVERLAY nn COULD NOT BE
+    # READ". Jamie hit exactly that on MSGS.OVL: 2,500 bytes into a 2,048-byte
+    # window, because 256 bytes added to bss had pushed the window up against
+    # the ceiling. Every number needed to see it was already printed on this
+    # very screen and nothing compared them.
+    if biggest > ceiling - win:
+        sys.exit("build_ovl: THE WINDOW HOLDS %d BYTES ($%04X..$%04X) AND THE "
+                 "LARGEST IMAGE IS %d.\n"
+                 "        ovl_load would fail on it at run time, not truncate: "
+                 "plat_read_all reports a filled buffer as an error.\n"
+                 "        Free %d bytes below the window, raise --ceiling, or "
+                 "split that overlay."
+                 % (ceiling - win, win, ceiling - 1, biggest,
+                    biggest - (ceiling - win)))
+
     top = max(hi, win + biggest)
     limit = STACK_TOP - STACK_BYTES
     print("  stack        $%04X down, %d bytes reserved to $%04X"

@@ -43,6 +43,10 @@
 #define G_SHIP    81     /* PETSCII 0xD1 -- a filled circle, the saucer of the
                             enemy silhouette: circle, G_HLINE hull, G_BLOCK
                             engine */
+#define G_HALF_LO 98     /* PETSCII 0xE2 -- lower half filled; the badge disc's
+                            top row, which is what rounds its top edge */
+#define G_HALF_HI 226    /* PETSCII 0x62 reversed -- upper half filled; the
+                            badge disc's bottom row */
 
 /* A panel with no title in its border. Not an empty pooled string: that
    would still cost an id and a far read to draw nothing. */

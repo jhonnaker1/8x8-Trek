@@ -25,7 +25,10 @@ WIDTH      = int(os.environ.get("WIDTH", "80"))
 # the disk reading STOR_OK throughout, and src/lowinit.c reads a file with the
 # full 80-column mode set and all 4,000 bytes written at $1000.
 SCREEN     = 0                # $1000..$1F9F, below the image, not above it
-LOG        = 2048     # ui.c: LOG_SLOTS 32 x LOG_STRIDE 64, at $F200
+# THE LOG IS NOT UP HERE ANY MORE EITHER. It moved to $2000, below the
+# load address, to give the overlay window the 2,048 bytes it needed for
+# MSGS.OVL -- see src/gimelog.c.
+LOG        = 0        # $2000..$27FF, below the image, not above it
 STACK      = 1024     # what cmoc's crt assumes
 # $FE00, NOT $FF00, AND THE 256 BYTES MATTER. The I/O page starts at $FF00,
 # but the page below it is MC3's RAM VECTOR PAGE and it is occupied: $FEF7 is

@@ -1429,6 +1429,71 @@ are drawn by `ui.c` with live game state, which no bench here reaches. That is
 [[fix-the-cycle-before-iterating]]'s second half again: a bench reaches the
 screens somebody listed, and nobody had listed a gauge.
 
+#### FOUR DEFECTS FROM ONE PERSON PLAYING IT (2026-09-16)
+
+Jamie played the card-less port through. Everything below came from that and
+nothing from a bench.
+
+**1. SOUND: THE RIG, NOT THE DRIVER.** Every XRoar session I handed him was
+launched with `-no-ratelimit` -- the CPU flat out, so the DAC toggled far too
+fast for the audio to mean anything. **`-nothrottle` is right for an automated
+check and wrong for any human, which is a rule this project already had**, and
+I broke it by handing over a probe rig as a play session. Before concluding
+that, the driver's live state was read out of the running game: `mus_ok 1`,
+`mus_on 1`, `sounding 1`, real note data, the IRQ slot holding `JMP $CE07`, and
+`level` toggling with `$FF20` alternating between the two DAC levels while
+`sink` stayed pinned at the timer flag. Launched at real speed, it plays.
+
+**2. UNPLAYABLY SLOW, AND IT WAS A ONE-ENTRY CACHE.** `strpool.c` fetches every
+string in two `far_read`s that are ALWAYS in different parts of the file: the
+index, in the 668-byte offset table at the front, and the text, hundreds of
+sectors later. `gimemem.c` had ONE 256-byte sector cache, so it evicted one for
+the other **twice per string, for ever**. Measured at real CoCo speed: fifteen
+cells drawn every twenty seconds, with every sampled PC inside
+`plat_raw_sector` or `dskcon_processSector`. Two ways with a one-bit LRU fixes
+it exactly, because the pattern is exactly two streams. 256 bytes.
+
+    before   59 cells after 120s, still climbing
+    after   221 cells -- the whole title -- by t+40s, 20s of which is the loader
+
+**3. THE OVERLAY THAT COULD NOT BE READ, AND THE BUILD KNEW.** `OVL_SIZE` is
+the bound `ovl_load` hands `plat_read_all`, and **a filled buffer is an error
+there, not a truncation** -- so an image bigger than the window FAILS. Adding
+256 bytes of cache pushed bss up, which pushed the window up against the log at
+`$F200`, which left 2,048 bytes for a 2,500-byte `MSGS.OVL`. `build_ovl.py`
+printed the window and the largest image on the same screen and compared
+nothing; it refuses now. The room came from moving the 2K message log into LOW
+RAM at `$2000` -- below the load address, above the screen, in the region
+`lowbisect.c` proved safe -- which took the ceiling from `$F200` to the stack.
+
+**4. KILLED AT THE TOP OF BRIEFING PAGE 2 -- ONE BUFFER, TWO USERS.**
+`coco3storage.c` has a single `static secbuf[256]`, and `plat_read` keeps the
+OPEN STREAM's current sector in it between calls. `ui_briefing` streams
+BRIEF.TXT and draws its own footer with `S(S_306)` -- and on this port `S()` is
+a disk read, because far memory IS the drive. So the footer fetched a
+STRINGS.DAT sector straight over the briefing's buffered page and the stream
+resumed serving pool text: **string 301 is ` KILLED`**, and that is what
+appeared, with page 2's own header gone. `plat_raw_sector` reads into the
+caller's buffer now, which also deletes a 256-byte copy.
+
+**The card port never showed this**: its far memory is the card's VRAM, so
+`S()` never goes near a drive. A latent one-buffer-two-users bug that only a
+port with disk-backed far memory could expose.
+
+Proved both ways with `src/streambis.c`, which streams the whole file in
+64-byte chunks with a pool read between every chunk:
+
+    fixed     10,557 bytes  sum16 3F67  xor 11   -- the host's figures exactly
+    reverted  10,557 bytes  sum16 33D8  xor 88   -- same COUNT, wrong content
+
+**AND THE GLYPHS AGAIN, ONE LEVEL UP.** `check_glyphs.py` passed the badge
+disc because `ui.c` named it -- `BADGE_DISC_TOP 98` -- and a LOCAL name is
+exactly as invisible to a port as a bare number, since a port reads
+`layout.h`. They are `G_HALF_LO`/`G_HALF_HI` now, the checker resolves local
+defines and insists they land on a `G_*`, and it knows `scr_hline`'s glyph is
+its FOURTH argument -- it had been reading the length of every panel rule and
+calling it a glyph.
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window

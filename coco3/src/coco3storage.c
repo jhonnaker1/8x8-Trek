@@ -111,7 +111,10 @@ static void gran_loc(unsigned char g, unsigned char *trk, unsigned char *sec)
    WHICH sector rather than just "somewhere in the read". Absolute address,
    not a local pointer -- cmoc drops stores through one of those. */
 #ifdef STOR_TRACE
-#define TR ((unsigned char *)0x2010)
+#ifndef STOR_TR_AT
+#define STOR_TR_AT 0x2010
+#endif
+#define TR ((unsigned char *)STOR_TR_AT)
 #endif
 
 /* IRQ OFF ACROSS EVERY DSKCON CALL, AND IT IS NOT DEFENSIVE TIDINESS.
@@ -146,7 +149,18 @@ static void dsk_unmask(void)
           tfr a,cc };
 }
 
-static unsigned char read_sec(unsigned char trk, unsigned char sec)
+/* READS INTO THE CALLER'S BUFFER, NOT ALWAYS INTO secbuf -- and that is a
+   correctness fix, not a tidy-up. `secbuf` holds the OPEN STREAM's current
+   sector between plat_read calls, so anything that reads a sector behind the
+   stream's back destroys it. On a port whose far memory is the DISK, every
+   S(S_nnn) is such a read: the briefing streams BRIEF.TXT and draws its own
+   footer with S(S_306), which fetched a STRINGS.DAT sector straight over the
+   briefing's buffered page. Jamie saw the word KILLED -- string 301 -- at the
+   top of briefing page 2, with that page's own header missing.
+   The card port never showed it because its far memory is the card's VRAM and
+   S() never goes near a drive. */
+static unsigned char read_sec_to(unsigned char trk, unsigned char sec,
+                                 unsigned char *dst)
 {
 #ifdef STOR_TRACE
     TR[0] = trk;
@@ -162,7 +176,7 @@ static unsigned char read_sec(unsigned char trk, unsigned char sec)
     DCDRV = 0;
     DCTRK = trk;
     DCSEC = sec;
-    DCBPT = secbuf;
+    DCBPT = dst;
     dsk_mask();
     dskcon_processSector();
     dsk_unmask();
@@ -172,6 +186,13 @@ static unsigned char read_sec(unsigned char trk, unsigned char sec)
     if (++TR[5] == 0) TR[7]++;               /* sectors completed, lo/hi */
 #endif
     return (unsigned char)(DCSTA == 0);
+}
+
+/* The common case: into the shared buffer the directory, FAT and stream all
+   use. */
+static unsigned char read_sec(unsigned char trk, unsigned char sec)
+{
+    return read_sec_to(trk, sec, secbuf);
 }
 
 /* THE VECTOR TABLE, MEASURED ON THE MACHINE RATHER THAN RECALLED -- and it is
@@ -245,7 +266,7 @@ static unsigned char write_sec(unsigned char trk, unsigned char sec)
     DCDRV = 0;
     DCTRK = trk;
     DCSEC = sec;
-    DCBPT = secbuf;
+    DCBPT = secbuf;                          /* writes still come from here */
     dsk_mask();                              /* same reason as read_sec */
     dskcon_processSector();
     dsk_unmask();
@@ -393,7 +414,6 @@ unsigned char plat_raw_sector(unsigned char first, unsigned int index,
 {
     unsigned char g = first, trk, sec, guard = 0;
     unsigned int within = index;
-    unsigned int i;
 
     if (first == 0xFF || !disk_ready()) return 0;
 
@@ -408,9 +428,9 @@ unsigned char plat_raw_sector(unsigned char first, unsigned int index,
     }
 
     gran_loc(g, &trk, &sec);
-    if (!read_sec(trk, (unsigned char)(sec + within))) return 0;
-    for (i = 0; i < SEC_SIZE; i++) dst[i] = secbuf[i];
-    return 1;
+    /* STRAIGHT INTO dst. It used to land in secbuf and then be copied out,
+       which cost 256 bytes of copying AND wrecked any open stream. */
+    return read_sec_to(trk, (unsigned char)(sec + within), dst);
 }
 
 /* Forces the next call to re-run dskcon_init and re-read the FAT. Enabling

@@ -21,7 +21,11 @@ import re, sys
 
 SHARED  = ("c128/src/ui.c", "c128/src/layout.c", "c128/src/main.c")
 HEADER  = "c128/src/layout.h"
-DRAWERS = ("scr_put", "scr_hline", "scr_vline")
+# WHICH ARGUMENT IS THE GLYPH, and it is not the same one for all three.
+# scr_put(x, y, GLYPH, colour) but scr_hline(x, y, LEN, GLYPH, colour) -- the
+# first version of this checker looked at argument three for all of them and
+# reported the LENGTH of every panel rule as an unnamed glyph.
+DRAWERS = {"scr_put": 2, "scr_hline": 3, "scr_vline": 3}
 FLOOR   = 64
 
 
@@ -35,6 +39,71 @@ def named():
     return out
 
 
+def local_defines(text):
+    """A file's own #define NAME VALUE map, one level."""
+    out = {}
+    for m in re.finditer(r"^#define\s+(\w+)\s+([^\n/]+)", text, re.M):
+        out[m.group(1)] = m.group(2).strip()
+    return out
+
+
+def nth_arg(rest, want):
+    """Argument `want` (0-based) of a call, paren-aware.
+
+    The first two arguments are nearly always casts, so splitting on commas
+    without counting brackets picks the wrong one -- which is how the first
+    version of this tool only ever looked at bare integers anywhere in the
+    line and missed two named constants holding raw glyph codes."""
+    depth, args, cur = 0, [], ""
+    for c in rest:
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            if depth == 0:
+                args.append(cur)
+                break
+            depth -= 1
+        if c == "," and depth == 0:
+            args.append(cur)
+            cur = ""
+            continue
+        cur += c
+    return args[want].strip() if len(args) > want else None
+
+
+def judge(arg, names, local):
+    """Nothing, or why this glyph argument is unreadable to a port."""
+    if re.fullmatch(r"\d+", arg):
+        v = int(arg)
+        if v < FLOOR:
+            return None                      # plain ASCII; every machine has it
+        return ("bare glyph %d -- it is %s, use the name" % (v, names[v])
+                if v in names else
+                "bare glyph %d -- no G_* constant has this value" % v)
+    if re.fullmatch(r"G_\w+", arg):
+        return None
+    if re.fullmatch(r"\w+", arg):
+        # A LOCAL NAME IS AS INVISIBLE AS A NUMBER. A port translating this
+        # console reads layout.h; a #define in ui.c is somewhere it has no
+        # reason to look. Resolve one level and insist it lands on a G_*.
+        seen, cur = set(), arg
+        while cur in local and cur not in seen:
+            seen.add(cur)
+            cur = local[cur]
+        if re.fullmatch(r"G_\w+", cur):
+            return None
+        if re.fullmatch(r"\d+", cur) and int(cur) < FLOOR:
+            return None
+        if cur == arg:
+            # NOT A CONSTANT AT ALL -- a local variable holding whatever the
+            # caller chose. A port's driver handles those generically, and
+            # there is nothing here for a name to fix.
+            return None
+        return ("`%s` resolves to %s, not a G_* constant -- a port reads "
+                "layout.h, not this file" % (arg, cur))
+    return None                              # an expression or a variable
+
+
 def main():
     names = named()
     if not names:
@@ -43,23 +112,20 @@ def main():
 
     bad = []
     for path in SHARED:
-        for n, line in enumerate(open(path), 1):
+        text = open(path).read()
+        local = local_defines(text)
+        for n, line in enumerate(text.split("\n"), 1):
             for fn in DRAWERS:
-                # The glyph is the third argument: scr_put(x, y, GLYPH, colour).
-                # Matched loosely on purpose -- a miss here is a false PASS,
-                # so the pattern errs towards catching too much and the
-                # numbers below FLOOR are filtered out afterwards.
                 for m in re.finditer(fn + r"\s*\(", line):
-                    rest = line[m.end():]
-                    for lit in re.findall(r"(?<![\w.])(\d+)(?![\w.])", rest):
-                        v = int(lit)
-                        if v >= FLOOR:
-                            bad.append((path, n, v, names.get(v), line.strip()))
+                    arg = nth_arg(line[m.end():], DRAWERS[fn])
+                    if arg is None:
+                        continue
+                    why = judge(arg, names, local)
+                    if why:
+                        bad.append((path, n, arg, why, line.strip()))
 
-    for path, n, v, name, text in bad:
-        hint = ("it is %s -- use the name" % name) if name else \
-               "no G_* constant has this value; add one to layout.h"
-        print("check_glyphs: %s:%d draws bare glyph %d -- %s" % (path, n, v, hint))
+    for path, n, arg, why, text in bad:
+        print("check_glyphs: %s:%d draws `%s` -- %s" % (path, n, arg, why))
         print("    %s" % text[:100])
 
     if bad:

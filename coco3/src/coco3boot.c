@@ -35,7 +35,15 @@
    LDB/STB, because it prefers B for 8-bit values. The stores were there the
    second time and the instrument said they were not. Search for both, or
    read the generated assembly instead of guessing an encoding. */
-#define BOOTR      ((unsigned char *)0x2000)
+/* $2000 ON THE CARD PORT, LOWER ON THE CARD-LESS ONE. That port's message log
+   moved into low RAM at $2000 to free the space its overlay window needed, so
+   the report moves into the 96-byte gap between the screen and the log. It is
+   a per-port address rather than a shared one because only the port that has
+   a tenant there has to care. */
+#ifndef BOOTR_AT
+#define BOOTR_AT 0x2000
+#endif
+#define BOOTR      ((unsigned char *)BOOTR_AT)
 
 #define GAME_ORG   0x2800
 #define GAME_MAX   0xC000        /* far more than the image; the read is bounded
