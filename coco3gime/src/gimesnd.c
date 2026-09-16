@@ -73,6 +73,7 @@
 #include "../../c128/src/sidfreq.h"
 #include "../../c128/src/music_data.h"
 #include "../../core/farmem.h"
+#include "../../coco3/src/coco3storage.h"
 #include "egagime.h"
 
 #define INIT0    (*(unsigned char *)0xFF90)
@@ -116,6 +117,15 @@ static unsigned char started;
 static unsigned char sink;
 static unsigned char tog_div, tog_cnt, level, sounding;
 
+/* HELD: the disk is working and the voice is off until the game polls again.
+   Masking IRQ across a DSKCON call freezes the DAC mid-square-wave, so the
+   tone dies for every sector and returns between them -- Jamie heard that as
+   the music stuttering while a screen loaded during the ending. Silencing on
+   the FIRST sector and staying silent until snd_poll runs turns a chop per
+   sector into one clean pause for the whole load. `cur_tenths` is what the
+   voice goes back to. */
+static unsigned char held, cur_tenths;
+
 static unsigned int acc;
 static unsigned int mus, mus_head;
 static unsigned char mus_on, mus_ok, note_left;
@@ -129,7 +139,7 @@ static unsigned char mus_buf[MUS_BYTES];
 interrupt void snd_tick_irq(void)
 {
     sink = IRQENR;
-    if (!sounding) return;
+    if (!sounding || held) return;
     if (--tog_cnt) return;
     tog_cnt = tog_div;
     level = (unsigned char)(level ? 0 : 1);
@@ -177,6 +187,7 @@ static void voice_note(unsigned char tenths)
     while (counts > TMR_MAX) { counts >>= 1; div = (unsigned char)(div << 1); }
     if (counts == 0) counts = 1;
 
+    cur_tenths = tenths;
     sounding = 0;                         /* the handler must not see a
                                              half-written divisor */
     tog_div = div;
@@ -214,6 +225,7 @@ void snd_init(void)
     IRQ_SLOT[0] = 0x7E;                   /* JMP over the ROM's LBRA */
     *((void **)0xFEF8) = (void *)snd_tick_irq;
 
+    plat_disk_quiet = disk_quiet;         /* the drive can silence us now */
     INIT0 = GIME_INIT0;                   /* IEN, and MC2 for the drive */
     if (!started) { asm { andcc #$EF } started = 1; }
     acc = 0;
@@ -339,8 +351,21 @@ static void music_tick(void)
     }
 }
 
+/* Called by the disk driver before it masks interrupts. It does NOT un-hold;
+   snd_poll does, which is the point -- the game does not poll while it is
+   loading, so the pause lasts the whole operation instead of one sector. */
+static void disk_quiet(void)
+{
+    held = 1;
+    PIA1_DA = DAC_LO;
+}
+
 void snd_poll(void)
 {
+    if (held) {
+        held = 0;
+        if (sounding && cur_tenths) voice_note(cur_tenths);
+    }
     if (!enabled) return;
     if (!mus_on && !sfx_on) return;
     if (!frame_tick()) return;

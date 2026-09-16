@@ -20,4 +20,9 @@ unsigned char plat_raw_open(const char *name, unsigned long *len);
 unsigned char plat_raw_sector(unsigned char first, unsigned int index,
                               unsigned char *dst);
 
+
+/* Set by a port whose sound is interrupt-driven; see coco3storage.c. Null by
+   default, so nothing that links this file has to provide anything. */
+extern void (*plat_disk_quiet)(void);
+
 #endif

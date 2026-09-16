@@ -136,6 +136,19 @@ static void gran_loc(unsigned char g, unsigned char *trk, unsigned char *sec)
    every one of them out from under the function. */
 static unsigned char dsk_cc;
 
+/* A PORT THAT MAKES NOISE CAN ASK TO BE TOLD. Masking IRQ across DSKCON means
+   the card-less port's sound timer stops for the duration of every sector, so
+   its DAC freezes mid-square-wave and the tone dies -- and comes back between
+   sectors, which Jamie heard during the ending sequence as the music
+   STUTTERING while a screen loaded.
+   A POINTER, NOT A FUNCTION, so nothing has to supply a stub: the card port
+   never sets it, and neither do the probes that link this file. gimesnd.c
+   points it at a routine that silences the voice and LEAVES it silent; the
+   sound driver un-silences itself the next time the game polls it, which is
+   after the whole load rather than between sectors. One pause, not a chop
+   per sector, which is what a person actually wants to hear. */
+void (*plat_disk_quiet)(void) = 0;
+
 static void dsk_mask(void)
 {
     asm { tfr cc,a
@@ -177,6 +190,7 @@ static unsigned char read_sec_to(unsigned char trk, unsigned char sec,
     DCTRK = trk;
     DCSEC = sec;
     DCBPT = dst;
+    if (plat_disk_quiet) plat_disk_quiet();
     dsk_mask();
     dskcon_processSector();
     dsk_unmask();
@@ -267,6 +281,7 @@ static unsigned char write_sec(unsigned char trk, unsigned char sec)
     DCTRK = trk;
     DCSEC = sec;
     DCBPT = secbuf;                          /* writes still come from here */
+    if (plat_disk_quiet) plat_disk_quiet();
     dsk_mask();                              /* same reason as read_sec */
     dskcon_processSector();
     dsk_unmask();
