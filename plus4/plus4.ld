@@ -40,7 +40,36 @@ MEMORY {
        .lowtext below.
        It stops at $DCFF because $DD00..$FCFF is the far store (p4mem.c owns
        it, the linker must not) and $FD00..$FF3F is I/O whatever is banked. */
-    ram (rw) : ORIGIN = 0x1001, LENGTH = 0xCCFF
+    ram (rw) : ORIGIN = 0x1001, LENGTH = 0xCBFF
+
+    /* THE OVERLAY WINDOW, AND IT IS ABOVE $8000 ON PURPOSE. The C64's window
+       is at $C000 because that is the 4K nothing in its $01 ever covers; here
+       every address above $8000 is covered by ROM during a KERNAL call, so
+       there is no such place and the question is whether it matters. It does
+       not: overlay code CAN call the storage layer, but it is not executing
+       while the ROM is in -- .lowtext is -- and its return address becomes
+       visible again the moment the ROM goes out. The same argument that lets
+       the resident image span $8000 lets the window sit up here.
+       Exactly 4K, so an overlay that outgrows it is a LINK ERROR rather than
+       something that quietly overwrites resident code. */
+    window (rwx) : ORIGIN = 0xCC00, LENGTH = 0x1000
+
+    /* ONE STAGING REGION PER OVERLAY. A single shared AT> region does not
+       advance its pointer when the section also has an explicit run address,
+       so every overlay would be dumped from the same bytes of the ELF and
+       eleven images would be written out identical. That happened on the C128
+       and the game ran the hall of fame when it asked for the evaluation. */
+    ovlimg0 (rw) : ORIGIN = 0x10000, LENGTH = 0x1000
+    ovlimg1 (rw) : ORIGIN = 0x11000, LENGTH = 0x1000
+    ovlimg2 (rw) : ORIGIN = 0x12000, LENGTH = 0x1000
+    ovlimg3 (rw) : ORIGIN = 0x13000, LENGTH = 0x1000
+    ovlimg4 (rw) : ORIGIN = 0x14000, LENGTH = 0x1000
+    ovlimg5 (rw) : ORIGIN = 0x15000, LENGTH = 0x1000
+    ovlimg6 (rw) : ORIGIN = 0x16000, LENGTH = 0x1000
+    ovlimg7 (rw) : ORIGIN = 0x17000, LENGTH = 0x1000
+    ovlimg8 (rw) : ORIGIN = 0x18000, LENGTH = 0x1000
+    ovlimg9 (rw) : ORIGIN = 0x19000, LENGTH = 0x1000
+    ovlimg10 (rw): ORIGIN = 0x1a000, LENGTH = 0x1000
 }
 
 __rc0 = __basic_zp_start;
@@ -71,8 +100,21 @@ SECTIONS {
        match nothing. verify_p4.py asserts the section really did end below
        $8000 rather than trusting the ordering. */
     .lowtext : { *(.lowtext) } >ram
+    .lowbss  : { *(.lowbss)  } >ram
 
     INCLUDE c.ld
+
+    .ovl_eval   ORIGIN(window) : { *(.ovl.eval)   } >window AT>ovlimg0
+    .ovl_hof    ORIGIN(window) : { *(.ovl.hof)    } >window AT>ovlimg1
+    .ovl_front  ORIGIN(window) : { *(.ovl.front)  } >window AT>ovlimg2
+    .ovl_info   ORIGIN(window) : { *(.ovl.info)   } >window AT>ovlimg3
+    .ovl_repair ORIGIN(window) : { *(.ovl.repair) } >window AT>ovlimg4
+    .ovl_msgs   ORIGIN(window) : { *(.ovl.msgs)   } >window AT>ovlimg5
+    .ovl_planet ORIGIN(window) : { *(.ovl.planet) } >window AT>ovlimg6
+    .ovl_cmds   ORIGIN(window) : { *(.ovl.cmds)   } >window AT>ovlimg7
+    .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
+    .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
+    .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
 }
 
 /* THE SOFT STACK MUST BE BELOW $8000 and this is the reason, not tidiness:
@@ -81,13 +123,8 @@ SECTIONS {
    while the call ran. $7F00 leaves 256 bytes of guard below the ROM boundary;
    measure the real depth with a sentinel fill before trusting it, exactly as
    the C64 and X16 had to. */
-/* A PLACEHOLDER FOR THE EARLY LINK ONLY. overlay.c takes the window address
-   from here; nothing is placed there yet, because this build is the staging
-   measurement -- the whole game linked RESIDENT, to read the overflow before
-   an overlay split is designed against a fit that may not exist. The real
-   window goes BELOW $8000 when it is cut, because overlay code can call the
-   storage layer and must not be hidden when it does. */
-__ovl_start = 0x7000;
+/* overlay.c takes the window address from here rather than repeating $CC00. */
+__ovl_start = ORIGIN(window);
 
 __stack = 0x7F00;
 

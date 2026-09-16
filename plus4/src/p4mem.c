@@ -1,4 +1,3 @@
-#include <cbm.h>
 #include <stdint.h>
 
 #include "../../core/farmem.h"
@@ -38,31 +37,67 @@
 
 static uint16_t far_len = 0;
 
-/* BELOW $8000, AND THE ATTRIBUTE IS LOAD-BEARING. Everything above $8000 is
- * hidden while the ROM is mapped, so a KERNAL call issued from up there would
- * return into ROM shadow. This function banks the ROM in, calls, banks it out,
- * and only then returns -- so its own address is the one thing that must stay
- * visible throughout.
+/* BELOW $8000, AND NOTHING IN THE BANKED WINDOW TOUCHES A C LOCAL.
  *
- * A FUNCTION ATTRIBUTE AND NOT A PER-FILE PLACEMENT, because this build uses
- * LTO: every translation unit becomes one `.lto.o` and a linker script that
- * matches `*p4mem.o(.text*)` would match nothing. Section attributes survive
- * LTO; file names do not.
+ * Two separate requirements, and the second is the one that nearly forced an
+ * awkward memory map. Above $8000 the ROM hides the program during a KERNAL
+ * call: harmless for code that is not executing and for a return address that
+ * becomes visible again the moment the ROM goes out -- but NOT harmless for
+ * llvm-mos's soft stack, which C locals spill to. Put the stack high and a
+ * spill inside the window writes into ROM shadow.
+ *
+ * The alternative was splitting `ram` either side of a low stack, and that
+ * does not work: code and rodata are about 37K on the C128's 40-column build
+ * and neither half of any split is that big, so the general code must span
+ * $8000 contiguously.
+ *
+ * SO THE WINDOW IS ASSEMBLY AND ITS OPERANDS ARE IN LOW RAM. Between the two
+ * stores to $FF3E and $FF3F nothing is touched but the 6502's own hardware
+ * stack at $0100 -- which no banking can hide -- and these eight bytes, which
+ * .lowbss keeps below $8000 by the same first-in-the-script trick as
+ * .lowtext. The soft stack is then free to live anywhere, and the memory map
+ * question dissolves.
+ *
+ * NOT `static`, AND THAT IS NOT AN OVERSIGHT: the assembly below names these
+ * symbols, and LTO renames or internalises a static that C code alone can see.
+ * The link failed with "undefined symbol: k_namlen" until they were given
+ * external linkage. Inline assembly is outside the compiler's view of who
+ * uses what.
+ *
+ * ALL THREE CALLS ARE INSIDE THE WINDOW. SETLFS and SETNAM go through $FFBA
+ * and $FFBD, which are as much KERNAL as LOAD is; an earlier version banked
+ * in only around LOAD and left the other two jumping into this program.
  */
+__attribute__((used, section(".lowbss"))) unsigned char k_namlen;
+__attribute__((used, section(".lowbss"))) unsigned char k_namlo, k_namhi;
+__attribute__((used, section(".lowbss"))) unsigned char k_dstlo, k_dsthi;
+__attribute__((used, section(".lowbss"))) unsigned char k_endlo, k_endhi;
+__attribute__((used, section(".lowbss"))) unsigned char k_err;
+
 __attribute__((noinline, section(".lowtext")))
-static uint16_t kernal_load(const char *fname, uint16_t dest)
+static void kernal_load_raw(void)
 {
-    uint16_t end;
-    /* ROM IN FIRST, BEFORE SETLFS -- these are all KERNAL calls. The first
-       version banked in only around cbm_k_load and left setlfs and setnam
-       jumping through $FFBA/$FFBD into RAM that holds this program. They are
-       as much KERNAL as LOAD is; the window has to cover all three. */
-    *(volatile unsigned char *)0xFF3E = 0;
-    cbm_k_setlfs(LFN_FAR, DEV, 0);
-    cbm_k_setnam(fname);
-    end = (uint16_t)(uintptr_t)cbm_k_load(0, (void *)dest);
-    *(volatile unsigned char *)0xFF3F = 0;      /* RAM back before returning */
-    return end;
+    __asm__ volatile (
+        "sta $ff3e\n"                 /* ROM in -- the KERNAL becomes real   */
+        "lda #3\n"                    /* SETLFS: logical file 3, device 8,   */
+        "ldx #8\n"                    /*         secondary 0 -- a RAW load,  */
+        "ldy #0\n"                    /*         not ,1 relocating           */
+        "jsr $ffba\n"
+        "lda k_namlen\n"              /* SETNAM: length in A, pointer in X/Y */
+        "ldx k_namlo\n"
+        "ldy k_namhi\n"
+        "jsr $ffbd\n"
+        "lda #0\n"                    /* LOAD: A=0 loads, X/Y is the address */
+        "ldx k_dstlo\n"
+        "ldy k_dsthi\n"
+        "jsr $ffd5\n"
+        "stx k_endlo\n"               /* one past the last byte, or an error */
+        "sty k_endhi\n"
+        "lda #0\n"
+        "rol\n"                       /* carry set means the KERNAL failed   */
+        "sta k_err\n"
+        "sta $ff3f\n"                 /* RAM back, before anything returns   */
+        ::: "a", "x", "y", "p", "memory");
 }
 
 uint16_t far_load(const char *name)
@@ -73,7 +108,19 @@ uint16_t far_load(const char *name)
 
     if (base >= (uint16_t)(FAR_LIMIT - FAR_BASE)) return FAR_NONE;
 
-    end = kernal_load(name, dest);
+    {   /* Set up outside the window, in ordinary C, with the ROM out. */
+        const char *p = name;
+        unsigned char n = 0;
+        while (p[n]) n++;
+        k_namlen = n;
+        k_namlo = (unsigned char)((uint16_t)(uintptr_t)name & 0xFF);
+        k_namhi = (unsigned char)((uint16_t)(uintptr_t)name >> 8);
+        k_dstlo = (unsigned char)(dest & 0xFF);
+        k_dsthi = (unsigned char)(dest >> 8);
+        kernal_load_raw();
+        if (k_err) return FAR_NONE;
+        end = (uint16_t)(k_endlo | ((uint16_t)k_endhi << 8));
+    }
 
     /* cbm_k_load returns one past the last byte, or a KERNAL ERROR CODE in the
        low byte with carry set -- which is indistinguishable here, so the range
