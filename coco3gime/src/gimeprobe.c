@@ -93,21 +93,36 @@ int main(void)
     PALETTE[14] = 0x0B;  /* lt blue  */
     PALETTE[15] = 0x16;  /* lt green */
 
-    /* A ruler on every row, each row in a different foreground, and the row
-       number first so 25 rows can be COUNTED off the picture. The attribute
-       byte is FGND in bits 5-3 and BGND in bits 2-0. */
-    for (r = 0; r < ROWS; r++) {
-        for (c = 0; c < COLS; c++) {
-            unsigned char ch;
-            if (c == 0)      ch = (unsigned char)('0' + (r / 10));
-            else if (c == 1) ch = (unsigned char)('0' + (r % 10));
-            else if (c == 2) ch = ' ';
-            else if (((c - 3) % 10) == 9) ch = (unsigned char)('1' + ((c - 3) / 10));
-            else if (((c - 3) % 5) == 4)  ch = '+';
-            else ch = '-';
-            SCREEN[(unsigned int)r * COLS * 2 + c * 2]     = ch;
-            SCREEN[(unsigned int)r * COLS * 2 + c * 2 + 1] =
-                (unsigned char)(((r % 8) << 3) | 0);
+    /* EVERY CHARACTER THE GIME HAS, 0..255, sixteen to a row with its code
+       in hex at the left. The console's borders are C128 SCREEN CODES in
+       layout.h -- 64 is G_HLINE, 93 G_VLINE, 112/110/109/125 the corners --
+       and the GIME's character generator is FIXED: there is no user font in
+       text mode. So what is at those codes decides whether this port can draw
+       the console's boxes at all, or has to fall back on - | and +. */
+    {
+        static const char hex[] = "0123456789ABCDEF";
+        unsigned char code = 0;
+        for (r = 0; r < 16; r++) {
+            unsigned int base = (unsigned int)(r + 4) * COLS * 2;
+            SCREEN[base + 0] = hex[r]; SCREEN[base + 1] = 0x38;
+            SCREEN[base + 2] = '0';    SCREEN[base + 3] = 0x38;
+            SCREEN[base + 4] = ':';    SCREEN[base + 5] = 0x38;
+            for (c = 0; c < 16; c++) {
+                unsigned int o = base + (unsigned int)(6 + c * 3) * 2;
+                SCREEN[o]     = code++;
+                SCREEN[o + 1] = 0x28;          /* fgnd 5, bgnd 0 */
+            }
+        }
+        /* A row of the codes layout.h actually asks for, so they can be
+           judged side by side rather than hunted for in the grid. */
+        {
+            static const unsigned char want[] =
+                { 64, 93, 112, 110, 109, 125, 107, 115, 114, 113, 91, 160, 98, 100, 81 };
+            unsigned int base = (unsigned int)21 * COLS * 2;
+            for (c = 0; c < 15; c++) {
+                SCREEN[base + (unsigned int)(c * 3) * 2]     = want[c];
+                SCREEN[base + (unsigned int)(c * 3) * 2 + 1] = 0x10;
+            }
         }
     }
 

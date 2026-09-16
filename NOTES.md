@@ -11820,3 +11820,25 @@ both the YM2149 and the far-memory VRAM are ON the SuperSprite, so this machine
 has neither. Sound is the CoCo's own 6-bit DAC; far memory has to fit the
 string pool somewhere in 64K that also holds a 45K program and a 4,000-byte
 screen.
+
+### THE FONT HAS NO BOXES, AND THE ATTRIBUTE BYTE GIVES TWO OF THEM BACK
+
+The GIME's text font cannot be changed and has **no box-drawing glyphs**:
+codes 128-255 MIRROR 0-127, so there is no reverse video and no solid block
+either. At layout.h's C128 screen codes the machine's own font shows
+`a ] p n m } k` -- the console would have drawn gibberish.
+
+Two of the three problems solve themselves out of the attribute byte, and
+both come out BETTER than a glyph would have:
+
+  * **A solid cell is a SPACE WITH A BACKGROUND.** G_BLOCK -- the badge body,
+    the cursor, the laser and systems bars -- is flat colour rather than a
+    character, which is what it always wanted to be.
+  * **A horizontal rule is an UNDERLINED SPACE.** Attribute bit 6 draws across
+    the WHOLE cell, so consecutive cells JOIN. Drawn as `-` the console's long
+    borders come out dotted, with a gap at every cell boundary; underlined
+    they are continuous. Measured both ways on screen.
+
+**The verticals stay dotted** -- `|` does not span the cell height and there is
+no attribute bit for it. That is the one visible compromise of this port.
+
