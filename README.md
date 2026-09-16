@@ -265,6 +265,42 @@ overruns the 256 codes it has.
 **Not machines:** MS-DOS is the reference oracle and never a build target;
 C64 OS is the C64 again.
 
+#### Swept 2026-09-16: what the list still gets wrong
+
+Two rule-outs turned out to have expired without anyone noticing — the ST's
+width rule and the IIgs's — so the rest were re-derived against the rules as
+they stand rather than as they were written. **No conclusion here changes; the
+REASONS do, and a reason is what a future pass will re-check.**
+
+**THE CONSOLE NEEDS 25 ROWS AND THIS SURVEY HAS NEVER SAID SO.** `layout40.h`
+is `SCR40_ROWS 25` and row 24 carries the briefing footer, so a 24-row machine
+needs a layout change — the expensive part, as the Spectrum's 32 columns are.
+The list discriminates on **width and colour only**. Its own entry for the
+Apple IIe reads *"40×24 text is monochrome"*: **the 24 was sitting in the text,
+independently disqualifying, uncounted.** Every candidate on the live table
+should be checked for rows before anything else about it is believed.
+
+**The PET is filed under the wrong axis.** It sits under *out on width or
+memory* with *"monochrome as well"* — but a PET is 40×25, and an 8032 is 80×25.
+Both are shipped layouts. **Width does not rule it out at all**; monochrome
+does, on its own. Out either way, for one reason rather than two.
+
+**The VIC-20's memory half has eroded like the Spectrum's.** "35K at most"
+against a requirement that the disk-backed pool has cut by ~7.9K. **22 columns
+is the blocker that does not move**, and it is further from 40 than the
+Spectrum's 32.
+
+**Two colour reasons need re-deriving and are flagged rather than fixed**,
+because neither was measured here and this project does not promote a guess to
+a finding. The **TI-99/4A** entry reasons from the TMS9918A colouring groups of
+character codes — but that machine is **32 columns**, which disqualifies it on
+the same axis as the Spectrum whatever the colour answer turns out to be, so
+the cited reason is not the load-bearing one. The **stock Atari 800XL** entry
+says ANTIC's text modes have *"no per-cell colour"*, which is absolute where
+the truth is likelier to be *"fewer than the eight the console needs"* —
+ANTIC's multicolour character modes do carry some. **Same verdict, weaker
+grounds than stated.**
+
 **Done.** The **Atari ST/STE** was top of this list and shipped in
 [v0.17.0](../../releases/latest) the same day. **The estimate held exactly**:
 one file, the video driver, four bitplanes interleaved by word. `vc +tos` was
