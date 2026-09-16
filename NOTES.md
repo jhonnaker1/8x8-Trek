@@ -12067,3 +12067,40 @@ cross-check and it has not been done.
 
 The expensive one is better: **Jamie has a CoCo 3 and an SDC.** `bits.c` needs
 no card, exactly as `speedtst.dsk` does not -- see `coco3/hardware/`.
+
+### ITEM 30'S CONCLUSION IS NOT SUPPORTED BY THE PROBE THAT PRODUCED IT
+
+Going to cross-check the MMUEN blocker under XRoar, I read `tools/coco3/bits.c`
+first. It ends with:
+
+    INIT0 = (unsigned char)(INIT0 | 0x40);
+
+**$FF90 DOES NOT READ BACK.** Item 30 establishes that on this machine -- it
+reads `$1B`, the floating bus, whatever was written -- and says in as many
+words: *"Never read-modify-write these; keep a RAM shadow."* **And then the
+probe read-modify-writes it.** `$1B | $40` is `$5B`, so the line that was
+supposed to set MMUEN alone sets FIVE bits:
+
+    bit 6 MMUEN   bit 4 FEN   bit 3 MC3   bit 1 MC1   bit 0 MC0
+
+**MC3 PUTS VECTOR RAM AT $FE00..$FEFF.** That is exactly where this port's
+interrupt LBRAs live -- `$FEEE` SWI3, `$FEF1` SWI2, `$FEF4` FIRQ, `$FEF7` IRQ,
+`$FEFA` SWI, `$FEFD` NMI -- and the standalone DSKCON driver takes an NMI per
+sector. **A bit that moves the machine's vectors out from under a driver that
+depends on them is a better suspect than the one the probe is named after**,
+and MC1/MC0 changing the ROM map is a second.
+
+So "it is MMUEN alone" is an unsupported conclusion, and the entire card-less
+port is designed around it: no MMU, so the string pool goes on the disk, so
+the budget is 422 over at 40 columns and 1,608 at 80.
+
+**`tools/coco3/bits2.c` asks it properly** -- explicit values from a shadow,
+never a read-modify-write, with MMUEN alone (`$40`) and MC3 alone (`$08`)
+separated, and a recovery step after each.
+
+**IT HAS NOT RUN YET, AND THE RIG IS WHY.** A fresh Lua rig returns
+`A5 FF FF...` -- armed, then nothing -- and **THE ORIGINAL bits.c RETURNS THE
+SAME THING IN IT**, which is the control saying the rig is wrong and the probe
+is not. The documented invocation uses `-ext multi` with the FDC in slot 4 and
+the card in slot 1, and slot order is recorded elsewhere here as load-bearing.
+That is the next thing to fix, before either emulator is believed.
