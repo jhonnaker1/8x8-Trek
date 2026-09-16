@@ -11985,13 +11985,21 @@ cause and not a coincidence.
 **The pattern surviving says the driver does not WRITE there; it READS
 something there.**
 
-**AND THE PROBE'S ENVIRONMENT IS NOT THE PORT'S, WHICH LIMITS THE FINDING.**
-This probe is `LOADM`ed and `EXEC`ed with `CLEAR 25,&H2FFF`, so the ROM is
-still mapped and BASIC is still live with its variables and buffers through
-`$1000..$2FFF`. The real port switches to ALL-RAM MODE and BASIC is gone.
-Whether `$1000` is free THERE is untested, and testing it needs the
-first-stage loader rather than `LOADM` -- a different rig, not a different
-wait.
+**RE-TESTED UNDER THE REAL LOADER, AND THE FINDING HOLDS.** The first run was
+`LOADM`ed with `CLEAR 25,&H2FFF`, so the ROM was mapped and BASIC live with
+its variables through `$1000..$2FFF` -- which would have explained everything
+and explained it wrongly. So the probe was rebuilt at the port's own `--org=2800`
+and put through `mkboot.py`: the stub writes `$FFDF`, BASIC is gone, the
+machine is all-RAM, exactly as the game runs.
+
+    BEFORE THE SCREEN EXISTED    FOUND, length 7,484
+    AFTER 4,000 BYTES AT $1000   NOT FOUND
+    THE PATTERN                  SURVIVED
+
+**Identical. So the low-RAM screen is dead**, and not for the reason that was
+easiest to believe. What the driver reads in `$1000..$1F9F` is not yet known;
+the pattern surviving rules out a write, and BASIC being absent rules out
+BASIC.
 
 **So the 1,608 bytes are still outstanding**, and the honest options are
 unchanged: page ~1,600 more out (new OVL_CODE markers in shared code, which
