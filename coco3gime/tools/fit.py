@@ -17,7 +17,14 @@ import re, subprocess, sys
 WINDOW_MIN = 2560     # the largest overlay image, rounded up to a page
 import os
 WIDTH      = int(os.environ.get("WIDTH", "80"))
-SCREEN     = WIDTH * 25 * 2   # cells are two bytes: character and attribute
+# THE SCREEN IS NOT COUNTED HERE ANY MORE, and that is a measurement, not an
+# economy. It lives at $1000, in the low RAM below the load address, which
+# lowram.c reported as fatal and was wrong about: what broke its disk was
+# vdc_init writing INIT0 = $00 and clearing MC2, the WD1773's chip select.
+# src/lowbisect.c fills and restores every 512-byte block of $0200..$27FF with
+# the disk reading STOR_OK throughout, and src/lowinit.c reads a file with the
+# full 80-column mode set and all 4,000 bytes written at $1000.
+SCREEN     = 0                # $1000..$1F9F, below the image, not above it
 LOG        = 2048     # ui.c: LOG_SLOTS 32 x LOG_STRIDE 64, at $F200
 STACK      = 1024     # what cmoc's crt assumes
 IO         = 0xFF00

@@ -1204,6 +1204,68 @@ each.** `/tmp/rig/xroar_probe.py`, and the durable parts are in
     to ask.
 
 
+#### AND THE LOW-RAM SCREEN WAS THE SAME BUG. 80 COLUMNS FITS (2026-09-16)
+
+**`lowram.c`'s finding is wrong, and it is wrong the same way item 30 was.**
+It reported that 4,000 bytes written at `$1000` stop standalone DSKCON finding
+a file, and it was re-tested under the real loader and held. It changed TWO
+things between its control read and its failing read:
+
+    before = plat_raw_open(...)     STOR_OK
+    vdc_init();                     <-- WRITES INIT0 = $00
+    fill 4,000 bytes at $1000
+    first  = plat_raw_open(...)     NOT FOUND
+
+and the fill took the blame. **`$00` clears MC2** -- so `vdc_init()` has been
+switching the WD1773 off the bus since the day it was written, and the
+comment on the line said *"COCO=0, MMUEN=0 -- never set MMUEN"*: the whole file
+organised around the wrong bit. `src/gimevid.c` writes `$04` now.
+
+**Both halves measured, both emulators available, XRoar used.**
+
+`src/lowbisect.c` -- every 512-byte block of `$0200..$27FF` saved, filled with
+`$AA`, read, restored, read again. **Nineteen blocks, thirty-eight reads, all
+STOR_OK.** Independence is the design: a sequential fill finds the first fatal
+block and then reports failure for every block after it, which is
+indistinguishable from "all of low RAM is fatal" -- the shape of answer this
+target has produced wrongly twice.
+
+`src/lowinit.c` -- one variable, the value `vdc_init` puts in INIT0, with the
+full 80-column mode set and all 4,000 bytes written at `$1000` each time:
+
+    $00   NOT FOUND   (and STOR_OK again once MC2 is restored)
+    $04   STOR_OK     COCO=0, MMUEN=0, MC2 kept
+    $0C   STOR_OK     + MC3
+    $8C   STOR_OK     + COCO
+    the 4,000-byte pattern at $1000 SURVIVED
+
+**SO THE SCREEN GOES IN LOW RAM AND 80 COLUMNS FITS.**
+
+      resident image    44169   $2800..$D488
+      bss                2832   $D498..$DFA7
+      window             2560
+      screen                0   ($1000..$1F9F, BELOW the image
+      message log        2048
+      stack              1024
+      still to place     5632
+      room to $FF00      8024
+
+    fit: IT FITS, 2392 bytes spare
+
+`make contest` draws the nine-panel console through the real `layout.c` at 80
+columns with the screen at `$1000`, photographed under MAME. The 40-column
+build is no longer needed to make this port fit, and the 2,392 bytes are what
+the unwritten sound driver has to come out of.
+
+**THE LESSON IS THE ONE THIS TARGET KEEPS TEACHING, AND I PAID FOR IT TWICE IN
+ONE DAY.** Item 30 and the low-RAM screen are the same defect: a step that
+looks like one change is several, and the name on the step decides the
+diagnosis. `lowram.c` even carries a paragraph explaining that its control
+exists to separate two possibilities -- and it separated the wrong pair,
+because `vdc_init()` sat between the control and the test and was never
+counted as a variable at all. **Everything between the control and the
+measurement is a variable, including the setup.**
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window

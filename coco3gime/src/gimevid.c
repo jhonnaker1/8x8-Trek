@@ -123,7 +123,18 @@ void vdc_init(void)
        identical picture. */
     phys_base = 0x70000UL;
 
-    INIT0 = 0x00;                 /* COCO=0, MMUEN=0 -- never set MMUEN */
+    /* $04, NOT $00, AND THE DIFFERENCE IS THE WHOLE DISK. Bit 2 is MC2, the
+       GIME's standard SCS -- the chip select that decodes $FF40..$FF5F, where
+       the WD1773 is. `$00` switches the disk controller off the bus, and this
+       line did that from the day it was written; the comment it used to carry
+       said "never set MMUEN", which is this file organised around the wrong
+       bit. It is what made lowram.c report that a screen at $1000 breaks the
+       disk -- two variables changed between that probe's control and its test,
+       and the fill took the blame for vdc_init.
+       Measured, src/lowinit.c: $00 NOT FOUND, $04/$0C/$8C all STOR_OK with
+       this same mode set and 4,000 bytes written at $1000. COCO=0 for the
+       GIME's own text mode, MMUEN off, MC2 KEPT. */
+    INIT0 = 0x04;
     VMODE = 0x03;                 /* alphanumeric, 8 scanlines a row */
     #ifdef TREK_40COL
     /* HRES=001 is 40 characters; CRES=01 keeps the attribute byte. */
