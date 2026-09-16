@@ -26,30 +26,45 @@
  * the bank first makes every later init see one memory map.
  */
 
+/* Somewhere harmless for an interrupt this program did not ask for. In
+   .lowtext because it must be visible whatever is banked. */
+__attribute__((used, noinline, section(".lowtext")))
+void p4_stray_irq(void) { __asm__ volatile ("rti"); }
+
 __attribute__((used, section(".init.010")))
 void p4_ram_in(void)
 {
-    /* THE MACHINE HAS A DESIGNED ANSWER FOR THIS AND I DID NOT KNOW IT.
-       Banking RAM in takes the 6502's vectors with it: the HI ROM is
-       $C000..$FBFF **and $FF40..$FFFF**, so $FFFA..$FFFF become RAM. But
-       $FC00..$FCFF is ALWAYS KERNAL ROM whatever is banked -- a permanent
-       page put there for exactly this -- and it holds the interrupt entry at
-       $FCB3, which saves the bank, does the KERNAL's IRQ work, and returns
-       through $FCBE to restore it from the zero-page byte at $FB.
+    /* $FCB3 IS NOT FOR US, AND THE ROM ITSELF SAYS SO. The encyclopedia
+       points banked programs at it, so the RAM vectors were aimed there and
+       the machine sat in it for ever. Disassembling the permanent page
+       explains why:
 
-       So the RAM vectors are pointed at $FCB3 and interrupts KEEP RUNNING.
-       That is not a nicety: input.c reads the keyboard with GETIN, which is
-       fed by the KERNAL's IRQ-driven buffer, so an SEI here would have left
-       the finished port unable to read a key. The first version did SEI and
-       cleared TED's $FF0A, which was me defending against a problem the
-       machine had already solved.
+           FCB3  PHA / TXA PHA / TYA PHA
+           FCB8  STA $FDD0          the ROM BANK latch
+           FCBB  JMP $CE00          the KERNAL's IRQ handler
+           FCBE  LDX $FB
+           FCC0  STA $FDD0,X        restore that ROM BANK
+           FCC3  PLA TAY / PLA TAX / PLA / RTI
 
-       Writes reach RAM through the ROM (src/wrprobe.c), so these land even
-       though the ROM is still mapped as they execute. */
-    *(volatile unsigned char *)0xFFFE = 0xB3;   /* IRQ/BRK -> $FCB3 */
-    *(volatile unsigned char *)0xFFFF = 0xFC;
-    *(volatile unsigned char *)0xFFFA = 0xB3;   /* NMI, which SEI never masked */
-    *(volatile unsigned char *)0xFFFB = 0xFC;
+       $FDD0,X selects WHICH ROM is mapped and there is no X that means RAM.
+       It is a trampoline for CARTRIDGE programs switching between ROM banks,
+       and $FB holds a bank NUMBER. It cannot restore a program running with
+       RAM under the ROM; it maps a ROM over it and jumps into the KERNAL.
+
+       SO THIS PROGRAM OWNS THE INTERRUPT. TED's enable at $FF0A goes off and
+       the CPU's flag goes down, and the vectors are pointed at an RTI in RAM
+       so that a stray NMI -- which SEI never masks -- lands somewhere
+       harmless rather than in the middle of a string.
+       THE COST IS THE KEYBOARD, and it is not paid yet: input.c reads through
+       GETIN, which the KERNAL's IRQ fills. A port that masks interrupts needs
+       its own keyboard seam. That is the next piece of work and it is written
+       down rather than discovered later. */
+    __asm__ volatile ("sei" ::: "memory");
+    *(volatile unsigned char *)0xFF0A = 0;      /* TED: no raster interrupt */
+    *(volatile unsigned char *)0xFFFE = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq & 0xFF);
+    *(volatile unsigned char *)0xFFFF = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq >> 8);
+    *(volatile unsigned char *)0xFFFA = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq & 0xFF);
+    *(volatile unsigned char *)0xFFFB = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq >> 8);
     *(volatile unsigned char *)0xFF3F = 0;      /* and now the RAM is ours */
 }
 
