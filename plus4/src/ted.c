@@ -46,6 +46,20 @@ void vdc_shutdown(void) {
     scr_clear();
 }
 
+/* THE WAY OUT. The C64's version jumps through the reset vector because
+   plat_exit there cannot return to a BASIC that has been paged away all game.
+   Same here, and more so: this port runs with RAM mapped over BOTH ROMs, so
+   there is no BASIC to return to until the ROM comes back. Bank it in, then
+   take the machine's own reset vector -- which is a cold start, and the
+   farewell string says so rather than promising READY.
+   BANK FIRST, JUMP SECOND, and the order is the whole function: with RAM
+   mapped, $FFFC holds two bytes of this program, not the reset vector. */
+__attribute__((noinline, section(".lowtext")))
+void plat_exit(void) {
+    *(volatile unsigned char *)0xFF3E = 0;      /* ROM in */
+    __asm__ volatile ("jmp ($fffc)");
+}
+
 void wait_vsync(void) {
     /* $FF1D is the low eight bits of the raster. Waiting for it to leave the
        visible area and come back is one frame, near enough, and this is only

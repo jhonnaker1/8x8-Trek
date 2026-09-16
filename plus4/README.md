@@ -91,6 +91,50 @@ is what `make ports` runs — and **all sixteen agree**.
 Jamie found in the card-less CoCo 3 lived in `ui.c` with live game state, which
 no bench here reaches.
 
+## The whole game links, and the staging number is in
+
+`make early`'s question, asked the way every 6502 port here asks it: link
+everything RESIDENT and read the overflow.
+
+    ram region      52,479 bytes   $1001..$DCFF
+    all-resident    68,976 bytes   demand
+    overflow        16,497 bytes
+
+**So it needs overlays, like every 6502 port here.** For scale, the C64 fits
+40,735 of 46,847 with an eleven-way split, so that split frees roughly 28,000
+bytes — which would leave about 40,976 in this machine's 52,479. There is
+room; the split is not a squeeze.
+
+Everything above the seams links unchanged: `main.c`, `ui.c`, `layout40.c`,
+`strpool.c`, `input.c`, `storage.c`, `overlay.c` and `core/` entire. **The
+C64's `input.c` and `storage.c` linked with no edit at all** — the Plus/4 keeps
+the CBM KERNAL jump table where the C64 has it, and that is the survey's "the
+C64's storage, input, overlay and KERNAL model" turning out to be true.
+
+What the link asked for on the way, all of it real work a platform package
+would normally supply: the KERNAL jump table as linker symbols, `plat_exit`,
+and `__ovl_start`.
+
+## The one design question left, stated precisely
+
+**The soft stack is the problem, and nothing else is.** Above `$8000` the ROM
+hides the program during a KERNAL call — which is fine for code, because the
+only code executing then is `.lowtext`, and fine for a return address, because
+it becomes visible again the moment the ROM goes out. It is NOT fine for
+llvm-mos's soft stack, which `.lowtext`'s own C locals spill to while the call
+is in progress.
+
+Three ways out, and the third is the cheap one:
+
+1. Split `ram` either side of the stack — **does not work**: code and rodata
+   are about 37K on the C128's 40-column build and neither half is that big,
+   so the general code genuinely must span `$8000` contiguously.
+2. Alias `c_readonly` low and `c_writeable` high — same arithmetic, same
+   answer.
+3. **Give the banked window no soft stack to use.** Write `kernal_load` so
+   nothing between `$FF3E` and `$FF3F` touches a C local — then the soft stack
+   can live anywhere and the whole question dissolves.
+
 ## What is next, in order
 
 1. **Decide the map against the ROM constraint.** `$1001..$7FFF` is 28,671
