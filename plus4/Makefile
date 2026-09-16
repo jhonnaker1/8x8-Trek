@@ -26,7 +26,8 @@ SHARED   = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
 # THIS PORT'S OWN. Four files where the C64 wrote two, and the survey said so:
 # TED is neither a VIC-II nor a SID, so vic.c and sid.c cannot be linked here
 # the way the C64 links them.
-PLATFORM = src/ted.c src/p4log.c src/p4mem.c src/tedsnd.c src/basichdr.c
+PLATFORM = src/ted.c src/p4log.c src/p4mem.c src/tedsnd.c src/basichdr.c \
+           src/p4bank.c
 SRC      = $(SHARED) $(PLATFORM)
 
 OUT = build/trek4.prg
