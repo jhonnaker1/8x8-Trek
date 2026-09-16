@@ -30,7 +30,13 @@
  * of it so the resident image can grow upward into the rest, and stops at
  * $FCFF because $FD00..$FF3F is I/O on this machine whatever is banked. */
 #define FAR_BASE   0xDD00
-#define FAR_LIMIT  0xFCFF
+/* $FBFF, NOT $FCFF. $FC00..$FCFF is ALWAYS KERNAL ROM on this machine --
+   it cannot be banked at all -- so a store there is discarded and a read
+   returns the ROM. The first limit was $FCFF, which would have let the pool
+   grow into it and reported a load as fine while the last 256 bytes were
+   somebody else's code. STRINGS.DAT and MUSIC.DAT together are 7,908 bytes
+   from $DD00, ending $FC23 -- 36 bytes INTO that page. It was already over. */
+#define FAR_LIMIT  0xFBFF
 
 #define LFN_FAR  3
 #define DEV      8

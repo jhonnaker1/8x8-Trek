@@ -29,18 +29,27 @@
 __attribute__((used, section(".init.010")))
 void p4_ram_in(void)
 {
-    /* INTERRUPTS OFF FIRST, AND THIS IS NOT CAUTION. The 6502 takes its IRQ,
-       NMI and RESET vectors from $FFFA..$FFFF, and on a Plus/4 those live in
-       the KERNAL ROM. Banking RAM in takes them away -- and TED's raster
-       interrupt is still enabled, because BASIC enabled it, so the next one
-       vectors through two bytes of this program and the CPU is gone.
-       MEASURED: with the bank-in alone the PC oscillated between $0002 and
-       $FFFF within a second -- a runaway through zero page and round the top
-       of memory, which is what a jump through a garbage vector looks like.
-       TED's own interrupt enable at $FF0A is cleared as well, so nothing is
-       merely masked and waiting for the first ANDCC. */
-    __asm__ volatile ("sei" ::: "memory");
-    *(volatile unsigned char *)0xFF0A = 0;      /* TED: no raster interrupt */
+    /* THE MACHINE HAS A DESIGNED ANSWER FOR THIS AND I DID NOT KNOW IT.
+       Banking RAM in takes the 6502's vectors with it: the HI ROM is
+       $C000..$FBFF **and $FF40..$FFFF**, so $FFFA..$FFFF become RAM. But
+       $FC00..$FCFF is ALWAYS KERNAL ROM whatever is banked -- a permanent
+       page put there for exactly this -- and it holds the interrupt entry at
+       $FCB3, which saves the bank, does the KERNAL's IRQ work, and returns
+       through $FCBE to restore it from the zero-page byte at $FB.
+
+       So the RAM vectors are pointed at $FCB3 and interrupts KEEP RUNNING.
+       That is not a nicety: input.c reads the keyboard with GETIN, which is
+       fed by the KERNAL's IRQ-driven buffer, so an SEI here would have left
+       the finished port unable to read a key. The first version did SEI and
+       cleared TED's $FF0A, which was me defending against a problem the
+       machine had already solved.
+
+       Writes reach RAM through the ROM (src/wrprobe.c), so these land even
+       though the ROM is still mapped as they execute. */
+    *(volatile unsigned char *)0xFFFE = 0xB3;   /* IRQ/BRK -> $FCB3 */
+    *(volatile unsigned char *)0xFFFF = 0xFC;
+    *(volatile unsigned char *)0xFFFA = 0xB3;   /* NMI, which SEI never masked */
+    *(volatile unsigned char *)0xFFFB = 0xFC;
     *(volatile unsigned char *)0xFF3F = 0;      /* and now the RAM is ours */
 }
 
