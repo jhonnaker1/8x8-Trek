@@ -31,50 +31,57 @@
 __attribute__((used, noinline, section(".lowtext")))
 void p4_stray_irq(void) { __asm__ volatile ("rti"); }
 
-__attribute__((used, section(".init.010")))
+/* NAKED, AND THAT IS THE WHOLE REASON THIS FILE DID NOT WORK. The .init.NNN
+   sections are CONCATENATED AND FALLEN THROUGH -- llvm-mos's own
+   unmap-basic.o is four instructions with NO RTS, and .fini.990 is two. A
+   normal C function ends in RTS, so putting one here RETURNED OUT OF THE INIT
+   CHAIN and main() was never called. Measured by bisection: the same hello.c
+   ran with this file left out and did not run with it linked. */
+__attribute__((used, naked, section(".init.010")))
 void p4_ram_in(void)
 {
-    /* $FCB3 IS NOT FOR US, AND THE ROM ITSELF SAYS SO. The encyclopedia
-       points banked programs at it, so the RAM vectors were aimed there and
-       the machine sat in it for ever. Disassembling the permanent page
-       explains why:
+    /* ALL ASSEMBLY, because a naked function may contain nothing else -- and
+       naked is required because .init.NNN sections are concatenated and
+       FALLEN THROUGH. llvm-mos's own unmap-basic.o is four instructions with
+       no RTS. A normal C function ends in RTS, which returns out of the init
+       chain, and main() is never called. Measured by bisection: the same
+       hello.c ran without this file and did not run with it.
 
-           FCB3  PHA / TXA PHA / TYA PHA
-           FCB8  STA $FDD0          the ROM BANK latch
-           FCBB  JMP $CE00          the KERNAL's IRQ handler
-           FCBE  LDX $FB
-           FCC0  STA $FDD0,X        restore that ROM BANK
-           FCC3  PLA TAY / PLA TAX / PLA / RTI
+       $FCB3 IS NOT USABLE HERE -- the ROM's own code says so. It is
+       PHA/TXA/PHA/TYA/PHA, STA $FDD0, JMP $CE00, and the exit at $FCBE is
+       LDX $FB / STA $FDD0,X. $FDD0,X picks WHICH ROM is mapped and no value
+       of X means RAM, so it is a trampoline for cartridge programs switching
+       ROM banks, not for a program running with RAM under the ROM.
 
-       $FDD0,X selects WHICH ROM is mapped and there is no X that means RAM.
-       It is a trampoline for CARTRIDGE programs switching between ROM banks,
-       and $FB holds a bank NUMBER. It cannot restore a program running with
-       RAM under the ROM; it maps a ROM over it and jumps into the KERNAL.
+       So this program owns the interrupt: TED's enable off, the CPU's flag
+       down, and both vectors pointed at an RTI so a stray NMI -- which SEI
+       never masks -- lands somewhere harmless. THE COST IS THE KEYBOARD:
+       input.c reads through GETIN, which the KERNAL's IRQ fills, so this port
+       needs its own keyboard seam. Written down rather than discovered later.
 
-       SO THIS PROGRAM OWNS THE INTERRUPT. TED's enable at $FF0A goes off and
-       the CPU's flag goes down, and the vectors are pointed at an RTI in RAM
-       so that a stray NMI -- which SEI never masks -- lands somewhere
-       harmless rather than in the middle of a string.
-       THE COST IS THE KEYBOARD, and it is not paid yet: input.c reads through
-       GETIN, which the KERNAL's IRQ fills. A port that masks interrupts needs
-       its own keyboard seam. That is the next piece of work and it is written
-       down rather than discovered later. */
-    __asm__ volatile ("sei" ::: "memory");
-    *(volatile unsigned char *)0xFF0A = 0;      /* TED: no raster interrupt */
-    *(volatile unsigned char *)0xFFFE = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq & 0xFF);
-    *(volatile unsigned char *)0xFFFF = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq >> 8);
-    *(volatile unsigned char *)0xFFFA = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq & 0xFF);
-    *(volatile unsigned char *)0xFFFB = (unsigned char)((unsigned int)(unsigned long)p4_stray_irq >> 8);
-    *(volatile unsigned char *)0xFF3F = 0;      /* and now the RAM is ours */
+       The vector stores happen with the ROM still mapped and reach the RAM
+       beneath it -- writes pass through, which src/wrprobe.c measured. */
+    __asm__ volatile (
+        "sei\n"
+        "lda #0\n"
+        "sta $ff0a\n"                  /* TED: no raster interrupt        */
+        "lda #<p4_stray_irq\n"
+        "sta $fffe\n"
+        "sta $fffa\n"
+        "lda #>p4_stray_irq\n"
+        "sta $ffff\n"
+        "sta $fffb\n"
+        "sta $ff3f\n"                  /* and now the RAM is ours         */
+        ::: "a", "memory");
 }
 
 /* The way out, for a program that returns rather than resetting. plat_exit()
    banks in for itself before taking the reset vector, because it cannot rely
    on reaching here. */
-__attribute__((used, section(".fini.990")))
+__attribute__((used, naked, section(".fini.990")))
 void p4_rom_back(void)
 {
-    *(volatile unsigned char *)0xFF3E = 0;
+    __asm__ volatile ("sta $ff3e" ::: "memory");
 }
 
 /* ---------------------------------------------------------------------------
