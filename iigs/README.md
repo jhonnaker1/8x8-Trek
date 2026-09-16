@@ -239,6 +239,58 @@ cell boundaries.
 colours and reverse video on a real machine, and `tools/check_sheet.py`
 measures four things no eye can judge on a screenshot.
 
+## Will more RAM help? No — but the RAM already under the ROM will
+
+Asked because the console driver left only 3,838 bytes for five seams.
+`make ram` measures it, at both ends of what MAME will emulate.
+
+**The constraint is not kilobytes, it is bank 0.** llvm-mos emits 16-bit code:
+every `jsr`, every pointer and the whole soft stack are sixteen bits, and it
+**never emits `jsl` or `rtl`**. Code executes only in the bank it was linked
+for, however many banks the machine has. Extra banks are **storage**, never
+program space.
+
+**The language card is the exception, and it is the answer.** `$D000..$FFFF`
+in bank 0 is RAM once the soft switches say so, and code there runs with
+ordinary sixteen-bit calls. Measured:
+
+    $D000 bank 2 / $E000 / $FFF0   written and read back      $A1 $A2 $A3
+    $D000 bank 1                   written and read back      $B1
+    back to bank 2, $D000          still $A1                  -- the two
+                                                                 $D000 banks
+                                                                 are SEPARATE
+    ROM switched back, $E000       $4C                        -- a JMP: ROM
+
+**16K, of which 12,288 bytes is contiguous executable space** (`$D000..$FFFF`
+using one `$D000` bank), with the other 4K as bankable storage. That is three
+times what is left, on a machine feature every IIgs has. Identical at
+`-ramsize 1M` and `-ramsize 8M`, which is the right behaviour for something
+that does not depend on expansion.
+
+Banks `$01`, `$E0` and `$E1` are real, distinct and writable — also identical
+at both sizes. That is where the message log, the string pool and an overlay
+cache can go, and it is present on every machine.
+
+### And the bank-count probe is abandoned, on purpose
+
+Walking all 224 banks was tried three times. The first version reported **222
+banks — 14 MB — and reported the same 222 at `-ramsize 1M` and at
+`-ramsize 8M`.** An answer that does not move when the thing being measured
+moves by a factor of eight is not an answer: a store to missing memory and the
+load after it can both come off the CPU's own data latch, so a phantom bank
+returns exactly what was written to it.
+
+The second version put a different value on the bus between the write and the
+read, which fixed the latch and made 1M differ from 2M — and still could not
+tell 2M from 8M, and reported banks answering **scattered rather than in a
+run**, which is not how memory is fitted.
+
+**The third attempt was the one not to make.** Three instruments in a row for
+a question whose answer changes nothing. And the rig cannot see the machine
+that matters anyway: **MAME's smallest `apple2gs` is 1M**, so a stock 256K
+IIgs is not testable here — which makes "do not rely on any bank above `$01`"
+a constraint this project has no way to check its way out of.
+
 ## What has NOT been established
 
 * **A filesystem.** The loader reads a flat run of blocks. The game needs

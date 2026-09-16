@@ -30,7 +30,7 @@ ROMS    = $(HOME)/Library/Application Support/Ample/roms
 MAMEOPT = -rompath "$(ROMS)" -window -skip_gameinfo -nothrottle -sound none \
           -autoboot_delay 0
 
-PROBES  = gsprobe gsmap gsfill1 gsdiv
+PROBES  = gsprobe gsmap gsfill1 gsdiv gsram
 
 all: $(PROBES:%=build/%.bin)
 
@@ -100,6 +100,21 @@ failcheck: build/badread.po
 	  -snapshot_directory build/snap -autoboot_script tools/bootrun.lua \
 	  -seconds_to_run 30
 	python3 tools/count_colours.py build/snap/apple2gs/0000.png --expect 1
+
+# WHAT MEMORY IS THERE, and the answer that matters is not the total. Run it
+# at both ends of what MAME will emulate: anything whose reading MOVES with
+# -ramsize is expansion RAM this project cannot rely on, because MAME's
+# smallest apple2gs is 1M and a stock 256K machine is not testable here.
+ram: build/gsram.bin
+	@for sz in 1M 8M; do \
+	  printf "ramsize %-3s  " $$sz; \
+	  GS_BIN=build/gsram.bin GS_WAIT=6 \
+	    GS_DONE=$$($(NM) build/gsram.elf | awk '/ gs_done$$/{print "0x"$$1}') \
+	    GS_DUMP="$$($(NM) build/gsram.elf | awk '/ bank_ok$$/{print "0x"$$1}'):3;$$($(NM) build/gsram.elf | awk '/ lc_result$$/{print "0x"$$1}'):7" \
+	    $(MAME) apple2gs $(MAMEOPT) -ramsize $$sz -video none \
+	    -autoboot_script tools/run.lua -seconds_to_run 25 2>&1 \
+	    | grep -E "^DUMP|NEVER" | tr '\n' '|'; echo; \
+	done
 
 # THE CONSOLE. gsvid.c draws c128/src/vdc.h's 40x25 grid into Super Hi-Res,
 # and gssmoke.c is the proof sheet: every text code, the box set, a drawn
@@ -179,6 +194,6 @@ verify: colours bootcheck failcheck early sheet sheetfail
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram verify clean
 
 .PRECIOUS: build/%.elf
