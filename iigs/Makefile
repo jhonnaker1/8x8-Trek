@@ -163,6 +163,53 @@ sheetfail: build/smokebad.po
 	  echo "arm-check ok: check_sheet rejected the naive box glyphs"; \
 	fi
 
+# FILES, WITH NO PRODOS ON THE DISK. gsblk.c is core/storage.h's five plat_*
+# over the slot firmware's block driver plus this port's own directory --
+# mkdisk.py's format, which is atari/src/atarisio.c's at 512 bytes.
+build/gsfile.bin: src/gsfile.c src/gsblk.c iigs.ld | build
+	$(CC) -mcpu=mosw65816 -Oz -I ../core -T iigs.ld $(LDFLAGS) \
+	  src/gsfile.c src/gsblk.c -o build/gsfile.elf $(LDLIBS)
+	$(OBJCOPY) -O binary build/gsfile.elf $@
+
+build/testdata.dat:
+	@mkdir -p build
+	@printf 'HELLO FROM A FILE ON OUR OWN DISK.' > $@
+
+build/file.po: build/boot.bin build/gsfile.bin build/testdata.dat tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin \
+	  --payload build/gsfile.bin --file TEST.DAT=build/testdata.dat --slots 2
+
+GSFILE_REP = $$($(NM) build/gsfile.elf | awk '/ rep$$/{print "0x"$$1}')
+GSFILE_DONE = $$($(NM) build/gsfile.elf | awk '/ gs_done$$/{print "0x"$$1}')
+
+files: build/file.po
+	@GS_DONE=$(GSFILE_DONE) GS_REP=$(GSFILE_REP) \
+	  $(MAME) apple2gs $(MAMEOPT) -video none -flop3 build/file.po \
+	  -autoboot_script tools/filerun.lua -seconds_to_run 30 2>&1 \
+	  | python3 tools/check_files.py
+
+# ARM-CHECK: poke the same image in instead of BOOTING it, so src/boot.S never
+# runs and the handoff signature is absent. Everything must fail cleanly and
+# nothing must hang -- a jmp through a driver address the ROM happened to
+# leave behind is the failure the signature exists to prevent. Inverted,
+# because here a PASS is the failure.
+filesfail: build/gsfile.bin
+	@GS_BIN=build/gsfile.bin GS_WAIT=8 GS_DONE=$(GSFILE_DONE) \
+	  GS_DUMP="$(GSFILE_REP):48" \
+	  $(MAME) apple2gs $(MAMEOPT) -video none \
+	  -autoboot_script tools/run.lua -seconds_to_run 25 2>&1 \
+	  | sed 's/^DUMP [0-9A-F]*+48\*1 /REP /' \
+	  | python3 tools/check_files.py > build/filesfail.log 2>&1; \
+	if [ $$? -eq 0 ]; then \
+	  echo "ARM-CHECK FAILED: check_files passed with no boot handoff"; \
+	  exit 1; \
+	else \
+	  grep -q "handoff signature was valid: rep\[2\] is .00" build/filesfail.log \
+	    && echo "arm-check ok: no handoff detected, every file call refused, nothing hung" \
+	    || { echo "ARM-CHECK INCONCLUSIVE: it failed for some other reason"; \
+	         cat build/filesfail.log; exit 1; }; \
+	fi
+
 # THE SIZE QUESTION, answered the way the Plus/4 answered it: link the real
 # game against a stubbed seam and read the map. The number is a FLOOR -- every
 # stub costs a handful of bytes where a driver costs hundreds, and the Falcon
@@ -178,22 +225,29 @@ build/early.elf: $(SHARED) src/gsstub.c iigs.ld | build
 	$(CC) $(EARLYFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map \
 	  $(SHARED) src/gsstub.c -o $@ $(LDLIBS)
 
+build/earlyfull.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c iigs.ld | build
+	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO \
+	  -DGS_REAL_STORAGE $(LDFLAGS) -Wl,-Map=build/earlyfull.map \
+	  $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c -o $@ $(LDLIBS)
+
 build/earlyvid.elf: $(SHARED) src/gsstub.c src/gsvid.c iigs.ld | build
 	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO $(LDFLAGS) \
 	  -Wl,-Map=build/earlyvid.map $(SHARED) src/gsstub.c src/gsvid.c \
 	  -o $@ $(LDLIBS)
 
-early: build/early.elf build/earlyvid.elf
+early: build/early.elf build/earlyvid.elf build/earlyfull.elf
 	@echo "-- seam entirely stubbed"
 	python3 tools/verify_gs.py build/early.elf --window 0xB000 --org 0x0800
-	@echo "-- with the REAL video driver linked"
+	@echo "-- with the REAL video driver"
 	python3 tools/verify_gs.py build/earlyvid.elf --window 0xB000 --org 0x0800
+	@echo "-- with the REAL video driver AND the real storage seam"
+	python3 tools/verify_gs.py build/earlyfull.elf --window 0xB000 --org 0x0800
 
-verify: colours bootcheck failcheck early sheet sheetfail
+verify: colours bootcheck failcheck early sheet sheetfail files filesfail
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail verify clean
 
 .PRECIOUS: build/%.elf

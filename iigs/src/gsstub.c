@@ -96,7 +96,9 @@ void far_read(uint16_t off, void *dst, uint8_t len)
 /* ---- overlays ---- */
 void ovl_load(uint8_t which) { gs_sink = which; }
 
-/* ---- storage ---- */
+/* ---- storage ----
+   GS_REAL_STORAGE links src/gsblk.c instead of these. */
+#ifndef GS_REAL_STORAGE
 uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got)
 { gs_sink = (unsigned char)*name; gs_sink16 = max;
   *(volatile unsigned char *)buf = 0; *got = 0; return STOR_OK; }
@@ -107,3 +109,5 @@ uint8_t plat_open(const char *name) { gs_sink = (unsigned char)*name; return STO
 uint16_t plat_read(void *buf, uint16_t len)
 { *(volatile unsigned char *)buf = 0; return len ? 0 : 0; }
 void plat_close(void) { gs_sink = 6; }
+
+#endif  /* GS_REAL_STORAGE */

@@ -7764,3 +7764,36 @@ and the overlay loader -- and that is not enough. What this port has that the
 C64 did not is somewhere to put things: the 2,048-byte message log need not
 be in bank 0, the language card at $D000 is 16K nothing has claimed, and bank
 $01 is another 64K. None attempted.
+
+## Apple IIgs: files with no ProDOS, and the budget after them (2026-09-16)
+
+`iigs/src/gsblk.c` -- core/storage.h's five plat_* over the slot firmware's
+block driver, plus this port's own directory, in atari/src/atarisio.c's format
+at 512 bytes.
+
+`make files`, fifteen checks on the machine, and half of them refusals:
+
+    plat_read_all of TEST.DAT         STOR_OK, 34 bytes, "HELLO FROM A FIL"
+    NOSUCH.DAT                        STOR_NOTFOUND
+    write to TEST.DAT (no slot bit)   STOR_ERROR -- refused BY THE FORMAT
+    write to SAVE.DAT (takes a slot)  STOR_OK
+    read SAVE.DAT back                STOR_OK, 8 bytes, "SAVED-OK"
+    plat_read 5 then 5                5, 'H'  then  5, ' '   -- the stream
+                                                                continues
+    boot handoff signature            valid
+
+ARM-CHECKED by poking the same binary in instead of BOOTING it, so boot.S
+never runs and the handoff is absent: the signature is detected missing, every
+call is refused, NOTHING HANGS, and the gate reports thirteen failures.
+
+### And the budget, which is now the port's live problem
+
+    seam entirely stubbed                headroom 9,819
+    + real video (gsvid.c)               headroom 3,838   video   cost 5,981
+    + real storage (gsblk.c)             headroom 1,012   storage cost 2,826
+
+**1,012 bytes for four remaining seams** -- keyboard, sound, far memory and
+the overlay loader. Not enough, and the answers are known rather than hoped
+for: the 2,048-byte message log and gsblk.c's two 512-byte block buffers are
+3,072 bytes of bank 0 that could live in bank $01 or $E0, and the language
+card is 12,288 bytes of EXECUTABLE space in bank 0 that nothing has claimed.

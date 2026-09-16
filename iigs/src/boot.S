@@ -19,13 +19,14 @@
 ;
 ; Emulation mode, 8-bit everything, which is what the firmware hands us.
 
-/* START_BLOCK is 1 for a real disk. The only reason it is a knob at all is
+/* START_BLOCK is 2 for a real disk: block 0 is this loader and block 1 is the
+   directory, so the image starts at 2. The only reason it is a knob at all is
    that the FAILED-READ path cannot otherwise be tested: every block a
    1,600-block image has reads successfully, so the only way to make the drive
    say no is to ask for one that is not there. A failure path nothing has ever
    executed is a comment, not a behaviour. */
 #ifndef START_BLOCK
-#define START_BLOCK 1
+#define START_BLOCK 2
 #endif
 
 /* WHERE THE IMAGE GOES, AND IT IS $0800 BECAUSE NOTHING SAYS OTHERWISE.
@@ -36,6 +37,28 @@
 #ifndef LOAD_ADDR
 #define LOAD_ADDR 0x0800
 #endif
+
+/* THE HANDOFF. The loader knows two things the game cannot re-derive for
+   free -- which drive the machine booted from, and where that slot's block
+   driver lives -- and zero page will not survive the C runtime's arrival.
+   Four bytes at $0280, in the second half of the monitor's GETLN input
+   buffer, which nothing this port runs ever touches.
+
+   THE SIGNATURE IS NOT DECORATION. tools/run.lua pokes an image straight into
+   memory and sets the PC, which is how every probe here was tested -- and in
+   that path the boot block never runs, so these bytes are whatever the ROM
+   left. Without a signature the storage layer would read a garbage driver
+   address and hang; with it, it can say "not booted from our loader" and the
+   difference between the two rigs stops being invisible.
+
+   Written out as four literals rather than as `HANDOFF + n`: the assembler
+   reads `sta (0x0280 + 0)` as an INDIRECT addressing mode and rejects the
+   operand as needing to be eight bits. A parenthesised expression is not a
+   number here. */
+#define HANDOFF_UNIT   0x0280
+#define HANDOFF_DRVLO  0x0281
+#define HANDOFF_DRVHI  0x0282
+#define HANDOFF_SIG    0x0283
 
         .section .boot,"ax",@progbits
         .globl _boot
@@ -103,7 +126,17 @@ relocated:
         lda (entlo),y           ; the driver's offset within $Cn00
         sta entlo               ; entlo/enthi now point at the driver
 
-; Read PAYLOAD_BLOCKS blocks from block 1 to $2000 upward.
+; Hand the drive and the driver to whatever we are about to run.
+        lda unit
+        sta HANDOFF_UNIT
+        lda entlo
+        sta HANDOFF_DRVLO
+        lda enthi
+        sta HANDOFF_DRVHI
+        lda #0x5A
+        sta HANDOFF_SIG
+
+; Read PAYLOAD_BLOCKS blocks from START_BLOCK to LOAD_ADDR upward.
         lda #(LOAD_ADDR & 0xFF)
         sta buflo
         lda #(LOAD_ADDR >> 8)

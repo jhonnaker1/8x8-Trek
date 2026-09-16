@@ -161,6 +161,10 @@ the whole platform seam, and read the map.
     driver linked instead of      headroom  3,838 bytes
     its stub                      video cost 5,981 bytes
 
+    and with the real STORAGE     resident  $0800..$AC0C
+    seam as well                  headroom  1,012 bytes
+                                  storage cost 2,826 bytes
+
 **`make early` runs it both ways; `tools/verify_gs.py` checks the invariants a
 link can break silently.**
 
@@ -170,8 +174,8 @@ linked — a factor of 3.05, against the Falcon's 4,636 for a 1,559-byte driver,
 a factor of 2.97. The callers grow: a stub is unfoldable only while nothing
 downstream is real.
 
-So the honest position is **3,838 bytes for five remaining seams** — keyboard,
-sound, storage, far memory and the overlay loader — and that is not enough.
+So the honest position is **1,012 bytes for four remaining seams** — keyboard,
+sound, far memory and the overlay loader — and that is not enough.
 The C64 shipped with 6,112 spare *after* its drivers were in. What this port
 has that the C64 did not is somewhere to put things: the **2,048-byte message
 log** is in bank 0 today and need not be, the **language card** at `$D000` is
@@ -290,6 +294,47 @@ a question whose answer changes nothing. And the rig cannot see the machine
 that matters anyway: **MAME's smallest `apple2gs` is 1M**, so a stock 256K
 IIgs is not testable here — which makes "do not rely on any bank above `$01`"
 a constraint this project has no way to check its way out of.
+
+## Files, with no ProDOS on the disk
+
+`src/gsblk.c` is `core/storage.h`'s five `plat_*` over the slot firmware's
+block driver, plus this port's own directory. The format is
+`atari/src/atarisio.c`'s at 512 bytes, and for the Atari's two reasons
+exactly: **PRODOS on the disk is Apple's code**, so a bootable image would not
+be ours to give away, and **the MLI uses zero page during a call**, which
+collides with llvm-mos's imaginary registers and is not something this project
+could measure its way out of.
+
+    block 0     the loader          block 2..  the game image
+    block 1     directory, 32x16    then       file data, each file CONTIGUOUS
+
+Contiguous, so there is no link field in every block and no free map. The
+save's name is typed by the player and cannot be known when the disk is built,
+so `mkdisk.py` lays down **slots** — entries with an extent assigned and no
+name — and `dir_claim()` takes one on the first write to an unknown name. That
+is the whole allocator: it cannot fragment, because nothing is ever freed and
+every slot is the same size. The slot bit does a second job — **a write to
+`STRINGS.DAT` is refused by the FORMAT** rather than by nobody having tried it.
+
+`make files` runs fifteen checks on the machine, and **half of them are
+refusals**: a file that is not there is reported missing, a write to a name
+with no slot bit is refused, and the save is **read back** — a save that
+cannot be re-read is the failure mode that matters and only the second half of
+that pair can see it.
+
+### The handoff, and the arm-check that proves it earns its place
+
+The loader knows two things the game cannot re-derive — which drive the
+machine booted from, and where that slot's block driver lives — and zero page
+does not survive the C runtime's arrival. Four bytes at `$0280` carry them,
+with a signature.
+
+**The signature is not decoration.** `tools/run.lua` pokes an image straight
+into memory and sets the PC, which is how every probe in this port was tested,
+and in that path `boot.S` never runs — so those bytes are whatever the ROM
+left and `jmp (gs_drv)` would go anywhere. `make filesfail` runs the identical
+binary that way: the signature is detected absent, **every file call is
+refused cleanly and nothing hangs**, and the gate reports thirteen failures.
 
 ## What has NOT been established
 
