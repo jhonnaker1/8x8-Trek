@@ -342,6 +342,12 @@ colour**; verticals are `|` and read as dotted. **A machine with a fixed ASCII
 charset and per-cell colour can draw this console**, which was never certain
 before and quietly widens every remaining candidate.
 
+**AND A FIFTH AXIS, LEARNED THE EXPENSIVE WAY: what does the candidate's ROM
+switch take away?** The C64's `$01` pages out BASIC and leaves the KERNAL; the
+Plus/4's `$FF3F` removes both, which needs a shim around every system call, its
+own interrupt handling and its own keyboard. That is invisible in colours,
+columns, rows and existing-code counts, and on the Plus/4 it decided the port.
+
 **ROWS, CHECKED 2026-09-16 — the axis this table was missing.** The console is
 25 rows and uses row 24, so a 24-row machine needs a layout that does not
 exist.
@@ -367,7 +373,7 @@ driver is the thing that transfers; the text mode was never the plan.
 | Candidate | What it would cost | What already exists |
 |---|---|---|
 | ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
-| **Commodore Plus/4** | video, a **new sound driver** (TED is not SID), a link script | the C64 port's storage, input, overlay and KERNAL model; TED gives 40×25 with all sixteen colours distinct |
+| **Commodore Plus/4** | **PARKED — and this row was wrong.** Video and sound are written and measured; the link script was the easy part. **`$FF3F` removes BOTH ROMs**, where the C64's `$01` leaves the KERNAL mapped — so every KERNAL call needs a banking shim, the 6502's vectors vanish with the ROM, and masking interrupts costs `GETIN`. A fourth seam, bigger than the other three. See [`plus4/README.md`](plus4/README.md) | `layout40.c`, `ui.c`, `strpool.c`, `core/`, and the C64's `storage.c`/`overlay.c` — which did link unchanged |
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
