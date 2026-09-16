@@ -11960,3 +11960,40 @@ EXTENT INCLUDING THE FIXED TENANTS ARE FOUR DIFFERENT NUMBERS**, and only the
 fourth decides anything. `fit.py` reads build_ovl.py's own report -- which asks
 the linker for `bss_start`/`bss_end` -- and adds the window, the screen, the
 log and the stack, which live at fixed addresses and appear in no map at all.
+
+### THE LOW-RAM SCREEN: THE CONTROL PASSED AND THE TEST DID NOT (2026-09-16)
+
+The last 1,608 bytes were to come from moving the 4,000-byte screen below the
+program, into what looked like Disk BASIC's space. **The map supported it**:
+every DSKCON variable -- DCOPC, DCBPT, DRGRAM, NMIFLG, DNMIVC -- resolves into
+the program's own bss at `$D498` and above, so nothing the standalone WD1773
+driver needs lives under `$2800`.
+
+`coco3gime/src/lowram.c` tested it anyway, and it was right to:
+
+    BEFORE THE SCREEN EXISTED    STRINGS.DAT FOUND, length 7,484
+    AFTER 4,000 BYTES AT $1000   NOT FOUND
+    THE 4,000-BYTE PATTERN       SURVIVED
+
+**THE CONTROL IS THE WHOLE VALUE OF THAT PROBE.** Its first version filled low
+RAM and then failed to find the file, which reads as "low RAM broke the disk"
+and is only one of two possibilities -- the other being that the disk was never
+going to work in that probe's setup at all. Trying the open BEFORE the screen
+exists separates them in one run, and it came back FOUND. So low RAM is the
+cause and not a coincidence.
+
+**The pattern surviving says the driver does not WRITE there; it READS
+something there.**
+
+**AND THE PROBE'S ENVIRONMENT IS NOT THE PORT'S, WHICH LIMITS THE FINDING.**
+This probe is `LOADM`ed and `EXEC`ed with `CLEAR 25,&H2FFF`, so the ROM is
+still mapped and BASIC is still live with its variables and buffers through
+`$1000..$2FFF`. The real port switches to ALL-RAM MODE and BASIC is gone.
+Whether `$1000` is free THERE is untested, and testing it needs the
+first-stage loader rather than `LOADM` -- a different rig, not a different
+wait.
+
+**So the 1,608 bytes are still outstanding**, and the honest options are
+unchanged: page ~1,600 more out (new OVL_CODE markers in shared code, which
+touches nine ports), shrink the log (a shared constant), or re-test low RAM
+under the real loader.

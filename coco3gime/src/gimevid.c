@@ -54,13 +54,19 @@
    address with 32-bit arithmetic; the screen filled with junk, because what
    $FF9D/$FF9E ended up holding was not where the array was. A literal is
    checkable by eye against the register value and cmoc cannot get it wrong.
-   PACKED HARD AGAINST THE I/O PAGE, with the log above it and the overlay
-   window below, so the resident image gets everything underneath. The three
-   fixed tenants are 10,144 bytes of the 54,528 between $2800 and $FF00; a
-   rounder $E000 would have wasted 1,792 in the gap and that is the difference
-   between fitting and not. */
-#define gime_screen ((unsigned char *)0xE260)
-#define SCREEN_CPU   0xE260UL
+   IN LOW RAM AT $1000, BELOW THE PROGRAM, and that is where the last 1,608
+   bytes came from. The port loads at $2800 and everything under it looked
+   like Disk BASIC's -- but this port runs in ALL-RAM MODE with cmoc's
+   STANDALONE WD1773 driver, so once the game starts there is no ROM down
+   there and no Disk BASIC workspace to protect. MEASURED, not assumed: every
+   DSKCON variable -- DCOPC, DCBPT, DRGRAM, NMIFLG, DNMIVC -- resolves into
+   the program's OWN BSS at $D498 and above, which the map says and a
+   datasheet could not.
+   4,000 bytes at $1000 is clear of the direct page, clear of the first-stage
+   loader's stub at $2800, and clear of its body at $6000 -- and the buffer is
+   not written until vdc_init(), by which time both have finished. */
+#define gime_screen ((unsigned char *)0x1000)
+#define SCREEN_CPU   0x1000UL
 
 /* PHYSICAL, AND THE MACHINE'S RAM SIZE DECIDES IT. With the MMU off the CPU's
    64K is the TOP 64K of whatever is fitted, so a CPU address is physical
