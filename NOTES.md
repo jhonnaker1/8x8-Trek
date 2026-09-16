@@ -11842,3 +11842,34 @@ both come out BETTER than a glyph would have:
 **The verticals stay dotted** -- `|` does not span the cell height and there is
 no attribute bit for it. That is the one visible compromise of this port.
 
+
+### THE BUDGET, MEASURED: IT DOES NOT FIT, AND BY HOW MUCH (2026-09-16)
+
+`make -C coco3gime early` links the whole game RESIDENT with the real string
+pool in it and reads the overflow, which is the staging rule every port here
+starts with.
+
+    all-resident program                61,208
+    $2800..$FEFF, everything            54,528
+    screen 4,000 + log 2,048 + pool 7,895   13,943
+    so the program may be              40,585
+    the CARD-carrying port's resident   45,729   (eleven overlays already)
+    ------------------------------------------
+    MORE THAT MUST PAGE OUT              5,144
+
+**So this port needs the existing overlay machinery AND about 5K more paged
+than the port that has a card.** That is the price of the SuperSprite's 128K
+of VRAM: the string pool lived there and here it has to live in the 64K the
+program is already in.
+
+**THE FIRST ARITHMETIC SAID 7,841 AND IT WAS WRONG IN A USEFUL WAY.** It
+assumed the program had to end below the screen at `$E000`, which wastes the
+3,936 bytes above it. Laying the screen, the log and the pool out CONTIGUOUSLY
+under the I/O page and giving the program everything below recovers 2,697
+bytes for nothing but arithmetic. The tenant list is the same; the order is
+not.
+
+Not attempted yet: the overlay split. `coco3/tools/build_ovl.py` and
+`ovl.link` are a working design -- one link, a `code` section renamed and
+placed at the window -- and the question is whether another 5K of the shared
+UI can be paged without breaking core/overlay.h's rule 4.
