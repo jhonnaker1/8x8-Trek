@@ -1,7 +1,70 @@
-# EGA Trek on the Commodore Plus/4 — scoping
+# EGA Trek on the Commodore Plus/4 — PARKED, 2026-09-16
 
-**Status: the toolchain, the rig and the memory map are established. No game
-code has been linked yet.**
+**IT DOES NOT BOOT. Everything below the game does: video, sound, far memory,
+the string pool, the overlay split and the disk are built and MEASURED. The
+program does not start.** Parked deliberately rather than abandoned — this
+file is the handover, and its job is to stop the next attempt re-deriving what
+is already known.
+
+## What works, and is measured on the machine
+
+| Piece | State |
+|---|---|
+| Toolchain | `plus4.ld` + `src/basichdr.c`; llvm-mos with **no `plus4` platform**, so the link script, the BASIC header and the KERNAL jump table are this port's own |
+| Rig | `xplus4` on the shared `tools/vice_mon.py`; `tools/run_p4.py`, `screen_p4.py`, `setpc_p4.py` |
+| Video | `src/ted.c`, 112 lines — the **real `layout40.c`** draws the console frame, 224 cells |
+| Colour | `src/egated.h`, checked programmatically against `check_colours.py`'s `PLUS4` table — **all sixteen agree, and this port folds nothing** |
+| Sound | `src/tedsnd.c`, **two voices**, measured 438.3 / 998.4 / 198.7 Hz against 440 / 1000 / 200, plus voice 2 |
+| Far memory | `src/p4mem.c` — **cheaper than the C64's**: the read path does not bank at all |
+| Disk | `make d64` — 11 overlay images, data files, `strings.dat` proven to load: 7,496 bytes, count 334 |
+| Budget | resident to `$AC26`, window `$CC00`, **5,890 bytes spare**, `verify_p4` 15 checks |
+
+## Where it stops
+
+`p4bank.c` — the file that banks RAM in — is what stops `main()` being reached.
+Bisected with a two-line `hello.c`:
+
+    without p4bank.c   ran = $5A   main() RUNS
+    with p4bank.c      ran = $00   main() does NOT run
+
+One cause is certain and fixed: **`.init.NNN` sections are concatenated and
+fallen through**, so a C function there returns out of the init chain — they
+are `naked` assembly now. That did not make it run, so there is more in that
+file.
+
+## What the next attempt should NOT re-derive
+
+  * **`$FC00-$FCFF` is always KERNAL ROM.** Not bankable. The far store's limit
+    is `$FBFF`; it was `$FCFF`, and the pool was already 36 bytes into ROM.
+  * **The HI ROM is `$C000-$FBFF` AND `$FF40-$FFFF`**, so banking RAM in takes
+    the 6502's vectors with it.
+  * **`$FCB3` is a cartridge ROM-bank trampoline, not a RAM-mode one** —
+    `STA $FDD0` / `JMP $CE00`, exit `LDX $FB` / `STA $FDD0,X`, and no value of
+    X means RAM. Disassembled, not read about. The encyclopedia points banked
+    programs at it and it cannot serve this one.
+  * **`$FF3F` removes BOTH ROMs**, unlike the C64's `$01 = $3E` which leaves the
+    KERNAL mapped. So **every KERNAL call needs a banking shim** — `p4bank.c`
+    overrides every `cbm_k_*` the game links. This is the cost the survey
+    missed entirely; it said "video, a new sound driver, a link script".
+  * **The soft stack must not sit in a loaded section.** It was `$7F00` while
+    `.text` ran `$1055..$9908`. `verify_p4.py` checks this now.
+  * **The zero-page question is OPEN and UNTESTED.** `plus4.ld` carries
+    `__basic_zp_start = 0x0002` verbatim from `c64.ld`, so `__rc0..__rc31` sit
+    at `$0002..$0021`. That is free on a C64 with BASIC out; nobody has
+    established it is free on a Plus/4 being called into. **The probe written
+    to test it was broken** — it reported "32 of 32 clobbered" with the KERNAL
+    call removed as well, because it never completed. Write a better one.
+  * **Masking interrupts costs the keyboard.** `input.c` reads through `GETIN`,
+    which the KERNAL's IRQ fills. This port will need its own keyboard seam.
+
+## Honest assessment
+
+The survey costs this port at three seams. Two of them — video and sound — are
+done and measured. The third, the link script, was the easy part. **What the
+survey did not cost is the banking**, and that is the whole difficulty: a
+machine whose ROM switch is all-or-nothing needs a shim around every system
+call, its own interrupt handling, and its own keyboard. That is not a link
+script; it is a fourth seam bigger than the other three.
 
 ## llvm-mos targets this machine, and the gap was never a compiler
 
