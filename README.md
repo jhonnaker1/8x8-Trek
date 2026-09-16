@@ -342,13 +342,33 @@ colour**; verticals are `|` and read as dotted. **A machine with a fixed ASCII
 charset and per-cell colour can draw this console**, which was never certain
 before and quietly widens every remaining candidate.
 
+**ROWS, CHECKED 2026-09-16 — the axis this table was missing.** The console is
+25 rows and uses row 24, so a 24-row machine needs a layout that does not
+exist.
+
+| Candidate | Geometry it would use | Rows | Where that comes from |
+|---|---|--:|---|
+| **Plus/4** | TED text, 40×25 | **25** | NOTES item 57's 40×25 family |
+| **MSX2** | **V9938 SCREEN 7 bitmap, 512×212, 6×8 cells → 80×25** | **25** | **the CoCo 3 card port already does exactly this** on the sibling V9958: `coco3vid.c` — *"512 and 8-pixel rows give 26; the console takes 80×25"*, `MARGIN_Y 6` centring 200 lines in 212 |
+| **Foenix F256K** | Vicky text | **UNKNOWN** | **nothing in this repository records it, and there is no emulator or ROM here to ask.** Check before costing it |
+| **CBM-II P500** | VIC-II text, 40×25 | **25** | a real VIC-II |
+| **Apple IIgs** | SHR 320×200, 8×8 cells | **25** | 200 ÷ 8 |
+
+**AND THIS CORRECTS THE MSX2 ENTRY RATHER THAN CONFIRMING IT.** The worry was
+that an MSX2 is 80×**24** in text mode, which would have made the cheapest-
+looking candidate expensive. **An MSX2 port would not use text mode at all** —
+it would use the bitmap, exactly as the CoCo 3 card port uses GRAPHIC6 on the
+V9938's sibling chip, and that yields 80×25 with six-pixel cells. The V9958
+driver is the thing that transfers; the text mode was never the plan.
+**MSX2 comes out of this stronger, not weaker.**
+
 **Still live, cheapest first:**
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
 | ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
 | **Commodore Plus/4** | video, a **new sound driver** (TED is not SID), a link script | the C64 port's storage, input, overlay and KERNAL model; TED gives 40×25 with all sixteen colours distinct |
-| **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling |
+| **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
 | **Apple IIgs** | a hand-built linker config, an Ensoniq 5503 sound driver, ProDOS storage, and **cross-bank writes** — SHR lives in bank `$E1` and llvm-mos's 65816 is a fast 6502 in 16-bit address space, so the video seam needs long addressing by hand | `layout40.c`, and SHR's 4bpp **packed** 2-pixels-per-byte format is the CoCo 3 card port's V9958 GRAPHIC6 shape, not the ST's planar one — **no far memory and no overlays at all**, the machine starts at 256K |
