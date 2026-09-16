@@ -76,11 +76,15 @@ unsigned char vdc_data_read(void)
 
 #endif  /* GS_REAL_FAR -- the log half */
 
-/* ---- keyboard ---- */
+/* ---- keyboard ----
+   GS_REAL_KEY links src/gskey.c instead. */
+#ifndef GS_REAL_KEY
 uint16_t kb_entropy;
 volatile unsigned char kb_inject;
 void kb_init(void) { gs_sink = 3; }
 char kb_waitkey(void) { return (char)gs_sink; }
+
+#endif  /* GS_REAL_KEY */
 
 /* ---- sound ---- */
 uint8_t snd_region;
@@ -103,8 +107,11 @@ void far_read(uint16_t off, void *dst, uint8_t len)
 
 #endif  /* GS_REAL_FAR */
 
-/* ---- overlays ---- */
+/* ---- overlays ----
+   GS_REAL_OVL links src/gsovl.c instead. */
+#ifndef GS_REAL_OVL
 void ovl_load(uint8_t which) { gs_sink = which; }
+#endif
 
 /* ---- storage ----
    GS_REAL_STORAGE links src/gsblk.c instead of these. */

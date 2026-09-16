@@ -32,7 +32,71 @@ MAMEOPT = -rompath "$(ROMS)" -window -skip_gameinfo -nothrottle -sound none \
 
 PROBES  = gsprobe gsmap gsfill1 gsdiv gsram
 
-all: $(PROBES:%=build/%.bin)
+# ---------------------------------------------------------------- THE GAME
+# Everything but sound is real. src/gsstub.c still supplies snd_*, behind
+# -DGS_REAL_* switches that say exactly which seams are finished -- so the
+# size measurement and the game are the same link with different flags rather
+# than two things that can drift apart.
+GAME_SRC = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
+           ../c128/src/strpool.c ../core/trek.c ../core/planet.c \
+           ../core/hof.c ../core/serial.c \
+           src/gsstub.c src/gsvid.c src/gsblk.c src/gsfar.c src/gsovl.c \
+           src/gskey.c
+GAME_FLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
+             -DTREK_40COL -DTREK_OVERLAYS -DTREK_COLOUR_IS_EGA \
+             -DGS_REAL_VIDEO -DGS_REAL_STORAGE -DGS_REAL_FAR \
+             -DGS_REAL_OVL -DGS_REAL_KEY -T iigs.ld
+OVL_NAMES = eval hof front info repair msgs planet cmds title events xtra
+
+build/trek.elf: $(GAME_SRC) iigs.ld | build
+	$(CC) $(GAME_FLAGS) $(LDFLAGS) -Wl,-Map=build/trek.map $(GAME_SRC) \
+	  -o $@ $(LDLIBS)
+
+# THE STAGING REGIONS MUST COME OUT. The overlay images are linked at $10000
+# upward so each gets its own AT> region; objcopy -O binary over the whole ELF
+# writes all eleven of them into the file and the image comes out 106,401
+# bytes instead of 38,395. They are cut separately by tools/cut_overlays.py.
+build/trek.bin: build/trek.elf
+	$(OBJCOPY) -O binary \
+	  $(foreach o,$(OVL_NAMES),-R .ovl_$(o)) build/trek.elf $@
+
+build/OVERLAYS.BIN: build/trek.elf tools/cut_overlays.py
+	python3 tools/cut_overlays.py build/trek.elf $@
+
+build/STRINGS.DAT: ../c128/src/strings.txt src/strings.override.txt ../tools/gen_strings.py | build
+	cd .. && python3 tools/gen_strings.py >/dev/null
+	cd .. && python3 tools/gen_strings.py --override iigs/src/strings.override.txt \
+	    iigs/build/STRINGS.DAT
+
+build/MUSIC.DAT: ../tools/make_music.py | build
+	cd .. && python3 tools/make_music.py >/dev/null
+	cp ../c128/build/music.dat $@
+	@cmp ../c128/build/music.dat $@
+
+build/trek.po: build/boot.bin build/trek.bin build/OVERLAYS.BIN \
+               build/STRINGS.DAT build/MUSIC.DAT tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin \
+	  --payload build/trek.bin \
+	  --file STRINGS.DAT=build/STRINGS.DAT \
+	  --file MUSIC.DAT=build/MUSIC.DAT \
+	  --file OVERLAYS.BIN=build/OVERLAYS.BIN --slots 4
+
+game: build/trek.po
+	python3 tools/verify_gs.py build/trek.elf --window 0xD000 --org 0x0800
+
+# Boot the game and drive it. GS_KEYS is a comma-separated list of ioport
+# field names -- "Return", "Space", "n", "1" -- because this machine's
+# keyboard is an ADB keyboard and neither natkeyboard:post_coded() nor a poke
+# at $C000 reaches it. See tools/play.lua.
+play: build/trek.po
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	GS_WAIT=$${GS_WAIT:-22} GS_KEYS="$${GS_KEYS:-Return}" \
+	  GS_STEP=$${GS_STEP:-8} $(MAME) apple2gs $(MAMEOPT) \
+	  -flop3 build/trek.po -snapshot_directory build/snap \
+	  -autoboot_script tools/play.lua -seconds_to_run $${GS_SECS:-140}
+
+
+all: $(PROBES:%=build/%.bin) build/trek.po
 
 build/%.elf: src/%.c iigs.ld | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) $< -o $@ $(LDLIBS)
@@ -251,11 +315,11 @@ early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 	@echo "-- and far memory too: the log and the pool leave bank 0"
 	python3 tools/verify_gs.py build/earlyfar.elf --window 0xD000 --org 0x0800
 
-verify: colours bootcheck failcheck early sheet sheetfail files filesfail
+verify: colours bootcheck failcheck early sheet sheetfail files filesfail game
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail game play verify clean
 
 .PRECIOUS: build/%.elf

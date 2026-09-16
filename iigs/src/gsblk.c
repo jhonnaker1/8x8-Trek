@@ -312,3 +312,15 @@ void plat_close(void)
     open_live = 0;
     open_have = 0;
 }
+
+/* The extent of a named file, for callers that want blocks rather than bytes
+   -- the overlay loader reads straight into the window and never wants the
+   data copied through a buffer first. */
+uint8_t blk_extent(const char *name, unsigned int *start, unsigned int *len)
+{
+    int i = dir_find(name);
+    if (i < 0) return STOR_NOTFOUND;
+    *start = ent_start((unsigned char)i);
+    *len   = ent_len((unsigned char)i);
+    return STOR_OK;
+}

@@ -7842,3 +7842,37 @@ the top of RAM, false once it was in a different mapping. The number jumped by
 4,096 bytes the program cannot use. It reports the LOWER of `__stack` and the
 window now, and says which is binding. **A derived figure can be correct for
 one layout and become a lie when the layout changes under it.**
+
+## Apple IIgs: the game runs (2026-09-16)
+
+Title screen, setup dialogue, and the whole chain behind them: boot block,
+block reads, a 38,395-byte image, the string pool in bank $01, overlays read
+from the disk into the language card, keyboard, console. Everything but sound.
+
+    resident   $0800..$AB8C     HEADROOM 5,236 bytes
+    overlays   11, largest 3,961 of 4,096
+    disk       75 blocks image, 15 STRINGS.DAT, 1 MUSIC.DAT, 88 OVERLAYS.BIN,
+               4 save slots, 1,403 blocks free
+
+The last two seams cost 542 bytes together: gskey.c is 39 (($C000 latch,
+$C010 strobe) and gsovl.c the rest.
+
+### THE KEYBOARD IS AN ADB KEYBOARD, which is a fact about the RIG
+
+`natkeyboard:post_coded()` is ACCEPTED AND DOES NOTHING on apple2gs: the first
+attempt posted RETURN, reported no error, and the title screen sat there --
+with $C000 reading $00, the hardware latch saying no key ever arrived. And
+$C000 cannot be poked: it is a READ-ONLY soft switch whose write side means
+something else. Keys come from :macadb:KEY0..KEY7 ioport fields, held down and
+released. tools/play.lua reads $C000 after each press so the rig can tell "the
+key did not arrive" from "the game did not react".
+
+### AND TWICE I READ A DEFECT OFF A SCREENSHOT THAT WAS NOT THERE
+
+Both the title screen and the setup dialogue looked like they had overlapping
+lines of text. Both times a per-scanline count showed every text row occupying
+exactly its own eight scanlines. The font is six pixels tall in an eight-pixel
+cell, so adjacent rows have ONE blank scanline between them and read as
+crowded at this scale. **A small screenshot is not a measurement**; the count
+took ten seconds and the second look would have cost a day of chasing the
+video driver.

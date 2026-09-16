@@ -249,6 +249,58 @@ cell boundaries.
 colours and reverse video on a real machine, and `tools/check_sheet.py`
 measures four things no eye can judge on a screenshot.
 
+## The game runs
+
+**EGA Trek's title screen is on an Apple IIgs, the setup dialogue answers, and
+the whole chain works: boot block, block reads, 38,395-byte image, string pool
+in bank `$01`, overlays read into the language card, keyboard, console.**
+Everything but sound is real.
+
+    make game     build build/trek.po
+    make play     boot it and drive it -- GS_KEYS="Return,n,Return" etc.
+
+Two seams were all that remained after far memory, and between them they cost
+**542 bytes**:
+
+* `src/gskey.c` — **39 bytes.** `$C000` holds the last key with bit 7 set;
+  `$C010` clears the strobe. No ROM, no interrupts, no firmware, which matters
+  on a port that has taken the machine and switched the language card in. A
+  IIgs returns real ASCII including lowercase, so it folds to upper here
+  rather than at thirty call sites — the X16 met the same difference and it
+  cost a release.
+* `src/gsovl.c` — eleven 4K images read from the disk into the window at
+  `$D000`. Shaped like the C128's rather than the Atari's: the Atari holds
+  every image in VRAM because its twelfth overlay is on the hot path, and this
+  port has no such overlay and no spare bank big enough (bank `$01` has ~16K
+  left against 45,056 for eleven padded images).
+
+### Two things this port did not have to learn again
+
+**`ovl_fatal` is the shared one.** This file defined its own for about a
+minute, and the duplicate-symbol error was the cheap half of what that was
+worth. The expensive half is in the shared version's comment: it writes the
+overlay number through `scr_puts` because `scr_put` takes a SCREEN code and a
+digit is ASCII. The private copy used `scr_put` — right on machines where
+digits map to themselves, and **this port's font is indexed by C128 screen
+code, where they do not.** A private copy of a shared routine loses every
+lesson the shared one has learned.
+
+**Every slot carries a stamp** — the low sixteen bits of `ovl_load`'s address
+in the link it was cut from, at offset 4094. An overlay is linked *with* the
+resident half, so yesterday's `OVERLAYS.BIN` beside today's program jumps into
+the middle of some other function. On the MEGA65 that reset the machine to
+BASIC and could mimic any bug you cared to name; on the C128 a missing
+eleventh image opened the game on an uninitialised galaxy, having first shown
+the SAVE GAME dialog, because that is what lived at that address in the image
+actually in the window.
+
+### And the first boot said C128 across the top
+
+`src/strings.override.txt`, four ids, same shape as `c64/`, `st/` and
+`mega65/`. The generator owns the numbering, so this port builds the same
+`strdata.h` and the same `STR_COUNT` as every other — a mismatch there makes
+the game run with **every label blank** rather than complain.
+
 ## Will more RAM help? No — but the RAM already under the ROM will
 
 Asked because the console driver left only 3,838 bytes for five seams.

@@ -1,0 +1,39 @@
+# Per-port text for the Apple IIgs, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override iigs/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, AND NOTHING ELSE -- the generator owns the numbering,
+# so this port builds the same strdata.h and the same STR_COUNT as every other.
+# See NOTES.md item 60 for what STR_COUNT is load-bearing for: the binary and
+# the STRINGS.DAT beside it are coupled by it, and a mismatch makes the game
+# run with every label BLANK rather than complain.
+#
+# Only the strings that NAME THE MACHINE differ. Same precedent and same shape
+# as c64/, st/ and mega65/src/strings.override.txt.
+#
+# THE FIRST BOOT OF THIS PORT SAID "C128 40-COLUMN PORT" ACROSS THE TOP, which
+# is what this file is for -- and it was visible in the first screenshot of the
+# title screen, before anything else had been looked at.
+
+# The title bar. The 40-column build draws S_330, not S_0 -- see ui_title().
+330	APPLE IIGS PORT
+
+# S_0 is the 80-column title bar, which this port never compiles. Overridden
+# anyway so that nothing on this disk says C128 about a IIgs: a string that is
+# unreachable today is a string somebody reaches tomorrow.
+0	 APPLE IIGS PORT 
+
+# The dedication line, drawn at x=0 on row 23 of the 40-column title.
+82	TO THE APPLE IIGS.
+
+# THE FAREWELL, and this machine's answer is its own. The C128's wording says
+# "BASIC IS ON THE 40-COLUMN SCREEN", which is a C128 sentence about its other
+# display. There is no BASIC here to go back to: this disk has no ProDOS on it
+# and plat_exit() restores the text screen and stops, because a program that
+# booted the machine itself has nothing to return to.
+#
+# It also names the keypress, which the C128's wording never does -- that left
+# the player looking at a dead screen on the MEGA65 and the C64 both. main.c
+# centres both lines from strlen in the 40-column build, so this may be any
+# length up to 40.
+10	POWER OFF OR REBOOT THE IIGS.
