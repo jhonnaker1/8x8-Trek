@@ -70,3 +70,10 @@ coco3/hardware/*.dsk
 __pycache__/
 *.pyc
 x16/build/
+
+# MAME writes these into whatever directory it is run from -- the IIgs rig runs
+# from iigs/, so its own config and battery RAM land there. Emulator state, not
+# port source: a committed nvram/rtc makes every run start from one machine's
+# clock and a committed cfg pins the input map of whoever ran it last.
+iigs/cfg/
+iigs/nvram/

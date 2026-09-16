@@ -12605,3 +12605,67 @@ place, and it still does.**
 **WHAT IT MEANS FOR THE PORT.** The MMU is not ruled back in -- enabling it
 requires writing INIT0 -- but the REASON is not the bit anyone thought, and
 the door is no longer closed on the evidence that closed it.
+
+## The Apple IIgs, measured back in: 320 mode places SIXTEEN colours (2026-09-16)
+
+The machine was ruled out on 2026-09-05 on a real measurement -- 640 mode
+gives FOUR freely-placeable colours, the Atari ST's objection exactly. That
+finding stands and is not what changed. **320 mode is 40 columns, and 40
+columns stopped being disqualifying when the ST shipped v0.17.0.**
+
+So the question was reopened and both halves of it are now answered on the
+machine rather than on paper. See `iigs/README.md` and MEASURED.md.
+
+**Sixteen distinct colours, every one the exact value programmed**, drawn by
+COMPILED C through hand-written long addressing into bank `$E1`. The console
+needs fifteen.
+
+### The survey's toolchain line was a recollection, not a measurement
+
+It said llvm-mos's `mosw65816` gives *"no `rep`/`sep`, no long addressing"*.
+Half right: the CODE GENERATOR is an 8-bit 6502 generator with the 65816's
+extra opcodes. But the ASSEMBLER encodes everything -- `8F` `9F` `B7` `97`
+`C2` `E2` `EB` `8B` `AB` `54` -- which is precisely what a hand-written video
+seam needs, and the generator emits `lda $00214e` (absolute long) for a global
+right beside `stz $214e` (absolute, DB-relative) for the SAME variable in the
+SAME loop body. That mixture is why `phk`/`plb` at startup is mandatory rather
+than tidy.
+
+### Three traps carried in from the Plus/4, and one the Plus/4 note understated
+
+`.init.NNN` needs `naked` and no `RTS` -- applied on the first build here
+rather than discovered on the twentieth. Establish the CPU mode with `sec;
+xce` instead of inheriting whatever the ROM was in. And **`used, retain` on
+every symbol inline asm names**: the Plus/4 note says such a symbol must not
+be `static`, and that is NOT ENOUGH -- a symbol only assembly refers to is
+invisible to LTO and gets dropped, failing at LINK time out of a file that
+compiled clean.
+
+The fourth is new and is the one that cost a run: **an asm INPUT operand that
+the asm overwrites must be declared.** `bankpoke` took `"a"(lo)`, the compiler
+was keeping the loop counter in A across it, the asm destroyed A, and the loop
+ran forever with the counter stuck at 1 -- indistinguishable from code that
+never started. Take nothing in registers; use fixed globals, which is what the
+C128 port concluded for its own reasons.
+
+### AND THE INSTRUMENT LIED FOR AN AFTERNOON
+
+**A dump of SHR taken while SHR is ON returns every written page twice.**
+Measured by building one probe two ways, one line different: 0 mismatches of
+125 pages with the display off, 124 of 125 with it on.
+
+For an afternoon that made a correct program look broken, and it produced the
+worst kind of evidence -- self-consistent, reproducible, and wrong. The probe
+logged the page and value of all 112 of its own calls and they were exact;
+`bankfill` tested alone wrote 256 of 256 bytes in the right page and 0 in the
+next; `p / 7` was suspected and proved correct for all 112 inputs. Every part
+was right and the memory still disagreed. **Two instruments disagreed and the
+program was not the liar** -- and the reading that finally settled it was not
+a cleverer dump but the SNAPSHOT, which does not go through that address
+space at all.
+
+A second-order note worth keeping: midway through, I read a disassembly of the
+PREVIOUS build against symbol addresses from the CURRENT one and invented a
+discrepancy that was not there. **Mixing two builds' output is its own way of
+seeing nothing**, and the tell was a rebuild that shifted every address by the
+two bytes an added `.init` section had cost.

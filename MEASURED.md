@@ -7617,3 +7617,49 @@ VIEWER on **POWER DISTRIB 509**, showing the PMAX/PAVL/PPCT header and the
 three pools at `1:5000 2:0500 3:2500` -- the page whose header measures 18
 columns against this port's 17, seen rather than inferred. And an ALERT panel,
 four DAMAGE REPORT boxes and a partially damaged SYSTEMS STATUS, all in green.
+
+## Apple IIgs: Super Hi-Res 320 mode gives SIXTEEN placeable colours (2026-09-16)
+
+Ample's MAME 0.289, verified `apple2gs` romset, ROM 03. The same instrument
+that counted colours in 640 mode on 2026-09-05 and ruled the machine out --
+count the distinct colours in the snapshot -- asked of 320 mode, this time
+with the pixels written by COMPILED C rather than by Lua.
+
+    content box            640 x 200 px   (320 mode pixels doubled in capture)
+    distinct colours       16 of 16       every one the exact value programmed
+    per-band pixel count   7,168          7 pages x 256 B x 2 px x 2 capture
+    black                  20,480         one band plus 13 unwritten pages
+
+    #000000 #777777 #884411 #7722cc #aa0000 #00cc00 #0000ee #ffdd00
+    #dd0000 #ffaa99 #888888 #00e000 #00eeee #ffff00 #0000ff #ffffff
+
+Programmed as `$0RGB` little-endian at `$E1/9E00`; each nibble came back
+replicated into a byte, which is the identity. **The console needs fifteen.**
+
+### The toolchain, measured rather than recalled
+
+`mosw65816` in the installed llvm-mos. The CODE GENERATOR emits 8-bit
+6502-shaped code (`sta ($0)`, `bra`, `txy`) and never `rep`/`sep`. The
+ASSEMBLER encodes the whole instruction set:
+
+    8F sta long      9F sta long,x    B7 lda [dp],y    97 sta [dp],y
+    C2 rep           E2 sep           EB xba           8B phb   AB plb
+    54 mvn           -- syntax is `mvn #$dst,#$src`; `mvn $e1,$00` is rejected
+
+Verified by assembling a bogus mnemonic first and checking it FAILED.
+
+### Long store, alone
+
+`src/gsfill1.c`, one call, one page: **256 of 256 bytes** written in page
+`$E1/30`, **0 of 256** in `$E1/31`, 0 in `$E1/2F`.
+
+### Every SHR page written with its own number
+
+`src/gsmap.c`, pages `$20`..`$9C`: **0 mismatches of 125** with SHR off.
+
+### AND 124 MISMATCHES OF 125 WITH SHR ON -- a property of the RIG
+
+Same program, one line different (`$C029 = $C1` at the end). With the display
+enabled, a readback of `$E1/2000..` returns every written page TWICE:
+`20 20 21 21 22 22 ...`. **A dump of SHR taken while SHR is on is not a
+picture of what the program wrote.** Use the snapshot; dump only with it off.

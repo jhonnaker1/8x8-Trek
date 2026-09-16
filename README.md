@@ -377,7 +377,7 @@ driver is the thing that transfers; the text mode was never the plan.
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
-| **Apple IIgs** | a hand-built linker config, an Ensoniq 5503 sound driver, ProDOS storage, and **cross-bank writes** — SHR lives in bank `$E1` and llvm-mos's 65816 is a fast 6502 in 16-bit address space, so the video seam needs long addressing by hand | `layout40.c`, and SHR's 4bpp **packed** 2-pixels-per-byte format is the CoCo 3 card port's V9958 GRAPHIC6 shape, not the ST's planar one — **no far memory and no overlays at all**, the machine starts at 256K |
+| **Apple IIgs** | **STARTED 2026-09-16 — the video question is answered.** Compiled C runs on ROM 03 and draws Super Hi-Res in bank `$E1` through hand-written long addressing, and **320 mode places sixteen colours freely** (the console needs fifteen), counted off the snapshot with the same instrument that counted four in 640 mode. Still to do: ProDOS 8 storage, an Ensoniq 5503 sound driver, keyboard, and whether the image fits `$2000..$BEFF`. See [`iigs/README.md`](iigs/README.md) | `layout40.c`, and SHR's 4bpp **packed** 2-pixels-per-byte format is the CoCo 3 card port's V9958 GRAPHIC6 shape, not the ST's planar one — **no far memory and no overlays at all**, the machine starts at 256K |
 
 **The IIgs's exclusion expired on 2026-09-05 and this table did not notice for
 eleven days.** It went on the width rule — *"320 mode is 16 colours and 40
@@ -388,9 +388,17 @@ about a mode nothing now needs. **Both of the other recorded blockers have also
 gone, checked 2026-09-16 rather than recalled:** `mame apple2gs -verifyroms`
 answered *"romset is not present"* in September and answers **`romset apple2gs
 is good`** now, so the rig exists; and `mosw65816` is a supported CPU in the
-llvm-mos already installed here. What it generates is 6502 code with the
-65816's extra opcodes and **no `rep`/`sep`, no long addressing** — which is why
-the bank-`$E1` video seam is listed as a cost rather than assumed away.
+llvm-mos already installed here.
+
+**AND THE NEXT SENTENCE HERE WAS WRONG, MEASURED 2026-09-16.** It said the
+toolchain generates *"6502 code with the 65816's extra opcodes and no
+`rep`/`sep`, no long addressing"*. The first half holds — the CODE GENERATOR
+emits 8-bit 6502-shaped code. The second half was never tested and is false:
+the **assembler** encodes the entire 65816 instruction set (`8F` `9F` `B7`
+`97` `C2` `E2` `EB` `8B` `AB` `54` all assemble), which is exactly what a
+hand-written video seam needs, and the code generator emits absolute-long
+accesses to globals on its own initiative. **A claim about a toolchain's
+output is a measurement, and this one was a recollection.**
 
 ### What a sub-80 port actually entails
 
