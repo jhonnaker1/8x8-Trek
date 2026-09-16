@@ -118,6 +118,7 @@ release-clean:
 ports:
 	@python3 tools/open_list.py
 	@python3 tools/check_colours.py
+	@python3 tools/check_glyphs.py
 	@python3 tools/check_portcost.py
 	@python3 tools/check_assets.py
 	@python3 tools/check_ports.py $(P)

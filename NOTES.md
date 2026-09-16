@@ -1395,6 +1395,40 @@ was chasing might not have been the one I named. They are sixteen bits now,
 and the widened count confirmed 46 -- which is the point: it was checked, not
 assumed.
 
+#### EVERY GAUGE IN THE GAME WAS A ROW OF QUESTION MARKS (2026-09-16)
+
+Jamie played the card-less port and reported three things. This is the first:
+SYSTEMS STATUS, both laser gauges, the badge and the enemy silhouette in the
+MAIN VIEWER all drew as `?`.
+
+**TWO CODES, AND NEITHER HAD A NAME.** `ui.c` drew them as bare numbers at the
+call sites -- `228` behind a local `SYS_BAR_GLYPH`, and `81` written out twice
+with a comment. Every other glyph in the console is a `G_*` constant in
+`layout.h`, which is the set a port with a different font translates. **A port
+has no reason to look anywhere else**, so `gimevid.c`'s `ascii_of` fell through
+to its `?` marker -- which did its job: a visible marker beat a blank, and that
+is how this was findable at all.
+
+They are `G_BAR` and `G_SHIP` in `layout.h` now, and `tools/check_glyphs.py`
+fails on any bare glyph code at a drawing call in the shared UI. **It found a
+second `G_SHIP` immediately** -- the MAIN VIEWER's silhouette, which is exactly
+the one Jamie named -- plus three cursor cells spelled `32 + 128`, invisible
+to a reader and to any grep for `160`.
+
+**THE GIME'S ANSWERS.** `G_BAR` is a C128 partial-height block, and the height
+is the point: seven pixels on an eight-pixel pitch, so bars on consecutive rows
+stay separate. This font has no partial block, and a solid background cell
+would fuse SYSTEMS STATUS's six rows of paired bars into two vertical slabs --
+exactly what `ui.c`'s comment warns about. An **underlined space** is the
+honest equivalent: a rule at the bottom of the cell with the row's whole height
+of gap above it. Same mechanism `G_HLINE` already uses. `G_SHIP` is `O`.
+
+**AND THE BENCH COULD NOT HAVE FOUND THIS.** `make contest` draws the console
+FRAME through the real `layout.c`, and the frame was always right. The gauges
+are drawn by `ui.c` with live game state, which no bench here reaches. That is
+[[fix-the-cycle-before-iterating]]'s second half again: a bench reaches the
+screens somebody listed, and nobody had listed a gauge.
+
 #### THE OVERLAY-IN-A-FIXED-WINDOW DESIGN IS BUILT (2026-09-12)
 
 **The C128's shape, not the GIME's**, because MMUEN breaks the disk: a window

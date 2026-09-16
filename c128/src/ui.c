@@ -409,7 +409,7 @@ void ui_draw_badge(void) {
    Read out of VICE's own C128 chargen ROM rather than guessed -- the port has
    already lost time to invented screen codes, and the charset is right there
    on disk to check against. */
-#define SYS_BAR_GLYPH 228
+#define SYS_BAR_GLYPH G_BAR   /* named in layout.h -- see why there */
 
 /* Order matches core/trek.h's SYS_* indices, which in turn match the order
    the original's console and repair dialog list them in. */
@@ -750,9 +750,9 @@ void ui_draw_viewer(void) {
     scr_puts(x, y, enemy_class(sector[cell]), color);
 
     /* A silhouette, not a drawing: saucer, hull, nacelle. */
-    scr_put((unsigned char)(x + 6), (unsigned char)(y + 2), 81 /* filled disc */, color);
+    scr_put((unsigned char)(x + 6), (unsigned char)(y + 2), G_SHIP, color);
     scr_hline((unsigned char)(x + 7), (unsigned char)(y + 2), 4, G_HLINE, color);
-    scr_put((unsigned char)(x + 11), (unsigned char)(y + 2), 160, color);
+    scr_put((unsigned char)(x + 11), (unsigned char)(y + 2), G_BLOCK, color);
 
     /* Bearing and range, in the corner the original uses. The slashed zero
        and triangle it prints have no PETSCII equivalent, so these are
@@ -1198,7 +1198,7 @@ uint8_t ui_confirm(const char *prompt) {
     scr_hline(x0, y, (unsigned char)(p->w - 3), SC_SPACE, COL_LABEL);
     scr_puts(x0, y, prompt, COL_LABEL);
     for (len = 0; prompt[len]; len++) { }
-    scr_put((unsigned char)(x0 + len + 1), y, 32 + 128, COL_VALUE);
+    scr_put((unsigned char)(x0 + len + 1), y, G_BLOCK, COL_VALUE);
 
     for (;;) {
         c = kb_waitkey();
@@ -1225,7 +1225,7 @@ void ui_read_command(char *buf, uint8_t max) {
     for (;;) {
         /* Block cursor drawn by hand -- the KERNAL's own cursor belongs to
            the 40-column screen, which this port does not use. */
-        scr_put((unsigned char)(x0 + 5 + n), y, 32 + 128, COL_VALUE);
+        scr_put((unsigned char)(x0 + 5 + n), y, G_BLOCK, COL_VALUE);
 
         c = kb_waitkey();
 
@@ -1404,7 +1404,7 @@ static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t 
     char c;
 
     for (;;) {
-        scr_put((unsigned char)(x0 + n), y, 32 + 128, COL_VALUE);   /* cursor */
+        scr_put((unsigned char)(x0 + n), y, G_BLOCK, COL_VALUE);   /* cursor */
         c = kb_waitkey();
         if (c == KB_ESC) {
             scr_put((unsigned char)(x0 + n), y, SC_SPACE, COL_VALUE);
@@ -2880,9 +2880,9 @@ void ui_info_panel(void) {
 
         /* Same silhouette the viewer draws, so a ship looks the same wherever
            it is shown. */
-        scr_put((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 2), 81, color);
+        scr_put((unsigned char)(INF_X + 14), (unsigned char)(INF_Y + 2), G_SHIP, color);
         scr_hline((unsigned char)(INF_X + 15), (unsigned char)(INF_Y + 2), 4, G_HLINE, color);
-        scr_put((unsigned char)(INF_X + 19), (unsigned char)(INF_Y + 2), 160, color);
+        scr_put((unsigned char)(INF_X + 19), (unsigned char)(INF_Y + 2), G_BLOCK, color);
 
         scr_puts((unsigned char)(INF_X + 2), (unsigned char)(INF_Y + 4),
                  enemy_class(sector[cell]), color);

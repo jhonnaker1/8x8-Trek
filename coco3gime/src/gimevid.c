@@ -88,6 +88,8 @@ static unsigned long phys_base = 0x70000UL;
    into 0-7. */
 #define ATTR(fg, bg) ((unsigned char)((((fg) & 7) << 3) | ((bg) & 7)))
 
+
+
 /* EGA's eight information-bearing colours in the GIME's two-bits-a-gun RGB,
    in the order core/ega.h numbers them after EGA_TO_VDC folds the other
    seven onto them. See egagime.h. */
@@ -226,6 +228,35 @@ void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char c
         gime_screen[o + 1] = (unsigned char)(ATTR(color, 0) | 0x40);
         return;
     }
+    /* THE GAUGE BAR, AND EVERY ? JAMIE SAW WAS THIS ONE CODE. ui.c's
+       G_BAR is 228 -- a C128 partial-height block, chosen there
+       BECAUSE it is 7 pixels on an 8-pixel pitch, so bars on consecutive rows
+       stay separate instead of fusing into one slab. This font has no partial
+       block, and a solid background cell would fuse exactly as ui.c warns:
+       SYSTEMS STATUS is six rows of paired bars and they would read as two
+       vertical slabs.
+       An UNDERLINED SPACE is the honest equivalent here. It is a rule at the
+       bottom of the cell, continuous across cells, with the row's whole height
+       of gap above it -- so a bar reads as a bar and six of them stacked stay
+       six. Same mechanism as G_HLINE above; the colour still carries lit
+       against unlit, which is what the gauge is actually saying.
+       It drives the SYSTEMS STATUS bars, both laser gauges and the badge. */
+    if (ch == G_BAR) {
+        gime_screen[o]     = ' ';
+        gime_screen[o + 1] = (unsigned char)(ATTR(color, 0) | 0x40);
+        return;
+    }
+
+    /* THE SHIP'S NOSE. ui.c draws an enemy silhouette as a saucer, a hull and
+       an engine block -- code 81, a filled circle on a C128, then G_HLINE then
+       G_BLOCK. `O` is the nearest thing this font has and it keeps the
+       silhouette reading left-to-right as a ship. */
+    if (ch == G_SHIP) {
+        gime_screen[o]     = 'O';
+        gime_screen[o + 1] = ATTR(color, 0);
+        return;
+    }
+
     gime_screen[o]     = ascii_of(ch);
     gime_screen[o + 1] = ATTR(color, 0);
 }

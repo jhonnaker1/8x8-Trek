@@ -30,6 +30,20 @@
 #define G_CROSS    91    /* PETSCII 0xDB  +   */
 #define G_BLOCK   160    /* reverse space -- a solid cell in the attr colour */
 
+/* THESE TWO WERE BARE NUMBERS AT THEIR CALL SITES IN ui.c, AND THAT IS HOW
+   THEY WENT UNRENDERED. A port whose font is not the C128's translates this
+   header's G_* set and has no reason to look anywhere else -- so the card-less
+   CoCo 3 drew every gauge in the game, both laser bars, the badge and the
+   enemy silhouette as question marks, and only a person playing it found out.
+   Naming them here is the fix; tools/check_glyphs.py keeps them named. */
+#define G_BAR     228    /* PETSCII 0xE4 -- a partial-height block, and the
+                            height is the point: 7 pixels on an 8-pixel pitch,
+                            so gauge bars on consecutive rows stay separate
+                            instead of fusing into one slab */
+#define G_SHIP    81     /* PETSCII 0xD1 -- a filled circle, the saucer of the
+                            enemy silhouette: circle, G_HLINE hull, G_BLOCK
+                            engine */
+
 /* A panel with no title in its border. Not an empty pooled string: that
    would still cost an id and a far read to draw nothing. */
 #define PANEL_NO_TITLE 0xFF
