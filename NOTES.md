@@ -11861,10 +11861,32 @@ answer came out pessimistic by thousands.
     coco3 + card   all-resident 63,426 -> resident 45,739   PAGES 17,687
     coco3gime      all-resident 61,218 -> resident ~44,352  PAGES ~16,866
 
-**SO IT FITS, AND WITH LESS PAGING THAN THE PORT THAT HAS A CARD.** This port's
-all-resident image is 2,208 bytes SMALLER than the card port's, because it
-deletes a 6x8 software font and a V9958 blitter and adds an 8K pool -- and the
-GIME's character generator is free.
+~~**SO IT FITS, AND WITH LESS PAGING THAN THE PORT THAT HAS A CARD.**~~
+**WRONG AGAIN, THE OTHER WAY, AND FOR A THIRD REASON: BSS IS NOT IN THE
+IMAGE.** A DECB binary carries code and initialised data; `static unsigned
+char store[7936]` is neither, so trimming the pool by 256 bytes changed the
+file size by ZERO and I read that as the pool being free. It is not -- it
+occupies address space at run time, and build_ovl.py measures it because its
+probe link reads `bss_start`/`bss_end` out of the map.
+
+**THE RIGOROUS NUMBER, with the split wired and bss counted:**
+
+    resident image   43,521   $2800..$D200
+    bss              10,498   $D210..$FB11   (7,936 of it the string pool)
+    image + bss reach $FB11
+    still to place: window 4,096 + screen 4,000 + log 2,048 + stack 1,024
+                                          = 11,168
+    room left above $FB11                 =  1,007
+    ------------------------------------------------
+    OVER BY                                 10,161
+
+**I HAVE NOW BEEN WRONG ON THIS BUDGET THREE TIMES**: 7,841 over (wasted the
+gap above the screen), then "fits with room" (compared an all-resident image
+against an overlay build's resident half), then this. Every one came from
+comparing two numbers that had the same name and different meanings. The file
+size, the resident image, the resident image plus bss, and the run-time extent
+including fixed tenants are FOUR different quantities and this port needs the
+fourth.
 
 The tenants of $2800..$FEFF are the screen (4,000), the message log (2,048)
 and the overlay window (4,096), which leaves the resident image 44,352.

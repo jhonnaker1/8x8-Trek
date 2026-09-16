@@ -34,7 +34,7 @@ GAME_SRC = src/gimevid.c ../c128/src/main.c ../c128/src/ui.c \
            src/gimemem.c src/gimesnd.c src/gimelog.c
 GAME_OUT = build/egatrek.bin
 
-.PHONY: early contest clean
+.PHONY: early overlays contest clean
 
 # THE FIRST MEASUREMENT, AND THE ONE THIS PORT TURNS ON. Link the whole game
 # resident, with the real string-pool array in it, and read the overflow. The
@@ -62,3 +62,42 @@ build/contest.dsk: build/CONTEST.BIN
 
 clean:
 	rm -f build/*.bin build/*.BIN build/*.dsk build/*.o build/*.s
+
+# ---------------------------------------------------------------- overlays
+#
+# THE CARD PORT'S MACHINERY, UNCHANGED: coco3/tools/build_ovl.py renames an
+# overlay source's `code` section and places it at the window, so ONE link
+# resolves calls in both directions and an overlay is ordinary C rather than a
+# jump-table dialect. Images are cut out as .OVL files and read from disk.
+#
+# THE WINDOW IS $D740 BECAUSE THE MAP SAYS SO, not because it is round. The
+# three fixed tenants are packed hard under the I/O page -- log $F700, screen
+# $E740, window $D740 -- which leaves the resident image $2800..$D73F. A
+# rounder $E000 screen would waste 1,792 bytes in the gap above it, and this
+# port does not have 1,792 to spare.
+OVL_WINDOW ?= D260
+
+# Same split as the card port's, for the same reason its Makefile gives: whole
+# files, because cmoc has no per-function section placement, and the index is
+# the SHARED OVL_* constant from core/overlay.h so that main()'s existing
+# load_hof()/load_front() calls already satisfy rule 4.
+OVL_SRC = 1:../core/hof.c
+
+# gimevid.c FIRST, and it is not cosmetic -- the card port lost a day to this.
+# vdc_init() takes the machine out of ROM/RAM mode and every other line
+# depends on that having happened, so the switch itself must live below $8000
+# or main() calls into Color BASIC ROM trying to reach it.
+RES_SRC = src/gimevid.c ../c128/src/main.c ../c128/src/ui.c \
+          ../c128/src/layout.c ../c128/src/strpool.c \
+          ../core/trek.c ../core/planet.c ../core/serial.c \
+          ../coco3/src/coco3input.c ../coco3/src/coco3storage.c \
+          ../coco3/src/music_data.c \
+          src/gimemem.c src/gimesnd.c src/gimelog.c src/gimeovl.c
+
+overlays:
+	@mkdir -p build/img build/int
+	python3 ../coco3/tools/build_ovl.py --org 2800 --window $(OVL_WINDOW) \
+	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
+	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../coco3/src -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
+	    --resident $(RES_SRC) --overlay $(OVL_SRC) --split
+	@python3 tools/early.py build/egatrek-ovl.bin --window 0x$(OVL_WINDOW)

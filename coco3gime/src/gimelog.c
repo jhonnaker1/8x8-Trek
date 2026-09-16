@@ -15,7 +15,7 @@
  */
 #define LOG_ORIGIN  0x1000                    /* ui.c's LOG_BASE */
 #define LOG_BYTES   (32 * 64)
-#define LOGSTORE    ((unsigned char *)0xF000) /* $F000..$F7FF, in the gap */
+#define LOGSTORE    ((unsigned char *)0xF200) /* hard against $FF00 */
 
 static unsigned int log_cursor = 0;
 

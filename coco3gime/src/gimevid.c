@@ -54,10 +54,13 @@
    address with 32-bit arithmetic; the screen filled with junk, because what
    $FF9D/$FF9E ended up holding was not where the array was. A literal is
    checkable by eye against the register value and cmoc cannot get it wrong.
-   $E000..$EF9F is 4,000 bytes, clear of a 45K program at $2800 and below the
-   I/O page at $FF00. */
-#define gime_screen ((unsigned char *)0xE000)
-#define SCREEN_CPU   0xE000UL
+   PACKED HARD AGAINST THE I/O PAGE, with the log above it and the overlay
+   window below, so the resident image gets everything underneath. The three
+   fixed tenants are 10,144 bytes of the 54,528 between $2800 and $FF00; a
+   rounder $E000 would have wasted 1,792 in the gap and that is the difference
+   between fitting and not. */
+#define gime_screen ((unsigned char *)0xE260)
+#define SCREEN_CPU   0xE260UL
 
 /* PHYSICAL, AND THE MACHINE'S RAM SIZE DECIDES IT. With the MMU off the CPU's
    64K is the TOP 64K of whatever is fitted, so a CPU address is physical

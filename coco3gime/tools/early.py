@@ -8,13 +8,20 @@ pointless. The numbers below are the machine's, not an estimate.
 import os, sys
 
 ORG = 0x2800          # where the program loads, from the Makefile's --org
-SCREEN = 0xE000       # the 80x25 text buffer, from src/gimevid.c
-SCREEN_END = SCREEN + 80 * 25 * 2
+LOG = 0xF200          # 2,048, from src/gimelog.c
+SCREEN = LOG - 4000   # the 80x25 text buffer, from src/gimevid.c
+SCREEN_END = LOG
 IO = 0xFF00           # the I/O page: nothing of ours may reach it
 
 
 def main():
     path = sys.argv[1]
+    # With --window, the ceiling is the overlay window rather than the screen:
+    # the resident image has to end below it.
+    win = None
+    if "--window" in sys.argv:
+        win = int(sys.argv[sys.argv.index("--window") + 1], 0)
+    ceiling = win if win else SCREEN
     n = os.path.getsize(path)
     # A DECB binary carries a 5-byte header per segment and a 5-byte trailer.
     body = n - 10
@@ -22,18 +29,16 @@ def main():
     print("  program   $%04X..$%04X   %d bytes" % (ORG, end - 1, body))
     print("  screen    $%04X..$%04X   %d bytes" % (SCREEN, SCREEN_END - 1,
                                                    SCREEN_END - SCREEN))
-    if end > SCREEN:
-        print("  OVERLAP   the program runs %d bytes INTO the screen buffer"
-              % (end - SCREEN))
+    if win:
+        print("  window    $%04X..$%04X   4096 bytes" % (win, win + 4095))
+    if end > ceiling:
+        print("  OVERLAP   the image runs %d bytes PAST $%04X"
+              % (end - ceiling, ceiling))
         print("early: it does not fit. The pool, the overlays or the screen "
               "position has to move.")
         return 1
-    print("  free      $%04X..$%04X   %d bytes between them"
-          % (end, SCREEN - 1, SCREEN - end))
-    print("  and       $%04X..$%04X   %d bytes above the screen"
-          % (SCREEN_END, IO - 1, IO - SCREEN_END))
-    print("early: it fits, with %d bytes spare below the screen"
-          % (SCREEN - end))
+    print("  free      $%04X..$%04X   %d bytes" % (end, ceiling - 1, ceiling - end))
+    print("early: IT FITS, with %d bytes spare" % (ceiling - end))
     return 0
 
 

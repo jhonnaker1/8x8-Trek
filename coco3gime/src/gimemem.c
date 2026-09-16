@@ -14,10 +14,12 @@
 #include "../../core/farmem.h"
 #include "../../core/storage.h"
 
-/* STRINGS.DAT is 7,483 bytes and MUSIC.DAT 412. Sized from the files rather
-   than rounded up, so that outgrowing it is a link failure here rather than a
-   truncated pool on the disk. */
-#define FAR_SIZE 8192
+/* STRINGS.DAT is 7,483 bytes and MUSIC.DAT 412 -- 7,895 together. SIZED FROM
+   THE FILES AND NOT ROUNDED UP TO 8K, because this port had 161 bytes too
+   little and the 256 that rounding wasted were most of the difference. Growing
+   the pool past this is a build failure here rather than a truncated pool on
+   the disk. */
+#define FAR_SIZE 7936
 
 static unsigned char store[FAR_SIZE];
 static unsigned int far_len = 0;
