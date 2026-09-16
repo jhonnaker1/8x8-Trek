@@ -11,6 +11,25 @@
 # COCO 3 IS AN 80-COLUMN PORT".
 .DEFAULT_GOAL := early
 
+# EIGHTY OR FORTY COLUMNS, BOTH BUILDABLE, because the budget question is not
+# settled and a switch nobody can reverse is not a measurement. `make
+# WIDTH=40` selects the 40-column layout and a 2,000-byte screen.
+#
+# MEASURED 2026-09-16, and the result is counter-intuitive: forty columns
+# saves 2,000 bytes of screen and SPENDS 779 of them back, because layout40.c
+# and ui.c's TREK_40COL path are bigger than the 80-column ones. Net 1,186.
+#
+#     80 columns   over by 1,608
+#     40 columns   over by   422
+WIDTH ?= 80
+ifeq ($(WIDTH),40)
+WIDTH_FLAG = -DTREK_40COL
+LAYOUT     = ../c128/src/layout40.c
+else
+WIDTH_FLAG =
+LAYOUT     = ../c128/src/layout.c
+endif
+
 CMOC      ?= $(HOME)/cmoc/bin/cmoc
 # PKGDATADIR must be exported or cmoc cannot find its own runtime and the link
 # fails with "Can't open library: -lcmoc-crt-ecb", which reads like a missing
@@ -22,12 +41,12 @@ export PKGDATADIR
 # cmoc hands the host cc a <stdint.h> include and on an arm64 Mac that fails
 # with "architecture not supported" -- a host error for a 6809 compile.
 CFLAGS = --coco --org=2800 -O2 -fomit-frame-pointer --intdir=build \
-         -DTREK_COLOUR_IS_EGA -Isrc -I../coco3/src -I../core -I../c128/src
+         -DTREK_COLOUR_IS_EGA $(WIDTH_FLAG) -Isrc -I../coco3/src -I../core -I../c128/src
 
 # src/gimevid.c FIRST, the same rule coco3/Makefile records: vdc_init() runs
 # while the ROM is still mapped and has to be reachable below $8000.
 GAME_SRC = src/gimevid.c ../c128/src/main.c ../c128/src/ui.c \
-           ../c128/src/layout.c ../c128/src/strpool.c \
+           $(LAYOUT) ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
            ../coco3/src/coco3input.c ../coco3/src/coco3storage.c \
            src/gimeovl.c ../coco3/src/music_data.c \
@@ -51,11 +70,11 @@ $(GAME_OUT): $(GAME_SRC) Makefile
 # The console frame through the real layout.c, for looking at.
 contest: build/contest.dsk
 
-build/CONTEST.BIN: src/contest.c src/gimevid.c ../c128/src/layout.c Makefile
+build/CONTEST.BIN: src/contest.c src/gimevid.c $(LAYOUT) Makefile
 	@mkdir -p build
 	$(CMOC) --coco --org=3000 -O2 -fomit-frame-pointer --intdir=build \
 	    -Isrc -I../coco3/src -I../core -I../c128/src \
-	    -o $@ src/contest.c src/gimevid.c ../c128/src/layout.c
+	    -o $@ src/contest.c src/gimevid.c $(LAYOUT)
 
 build/contest.dsk: build/CONTEST.BIN
 	@python3 ../coco3/tools/mkdisk.py $@ $<
@@ -88,7 +107,7 @@ OVL_SRC = 1:../core/hof.c
 # depends on that having happened, so the switch itself must live below $8000
 # or main() calls into Color BASIC ROM trying to reach it.
 RES_SRC = src/gimevid.c ../c128/src/main.c ../c128/src/ui.c \
-          ../c128/src/layout.c ../c128/src/strpool.c \
+          $(LAYOUT) ../c128/src/strpool.c \
           ../core/trek.c ../core/planet.c ../core/serial.c \
           ../coco3/src/coco3input.c ../coco3/src/coco3storage.c \
           ../coco3/src/music_data.c \
@@ -98,6 +117,6 @@ overlays:
 	@mkdir -p build/img build/int
 	python3 ../coco3/tools/build_ovl.py --org 2800 --window $(OVL_WINDOW) \
 	    --out build/egatrek-ovl.bin --intdir build/int --imgdir build/img \
-	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../coco3/src -I../core -I../c128/src -DTREK_COLOUR_IS_EGA" \
+	    --cflags "--coco -O2 -fomit-frame-pointer -Isrc -Ibuild/img -I../coco3/src -I../core -I../c128/src -DTREK_COLOUR_IS_EGA $(WIDTH_FLAG)" \
 	    --resident $(RES_SRC) --overlay $(OVL_SRC) --split
 	@python3 tools/early.py build/egatrek-ovl.bin --window 0x$(OVL_WINDOW)

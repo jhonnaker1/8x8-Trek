@@ -12005,3 +12005,33 @@ BASIC.
 unchanged: page ~1,600 more out (new OVL_CODE markers in shared code, which
 touches nine ports), shrink the log (a shared constant), or re-test low RAM
 under the real loader.
+
+### 40 COLUMNS SAVES LESS THAN IT LOOKS (measured 2026-09-16)
+
+A 40-column GIME TEXT screen is 2,000 bytes against 80 columns' 4,000 -- still
+hardware text, still eight colours, no blitter. The obvious move, and the
+arithmetic says it closes the 1,608-byte gap outright.
+
+**IT DOES NOT, AND THE REASON IS THE INTERESTING PART.**
+
+    80 columns   image 44,169   bss 2,832   screen 4,000   OVER BY 1,608
+    40 columns   image 44,948   bss 2,867   screen 2,000   OVER BY   422
+
+**`layout40.c` AND ui.c's TREK_40COL PATH ARE 779 BYTES BIGGER** than the
+80-column ones, so 2,000 saved comes back as 1,186 net. That is not obvious
+from anywhere: the 40-column layout carries two page tables and two junction
+tables where the 80-column one carries one of each, and `ui.c`'s paging and
+word-wrap code only exists under `TREK_40COL`. **The narrower console costs
+more code than the wider one.**
+
+Both widths build -- `make WIDTH=40` -- because the budget is not settled and
+a switch nobody can reverse is not a measurement.
+
+**WHAT WOULD ACTUALLY CLOSE IT.** Halving the message log (LOG_SLOTS 32 -> 16,
+a shared constant in ui.c) frees 1,024:
+
+    80 columns + half log    584 OVER
+    40 columns + half log    FITS, 602 spare
+
+So the only combination measured to fit is **40 columns AND a 16-entry log**,
+and the 602 spare still has to cover a sound driver that is not written.

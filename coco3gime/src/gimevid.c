@@ -45,7 +45,11 @@
 #define PALETTE   ((unsigned char *)0xFFB0)
 #define CPU_SLOW  (*(unsigned char *)0xFFD8)
 
+#ifdef TREK_40COL
+#define COLS 40
+#else
 #define COLS 80
+#endif
 #define ROWS 25
 
 /* THE SCREEN IS AT A FIXED ADDRESS, NOT A LINKER-PLACED ARRAY, and that is
@@ -121,7 +125,12 @@ void vdc_init(void)
 
     INIT0 = 0x00;                 /* COCO=0, MMUEN=0 -- never set MMUEN */
     VMODE = 0x03;                 /* alphanumeric, 8 scanlines a row */
+    #ifdef TREK_40COL
+    /* HRES=001 is 40 characters; CRES=01 keeps the attribute byte. */
+    VRES  = (unsigned char)((0x01 << 5) | (0x01 << 2) | 0x01);
+#else
     VRES  = (unsigned char)((0x01 << 5) | (0x05 << 2) | 0x01);
+#endif
 
     /* (physical >> 3), and BOTH halves are written out so the value can be
        read straight off the page and compared with the picture. 512K machine:

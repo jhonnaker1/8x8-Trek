@@ -15,17 +15,17 @@ the message log and the stack.
 import re, subprocess, sys
 
 WINDOW_MIN = 2560     # the largest overlay image, rounded up to a page
-SCREEN     = 0        # the 80x25 buffer is in LOW RAM at $1000, below the
-                      # program -- it costs the top of memory nothing. See
-                      # src/gimevid.c for why that space is free.
+import os
+WIDTH      = int(os.environ.get("WIDTH", "80"))
+SCREEN     = WIDTH * 25 * 2   # cells are two bytes: character and attribute
 LOG        = 2048     # ui.c: LOG_SLOTS 32 x LOG_STRIDE 64, at $F200
 STACK      = 1024     # what cmoc's crt assumes
 IO         = 0xFF00
 
 
 def main():
-    out = subprocess.run(["make", "overlays"], capture_output=True,
-                         text=True).stdout
+    out = subprocess.run(["make", "overlays", "WIDTH=%d" % WIDTH],
+                         capture_output=True, text=True).stdout
     res = re.search(r"resident\s+(\d+) bytes, \$([0-9A-F]{4})\.\.\$([0-9A-F]{4})", out)
     bss = re.search(r"bss\s+\$([0-9A-F]{4})\.\.\$([0-9A-F]{4}), (\d+) bytes", out)
     img = re.search(r"largest image (\d+) bytes", out)
@@ -44,7 +44,7 @@ def main():
     print("  image + bss end  $%04X" % top)
     print()
     print("  window           %6d   (largest image %d, to a page)" % (window, biggest))
-    print("  screen                0   (at $1000, low RAM, below the program)")
+    print("  screen           %6d   (%dx25, two bytes a cell)" % (SCREEN, WIDTH))
     print("  message log      %6d" % LOG)
     print("  stack            %6d" % STACK)
     need = window + SCREEN + LOG + STACK
