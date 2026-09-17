@@ -196,3 +196,65 @@ unsigned char cbm_k_chrin(void)  { k_chrin();  return kb_a; }
 void cbm_k_chrout(unsigned char c){ kb_a = c;  k_chrout(); }
 unsigned char cbm_k_readst(void) { k_readst(); return kb_a; }
 unsigned char cbm_k_getin(void)  { k_getin();  return kb_a; }
+
+/* LOAD, AND ITS ABSENCE IS WHY THE TITLE OVERLAY NEVER ARRIVED.
+ *
+ * The eleven wrappers above cover every KERNAL call storage.c makes, and the
+ * string pool arrives through p4mem.c's own kernal_load_raw -- so the game
+ * reached main(), cleared the screen and had STRINGS.DAT in the far store at
+ * $DD00, byte for byte. The one call nobody wrapped is the one the SHARED
+ * overlay.c makes: `cbm_k_load(0, __ovl_start)`, which llvm-mos's commodore
+ * libc compiles to a bare `jsr $FFD5`.
+ *
+ * With both ROMs banked out, $FFD5 is uninitialised RAM. Exactly the fault
+ * that `.init.250 <shift>` had -- a KERNAL call made with the KERNAL gone --
+ * in a file this port does not own and therefore never read.
+ *
+ * cc65's libsrc/plus4/kload.s is this, in four instructions, in a segment
+ * commented "Must go into low memory".
+ *
+ * IT NEEDS ITS OWN WRAPPER RATHER THAN BANKED_CALL, because LOAD returns the
+ * END ADDRESS IN X AND Y and BANKED_CALL preserves only A, X and the carry --
+ * that is all the other eleven need, and losing Y here would give overlay.c an
+ * end address with a random high byte. Its own guard compares that end against
+ * the window, so a lost Y would read as a corrupt overlay rather than as this.
+ */
+/* `used, retain` AND NOT static: with only `noinline` this function VANISHED.
+   The image afterwards held exactly ONE `jsr $ffd5` -- p4mem.c's own
+   kernal_load_raw -- where it should now hold two, so LTO folded this into
+   that one or dropped it outright, and `cbm_k_load` ended up calling code
+   written for a different caller. The port went from "reaches main, clears
+   the screen, loads STRINGS.DAT" straight back to `?SYNTAX ERROR IN 10`.
+   The count of a distinctive instruction is a cheap thing to check and it was
+   in front of me a step before the regression was. */
+__attribute__((used, retain, noinline, section(".lowtext"))) void k_load(void)
+{
+    __asm__ volatile (
+        "sta $ff3e\n"
+        "lda kb_a\n"
+        "ldx kb_x\n"
+        "ldy kb_y\n"
+        "jsr $ffd5\n"
+        "sta kb_a\n"
+        "stx kb_x\n"
+        "sty kb_y\n"
+        "lda #0\n"
+        "rol\n"
+        "sta kb_st\n"
+        "sta $ff3f\n"
+        ::: "a", "x", "y", "p", "memory");
+}
+
+void *cbm_k_load(unsigned char flag, void *load_addr)
+{
+    kb_a = flag;
+    kb_x = (unsigned char)((unsigned int)load_addr & 0xFF);
+    kb_y = (unsigned char)(((unsigned int)load_addr) >> 8);
+    k_load();
+    /* Carry set is a KERNAL error. Returning the START address makes the end
+       equal the start, which is precisely what overlay.c's guard tests for --
+       so a failure reports itself through the path that already exists rather
+       than through a second one. */
+    if (kb_st) return load_addr;
+    return (void *)(unsigned int)(kb_x | ((unsigned int)kb_y << 8));
+}

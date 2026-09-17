@@ -101,6 +101,41 @@ that the keyboard, which this port does not have: `p4bank.c` disables
 interrupts, `input.c` reads through `GETIN`, and `GETIN` is filled by the
 KERNAL's IRQ. That cost is written down in `p4bank.c` and has never been paid.
 
+### THE TITLE OVERLAY: cause found, fix NOT working
+
+**`overlay.c` calls `cbm_k_load(0, __ovl_start)`, and `p4bank.c` does not wrap
+`LOAD`.** It wraps eleven KERNAL calls -- SETLFS, SETNAM, OPEN, CLOSE, CHKIN,
+CKOUT, CLRCH, CHRIN, CHROUT, READST, GETIN -- and llvm-mos's commodore libc
+compiles `cbm_k_load` to a bare `jsr $FFD5`. With both ROMs banked out that is
+a jump into uninitialised RAM.
+
+**Exactly the fault `.init.250 <shift>` had** -- a KERNAL call made with the
+KERNAL gone -- in a file this port does not own and therefore never read. The
+string pool arrives because `p4mem.c` has its own `kernal_load_raw`, banked, in
+`.lowtext`; the overlays have nothing.
+
+cc65's `libsrc/plus4/kload.s` is the missing wrapper, in four instructions, in
+a segment commented *"Must go into low memory"*.
+
+**And adding it regresses startup to `?SYNTAX ERROR IN 10`.** Two attempts:
+
+  * a plain wrapper -- and the image then held exactly **one** `jsr $ffd5`
+    where it should hold two, so LTO had folded it into `p4mem.c`'s
+    `kernal_load_raw` or dropped it. The count of a distinctive instruction is
+    a cheap check and it was on screen a step before the regression was.
+  * `used, retain, noinline` -- two `jsr $ffd5` now, mine at `$1172` inside
+    `.lowtext`, and **the same `?SYNTAX ERROR`**.
+
+`verify_p4` passes all fifteen checks on that build: entry `JMP $11A8`,
+`.lowtext` `$1011..$1187`, resident top `$B93C`, `__stack` `$CC00`, 4,804 bytes
+spare, and the init chain in the right order (100 init-stack, 200 zero-bss,
+250 shift, 260 bank-in, call_main). The link is sound; the regression is
+something else about the wrapper's presence, and it is **not diagnosed**.
+
+The wrapper is left in, with this note, because it is the right fix and the
+port ships nowhere -- `plus4` is in neither `RELEASE_PORTS` nor
+`tools/check_ports.py`.
+
 ### And cc65 was asked, which is how the first fault was found
 
 `cl65 -t plus4` builds and **runs**: a program that writes `$5A` to `$A000` and
