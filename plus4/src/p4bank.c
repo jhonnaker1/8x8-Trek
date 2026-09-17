@@ -219,14 +219,27 @@ unsigned char cbm_k_getin(void)  { k_getin();  return kb_a; }
  * end address with a random high byte. Its own guard compares that end against
  * the window, so a lost Y would read as a corrupt overlay rather than as this.
  */
+/* BISECTED, because "adding this breaks startup" is not a cause either.
+ * P4LOAD picks how much of the wrapper exists:
+ *
+ *   0   neither -- the baseline that reaches main() and loads STRINGS.DAT
+ *   1   k_load defined in .lowtext, never called
+ *   2   + cbm_k_load OVERRIDING the libc symbol, but NOT calling k_load
+ *   3   + cbm_k_load calling k_load -- the full wrapper
+ *
+ * 1 separates "a function exists in .lowtext" from "the libc symbol is
+ * overridden"; 2 separates the override from the banked call itself.
+ */
+#ifndef P4LOAD
+#define P4LOAD 3
+#endif
+
+#if P4LOAD >= 1
 /* `used, retain` AND NOT static: with only `noinline` this function VANISHED.
    The image afterwards held exactly ONE `jsr $ffd5` -- p4mem.c's own
    kernal_load_raw -- where it should now hold two, so LTO folded this into
-   that one or dropped it outright, and `cbm_k_load` ended up calling code
-   written for a different caller. The port went from "reaches main, clears
-   the screen, loads STRINGS.DAT" straight back to `?SYNTAX ERROR IN 10`.
-   The count of a distinctive instruction is a cheap thing to check and it was
-   in front of me a step before the regression was. */
+   that one or dropped it outright. The count of a distinctive instruction is
+   a cheap thing to check. */
 __attribute__((used, retain, noinline, section(".lowtext"))) void k_load(void)
 {
     __asm__ volatile (
@@ -244,17 +257,34 @@ __attribute__((used, retain, noinline, section(".lowtext"))) void k_load(void)
         "sta $ff3f\n"
         ::: "a", "x", "y", "p", "memory");
 }
+#endif
 
+#if P4LOAD >= 2
 void *cbm_k_load(unsigned char flag, void *load_addr)
 {
     kb_a = flag;
     kb_x = (unsigned char)((unsigned int)load_addr & 0xFF);
     kb_y = (unsigned char)(((unsigned int)load_addr) >> 8);
+#if P4LOAD >= 3
     k_load();
-    /* Carry set is a KERNAL error. Returning the START address makes the end
-       equal the start, which is precisely what overlay.c's guard tests for --
-       so a failure reports itself through the path that already exists rather
-       than through a second one. */
     if (kb_st) return load_addr;
     return (void *)(unsigned int)(kb_x | ((unsigned int)kb_y << 8));
+#else
+    /* The override WITHOUT the call: every overlay "fails" the way a short
+       load does, which overlay.c already handles, and startup is the only
+       thing under test. */
+    return load_addr;
+#endif
 }
+#endif
+
+#if P4LOAD == 9
+/* Thirty-four bytes of NOTHING ANYBODY CAN CALL, in .lowtext, the same size
+   k_load takes. .lowtext is a code section, so this is a naked function of
+   nops rather than an array -- clang rejects const data there outright. */
+__attribute__((used, retain, naked, section(".lowtext")))
+void p4_pad(void) { __asm__ volatile(
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop"); }
+#endif

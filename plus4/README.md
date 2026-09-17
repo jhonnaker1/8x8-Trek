@@ -117,7 +117,32 @@ string pool arrives because `p4mem.c` has its own `kernal_load_raw`, banked, in
 cc65's `libsrc/plus4/kload.s` is the missing wrapper, in four instructions, in
 a segment commented *"Must go into low memory"*.
 
-**And adding it regresses startup to `?SYNTAX ERROR IN 10`.** Two attempts:
+**And adding it regresses startup — but NOT because of the wrapper.**
+
+Bisected with `-DP4LOAD=0..3` in `p4bank.c`, each variant written to a copy of
+the disk and booted:
+
+    P4LOAD=0   no wrapper at all              strings load, main() reached
+    P4LOAD=1   k_load defined, NEVER CALLED   ?SYNTAX ERROR
+    P4LOAD=2   + the override, no call        no strings
+    P4LOAD=3   the full wrapper               ?SYNTAX ERROR
+
+**Merely defining an unused function breaks it.** So the control: `P4LOAD=9`
+puts **thirty-four NOPs** in `.lowtext` — nothing callable, nothing referenced,
+the same size `k_load` takes. **It breaks in the same way.**
+
+**The fault is the SHIFT, not the LOAD.** Every symbol after `.lowtext` moves
+by the same amount and the linker fixes every reference — `__p4_start`,
+`main`, `far_load`, `ovl_load` and `__bss_start` all move together, and
+`verify_p4` passes fifteen checks on the result. Something in this port
+nevertheless depends on the layout it had, and **that** is the blocker. The
+missing `LOAD` wrapper is a real and separate fault that cannot be tested until
+it is lifted.
+
+Jamie, watching: **"cpu jam at 9cf5"** — which is inside `memcpy` in both
+builds, at different offsets into it.
+
+The earlier attempts, kept because the first one is its own lesson:
 
   * a plain wrapper -- and the image then held exactly **one** `jsr $ffd5`
     where it should hold two, so LTO had folded it into `p4mem.c`'s
