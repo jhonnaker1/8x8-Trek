@@ -42,12 +42,36 @@ GAME_OUT = build/egatrek
 # 1541 one does and PROGDIR: makes the drawer's location irrelevant.
 REL = build/release
 
-release: game data
+# THE WORKBENCH ICONS. Jamie ran this port on a real Amiga by unzipping it to
+# the hard drive -- and WITHOUT A .info FILE WORKBENCH DOES NOT SHOW A PROGRAM
+# AT ALL unless you turn on Show All Files. The game was there and invisible.
+#
+# BOTH are needed, and a tool icon alone would not have helped: Workbench will
+# not show the DRAWER without one either, so the icon inside it would be
+# unreachable. egatrek-amiga.info sits BESIDE the drawer, which is how
+# AmigaDOS pairs an icon with what it belongs to.
+#
+# The artwork is this project's own -- see tools/mkicon.py, which draws it,
+# prints it back with --sheet, and decodes the bitplanes it wrote to a PNG
+# with --png so what ships is what was looked at.
+icons: build/egatrek.info build/egatrek-amiga.info
+
+build/egatrek.info: tools/mkicon.py
+	@python3 tools/mkicon.py $@
+
+build/egatrek-amiga.info: tools/mkicon.py
+	@python3 tools/mkicon.py $@ --drawer
+
+release: game data icons
 	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-amiga
 	@cp build/egatrek build/STRINGS.DAT build/MUSIC.DAT build/BRIEF.TXT \
 	    $(REL)/egatrek-amiga/
+	@cp build/egatrek.info $(REL)/egatrek-amiga/egatrek.info
+	@cp build/egatrek-amiga.info $(REL)/egatrek-amiga.info
 	@cp README-release.txt $(REL)/egatrek-amiga/README.txt
-	@cd $(REL) && zip -q -r ../egatrek-amiga.zip egatrek-amiga
+	@python3 tools/mkicon.py --dump build/egatrek.info
+	@python3 tools/mkicon.py --dump build/egatrek-amiga.info
+	@cd $(REL) && zip -q -r ../egatrek-amiga.zip egatrek-amiga egatrek-amiga.info
 	@echo "release: build/egatrek-amiga.zip"
 	@unzip -l build/egatrek-amiga.zip | tail -n +4
 
