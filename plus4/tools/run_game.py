@@ -19,6 +19,18 @@ v = subprocess.Popen(["xplus4", "-binarymonitor",
                       # A player types LOAD"TREK4",8 -- no ,1 -- for the same
                       # reason, and README-release says so.
                       "-basicload",
+                      # SOUND DEVICE, STATED EXPLICITLY, AND IT IS NOT A
+                      # PREFERENCE. VICE PERSISTS -sounddev INTO vicerc, so one
+                      # calibration run with `-sounddev wav` leaves EVERY later
+                      # session writing audio to a file instead of the speakers
+                      # -- silently, for every emulated machine, until someone
+                      # notices they have not heard anything in weeks. That is
+                      # exactly what happened here: SoundDeviceName="wav" was
+                      # still in ~/.config/vice/vicerc from the tedsnd.c
+                      # calibration, and the Plus/4 port was reported as having
+                      # no sound when it had been making sound all along.
+                      # A rig that wants a human to HEAR something must say so.
+                      "-sounddev", "coreaudio",
                       "-8", d64, "-autostart", d64],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(wait)
