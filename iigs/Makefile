@@ -135,6 +135,22 @@ brieffail: build/nobrief.po
 	  exit 1; \
 	else echo "arm-check ok: check_briefing rejected a disk with no BRIEF.TXT"; fi
 
+# ---------------------------------------------------------------- release
+#
+# `verify` FIRST, and that is the same wiring the MEGA65 and the C64 use: a
+# binary that cannot pass the gates can never reach a disk. It is also the
+# thing that catches a STRINGS.DAT built against a different STR_COUNT, which
+# blanks every label in the game and complains about nothing.
+REL = build/release
+
+release: verify build/trek.po
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-iigs
+	@cp build/trek.po $(REL)/egatrek-iigs/EGATREK.PO
+	@cp README-release.txt $(REL)/egatrek-iigs/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-iigs.zip egatrek-iigs
+	@echo "release: build/egatrek-iigs.zip"
+	@unzip -l build/egatrek-iigs.zip | tail -n +4
+
 # FOR A HUMAN. No -nothrottle, sound ON, a real window, no -seconds_to_run and
 # no autoboot script -- every one of those is right for a measurement and
 # wrong for somebody playing. `-nothrottle` in particular has fooled this
@@ -435,11 +451,26 @@ early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 	@echo "-- and far memory too: the log and the pool leave bank 0"
 	python3 tools/verify_gs.py build/earlyfar.elf --window 0xD000 --org 0x0800
 
-verify: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail briefing brieffail
+# TWO LEVELS, AND THE SPLIT IS NOT COSMETIC. `make ports` runs every port's
+# `verify` from the repository root, so a verify that boots MAME seventeen
+# times turns a cross-port gate that takes seconds into one that takes an
+# hour -- and a gate nobody runs is not a gate. Every other port's verify is
+# static, and so is this one now.
+#
+#   verify   builds the game and checks the link. Seconds. What `make ports`
+#            and `make release` depend on.
+#   gates    the whole suite on real hardware-in-emulation: colours, the boot
+#            chain, files, the proof sheet, sound, the tune, the briefing, and
+#            the six arm-checks that prove those can fail. Minutes.
+verify: build/trek.elf
+	python3 ../c128/tools/layout40_check.py
+	python3 tools/verify_gs.py build/trek.elf --window 0xD000 --org 0x0800
+
+gates: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail briefing brieffail
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail sound soundfail game play run music musicfail briefing brieffail verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail sound soundfail game play run music musicfail briefing brieffail release verify gates clean
 
 .PRECIOUS: build/%.elf

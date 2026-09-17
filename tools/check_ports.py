@@ -73,6 +73,7 @@ PORTS = (
     ("coco3gime", "verify", "CMOC"),
     ("c64",    "verify",  "CC"),
     ("st",     "verify",  "CC"),
+    ("iigs",   "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

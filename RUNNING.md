@@ -1,6 +1,6 @@
 # How to run each one
 
-Fourteen assets, ten machines. Every port plays the same game from the same
+Fifteen assets, eleven machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -286,6 +286,41 @@ CoCo 3's own video gives eight colours in 80 columns; this wants sixteen per
 pixel and a 512-wide bitmap, and the SuperSprite's V9958 is what provides them.
 Everything here was measured under MAME's `ssfm` emulation. **It is the slowest
 of the seven** and it is playable.
+
+### `egatrek-iigs.zip` — Apple IIgs
+
+**Any IIgs, any ROM, any memory size, no card and no system software.** Unzip
+and put `EGATREK.PO` in a 3.5" drive, then switch the machine on.
+
+That is all there is to it. **There is no ProDOS on this disk and nothing to
+type**: the machine reads block 0, which is this port's own loader, and that
+reads the game. About fifteen seconds to the title screen.
+
+Under **MAME**, with a IIgs romset:
+
+    mame apple2gs -flop3 EGATREK.PO
+
+**Super Hi-Res, 320×200 — which is exactly 40×25 cells of 8×8**, no margin and
+no rounding. The palette holds **EGA's own sixteen colours**, so what you see is
+what the original's EGA card put on a monitor, brown included — the one colour
+the C128's fixed RGBI chip renders as olive.
+
+Sound is the **Ensoniq 5503**: two oscillators, music on one and effects on the
+other, so a hit during the title tune does not chop it. The original had one PC
+speaker and could not.
+
+**The console is in two halves** — `C` at the `CMD:` prompt shows the chart
+page and any key brings you back, exactly as on the C64. Four saved games fit
+on the disk, and they go on the disk the game came from, so do not write
+protect it.
+
+**The disk is entirely this port's own** — its own boot block, its own
+directory, its own reader over the drive's firmware. Nothing on it belongs to
+anyone but Nels Anderson and this project. And the font is this project's own
+too, because a IIgs's character generator is **not readable by the CPU**: unlike
+the Amiga and ST builds, not one glyph here comes out of the machine's ROM.
+
+---
 
 ### `egatrek-coco3gime.zip` — Tandy Color Computer 3, **stock**
 

@@ -56,6 +56,7 @@ def main(argv):
         return 1
 
     fails, notes = [], []
+    bound = window
 
     resident = {n: s for n, s in secs.items()
                 if s["addr"] and s["addr"] < window
@@ -164,6 +165,14 @@ def main(argv):
         for f in fails:
             print(f"FAIL: {f}")
         return 1
+    # ONE LINE THE CROSS-PORT GATE WILL SURFACE. tools/check_ports.py prints
+    # any line that contains BOTH a keyword it cares about and the literal
+    # "verify:" -- and "verify_gs:" does not contain "verify:", so this port's
+    # numbers were invisible in `make ports` while every other port's showed.
+    # These are exactly the figures that go stale when nobody looks at them.
+    big = max((s["size"] for s in ovls.values()), default=0)
+    print(f"iigs verify: resident ${org:04X}..${top:04X}, "
+          f"{bound - top} bytes spare, largest overlay {big} of 4096")
     print(f"verify_gs: {len(notes)} checks reported, 0 failures")
     return 0
 

@@ -98,7 +98,7 @@ tiers:
 running-section:
 	@sed '1s/^# /## /' RUNNING.md
 
-RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64 st coco3gime
+RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64 st coco3gime iigs
 
 release:
 	@python3 tools/open_list.py
@@ -108,8 +108,16 @@ release:
 	done
 	@echo ""
 	@echo "release artefacts:"
-	@ls -l */build/egatrek-*.zip */build/egatrek-*.d64 */build/egatrek-*.d81 \
-	      */build/egatrek-*.atr 2>/dev/null | awk '{printf "  %10s  %s\n", $$5, $$9}'
+	@# ONLY RELEASE_PORTS, AND THE GLOB USED TO BE `*/build/`. release-clean
+	@# wipes the build directory of every port in RELEASE_PORTS and no other,
+	@# so a PARKED port's artefact survives and the listing offered it up
+	@# beside the real ones -- plus4/build/egatrek-plus4.d64 sat in this list
+	@# on the v0.19.0 build, for a port that does not boot. A list of what to
+	@# upload must not include something that must not ship.
+	@for d in $(RELEASE_PORTS); do \
+	    ls -l $$d/build/egatrek-*.zip $$d/build/egatrek-*.d64 \
+	          $$d/build/egatrek-*.d81 $$d/build/egatrek-*.atr 2>/dev/null; \
+	done | awk '{printf "  %10s  %s\n", $$5, $$9}'
 
 release-clean:
 	@for d in $(RELEASE_PORTS); do rm -rf $$d/build; done
