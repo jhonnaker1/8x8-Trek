@@ -1,30 +1,80 @@
-# EGA Trek on the Commodore Plus/4 — PARKED AGAIN, 2026-09-16
+# EGA Trek on the Commodore Plus/4 — IT BOOTS, 2026-09-17
 
-**Five faults found in one session, two fixed, one retracted, one identified
-but untestable, and one still open. The port does not boot.** It gets further
-than it did: the init chain completes, `main()` runs, the soft stack is
-initialised, and — before the last change — `STRINGS.DAT` landed in the far
-store at `$DD00` byte for byte, through both banked ROMs.
+**The title screen draws.** Boot, the init chain, `main()`, the far store,
+`STRINGS.DAT`, and the banked KERNAL `LOAD` that fetches the title overlay all
+work. The keyboard is written and its registers are proved; whether the matrix
+table is right is the one thing still unconfirmed by a human.
 
 | | state |
 |---|---|
 | `.init.250 <shift>` calls the KERNAL after the ROMs are banked out | **fixed** — hook moved off `.init.010` |
 | `-linit-stack` missing from the link line | **fixed** — `__do_init_stack` was absent entirely |
 | `$FFFF` "overwritten with `$11`" | **retracted** — it was VICE's monitor showing a ROM/RAM mixture |
-| `overlay.c` calls `cbm_k_load`, which nothing banks | **identified, untestable** until startup works |
-| something reaches zero page — `BREAK` at `PC 000E` | **open** |
+| `overlay.c` calls `cbm_k_load`, which nothing banks | **fixed** — `k_load`, and it never was the regression |
+| `BREAK` at `PC 000E` | **fixed** — the soft stack was on the ROM's RAM-resident fetch routines |
+| the keyboard | **written** — `src/p4key.c`, TED matrix, not CIA and not GETIN |
 
-**Where a fresh attempt should start:** `PC 000E` is inside
-`__rc0..__rc31`, so the CPU is executing the imaginary registers. That is a
-jump through a corrupted pointer. Everything below is the road to that point,
-and none of it needs re-deriving.
+## THE FAULT, AND IT WAS A FREE-MEMORY CLAIM THAT WAS NEVER TRUE
 
-**What must NOT be re-derived** — all measured on the machine today:
-the soft stack cannot live above `$8000` (a write passes through the ROM, a
-read returns ROM); `$0400..$04FF` is the free page and `$0500` is a live system
-vector; `shift` cannot be overridden because the collision is in LTO, not the
-linker; and cc65's Plus/4 target is **this port's architecture, not an
-alternative to it**.
+**`$0400..$04FF` IS NOT FREE ON A PLUS/4.** It holds RAM-resident subroutines
+that the **ROM calls into**:
+
+    $0473-$0478  CHRGET      $0494-$04A1  INDSUB  "shared ROM fetch sub"
+    $0479-$0484  CHRGOT      $04A5-$04AF  INDTXT
+    $0485-$0493  QNUM        $04B0-$04E6  INDIN1/INDIN2/INDST1/INDLOW/INDFMO
+                             $04E7-$04FF  print-using, ERRNUM, ERRLIN, TRAPNO
+
+That is **this machine's own banking machinery**: because the ROM can be
+switched out, Commodore put the indirect-fetch subroutines in RAM so ROM code
+can reach RAM underneath it. The soft stack was growing down through all of
+it, and the CPU ended up executing zero page.
+
+**AND THE PROBE THAT SAID IT WAS FREE ASKED THE WRONG QUESTION.**
+`src/lowfree.c` fills a region, does what startup does, and counts which
+blocks still hold the fill — so it sees **writes**. Nothing writes to
+`$0400..$04FF` while this program runs. The ROM **reads and executes** it.
+The probe had a control, completed, and reported "16 of 16 blocks intact —
+NOTHING touches it", and every word of that was true and it meant nothing.
+*A measurement can be sound and still answer a question you did not ask.*
+
+Two independent memory maps agree: floodgap's `264memory.txt` and
+Butterfield's Commodore 16/Plus-4 map.
+
+## THE FIX: STOP NOMINATING ADDRESSES
+
+Every home the soft stack has had was **an address somebody believed was
+free** — `$7F00` (inside `.text`), `$CC00` (under the ROM, so reads returned
+ROM), `$0500` (on top of the above). The pattern is the bug, not the three
+addresses.
+
+`plus4.ld` now **reserves a `.stack` section** inside the program, below
+`$8000`. Nothing else can be there by construction, it is never ROM-shadowed,
+and **it moves with the program** instead of having to be re-measured whenever
+the layout shifts. `verify_p4.py` reads `__stack`/`__stack_bottom` out of the
+ELF — the link script no longer states an address anywhere, so the old regex
+over `plus4.ld` would have found nothing and passed a build with no stack.
+
+**And that is what "the layout dependency" was.** Adding thirty-four NOPs
+moved the program, which moved nothing about `$0500` — so the stack's
+relationship to the ROM stubs beneath it changed. A linker-owned stack cannot
+have that failure. **The `cbm_k_load` wrapper was never the regression**: it
+is in, at `P4LOAD=3`, and the title overlay it fetches is on screen.
+
+## WHAT MUST NOT BE RE-DERIVED
+
+  * the soft stack cannot live above `$8000` — a write passes through the ROM,
+    **a read returns ROM**
+  * **`$0400..$04FF` is NOT free** — see above. The README said it was, for a
+    day, on a measurement that counted the wrong thing.
+  * `$0500` **is** a live system jump vector (`4C 1C 99`, USRPOK)
+  * `shift` cannot be overridden: the collision is in **LTO**, not link order
+  * cc65's Plus/4 target is **this port's architecture, not an alternative**
+  * **the shared `input.c` cannot be linked here** — it reads CIA1 at
+    `$DC00/$DC01`, and a Plus/4 has no CIA, so that is plain RAM inside this
+    program's own image. It also picks cursor keys with
+    `#ifdef __C128__ ... #else __C64__` and mos-commodore-clang defines
+    **neither**, so this port silently compiled the C64 branch.
+    The README used to say "input.c reads through GETIN". It does not.
 
 ---
 

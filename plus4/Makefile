@@ -30,14 +30,19 @@ CFLAGS   = -Oz -DTREK_40COL -I../c128/src -T plus4.ld
 LDFLAGS  = -Wl,--no-check-sections -linit-stack
 
 SHARED   = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
-           ../c128/src/input.c ../c128/src/music_data.c ../c128/src/storage.c \
+           ../c128/src/music_data.c ../c128/src/storage.c \
            ../c128/src/overlay.c ../c128/src/strpool.c \
            ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
 # THIS PORT'S OWN. Four files where the C64 wrote two, and the survey said so:
 # TED is neither a VIC-II nor a SID, so vic.c and sid.c cannot be linked here
 # the way the C64 links them.
+# src/p4key.c REPLACES the shared ../c128/src/input.c, which is CIA1 code:
+# it reads $DC00/$DC01, and a Plus/4 has no CIA -- that address is plain RAM
+# inside this program's own image. It also picks its cursor-key handling with
+# `#ifdef __C128__ ... #else __C64__`, and mos-commodore-clang defines NEITHER,
+# so this port was silently compiling the C64 branch. See src/p4key.c.
 PLATFORM = src/ted.c src/p4log.c src/p4mem.c src/tedsnd.c src/basichdr.c \
-           src/p4bank.c
+           src/p4bank.c src/p4key.c
 SRC      = $(SHARED) $(PLATFORM)
 
 OUT = build/trek4.prg
