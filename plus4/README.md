@@ -214,14 +214,26 @@ $07FF` was chosen as the only kilobyte down there that is neither the screen
 
 **It changes the failure and does not fix it.** `?SYNTAX ERROR` is gone; the
 machine now enters its monitor with `BREAK` at **`PC 000E`** -- the CPU reached
-zero page, where llvm-mos keeps `__rc0..__rc31`. So `$0400..$07FF` is not the
-free kilobyte it was assumed to be, or the stack is being lost another way.
-**That assumption was not measured** -- it is the only step in this sequence
-that was not, and it is the one that is wrong.
+zero page, where llvm-mos keeps `__rc0..__rc31`.
 
-The next move is to measure which of `$0400..$07FF` a Plus/4 actually leaves
-alone, the way `src/gsfarp.c` did for the IIgs's banks: fill it, run, and see
-what survives.
+**So the region was measured** (`src/lowfree.c`), the way `iigs/src/gsfarp.c`
+measured the IIgs's banks -- fill it, do what startup does, count what
+survives -- and with the control `src/zpprobe.c` never had:
+
+    control: fill and read, nothing between   64 of 64 blocks intact
+    fill $0400..$04FF                         16 of 16 -- NOTHING touches it
+    fill $0400..$05FF                         31 of 32 -- one dirty block
+    fill $0400..$06FF                         47 of 48 -- the same one
+    fill $0400..$07FF                         the probe never completes
+
+`$0500` is a live system jump vector (`4C 1C 99`, found by `src/bankprobe.c`
+and recorded here long before this). So the free page is `$0400..$04FF`, and
+`__stack` is `$0500` growing down into it -- 256 bytes against the 143 to 184
+other ports measure on their deepest path.
+
+**And the machine still breaks at `PC 000E`.** The measurement was right, the
+placement is now measured rather than assumed, and it is not the whole fault.
+Something else reaches zero page. **Not diagnosed.**
 
 **And `verify_p4.py` had a false positive that this exposed.** It counted
 `.symtab` and `.strtab` -- ELF metadata at VMA 0, thousands of bytes wide -- as

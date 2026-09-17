@@ -164,11 +164,30 @@ __ovl_start = ORIGIN(window);
 
    Below $8000 nothing is ever ROM-shadowed, so the ordering conflict goes
    away: `shift` keeps its ROM, and the soft stack is real RAM from the first
-   frame. $0400..$07FF is the only kilobyte down there that is neither the
-   screen ($0C00), the colour RAM ($0800), the hardware stack, nor the
-   program -- which starts at $1001. Other ports measure 143 to 184 bytes of
-   soft stack on their deepest path, so a kilobyte is not tight. */
-__stack = 0x0800;
+   frame.
+
+   $0500, AND THE PAGE BELOW IT, MEASURED RATHER THAN REASONED. The first
+   attempt put it at $0800 on the argument that $0400..$07FF is the only
+   kilobyte down here that is neither the screen ($0C00), the colour RAM
+   ($0800), the hardware stack, nor the program -- and the machine broke at
+   PC $000E. That argument was the one step in the whole sequence that was not
+   measured, and it was the one that was wrong.
+
+   src/lowfree.c fills the region, runs a KERNAL LOAD and a screenful of
+   drawing, and counts which 16-byte blocks still hold the fill. With a control
+   that fills and reads with NOTHING in between, and reports 64 of 64 intact,
+   so "untouched" is demonstrably reportable:
+
+       fill $0400..$04FF     16 of 16 blocks intact -- NOTHING touches it
+       fill $0400..$05FF     31 of 32 -- one dirty block, in $05xx
+       fill $0400..$06FF     47 of 48 -- the same one
+       fill $0400..$07FF     the probe never completes at all
+
+   $0500 is a live system jump vector on this machine -- src/bankprobe.c found
+   `4C 1C 99` there and this port's README has said so since. So the free page
+   is $0400..$04FF, and the stack grows DOWN from $0500 into it. 256 bytes,
+   against the 143 to 184 other ports measure on their deepest path. */
+__stack = 0x0500;
 
 /* NO OUTPUT_FORMAT, AND THAT IS DELIBERATE. The platform templates end with a
    SHORT/TRIM block that makes the linker emit a finished PRG -- convenient,
