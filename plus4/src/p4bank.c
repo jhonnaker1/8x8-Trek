@@ -20,10 +20,41 @@
  * stored is irrelevant, which is why these look like they are writing nothing
  * useful.
  *
- * .init.010 RUNS BEFORE .init.200's bss clear, and that ordering matters: bss
- * is at $A1CE, under the ROM, so zeroing it with the ROM still mapped would
- * write through to RAM the program cannot then read back consistently. Doing
- * the bank first makes every later init see one memory map.
+ * .init.260, AND IT USED TO BE .init.010 -- WHICH IS WHY THIS PORT DID NOT
+ * BOOT. This file was blamed as a whole for months ("the same hello.c ran
+ * without this file and did not run with it"), and a whole file is not a
+ * cause. Bisected on the machine, one instruction at a time:
+ *
+ *     sei                                main() reached
+ *     + $FF0A = 0  (TED mask off)        main() reached
+ *     + the CPU's IRQ/NMI vectors        main() reached
+ *     + $FF3F, RAM in                    main() NEVER REACHED
+ *
+ * and then, with markers either side of that store, the hook was seen to
+ * COMPLETE -- so the bank switch works and something between it and main()
+ * dies. The disassembly names it:
+ *
+ *     .init.250 <shift>:  lda #$0e
+ *                         jsr $ffd2      ; BSOUT -- second charset
+ *
+ * llvm-mos's commodore libc puts its own hook in the init chain, AFTER ours,
+ * and it calls the KERNAL. With both ROMs gone `jsr $FFD2` lands in
+ * uninitialised RAM. Jamie, watching the emulator, described it better than
+ * the marker bytes did: "seemed like the tape drive pressed play" -- garbage
+ * executing into $01, whose bit 3 is the cassette motor.
+ *
+ * cc65's own plus4 crt0.s does the identical `lda #14 / jsr $FFD2`, and does
+ * it BEFORE banking. So does this now: the hook moved to .init.260, after
+ * shift, and main() is reached.
+ *
+ * AND THE ORDERING THIS FILE USED TO CLAIM WAS WRONG. It said .init.010 had
+ * to run before .init.200's bss clear, "because bss is at $A1CE, under the
+ * ROM, so zeroing it with the ROM still mapped would write through to RAM the
+ * program cannot then read back consistently." src/vecprobe.c measured that:
+ * a write made with the ROM mapped LANDS IN THE RAM BENEATH and reads back
+ * correctly once RAM is banked in -- $BE $EF at $FFFE, in the tightest corner
+ * of the map. So zero-bss with the ROM in is fine, and the constraint that
+ * forced the hook to the front of the chain never existed.
  */
 
 /* Somewhere harmless for an interrupt this program did not ask for. In
@@ -37,7 +68,7 @@ void p4_stray_irq(void) { __asm__ volatile ("rti"); }
    normal C function ends in RTS, so putting one here RETURNED OUT OF THE INIT
    CHAIN and main() was never called. Measured by bisection: the same hello.c
    ran with this file left out and did not run with it linked. */
-__attribute__((used, naked, section(".init.010")))
+__attribute__((used, naked, section(".init.260")))
 void p4_ram_in(void)
 {
     /* ALL ASSEMBLY, because a naked function may contain nothing else -- and

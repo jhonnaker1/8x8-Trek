@@ -1,5 +1,67 @@
 # EGA Trek on the Commodore Plus/4 — PARKED, 2026-09-16
 
+## UNPARKED IN PART, 2026-09-16: the startup blocker is FOUND and FIXED
+
+**The cause was never this file's banking.** `p4bank.c` had been blamed as a
+whole since the port was parked — *"the same hello.c ran without this file and
+did not run with it"* — and a whole file is not a cause.
+
+**Bisected on the machine**, one instruction at a time (`src/stepprobe.c`):
+
+    sei                                  main() reached
+    + $FF0A = 0   (TED mask off)         main() reached
+    + the CPU's IRQ/NMI vectors          main() reached
+    + $FF3F, RAM in                      main() NEVER REACHED
+
+Then, with markers either side of that store, **the hook was seen to finish**:
+`$A1` before the bank and `$A2` after it, with RAM in. So the bank switch works
+and something between it and `main()` dies. The disassembly names it:
+
+    .init.250 <shift>:  lda #$0e
+                        jsr $ffd2      ; BSOUT -- second charset
+
+**llvm-mos's commodore libc puts its own hook in the init chain, after ours,
+and it calls the KERNAL.** With both ROMs gone, `jsr $FFD2` lands in
+uninitialised RAM. Jamie, watching the emulator, described it better than the
+marker bytes did: *"seemed like the tape drive pressed play"* — garbage
+executing into `$01`, whose bit 3 is the cassette motor.
+
+**cc65's own `libsrc/plus4/crt0.s` does the identical `lda #14 / jsr $FFD2`,
+and does it BEFORE banking.** That is the documented precedent, and it is what
+this port now does: the hook moved from `.init.010` to `.init.260`, after
+`shift`. A minimal program then reaches `main()` with RAM banked in —
+measured `A1 A2 5A`.
+
+### And the reason it had been at `.init.010` was a claim that is false
+
+The file said the hook had to precede `.init.200`'s bss clear, *"because bss
+is at `$A1CE`, under the ROM, so zeroing it with the ROM still mapped would
+write through to RAM the program cannot then read back consistently."*
+
+`src/vecprobe.c` measured that, in the tightest corner of the map: a write made
+with the ROM mapped **lands in the RAM beneath and reads back correctly** once
+RAM is banked in — `$BE $EF` at `$FFFE`. So zero-bss with the ROM in is fine
+and the constraint that forced the hook to the front of the chain never
+existed. (The old justification cited `src/wrprobe.c`, which measured `$A000`
+and `$E000` and never touched `$FFFE` — a citation to a measurement of
+somewhere else.)
+
+### STILL NOT PLAYING, and these are the next two threads
+
+The full game gets further and does not run. Two readings from the live
+machine say something is still wrong **after** the fix:
+
+  * `__rc0/__rc1`, the soft stack pointer, reads **`$FFCD`** where `__stack` is
+    `$CC00`. Either init-stack did not run or something overwrote it.
+  * `$FFFE` points at **`$114D`** where `p4_stray_irq` is at `$104D` — wrong by
+    exactly `$100`, and the byte there is `$AE`, not the `$40` of an `RTI`.
+    The disk was checked and holds the binary those symbols came from, so it
+    is not staleness.
+
+Both smell like one fault rather than two. Neither is diagnosed.
+
+
+
 **IT DOES NOT BOOT. Everything below the game does: video, sound, far memory,
 the string pool, the overlay split and the disk are built and MEASURED. The
 program does not start.** Parked deliberately rather than abandoned — this
