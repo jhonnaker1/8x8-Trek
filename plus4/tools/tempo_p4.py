@@ -39,7 +39,11 @@ for want in ("snd_frames", "snd_ticks"):
 
 v = subprocess.Popen(["xplus4", "-binarymonitor",
                       "-binarymonitoraddress", "ip4://127.0.0.1:6502",
-                      "-basicload", "-sounddev", "dummy",
+                      # +saveres, AND WITHOUT IT THIS GATE MUTES THE USER. VICE writes
+                      # command-line options back to vicerc on exit when
+                      # SaveResourcesOnExit is set, so `-sounddev dummy`
+                      # here would persist and silence every later session.
+                      "+saveres", "-basicload", "-sounddev", "dummy",
                       "-8", a.d64, "-autostart", a.d64],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(a.boot)

@@ -20,6 +20,8 @@ a = ap.parse_args()
 vice = subprocess.Popen(
     ["xplus4", "-binarymonitor",
      "-binarymonitoraddress", "ip4://127.0.0.1:6502",
+     # DO NOT PERSIST THIS RUN'S OPTIONS -- see run_game.py.
+     "+saveres",
      "-autostart", a.prg],
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(a.wait)

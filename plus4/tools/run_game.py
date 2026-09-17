@@ -19,6 +19,16 @@ v = subprocess.Popen(["xplus4", "-binarymonitor",
                       # A player types LOAD"TREK4",8 -- no ,1 -- for the same
                       # reason, and README-release says so.
                       "-basicload",
+                      # +saveres: DO NOT WRITE THIS RUN'S OPTIONS BACK TO
+                      # vicerc. Jamie's config has SaveResourcesOnExit=1, so
+                      # VICE PERSISTS COMMAND-LINE OPTIONS ON EXIT -- which is
+                      # how one calibration run with `-sounddev wav` left
+                      # SoundDeviceName="wav" in [PLUS4] and silently muted
+                      # every later session, until the port was reported as
+                      # having no sound while it had been making sound all
+                      # along. A rig must not edit the user's settings as a
+                      # side effect of measuring something.
+                      "+saveres",
                       # SOUND DEVICE, STATED EXPLICITLY, AND IT IS NOT A
                       # PREFERENCE. VICE PERSISTS -sounddev INTO vicerc, so one
                       # calibration run with `-sounddev wav` leaves EVERY later
