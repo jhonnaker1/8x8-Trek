@@ -7876,3 +7876,50 @@ cell, so adjacent rows have ONE blank scanline between them and read as
 crowded at this scale. **A small screenshot is not a measurement**; the count
 took ten seconds and the second look would have cost a day of chasing the
 video driver.
+
+## Apple IIgs: the Ensoniq, calibrated at three points (2026-09-16)
+
+    register    MEASURED       Hz per unit
+     $0400      1757.1 Hz       1.71592
+     $0800      3514.8 Hz       1.71621
+     $1000      7026.9 Hz       1.71555
+
+Ratios 2.0003 and 1.9992 against a wanted 2.0 -- the MODEL is right. The three
+constants agree to 0.04% -- the NUMBER is right. One point tells neither.
+
+Theory afterwards: two oscillators enabled gives 894886/(2+2) = 223,721 Hz and
+a 256-entry table at resolution 0 gives reg x 1.70686, which is 0.53% below
+measurement. The measured column ships.
+
+Four tones through the SHIPPING driver's own voice_note:
+
+    wanted   MEASURED    error
+      440    438.9 Hz   -0.25%
+     1000   1000.0 Hz   +0.00%
+      200    200.7 Hz   +0.33%
+      440    440.1 Hz   +0.02%   <- on the SECOND voice
+
+### AND THE DRIVER WAS RIGHT WHILE THE GAME WAS SILENT
+
+The first build with sound played NOTHING: kb_waitkey() did not call
+snd_poll(). sid.h says it must, in as many words. The driver was already
+correct and already measured; the thing that never called it was thirty-nine
+bytes away.
+
+**And the fix looked like a failure too.** hearit.py reports a tune with no
+rests as ONE burst at its middle pitch -- "441.0 Hz for 14.64s" -- which is
+indistinguishable from a stuck note. Slicing the burst gives 21 distinct
+pitches over 14.6 seconds. tools/check_music.py does the slicing, and
+`make musicfail` feeds it a synthesised steady tone to prove it says no.
+
+### The budget, with every seam real
+
+    stubbed                     13,915
+    + video                      7,934   cost 5,981
+    + storage                    5,108   cost 2,826
+    + far memory                 5,732   gave back 624
+    + keyboard and overlays      5,236   cost 496
+    + the Ensoniq                4,398   cost 838
+    + generated music data       3,622   cost 776
+
+3,622 bytes spare against the C64's 6,112 and the 40-column C128's 304.

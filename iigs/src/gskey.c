@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "../../c128/src/input.h"
+#include "../../c128/src/sid.h"
 
 #define KBD    (*(volatile unsigned char *)0xC000)
 #define STROBE (*(volatile unsigned char *)0xC010)
@@ -36,13 +37,23 @@ char kb_waitkey(void)
 {
     unsigned char c;
 
-    /* The entropy counter is bumped once per pass, and sampling it when the
+    /* snd_poll() IN THE WAIT LOOP, AND WITHOUT IT THE MUSIC NEVER PLAYS.
+       sid.h says so in as many words -- "kb_waitkey() is the important
+       caller: that is where this port spends every second it is not drawing"
+       -- and the first version of this file did not, so the title tune was
+       started, advanced not one note, and the recording held nothing but the
+       ROM's own boot beep. The driver was correct and measured; the thing
+       that never called it was thirty-nine bytes away.
+
+       The entropy counter is bumped on the same pass. Sampling it when the
        player presses a key is this port's only source of randomness: there is
        no clock the game reads, and how long a human takes to answer a prompt
        is unpredictable at this resolution. Before this existed on any port
        every game was the same one. */
-    while (!(KBD & 0x80))
+    while (!(KBD & 0x80)) {
+        snd_poll();
         kb_entropy++;
+    }
 
     c = (unsigned char)(KBD & 0x7F);
     STROBE;

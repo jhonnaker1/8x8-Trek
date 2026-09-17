@@ -86,7 +86,9 @@ char kb_waitkey(void) { return (char)gs_sink; }
 
 #endif  /* GS_REAL_KEY */
 
-/* ---- sound ---- */
+/* ---- sound ----
+   GS_REAL_SOUND links src/gssnd.c instead. */
+#ifndef GS_REAL_SOUND
 uint8_t snd_region;
 void snd_init(void) { gs_sink = 4; }
 void snd_music_data(unsigned int base, unsigned char ok)
@@ -98,6 +100,8 @@ void snd_effect(uint8_t track) { gs_sink = track; }
 void snd_beep(void) { gs_sink = 10; }
 void snd_poll(void) { gs_sink = 11; }
 uint8_t snd_enabled(void) { return gs_sink; }
+
+#endif  /* GS_REAL_SOUND */
 
 /* ---- far memory (the string pool) ---- */
 #ifndef GS_REAL_FAR

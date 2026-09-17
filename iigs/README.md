@@ -180,8 +180,12 @@ linked — a factor of 3.05, against the Falcon's 4,636 for a 1,559-byte driver,
 a factor of 2.97. The callers grow: a stub is unfoldable only while nothing
 downstream is real.
 
-So the position is **5,732 bytes for three remaining seams** — keyboard, sound
-and the overlay loader.
+    + keyboard and overlays       HEADROOM  5,236        cost 496
+    + the Ensoniq                 HEADROOM  4,398        cost 838
+    + the generated music data    HEADROOM  3,622        cost 776
+
+**3,622 bytes spare with every seam real**, against the C64's 6,112 and the
+40-column C128's 304.
 The C64 shipped with 6,112 spare *after* its drivers were in. What this port
 has that the C64 did not is somewhere to put things: the **2,048-byte message
 log** is in bank 0 today and need not be, the **language card** at `$D000` is
@@ -249,12 +253,69 @@ cell boundaries.
 colours and reverse video on a real machine, and `tools/check_sheet.py`
 measures four things no eye can judge on a screenshot.
 
+## Sound: the Ensoniq, calibrated at three points
+
+Two oscillators — music on one, effects on the other, which is what
+`c128/src/sid.h` asks for and what the original's single PC speaker could not
+do. The DOC has thirty-two; two is the shape of the shared driver, not a
+limit of the machine.
+
+**The frequency was measured before a note of music was written**, because
+this project shipped a port an octave flat for four months off a single-point
+check and shipped the CoCo 3's first build an octave *sharp* for the same
+reason:
+
+    register    MEASURED      Hz per unit
+     $0400      1757.1 Hz      1.71592
+     $0800      3514.8 Hz      1.71621
+     $1000      7026.9 Hz      1.71555
+
+Ratios 2.0003 and 1.9992 against a wanted 2.0, so the **model** is right; the
+three constants agree to 0.04%, so the **number** is right. One point could
+not have told those apart.
+
+Theory, *afterwards*: with two oscillators enabled the sample rate is
+894886/(2+2) = 223,721 Hz, and a 256-entry table at resolution 0 gives
+`reg × 1.70686` — 0.53% below what was measured. The measured column ships.
+**Arithmetic that agrees with itself is not evidence.** And the constant is
+tied to `$E1`: the sample rate depends on how many oscillators are enabled, so
+it is only this constant while that says two.
+
+Then four tones through the **shipping driver's own `voice_note`** — a test
+that reimplements the frequency arithmetic proves the test:
+
+    wanted    MEASURED     error
+       440     438.9 Hz    -0.25%
+      1000    1000.0 Hz    +0.00%
+       200     200.7 Hz    +0.33%
+       440     440.1 Hz    +0.02%   <- on the SECOND voice
+
+`make sound` runs it; `make soundfail` proves the gate rejects an octave.
+
+### The driver was right and the game was silent
+
+`make music` boots the real game, records it, and slices the burst. It exists
+because the first build played **nothing**: `kb_waitkey()` did not call
+`snd_poll()`. `sid.h` says it must, in as many words — *"that is where this
+port spends every second it is not drawing"* — and the thing that never called
+it was thirty-nine bytes away from the driver that was already measured.
+
+**And the fix looked like a failure too.** `hearit.py` reports a tune with no
+rests in it as ONE burst at its middle pitch: *"441.0 Hz for 14.6 seconds"* —
+which is exactly what a stuck note reads as. Slicing the burst shows 21
+distinct pitches. `make musicfail` feeds the gate a synthesised steady tone and
+proves it says no.
+
+**No zero bytes in the wavetable.** The DOC halts an oscillator when it reads
+a sample of zero — that is how one-shot sounds end — so a waveform that swings
+through zero stops itself. `$40` and `$C0`.
+
 ## The game runs
 
-**EGA Trek's title screen is on an Apple IIgs, the setup dialogue answers, and
-the whole chain works: boot block, block reads, 38,395-byte image, string pool
-in bank `$01`, overlays read into the language card, keyboard, console.**
-Everything but sound is real.
+**EGA Trek's title screen is on an Apple IIgs, the setup dialogue answers, the
+title tune plays, and the whole chain works: boot block, block reads, the
+image, string pool in bank `$01`, overlays read into the language card,
+keyboard, console, Ensoniq.** Every seam is real.
 
     make game     build build/trek.po
     make play     boot it and drive it -- GS_KEYS="Return,n,Return" etc.

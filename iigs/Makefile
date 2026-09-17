@@ -38,17 +38,26 @@ PROBES  = gsprobe gsmap gsfill1 gsdiv gsram
 # size measurement and the game are the same link with different flags rather
 # than two things that can drift apart.
 GAME_SRC = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
-           ../c128/src/strpool.c ../core/trek.c ../core/planet.c \
+           ../c128/src/strpool.c ../c128/src/music_data.c \
+           ../core/trek.c ../core/planet.c \
            ../core/hof.c ../core/serial.c \
            src/gsstub.c src/gsvid.c src/gsblk.c src/gsfar.c src/gsovl.c \
-           src/gskey.c
+           src/gskey.c src/gssnd.c
 GAME_FLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
              -DTREK_40COL -DTREK_OVERLAYS -DTREK_COLOUR_IS_EGA \
              -DGS_REAL_VIDEO -DGS_REAL_STORAGE -DGS_REAL_FAR \
-             -DGS_REAL_OVL -DGS_REAL_KEY -T iigs.ld
+             -DGS_REAL_OVL -DGS_REAL_KEY -DGS_REAL_SOUND -T iigs.ld
 OVL_NAMES = eval hof front info repair msgs planet cmds title events xtra
 
-build/trek.elf: $(GAME_SRC) iigs.ld | build
+# music_data.c IS GENERATED, so the game cannot be linked before make_music.py
+# has run. Named as a prerequisite because it was not, and the first build with
+# sound in it failed on `undefined symbol: mus_offset` -- while `make game`'s
+# output was being piped to /dev/null, so the run that followed recorded a
+# STALE disk and reported silence. Check the exit status before the output.
+../c128/src/music_data.c: ../tools/make_music.py
+	cd .. && python3 tools/make_music.py >/dev/null
+
+build/trek.elf: $(GAME_SRC) ../c128/src/music_data.c iigs.ld | build
 	$(CC) $(GAME_FLAGS) $(LDFLAGS) -Wl,-Map=build/trek.map $(GAME_SRC) \
 	  -o $@ $(LDLIBS)
 
@@ -179,6 +188,63 @@ ram: build/gsram.bin
 	    -autoboot_script tools/run.lua -seconds_to_run 25 2>&1 \
 	    | grep -E "^DUMP|NEVER" | tr '\n' '|'; echo; \
 	done
+
+# SOUND: the Ensoniq 5503, two oscillators, CALIBRATED AT THREE POINTS.
+# src/gssndt.c plays four tones through the SHIPPING driver's own voice_note
+# -- a test that reimplements the frequency arithmetic proves the test -- and
+# hearit.py reads the pitch back out of the recording. 440 on voice 1 is the
+# fourth, because "two voices" is a claim and a second oscillator addressed
+# independently is the evidence.
+build/gssndt.bin: src/gssndt.c src/gssnd.c src/gsfar.c src/gsblk.c iigs.ld | build
+	$(CC) -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core -DTREK_40COL \
+	  -DGS_SNDTEST -T iigs.ld $(LDFLAGS) src/gssndt.c src/gssnd.c \
+	  src/gsfar.c src/gsblk.c -o build/gssndt.elf $(LDLIBS)
+	$(OBJCOPY) -O binary build/gssndt.elf $@
+
+build/sndt.po: build/boot.bin build/gssndt.bin tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin --payload build/gssndt.bin
+
+sound: build/sndt.po
+	rm -f build/sndt.wav
+	$(MAME) apple2gs $(MAMEOPT) -video none -flop3 build/sndt.po \
+	  -wavwrite build/sndt.wav -autoboot_script tools/bootrun.lua \
+	  -seconds_to_run 50
+	python3 ../coco3gime/tools/hearit.py build/sndt.wav 440 1000 200 440
+
+# ARM-CHECK: the pitch gate must reject an octave. Inverted -- a PASS is the
+# failure, and an octave is exactly the error this project shipped twice.
+soundfail: build/sndt.po
+	@if python3 ../coco3gime/tools/hearit.py build/sndt.wav 880 2000 400 880 \
+	    > build/soundfail.log 2>&1; then \
+	  echo "ARM-CHECK FAILED: hearit passed pitches an octave out"; exit 1; \
+	else echo "arm-check ok: hearit rejected pitches an octave out"; fi
+
+# AND THAT THE TUNE ADVANCES, which `sound` cannot see: it settles whether the
+# pitches are RIGHT, and a stuck note is right at one pitch forever. Boot the
+# real game, record it, and slice the burst -- hearit reports a working tune
+# and a held note identically, as "441.0 Hz for 14.6 seconds".
+build/game.wav: build/trek.po
+	rm -f $@
+	mkdir -p build/snap/apple2gs
+	GS_WAIT=26 GS_KEYS=Return GS_STEP=10 $(MAME) apple2gs $(MAMEOPT) \
+	  -flop3 build/trek.po -wavwrite $@ -snapshot_directory build/snap \
+	  -autoboot_script tools/play.lua -seconds_to_run 70
+
+music: build/game.wav
+	python3 tools/check_music.py build/game.wav
+
+# ARM-CHECK: a synthesised steady tone is what a stuck note sounds like and
+# what looked like success the first time. Inverted -- a PASS is the failure.
+build/stuck.wav: | build
+	@python3 -c "import array,math,wave; r=48000; \
+	  a=array.array('h',(int(12000*math.sin(2*math.pi*440*t/r)) for t in range(r*15))); \
+	  w=wave.open('build/stuck.wav','wb'); w.setnchannels(1); w.setsampwidth(2); \
+	  w.setframerate(r); w.writeframes(a.tobytes()); w.close()"
+
+musicfail: build/stuck.wav
+	@if python3 tools/check_music.py build/stuck.wav > build/musicfail.log 2>&1; \
+	then echo "ARM-CHECK FAILED: check_music passed a single held note"; exit 1; \
+	else echo "arm-check ok: check_music rejected a single held note"; fi
 
 # THE CONSOLE. gsvid.c draws c128/src/vdc.h's 40x25 grid into Super Hi-Res,
 # and gssmoke.c is the proof sheet: every text code, the box set, a drawn
@@ -315,11 +381,11 @@ early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 	@echo "-- and far memory too: the log and the pool leave bank 0"
 	python3 tools/verify_gs.py build/earlyfar.elf --window 0xD000 --org 0x0800
 
-verify: colours bootcheck failcheck early sheet sheetfail files filesfail game
+verify: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail game play verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail sound soundfail game play music musicfail verify clean
 
 .PRECIOUS: build/%.elf
