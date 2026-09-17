@@ -1,18 +1,82 @@
-# EGA Trek on the Commodore Plus/4 — IT BOOTS, 2026-09-17
+# EGA Trek on the Commodore Plus/4 — IT RUNS, 2026-09-17
 
-**The title screen draws.** Boot, the init chain, `main()`, the far store,
-`STRINGS.DAT`, and the banked KERNAL `LOAD` that fetches the title overlay all
-work. The keyboard is written and its registers are proved; whether the matrix
-table is right is the one thing still unconfirmed by a human.
+**Title screen with Anderson's credit, the briefing question, and the setup
+screens — all drawing real text.** The string pool loads, the overlays load,
+the keyboard works, `main()` runs.
 
 | | state |
 |---|---|
-| `.init.250 <shift>` calls the KERNAL after the ROMs are banked out | **fixed** — hook moved off `.init.010` |
-| `-linit-stack` missing from the link line | **fixed** — `__do_init_stack` was absent entirely |
-| `$FFFF` "overwritten with `$11`" | **retracted** — it was VICE's monitor showing a ROM/RAM mixture |
-| `overlay.c` calls `cbm_k_load`, which nothing banks | **fixed** — `k_load`, and it never was the regression |
-| `BREAK` at `PC 000E` | **fixed** — the soft stack was on the ROM's RAM-resident fetch routines |
-| the keyboard | **written** — `src/p4key.c`, TED matrix, not CIA and not GETIN |
+| `.init.250 <shift>` calls the KERNAL after the ROMs are banked out | **fixed** — an RTS at `$FFD2`, see below |
+| `-linit-stack` missing from the link line | **fixed** |
+| `$FFFF` "overwritten with `$11`" | **retracted** — VICE's monitor showing a ROM/RAM mixture |
+| `overlay.c` calls `cbm_k_load`, which nothing banks | **fixed** — and it never was the regression |
+| `BREAK` at `PC 000E` | **fixed** — soft stack on the ROM's RAM-resident fetch routines |
+| keys do nothing | **fixed** — `src/p4key.c`, and its matrix was TRANSPOSED |
+| every label blank | **fixed** — `far_load` gave SETNAM a filename above `$8000` |
+| `BREAK` at `PC 0BFA` | **fixed** — `__zero_bss` tail-jumps to `__memset` ABOVE `$8000` |
+
+## THE ORDERING CONFLICT, DISSOLVED BY OWNING $FFD2
+
+This is the one that parked the port twice, and both horns were real:
+
+  * llvm-mos's commodore libc puts `lda #$0e / jsr $ffd2` in the init chain as
+    `shift`. It **cannot be overridden** — the collision is in LTO, not link
+    order. So the bank-in hook had to run **after** it, or that call landed in
+    RAM.
+  * But running after it means `.init.200`'s `__zero_bss` runs with the ROM
+    mapped — and `__zero_bss` **tail-jumps to `__memset`, which is in `.text`
+    above `$8000`** (measured at `$A545`). With the ROM in, that is BASIC ROM.
+    The CPU jumped into BASIC and never came back.
+
+Whether the port survived depended on *which ROM bytes happened to sit at
+`__memset`'s address*, which is why growing `.stack` by 1536 bytes turned a
+booting build into one that died before `main()`. **That is the same layout
+sensitivity that was blamed on thirty-four NOPs, in code nobody had audited.**
+
+**Both are satisfied at once by owning `$FFD2`.** With RAM banked in,
+`$FF40-$FFFF` is *our* RAM — so write an `RTS` there and `shift`'s KERNAL call
+becomes a harmless no-op. The hook goes back to `.init.010`, everything after
+it runs with RAM in and the whole program visible, and the soft stack is real
+RAM from the first frame because `plus4.ld` reserves it low. The banked
+wrappers are unaffected: they map the ROM in first, and then `$FFD2` is the
+KERNAL's real CHROUT again.
+
+## THE STRING POOL: A FILENAME THE KERNAL COULD NOT SEE
+
+`far_load()` passed SETNAM the caller's `const char *` directly. Those are
+string literals in `.rodata` — `"STRINGS.DAT"` measured at `$A2B3`, with
+`.rodata` running `$9F5E..$A817`. **SETNAM is called inside the banked window,
+with the ROM mapped**, so the KERNAL read the filename out of BASIC ROM.
+
+`p4bank.c`'s `cbm_k_setnam` has copied its names down into `.lowbss` since it
+was written **and says why in a comment**. `p4mem.c` makes the same three
+KERNAL calls in its own assembly and never got the same treatment. So overlays
+arrived and the string pool did not, and the game ran with blank labels —
+exactly what `main.c` says a disk with no `STRINGS.DAT` should do.
+
+## THE KEYBOARD MATRIX WAS TRANSPOSED
+
+`src/p4key.c`'s first table was checked against **both** VICE's
+`PLUS4/gtk3_sym.vkm` and the Plus/4 Encyclopedia, and the pairs matched both —
+because comparing `(x,y)` against `(x,y)` **cannot catch a swap of which one is
+written and which is read**. The Encyclopedia's table is drawn transposed
+relative to VICE's, which is the trap. Pressing `a` produced `R`.
+
+**Measured instead:** `src/keylive.c` latched a real keypress — `a` gave
+`$FD30` select bit 1, `$FF08` readback bit 2, and VICE puts A at *row* 1,
+*column* 2. So `$FD30` takes the ROW and `$FF08` returns the COLUMN.
+
+The access sequence is the KERNAL's own, disassembled from
+`kernal-318004-05.bin`: `SCNKEY $FF9F -> $DB11`, whose helper at `$DB70` is
+`STA $FD30 / STA $FF08 / LDA $FF08 / RTS`.
+
+## THE SOFT STACK SIZE WAS A WRONG DIAGNOSIS, KEPT
+
+`BREAK` at `PC 0BFA` is colour RAM, and it was called a stack underflow and
+"fixed" by growing `.stack` from 512 to 2048. **The sentinel says the deepest
+use is 50 bytes.** The real cause was `__memset`, above. The sentinel fill in
+`p4bank.c` stays, because it is what turned a guess into a number — and 2048
+stays only because nothing needs the 1536 bytes back yet.
 
 ## THE FAULT, AND IT WAS A FREE-MEMORY CLAIM THAT WAS NEVER TRUE
 

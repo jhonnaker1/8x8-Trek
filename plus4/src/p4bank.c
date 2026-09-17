@@ -68,7 +68,7 @@ void p4_stray_irq(void) { __asm__ volatile ("rti"); }
    normal C function ends in RTS, so putting one here RETURNED OUT OF THE INIT
    CHAIN and main() was never called. Measured by bisection: the same hello.c
    ran with this file left out and did not run with it linked. */
-__attribute__((used, naked, section(".init.260")))
+__attribute__((used, naked, section(".init.010")))
 void p4_ram_in(void)
 {
     /* ALL ASSEMBLY, because a naked function may contain nothing else -- and
@@ -102,10 +102,57 @@ void p4_ram_in(void)
         "lda #>p4_stray_irq\n"
         "sta $ffff\n"
         "sta $fffb\n"
+        /* AN RTS AT $FFD2, AND IT DISSOLVES THE ORDERING CONFLICT THAT
+           PARKED THIS PORT TWICE.
+
+           llvm-mos's commodore libc puts `lda #$0e / jsr $ffd2` in the init
+           chain as `shift`, and it cannot be overridden -- the collision is
+           in LTO, not link order. So the hook had to run AFTER it, or that
+           KERNAL call landed in RAM. But running after it means `__zero_bss`
+           runs with the ROM mapped, and __zero_bss tail-jumps to __memset,
+           WHICH IS IN .text ABOVE $8000 -- measured at $A545. With the ROM in
+           that is BASIC ROM, so the CPU jumped into BASIC and never came back.
+           Whether it survived depended on which ROM bytes sat at __memset's
+           address, which is why growing .stack by 1536 bytes turned a booting
+           build into one that died before main().
+
+           Both constraints are satisfied at once by owning $FFD2. With RAM
+           banked in, $FF40-$FFFF is OUR RAM -- so put an RTS there and
+           `shift`'s call becomes a harmless no-op. The wrappers below are
+           unaffected: they bank the ROM in first, and then $FFD2 is the
+           KERNAL's real CHROUT again.
+
+           So the hook is back at .init.010, everything after it runs with RAM
+           in and the whole program visible, and the soft stack is real RAM
+           from the very first frame because plus4.ld now RESERVES it low. */
+        "lda #$60\n"
+        "sta $ffd2\n"                  /* RTS -- neutralise libc's `shift` */
+
         "sta $ff3f\n"                  /* and now the RAM is ours         */
+
+        /* THE SOFT STACK GETS A SENTINEL, so its depth is a measurement and
+           not a borrowed number. Nothing reports how much soft stack a build
+           uses -- llvm-mos does not, and the linker cannot -- so the only way
+           to know is to fill it and look at what survived. $A5 from
+           __stack_bottom up to __stack, eight pages, unrolled because there
+           is no pointer to spare down here: zero page IS __rc0..__rc31.
+           Sized to match .stack in plus4.ld; verify_p4 checks the two agree.
+
+           Safe here: this hook is naked assembly and touches no C local, and
+           it runs before main(). */
+        "lda #$a5\n"
+        "ldx #0\n"
+        "1:\n"
+        "sta __stack_bottom+$000,x\n" "sta __stack_bottom+$100,x\n"
+        "sta __stack_bottom+$200,x\n" "sta __stack_bottom+$300,x\n"
+        "sta __stack_bottom+$400,x\n" "sta __stack_bottom+$500,x\n"
+        "sta __stack_bottom+$600,x\n" "sta __stack_bottom+$700,x\n"
+        "inx\n"
+        "bne 1b\n"
+
         "lda #$a1\n"
         "sta P4M+0\n"
-        ::: "a", "memory");
+        ::: "a", "x", "memory");
 }
 
 /* The way out, for a program that returns rather than resetting. plat_exit()

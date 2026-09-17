@@ -22,9 +22,22 @@
  *
  * HOW TED'S KEYBOARD PORT WORKS, from the Plus/4 Encyclopedia's matrix page:
  *
- *   1. write a row selector to $FD30 -- ACTIVE LOW, so ~(1 << row)
+ *   1. write a ROW selector to $FD30 -- ACTIVE LOW, so ~(1 << row)
  *   2. WRITE to $FF08, which is what makes TED sample the keyboard lines
- *   3. READ $FF08 for the columns -- ALSO ACTIVE LOW, a 0 bit is pressed
+ *   3. READ $FF08 for the COLUMNS -- ALSO ACTIVE LOW, a 0 bit is pressed
+ *
+ * WHICH AXIS GOES TO WHICH REGISTER IS MEASURED, NOT READ. The first version
+ * of this table was TRANSPOSED and `a` came out as `R`. It had been checked
+ * against VICE's own PLUS4/gtk3_sym.vkm matrix and the Plus/4 Encyclopedia,
+ * and the pairs matched BOTH -- because comparing (x,y) against (x,y) cannot
+ * catch a swap of which one is written and which is read. Neither source
+ * states it in those terms; the Encyclopedia's table is drawn transposed
+ * relative to VICE's, which is exactly the trap.
+ *
+ * src/keylive.c latched a real keypress: holding `a` gave $FD30 select bit 1,
+ * $FF08 readback bit 2. VICE's matrix puts A at ROW 1, COLUMN 2. So
+ * $FD30 <- VICE row, $FF08 -> VICE column, and the table below is VICE's grid
+ * copied straight down with no reinterpretation.
  *
  * Step 2 is the one that is easy to miss: $FF08 is not a port that simply
  * reflects the lines, it is a latch, and the write is the trigger. Both
@@ -48,38 +61,47 @@ typedef struct {
     char          ch;    /* the KB_* this produces           */
 } Key;
 
-/* Transcribed from the Plus/4 Encyclopedia's keyboard/joystick matrix table,
-   whose header row gives the column read-back values $FE $FD $FB $F7 $EF $DF
-   $BF $7F -- so column N is bit N -- and whose selector column gives the same
-   for the rows. Values are the KB_* constants and never character literals,
-   for the reason input.h states. */
+/* VICE's own PLUS4/gtk3_sym.vkm matrix, copied down row by row:
+
+       0        1        2        3       4         5        6        7
+   0 |INST/DEL|RETURN  |POUND   |F7/HELP |F4/F1   |F5/F2   |F6/F3   |@       |
+   1 |3 #     |W       |A       |4 $     |Z       |S       |E       | SHIFTs |
+   2 |5 %     |R       |D       |6 &     |C       |F       |T       |X       |
+   3 |7 '     |Y       |G       |8 (     |B       |H       |U       |V       |
+   4 |9 )     |I       |J       |0 ^     |M       |K       |O       |N       |
+   5 |DOWN    |P       |L       |UP      |. >     |: [     |-       |, <     |
+   6 |LEFT    |*       |; ]     |RIGHT   |ESC     |= <- pi |+       |/ ?     |
+   7 |1 !     |CLR/HOME| CTRLs  |2 "     |SPACE   |CBM     |Q       |RUN/STOP|
+
+   Values are the KB_* constants and never character literals, for the reason
+   input.h states. */
 static const Key keys[] = {
-    /* The three the game blocks on most. This machine has a REAL Escape key
-       and four DEDICATED cursor keys, so unlike the C64 there is no shift to
-       decode and no one physical key serving two directions. */
-    { 1, 0, KB_RETURN }, { 0, 0, KB_DELETE }, { 4, 6, KB_ESC },
-    { 3, 5, KB_UP },     { 0, 5, KB_DOWN },   { 4, 7, KB_SPACE },
+    /* The ones the game blocks on. This machine has a REAL Escape key and
+       FOUR DEDICATED cursor keys, so unlike the C64 there is no shift to
+       decode and no single key serving two directions. */
+    { 0, 1, KB_RETURN }, { 0, 0, KB_DELETE }, { 6, 4, KB_ESC },
+    { 5, 3, KB_UP },     { 5, 0, KB_DOWN },   { 7, 4, KB_SPACE },
 
-    { 2, 1, KB_A }, { 4, 3, KB_B }, { 4, 2, KB_C }, { 2, 2, KB_D },
-    { 6, 1, KB_E }, { 5, 2, KB_F }, { 2, 3, KB_G }, { 5, 3, KB_H },
-    { 1, 4, KB_I }, { 2, 4, KB_J }, { 5, 4, KB_K }, { 2, 5, KB_L },
-    { 4, 4, KB_M }, { 7, 4, KB_N }, { 6, 4, KB_O }, { 1, 5, KB_P },
-    { 6, 7, KB_Q }, { 1, 2, KB_R }, { 5, 1, KB_S }, { 6, 2, KB_T },
-    { 6, 3, KB_U }, { 7, 3, KB_V }, { 1, 1, KB_W }, { 7, 2, KB_X },
-    { 1, 3, KB_Y }, { 4, 1, KB_Z },
+    { 1, 2, KB_A }, { 3, 4, KB_B }, { 2, 4, KB_C }, { 2, 2, KB_D },
+    { 1, 6, KB_E }, { 2, 5, KB_F }, { 3, 2, KB_G }, { 3, 5, KB_H },
+    { 4, 1, KB_I }, { 4, 2, KB_J }, { 4, 5, KB_K }, { 5, 2, KB_L },
+    { 4, 4, KB_M }, { 4, 7, KB_N }, { 4, 6, KB_O }, { 5, 1, KB_P },
+    { 7, 6, KB_Q }, { 2, 1, KB_R }, { 1, 5, KB_S }, { 2, 6, KB_T },
+    { 3, 6, KB_U }, { 3, 7, KB_V }, { 1, 1, KB_W }, { 2, 7, KB_X },
+    { 3, 1, KB_Y }, { 1, 4, KB_Z },
 
-    { 3, 4, KB_DIGIT0 + 0 }, { 0, 7, KB_DIGIT0 + 1 }, { 3, 7, KB_DIGIT0 + 2 },
-    { 0, 1, KB_DIGIT0 + 3 }, { 3, 1, KB_DIGIT0 + 4 }, { 0, 2, KB_DIGIT0 + 5 },
-    { 3, 2, KB_DIGIT0 + 6 }, { 0, 3, KB_DIGIT0 + 7 }, { 3, 3, KB_DIGIT0 + 8 },
-    { 0, 4, KB_DIGIT0 + 9 },
+    { 4, 3, KB_DIGIT0 + 0 }, { 7, 0, KB_DIGIT0 + 1 }, { 7, 3, KB_DIGIT0 + 2 },
+    { 1, 0, KB_DIGIT0 + 3 }, { 1, 3, KB_DIGIT0 + 4 }, { 2, 0, KB_DIGIT0 + 5 },
+    { 2, 3, KB_DIGIT0 + 6 }, { 3, 0, KB_DIGIT0 + 7 }, { 3, 3, KB_DIGIT0 + 8 },
+    { 4, 0, KB_DIGIT0 + 9 },
 
-    /* The unshifted punctuation, for the same reason input.h gives: a
-       keyboard that can only spell the words the program already knows is not
-       a keyboard. All eight are plain keys on this machine. */
-    { 7, 0, KB_AT },    { 1, 6, KB_STAR },  { 2, 6, KB_SEMI },
-    { 4, 5, KB_PERIOD },{ 5, 5, KB_COLON }, { 5, 6, KB_EQUALS },
-    { 6, 5, KB_MINUS }, { 6, 6, KB_PLUS },  { 7, 5, KB_COMMA },
-    { 7, 6, KB_SLASH },
+    /* The unshifted punctuation, for the reason input.h gives: a keyboard that
+       can only spell the words the program already knows is not a keyboard.
+       All of these are plain keys on this machine. */
+    { 0, 7, KB_AT },     { 6, 1, KB_STAR },  { 6, 2, KB_SEMI },
+    { 5, 4, KB_PERIOD }, { 5, 5, KB_COLON }, { 6, 5, KB_EQUALS },
+    { 5, 6, KB_MINUS },  { 6, 6, KB_PLUS },  { 5, 7, KB_COMMA },
+    { 6, 7, KB_SLASH },
 };
 
 #define KEY_COUNT (sizeof keys / sizeof keys[0])

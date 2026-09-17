@@ -80,6 +80,22 @@ __attribute__((used, section(".lowbss"))) unsigned char k_dstlo, k_dsthi;
 __attribute__((used, section(".lowbss"))) unsigned char k_endlo, k_endhi;
 __attribute__((used, section(".lowbss"))) unsigned char k_err;
 
+/* THE FILENAME HAS TO LIVE DOWN HERE TOO, and this is the fault that made the
+   game draw a title screen and then a blank prompt with a cursor.
+   
+   SETNAM is called INSIDE the banked window, with the ROM mapped. The name
+   this function is handed is a string literal in .rodata -- measured at
+   $A2B3 for "STRINGS.DAT", with .rodata running $9F5E..$A817 -- so with the
+   ROM in, the KERNAL read the filename out of BASIC ROM and the LOAD failed.
+   
+   p4bank.c's cbm_k_setnam has copied its names into .lowbss since it was
+   written, and says why in a comment. This file makes the same three KERNAL
+   calls in its own assembly and never got the same treatment -- so overlays
+   arrived (they go through p4bank.c) and the string pool did not (it comes
+   through here). The game played on with blank labels, which is exactly what
+   main.c says a disk with no STRINGS.DAT should do. */
+__attribute__((used, section(".lowbss"))) char k_name[20];
+
 __attribute__((noinline, section(".lowtext")))
 static void kernal_load_raw(void)
 {
@@ -115,12 +131,14 @@ uint16_t far_load(const char *name)
     if (base >= (uint16_t)(FAR_LIMIT - FAR_BASE)) return FAR_NONE;
 
     {   /* Set up outside the window, in ordinary C, with the ROM out. */
-        const char *p = name;
         unsigned char n = 0;
-        while (p[n]) n++;
+        while (name[n] && n < (unsigned char)(sizeof k_name - 1)) {
+            k_name[n] = name[n];
+            n++;
+        }
         k_namlen = n;
-        k_namlo = (unsigned char)((uint16_t)(uintptr_t)name & 0xFF);
-        k_namhi = (unsigned char)((uint16_t)(uintptr_t)name >> 8);
+        k_namlo = (unsigned char)((uint16_t)(uintptr_t)k_name & 0xFF);
+        k_namhi = (unsigned char)((uint16_t)(uintptr_t)k_name >> 8);
         k_dstlo = (unsigned char)(dest & 0xFF);
         k_dsthi = (unsigned char)(dest >> 8);
         kernal_load_raw();

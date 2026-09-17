@@ -136,6 +136,14 @@ def main():
         if stk > ROM:
             bad.append("__stack $%04X is above $%04X -- a write there passes "
                        "through the ROM and A READ RETURNS ROM" % (stk, ROM))
+        # THE SENTINEL FILL IS UNROLLED TO A FIXED NUMBER OF PAGES in
+        # p4bank.c. If .stack grows and that fill does not, the top of the
+        # stack is never filled and the high-water reading silently
+        # under-reports -- the measurement would break quietly, which is the
+        # one failure this project keeps meeting.
+        if (stk - bot) != 0x800:
+            bad.append(".stack is %d bytes but p4bank.c's sentinel fills "
+                       "2048 -- keep them equal" % (stk - bot))
         if stk - bot < 0x100:
             bad.append("__stack is only %d bytes; the deepest path other ports "
                        "measure is 184" % (stk - bot))

@@ -139,12 +139,20 @@ SECTIONS {
        what is free: nothing else can be here by construction, it is below
        $8000 so it is never ROM-shadowed, and it moves with the program
        instead of having to be re-measured every time the layout shifts.
-       512 bytes against the 143-184 other ports measure on their deepest
-       path; src/stackdepth.c measures THIS port's and verify_p4 prints it. */
+       2048 BYTES, AND THE SIZE IS MEASURED NOW RATHER THAN BORROWED. It was
+       512, on the 143-184 bytes other ports measure on their deepest path --
+       and the game reached BASIC's monitor with BREAK at PC $0BFA, which is
+       COLOUR RAM: the stack had underflowed past $1200, down through .lowbss,
+       .lowtext, the BASIC header and the screen. That only started happening
+       once STRINGS.DAT actually loaded, because until then the pool was empty
+       and the deep parse-and-draw path was never taken.
+       p4bank.c fills this region with $A5 before main(), so the high-water
+       mark can be read straight out of memory. Keep the size a whole number
+       of pages: that fill is eight unrolled stores. */
     .stack (NOLOAD) : {
         . = ALIGN(256);
         __stack_bottom = .;
-        . += 0x0200;
+        . += 0x0800;                 /* EIGHT PAGES -- see p4bank.c's fill */
         __stack = .;
     } >ram
 
