@@ -455,6 +455,37 @@ left and `jmp (gs_drv)` would go anywhere. `make filesfail` runs the identical
 binary that way: the signature is detected absent, **every file call is
 refused cleanly and nothing hangs**, and the gate reports thirteen failures.
 
+## The briefing, and the gate that did not exist
+
+**Jamie played the first build for three minutes and found what fifteen gates
+had missed: the briefing did nothing.** The prompt answered Y and the game
+carried on to the setup screen.
+
+The code was right. `ui_briefing()` opens `BRIEF.TXT` and its own comment says
+what happens when it is not there — *"NO FILE, NO BRIEFING. A disk without
+BRIEF.TXT skips it silently and the game starts, exactly as a disk without
+STRINGS.DAT plays without words."* **The disk was wrong: `mkdisk.py` was never
+told to put the file on it.**
+
+So the failure had no symptom any gate could see, and not one of the fifteen
+ever pressed Y at that prompt. `make briefing` does now, and `make brieffail`
+builds the same disk without `BRIEF.TXT` to prove the gate catches exactly
+this. That is the recorded lesson arriving on schedule: *a bench reaches the
+screens somebody listed*.
+
+### And the bleed test had a false positive, which is worse than no test
+
+`check_briefing.py` also asserts that no row draws on scanline 7 — the blank
+one between rows — because a six-pixel font in an eight-pixel cell makes tight
+text LOOK like overlapping lines on a small screenshot, and **I misread it as
+a defect three times in one session.**
+
+The first version failed the setup screen for the **cursor**: a solid cell
+lights all eight scanlines and is not bleed. It would have failed every
+console screen in the game, since the console is built out of solid cells.
+What counts is a column lit on scanline 7 that is *not* lit on all of 0..6 —
+part of a glyph, in the gap.
+
 ## What has NOT been established
 
 * **A filesystem.** The loader reads a flat run of blocks. The game needs

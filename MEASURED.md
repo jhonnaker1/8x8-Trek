@@ -7923,3 +7923,25 @@ pitches over 14.6 seconds. tools/check_music.py does the slicing, and
     + generated music data       3,622   cost 776
 
 3,622 bytes spare against the C64's 6,112 and the 40-column C128's 304.
+
+## Apple IIgs: the briefing, found by playing (2026-09-16)
+
+Jamie played the first complete build -- "it looks, sounds, and plays great.
+the breifing doesn't work though" -- and that was a disk with no BRIEF.TXT on
+it. ui_briefing() opens the file and skips SILENTLY when it is absent, by
+design and by its own comment, so the failure had no symptom to gate on.
+
+FIFTEEN GATES PASSED ON THAT DISK. Not one of them ever pressed Y at the
+briefing prompt. `make briefing` does now: 14 rows of text on page 1 of 24,
+against 4 on the setup screen a missing file leaves behind. `make brieffail`
+builds the same disk without the file and proves the gate says no.
+
+### The bleed test's false positive
+
+check_briefing.py also asserts no row draws on scanline 7 -- the blank one --
+because a six-pixel font in an eight-pixel cell makes tight text LOOK like
+overlapping lines, which was misread as a defect THREE TIMES in one session.
+The first version failed the setup screen for the CURSOR: a solid cell lights
+all eight scanlines and is not bleed, and that check would have failed every
+console screen in the game. Bleed is a column lit on scanline 7 that is not
+lit on all of 0..6.

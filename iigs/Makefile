@@ -82,16 +82,70 @@ build/MUSIC.DAT: ../tools/make_music.py | build
 	cp ../c128/build/music.dat $@
 	@cmp ../c128/build/music.dat $@
 
+# BRIEF.TXT IS A FILE THE GAME OPENS AND THE BUILD HAS TO PUT THERE, and the
+# first disk did not. ui_briefing() says what happens then, in its own comment:
+# "NO FILE, NO BRIEFING. A disk without BRIEF.TXT skips it silently and the
+# game starts." So the briefing prompt answered Y and nothing happened -- no
+# error, no blank page, nothing -- and every gate in this directory passed,
+# because not one of them ever answered that prompt. Jamie found it in three
+# minutes of playing.
+#
+# briefing40.txt, not briefing.txt: the 40-column ports ship the reflowed one.
 build/trek.po: build/boot.bin build/trek.bin build/OVERLAYS.BIN \
-               build/STRINGS.DAT build/MUSIC.DAT tools/mkdisk.py
+               build/STRINGS.DAT build/MUSIC.DAT \
+               ../c128/src/briefing40.txt tools/mkdisk.py
 	python3 tools/mkdisk.py $@ --boot build/boot.bin \
 	  --payload build/trek.bin \
 	  --file STRINGS.DAT=build/STRINGS.DAT \
 	  --file MUSIC.DAT=build/MUSIC.DAT \
+	  --file BRIEF.TXT=../c128/src/briefing40.txt \
 	  --file OVERLAYS.BIN=build/OVERLAYS.BIN --slots 4
 
 game: build/trek.po
 	python3 tools/verify_gs.py build/trek.elf --window 0xD000 --org 0x0800
+
+# THE BRIEFING, ANSWERED. Not one of the other gates ever pressed Y at that
+# prompt, which is why a disk with no BRIEF.TXT on it passed all fifteen of
+# them -- ui_briefing() skips silently when the file is missing, so the failure
+# had no symptom to see. Jamie found it in three minutes.
+briefing: build/trek.po
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	GS_WAIT=26 GS_KEYS="Return,y,Return" GS_STEP=8 $(MAME) apple2gs \
+	  $(MAMEOPT) -flop3 build/trek.po -snapshot_directory build/snap \
+	  -autoboot_script tools/play.lua -seconds_to_run 120
+	python3 tools/check_briefing.py build/snap/apple2gs/0003.png
+
+# ARM-CHECK: the same disk WITHOUT BRIEF.TXT, which is the bug exactly.
+# Inverted -- a PASS is the failure.
+build/nobrief.po: build/boot.bin build/trek.bin build/OVERLAYS.BIN \
+                  build/STRINGS.DAT build/MUSIC.DAT tools/mkdisk.py
+	python3 tools/mkdisk.py $@ --boot build/boot.bin \
+	  --payload build/trek.bin --file STRINGS.DAT=build/STRINGS.DAT \
+	  --file MUSIC.DAT=build/MUSIC.DAT \
+	  --file OVERLAYS.BIN=build/OVERLAYS.BIN --slots 4
+
+brieffail: build/nobrief.po
+	mkdir -p build/snap/apple2gs && rm -f build/snap/apple2gs/*.png
+	@GS_WAIT=26 GS_KEYS="Return,y,Return" GS_STEP=8 $(MAME) apple2gs \
+	  $(MAMEOPT) -flop3 build/nobrief.po -snapshot_directory build/snap \
+	  -autoboot_script tools/play.lua -seconds_to_run 120 > /dev/null 2>&1; \
+	if python3 tools/check_briefing.py build/snap/apple2gs/0003.png \
+	    > build/brieffail.log 2>&1; then \
+	  echo "ARM-CHECK FAILED: check_briefing passed a disk with no BRIEF.TXT"; \
+	  exit 1; \
+	else echo "arm-check ok: check_briefing rejected a disk with no BRIEF.TXT"; fi
+
+# FOR A HUMAN. No -nothrottle, sound ON, a real window, no -seconds_to_run and
+# no autoboot script -- every one of those is right for a measurement and
+# wrong for somebody playing. `-nothrottle` in particular has fooled this
+# project before: the CoCo 3's sound was reported broken for an afternoon
+# because every session ran at 1,200% and the tune was a chirp.
+#
+# IT LEAVES THE MACHINE RUNNING. That is the point of this target; `make play`
+# is the one that drives itself and exits.
+run: build/trek.po
+	$(MAME) apple2gs -rompath "$(ROMS)" -window -skip_gameinfo \
+	  -flop3 build/trek.po
 
 # Boot the game and drive it. GS_KEYS is a comma-separated list of ioport
 # field names -- "Return", "Space", "n", "1" -- because this machine's
@@ -381,11 +435,11 @@ early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 	@echo "-- and far memory too: the log and the pool leave bank 0"
 	python3 tools/verify_gs.py build/earlyfar.elf --window 0xD000 --org 0x0800
 
-verify: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail
+verify: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail briefing brieffail
 
 clean:
 	rm -rf build
 
-.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail sound soundfail game play music musicfail verify clean
+.PHONY: all colours pagemap disk bootcheck failcheck early sheet sheetfail ram files filesfail sound soundfail game play run music musicfail briefing brieffail verify clean
 
 .PRECIOUS: build/%.elf
