@@ -1,6 +1,34 @@
-# EGA Trek on the Commodore Plus/4 — PARKED, 2026-09-16
+# EGA Trek on the Commodore Plus/4 — PARKED AGAIN, 2026-09-16
 
-## UNPARKED IN PART, 2026-09-16: the startup blocker is FOUND and FIXED
+**Five faults found in one session, two fixed, one retracted, one identified
+but untestable, and one still open. The port does not boot.** It gets further
+than it did: the init chain completes, `main()` runs, the soft stack is
+initialised, and — before the last change — `STRINGS.DAT` landed in the far
+store at `$DD00` byte for byte, through both banked ROMs.
+
+| | state |
+|---|---|
+| `.init.250 <shift>` calls the KERNAL after the ROMs are banked out | **fixed** — hook moved off `.init.010` |
+| `-linit-stack` missing from the link line | **fixed** — `__do_init_stack` was absent entirely |
+| `$FFFF` "overwritten with `$11`" | **retracted** — it was VICE's monitor showing a ROM/RAM mixture |
+| `overlay.c` calls `cbm_k_load`, which nothing banks | **identified, untestable** until startup works |
+| something reaches zero page — `BREAK` at `PC 000E` | **open** |
+
+**Where a fresh attempt should start:** `PC 000E` is inside
+`__rc0..__rc31`, so the CPU is executing the imaginary registers. That is a
+jump through a corrupted pointer. Everything below is the road to that point,
+and none of it needs re-deriving.
+
+**What must NOT be re-derived** — all measured on the machine today:
+the soft stack cannot live above `$8000` (a write passes through the ROM, a
+read returns ROM); `$0400..$04FF` is the free page and `$0500` is a live system
+vector; `shift` cannot be overridden because the collision is in LTO, not the
+linker; and cc65's Plus/4 target is **this port's architecture, not an
+alternative to it**.
+
+---
+
+## The startup blocker: FOUND and FIXED
 
 **The cause was never this file's banking.** `p4bank.c` had been blamed as a
 whole since the port was parked — *"the same hello.c ran without this file and
