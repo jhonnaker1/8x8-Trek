@@ -212,6 +212,15 @@ volume**; neither ships here.
 **On real hardware, just copy the drawer across** — `PROGDIR:` makes its
 location irrelevant, so it runs from anywhere, Workbench included.
 
+
+**Two Workbench icons ship with it, and you want both**: `egatrek-amiga.info`
+sits *beside* the drawer and makes the drawer visible; `egatrek.info` sits
+*inside* it and makes the game double-clickable. Copy the drawer and the
+`.info` next to it together — AmigaDOS pairs an icon with the thing of the same
+name beside it. **Without them Workbench shows nothing at all** unless Show All
+Files is on, which is what an earlier release looked like on a real machine. A
+Shell needs neither.
+
 ### `egatrek-falcon.zip` — Atari Falcon030
 
 Unzip and **run `EGATREK.PRG` from its own folder** — unlike the Amiga, this

@@ -9,6 +9,22 @@ enjoy that, register it. That was always the deal.
     https://archive.org/details/EGATrek
 
 
+WORKBENCH ICONS
+
+The zip holds two of them, and you want both:
+
+    egatrek-amiga.info          beside the drawer -- makes the DRAWER visible
+    egatrek-amiga/egatrek.info  inside it -- makes the GAME double-clickable
+
+Copy the drawer AND the .info file next to it to your hard drive; AmigaDOS
+pairs an icon with the thing of the same name beside it. Without them
+Workbench does not show a program at all unless Show All Files is on, which is
+why an earlier release looked like an empty drawer on a real machine even
+though the game was sitting in it.
+
+Running it from a Shell works exactly as before and needs neither.
+
+
 RUNNING IT
 
 OCS or ECS, Kickstart 2.0 or later, and about 200K free. Copy the whole drawer
