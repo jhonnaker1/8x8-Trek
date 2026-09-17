@@ -1,4 +1,5 @@
 #include <cbm.h>
+#include "ted.h"   /* snd_hush/snd_unhush around the blocking load */
 
 /* PUT RAM UNDER THE ROM BEFORE main() RUNS, AND PUT THE ROM BACK ON THE WAY
  * OUT. This is the Plus/4's `unmap-basic.o`, and its absence is the single
@@ -253,6 +254,26 @@ unsigned char cbm_k_ckout(unsigned char f) { kb_a = 0; kb_x = f; kb_y = 0; k_cko
 void cbm_k_clrch(void)           { k_clrch(); }
 unsigned char cbm_k_chrin(void)  { k_chrin();  return kb_a; }
 void cbm_k_chrout(unsigned char c){ kb_a = c;  k_chrout(); }
+
+/* BSOUT IS A SEPARATE SYMBOL FROM CHROUT, AND MISSING IT COST EVERY SAVE.
+ *
+ * llvm-mos's cbm.h declares both `cbm_k_bsout` and `cbm_k_chrout`; they are
+ * the same KERNAL entry at $FFD2 and two different C symbols. This file
+ * wrapped CHROUT, and the shared storage.c calls BSOUT -- at line 282 for
+ * every byte of the file and at line 163 for the SCRATCH command string. So
+ * the unwrapped libc version was linked: a bare `jsr $FFD2`.
+ *
+ * WHICH USED TO BE A JUMP INTO UNINITIALISED RAM AND IS NOW AN RTS, because
+ * p4_ram_in() puts one at $FFD2 to neutralise libc's `shift`. That turned a
+ * crash into SILENCE: OPEN succeeded, CKOUT succeeded, every byte went to an
+ * RTS, the file closed clean and the drive reported no error. Jamie saved a
+ * game, and restoring it said the file was not found.
+ *
+ * A wrapper that is missing is not a compile error and not a link error --
+ * the libc symbol satisfies it. verify_p4 now checks the invariant instead:
+ * NO KERNAL CALL MAY EXIST OUTSIDE .lowtext.
+ */
+void cbm_k_bsout(unsigned char c) { kb_a = c;  k_chrout(); }
 unsigned char cbm_k_readst(void) { k_readst(); return kb_a; }
 unsigned char cbm_k_getin(void)  { k_getin();  return kb_a; }
 
@@ -325,7 +346,12 @@ void *cbm_k_load(unsigned char flag, void *load_addr)
     kb_x = (unsigned char)((unsigned int)load_addr & 0xFF);
     kb_y = (unsigned char)(((unsigned int)load_addr) >> 8);
 #if P4LOAD >= 3
+    /* SILENCE THE VOICES ACROSS THE LOAD. Nothing advances the tune while the
+       KERNAL has the drive, so without this the note gated when the read began
+       sounds for the whole of it. See tedsnd.c. */
+    snd_hush();
     k_load();
+    snd_unhush();
     if (kb_st) return load_addr;
     return (void *)(unsigned int)(kb_x | ((unsigned int)kb_y << 8));
 #else

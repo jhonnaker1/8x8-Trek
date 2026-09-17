@@ -36,6 +36,13 @@
 #define TED_CHGEN  (*(volatile unsigned char *)0xFF12)
 #define TED_CHGEN_ROM 0x04
 
+/* Pause/resume the voices across a blocking disk load -- see tedsnd.c. Kept
+   in this port's own header rather than c128/src/sid.h, because no other port
+   needs it: they either advance the tune from an interrupt or do not block
+   this long. */
+void snd_hush(void);
+void snd_unhush(void);
+
 #define TED_CTRL1  (*(volatile unsigned char *)0xFF06)
 #define TED_CTRL2  (*(volatile unsigned char *)0xFF07)
 #define TED_BGND   (*(volatile unsigned char *)0xFF15)

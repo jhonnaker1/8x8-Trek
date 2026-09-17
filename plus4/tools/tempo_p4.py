@@ -19,7 +19,9 @@ import argparse, os, subprocess, sys, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools"))
 import vice_mon
 
-FRAMES_PAL, TICKS = 50.125, 18.2065
+FRAMES = {"pal": 50.125, "ntsc": 59.826}
+TICKS = 18.2065          # the original's PC timer, both regions
+REGION = {1: "PAL", 0: "NTSC"}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--d64", default="build/egatrek-plus4.d64")
@@ -29,11 +31,13 @@ ap.add_argument("--boot", type=float, default=30.0)
 ap.add_argument("--window", type=float, default=10.0)
 ap.add_argument("--tol", type=float, default=5.0, help="percent")
 ap.add_argument("--kill", action="store_true")
+ap.add_argument("--video", choices=("pal", "ntsc"), default=None,
+                help="force the emulated video standard; default is whatever vicerc says")
 a = ap.parse_args()
 
 out = subprocess.run([a.nm, a.elf], capture_output=True, text=True).stdout
 sym = {f[2]: int(f[0], 16) for f in (l.split() for l in out.splitlines()) if len(f) == 3}
-for want in ("snd_frames", "snd_ticks"):
+for want in ("snd_frames", "snd_ticks", "snd_region", "snd_rastermax"):
     if want not in sym:
         sys.exit("tempo_p4: %s is not in %s -- this gate cannot run" % (want, a.elf))
 
@@ -43,7 +47,8 @@ v = subprocess.Popen(["xplus4", "-binarymonitor",
                       # command-line options back to vicerc on exit when
                       # SaveResourcesOnExit is set, so `-sounddev dummy`
                       # here would persist and silence every later session.
-                      "+saveres", "-basicload", "-sounddev", "dummy",
+                      "+saveres", "-basicload", "-sounddev", "dummy"] +
+                     (["-" + a.video] if a.video else []) + [
                       "-8", a.d64, "-autostart", a.d64],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(a.boot)
@@ -52,6 +57,16 @@ mon = vice_mon.Mon(check=False)
 def rd(n):
     b = mon.mem_get(sym[n], 2)
     return b[0] | (b[1] << 8)
+
+region = mon.mem_get(sym["snd_region"], 1)[0]
+rmax = rd("snd_rastermax")
+print("  region detected: %s (raster max %d -- PAL is 311, NTSC 261)"
+      % (REGION.get(region, "?%d" % region), rmax))
+want_frames = FRAMES["pal" if region == 1 else "ntsc"]
+if a.video and REGION.get(region, "").lower() != a.video:
+    print("tempo_p4: asked for %s and the program detected %s"
+          % (a.video.upper(), REGION.get(region, region)))
+    sys.exit(1)
 
 f0, t0, w0 = rd("snd_frames"), rd("snd_ticks"), time.time()
 time.sleep(a.window)
@@ -72,7 +87,7 @@ if f1 == f0:
     sys.exit(1)
 
 bad = 0
-for name, got, want in (("frames", (f1 - f0) / dt, FRAMES_PAL),
+for name, got, want in (("frames", (f1 - f0) / dt, want_frames),
                         ("ticks",  (t1 - t0) / dt, TICKS)):
     err = (got / want - 1.0) * 100.0
     print("  %-7s %7.2f /s   want %7.4f   %+.1f%%" % (name, got, want, err))

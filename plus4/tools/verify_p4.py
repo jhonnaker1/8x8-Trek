@@ -110,12 +110,63 @@ def main():
     else:
         print("  spare               %d bytes" % (WINDOW - top))
 
+    # NO KERNAL CALL MAY EXIST OUTSIDE .lowtext, AND THIS IS THE ONLY CHECK
+    # THAT CAN SEE A MISSING WRAPPER.
+    #
+    # Every KERNAL entry is reached through a banked wrapper in p4bank.c,
+    # because $FF3F removes BOTH ROMs -- so a `jsr $FFxx` anywhere else is a
+    # jump into this program's own RAM. The failure is SILENT and is not a
+    # link error: llvm-mos's libc defines every cbm_k_* itself, so a wrapper
+    # this port forgot is quietly satisfied by the unwrapped version.
+    #
+    # It has happened TWICE. cbm_k_load, which overlay.c calls and nothing
+    # banked; and cbm_k_bsout, a SEPARATE SYMBOL from cbm_k_chrout at the same
+    # $FFD2 -- storage.c writes every byte of a save through it, and with an
+    # RTS now at $FFD2 the file went nowhere while every status said success.
+    #
+    # EXACTLY ONE STRAY CALL IS LEGITIMATE and it is named rather than waved
+    # through: llvm-mos's `shift` does `lda #$0e / jsr $ffd2` in the init
+    # chain, cannot be overridden (the collision is in LTO), and is
+    # neutralised by the RTS p4_ram_in() writes to $FFD2. It is safe only
+    # because the hook runs at .init.010, BEFORE it. So the exception is
+    # allowed only for $FFD2, and only between the init entry and main().
+    sym = symbols()
+    lo = s.get(".lowtext")
+    if lo and lo[1]:
+        lo_start, lo_end = lo[0], lo[0] + lo[1] - 1
+        init_lo = sym.get("_init", sym.get("__do_init_stack", 0))
+        init_hi = sym.get("main", 0)
+        found, stray, excused = 0, [], 0
+        for i in range(len(d) - 4):
+            if d[i] not in (0x20, 0x4C):
+                continue
+            tgt = d[i + 1] | (d[i + 2] << 8)
+            if not (0xFF81 <= tgt <= 0xFFF5):
+                continue
+            found += 1
+            addr = LOAD + i - 2
+            if lo_start <= addr <= lo_end:
+                continue
+            if tgt == 0xFFD2 and init_lo and init_lo <= addr < init_hi:
+                excused += 1
+                continue
+            stray.append((addr, tgt))
+        print("  KERNAL calls        %d, %d in .lowtext, %d excused (libc shift)"
+              % (found, found - len(stray) - excused, excused))
+        if excused > 1:
+            bad.append("%d calls excused as libc's `shift`; there should be "
+                       "exactly one" % excused)
+        for addr, tgt in stray[:6]:
+            bad.append("KERNAL call to $%04X at $%04X is OUTSIDE .lowtext "
+                       "($%04X..$%04X) -- with RAM banked in that is this "
+                       "program's own memory. A cbm_k_* wrapper is missing "
+                       "from p4bank.c." % (tgt, addr, lo_start, lo_end))
+
     # THE SOFT STACK MUST NOT BE INSIDE A LOADED SECTION, and nothing but this
     # check can see it. __stack was $7F00 while .text ran $1055..$9908: the
     # stack grew down into the program's own code and killed it on the first
     # call. The link succeeded, every size fitted, and the failure surfaced as
     # `?SYNTAX ERROR` from BASIC.
-    sym = symbols()
     stk, bot = sym.get("__stack"), sym.get("__stack_bottom")
     if stk is None or bot is None:
         bad.append("the binary defines no __stack/__stack_bottom -- plus4.ld "

@@ -107,11 +107,20 @@ static unsigned int raster(void)
 #define BEEP_TENTHS 44            /* 440Hz, the A every other port beeps */
 #define BEEP_FRAMES 15            /* 250ms at 60Hz */
 
-/* A PLUS/4 IS PAL OR NTSC AND THIS DOES NOT DETECT WHICH. snd_region decides
-   the tempo divisor and, strictly, the 111860.78 above -- an NTSC TED clocks
-   111840.45, which is 0.02% and inaudible. The tempo is the part that would be
-   heard. Detection is unwritten; PAL is the machine's home market and the
-   honest default. */
+/* PAL OR NTSC, DETECTED FROM THE HARDWARE, and it used to be hardcoded PAL
+   with a comment admitting detection was unwritten. On an NTSC machine that is
+   not a rounding error: the tempo numerator differs 363 vs 304, so the tune
+   would have run about 19% fast for every NTSC player. (The 111860.78 above is
+   a separate matter -- an NTSC TED clocks 111840.45, 0.02%, inaudible.)
+
+   MEASURED, NOT READ OFF A REGISTER. TED's raster counter runs 0..311 on PAL
+   and 0..261 on NTSC, so sampling it for a few frames and taking the maximum
+   answers the question with no documentation to be wrong about. The threshold
+   sits far from both so that missing the top few lines cannot flip it.
+   src/rasterprobe.c established the 9-bit read this depends on.
+
+   snd_init() sets it. Until then it is PAL, which is the machine's home
+   market and the right default for anything that asks before detection. */
 uint8_t snd_region = REGION_PAL;
 
 static uint8_t enabled = 1;
@@ -176,8 +185,25 @@ static void voice_note(unsigned char ch, unsigned char tenths)
     TED_CTRL = ctrl;
 }
 
+__attribute__((used, retain)) unsigned int snd_rastermax;
+
+/* Sample the raster for several frames and take the highest line seen.
+   8000 iterations is roughly 180ms here -- about nine PAL frames -- which is a
+   one-off cost at startup and samples most of the 312 lines many times over. */
+static unsigned char detect_region(void)
+{
+    unsigned int i, r, max = 0;
+    for (i = 0; i < 8000u; i++) {
+        r = raster();
+        if (r > max) max = r;
+    }
+    snd_rastermax = max;
+    return (unsigned char)(max > 280 ? REGION_PAL : REGION_NTSC);
+}
+
 void snd_init(void)
 {
+    snd_region = detect_region();
     ctrl = VOLUME;                        /* volume up, both voices gated off */
     TED_CTRL = ctrl;
     /* READ-MODIFY-WRITE, AND `= 0` HERE COST THE WHOLE DISPLAY. $FF12 bit 2
@@ -195,6 +221,38 @@ void snd_init(void)
     TED_V2HI = v2hi;
     acc = 0;
     last_raster = 0;
+}
+
+/* PAUSE AND RESUME ACROSS A BLOCKING DISK LOAD.
+ *
+ * snd_poll() only runs inside p4key.c's matrix scan, which means it only runs
+ * while the game is WAITING FOR A KEY. A disk load blocks in the KERNAL for a
+ * second or more and nothing advances the tune -- so TED goes on sounding
+ * whatever note was gated when the load began, and a melody turns into a drone
+ * for the length of the read. Jamie heard it on the end-of-game screens, where
+ * the evaluation and hall of fame are each fetched from disk while a track is
+ * playing, and the CoCo 3 port needed the same treatment.
+ *
+ * This is a PAUSE, not snd_off(): the gate bits are dropped and the shadow
+ * remembers them, so the same note resumes when the load returns. snd_off()
+ * would clear mus_on and abandon the tune.
+ *
+ * Called from p4bank.c's cbm_k_load, which is the one blocking read this port
+ * makes with music running -- far_load happens at startup before any track and
+ * the briefing stream runs on a screen with no music. */
+static unsigned char hush_save;
+
+void snd_hush(void)
+{
+    hush_save = ctrl;
+    ctrl &= (unsigned char)~(V1_ON | V2_ON);
+    TED_CTRL = ctrl;
+}
+
+void snd_unhush(void)
+{
+    ctrl = hush_save;
+    TED_CTRL = ctrl;
 }
 
 void snd_off(void)

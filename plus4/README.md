@@ -18,6 +18,63 @@ the keyboard works, `main()` runs.
 | the whole game rendered dark | **fixed** — `egated.h` had never been compiled in |
 | no sound | **not the port** — `vicerc` held `SoundDeviceName="wav"` |
 | music at double speed | **fixed** — a MISCOMPILE in `snd_poll`, plus a 9-bit raster |
+| a saved game could not be restored | **fixed** — `cbm_k_bsout` was never wrapped |
+| music drones through a disk load | **fixed** — `snd_hush`/`snd_unhush` around `cbm_k_load` |
+| NTSC ran ~19% fast | **fixed** — the region is DETECTED now, not assumed |
+
+## A SAVE THAT WROTE NOTHING AND REPORTED SUCCESS
+
+`cbm_k_bsout` and `cbm_k_chrout` are **two C symbols for the same KERNAL entry**
+at `$FFD2`. `p4bank.c` wrapped CHROUT; the shared `storage.c` calls BSOUT --
+for every byte of the file *and* for the SCRATCH command string. So the
+unwrapped libc version linked: a bare `jsr $FFD2`.
+
+Which **used to be a jump into uninitialised RAM and is now an RTS**, because
+`p4_ram_in()` puts one there to neutralise libc's `shift`. That turned a crash
+into **silence**: OPEN succeeded, CKOUT succeeded, every byte went to the RTS,
+the file closed clean and the drive reported no error. Jamie saved a game and
+restoring it said the file was not found.
+
+**A missing wrapper is neither a compile error nor a link error** -- libc
+defines every `cbm_k_*` itself, so the omission is quietly satisfied. It has
+happened twice now (`cbm_k_load` was the first). `verify_p4` checks the
+invariant instead: **no KERNAL call may exist outside `.lowtext`**, scanning
+for `JSR`/`JMP` into `$FF81..$FFF5`. Exactly one exception is named rather
+than waved through -- libc's `shift`, which is safe only because the bank-in
+hook runs before it. Proven to fail: removing the `bsout` wrapper reports both
+of `storage.c`'s call sites, at `$79AE` and `$7A1C`.
+
+Witnessed on disk, not inferred: `src/saveprobe.c` writes 300 known bytes,
+reads them back, and `TESTSAVE` appears in the directory with the free count
+dropping 286 -> 284.
+
+## THE MUSIC DRONED THROUGH EVERY DISK LOAD
+
+`snd_poll()` runs only inside `p4key.c`'s matrix scan, so it runs only while
+the game is **waiting for a key**. A disk load blocks in the KERNAL for a
+second or more and nothing advances the tune, so TED goes on sounding whatever
+note was gated when the read began. Jamie heard it on the end-of-game screens,
+where the evaluation and hall of fame are each fetched while a track plays.
+
+`snd_hush()`/`snd_unhush()` bracket the banked `LOAD`. It is a **pause, not
+`snd_off()`**: the gate bits drop and the shadow remembers them, so the same
+note resumes. `snd_off()` would clear `mus_on` and abandon the tune.
+
+## PAL AND NTSC, DETECTED RATHER THAN ASSUMED
+
+`snd_region` was hardcoded `REGION_PAL` with a comment admitting detection was
+unwritten. That is not a rounding error on an NTSC machine: the tempo numerator
+is 363 against 304, so the tune ran about **19% fast for every NTSC player**.
+
+TED's raster runs `0..311` on PAL and `0..261` on NTSC, so `snd_init()` samples
+it for a few frames and takes the maximum -- no register documentation to be
+wrong about. Measured in both modes:
+
+    PAL    raster max 311    49.84 frames/s    18.10 ticks/s
+    NTSC   raster max 261    59.89 frames/s    18.24 ticks/s
+
+The tick rate is ~18.21 in both, which is the original's PC timer and what the
+music data assumes. `tools/tempo_p4.py --video ntsc` runs that check.
 
 ## THE TEMPO WAS EXACTLY DOUBLE, AND IT WAS A MISCOMPILE
 
