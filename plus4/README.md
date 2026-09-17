@@ -14,6 +14,29 @@ the keyboard works, `main()` runs.
 | keys do nothing | **fixed** — `src/p4key.c`, and its matrix was TRANSPOSED |
 | every label blank | **fixed** — `far_load` gave SETNAM a filename above `$8000` |
 | `BREAK` at `PC 0BFA` | **fixed** — `__zero_bss` tail-jumps to `__memset` ABOVE `$8000` |
+| every glyph drawn as horizontal bars | **fixed** — `snd_init` cleared `$FF12` bit 2, TED's CHARGEN ROM enable |
+
+## THE DISPLAY WAS WRONG FOR THE WHOLE SESSION AND NO READ OF $0C00 COULD SEE IT
+
+`$FF12` bit 2 is **TED's character-generator ROM enable**: set, TED enables
+ROM for its charset fetch; clear, it reads DRAM — which, with this port's RAM
+banked in under the ROM, is *the program itself*. Bits 1-0 of that same
+register are **voice 1's frequency high bits**, so `tedsnd.c` owns part of a
+register the display depends on.
+
+`snd_init()` did `TED_V1HI = 0;`. `main()` calls `str_load()` and then
+`snd_init()`, so the screen was correct up to that line and every glyph after
+it was drawn out of this program's RAM.
+
+**Every check in this port reads `$0C00` and decodes screen codes.** Those were
+perfect throughout — `EGA TREK WAS WRITTEN BY NELS ANDERSON` decodes exactly —
+while the pixels were horizontal bars. Jamie sent three screenshots; nothing
+else in the session could have found it. **Screen memory says what the
+characters ARE, never what they LOOK like.**
+
+Fixed twice over: `tedsnd.c` read-modify-writes both `$FF10` and `$FF12`, and
+`vdc_init()` now SETS bit 2 explicitly, because a setting the display depends
+on belongs to the display driver rather than being inherited from BASIC.
 
 ## THE ORDERING CONFLICT, DISSOLVED BY OWNING $FFD2
 

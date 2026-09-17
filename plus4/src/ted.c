@@ -35,6 +35,12 @@ void vdc_init(void) {
        however it pleases; a port that does not clear it draws a correct
        console in negative. */
     TED_CTRL2 = (unsigned char)(TED_CTRL2 & 0x7F);
+    /* THE CHARACTER GENERATOR COMES FROM ROM, AND THIS PORT SAYS SO RATHER
+       THAN INHERITING IT. BASIC leaves $FF12 bit 2 set, so this looked
+       unnecessary -- until tedsnd.c's snd_init() wrote the register whole and
+       cleared it. A setting the display depends on belongs to the display
+       driver, stated once, not borrowed from whatever ran before. */
+    TED_CHGEN = (unsigned char)(TED_CHGEN | TED_CHGEN_ROM);
     TED_BGND   = TED_BLACK;
     TED_BORDER = TED_BLACK;
     scr_clear();

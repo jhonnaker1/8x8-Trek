@@ -28,6 +28,14 @@
 /* $FF06 bit 4 blanks the display; bit 3 picks 25 rows over 24. $FF07 bit 7 is
    the reverse-video flag for the whole screen and must be CLEAR or every cell
    inverts. $FF15 is background 0, $FF19 the border. */
+/* $FF12 bit 2: TED enables ROM for its CHARACTER GENERATOR fetch. Clear it
+   and TED reads the charset out of DRAM -- which, with this port's RAM banked
+   in under the ROM, is the program itself. The other bits belong to the sound
+   driver (voice 1's frequency high bits), so both files touch this register
+   and both must read-modify-write. */
+#define TED_CHGEN  (*(volatile unsigned char *)0xFF12)
+#define TED_CHGEN_ROM 0x04
+
 #define TED_CTRL1  (*(volatile unsigned char *)0xFF06)
 #define TED_CTRL2  (*(volatile unsigned char *)0xFF07)
 #define TED_BGND   (*(volatile unsigned char *)0xFF15)

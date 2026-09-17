@@ -14,7 +14,9 @@
  *     $FF10  bits 1-0: voice 2 frequency, high two bits
  *     $FF11  bits 3-0 VOLUME (global, 0-8), bit 4 voice 1 on,
  *            bit 5 voice 2 on, bit 6 makes voice 2 noise instead of tone
- *     $FF12  bits 1-0: voice 1 frequency, high two bits
+ *     $FF12  bits 1-0: voice 1 frequency, high two bits -- AND BIT 2 IS THE
+ *            CHARACTER GENERATOR'S ROM ENABLE, which has nothing to do with
+ *            sound and must never be written as a side effect. See below.
  *
  * A TEN-BIT COUNTER THAT COUNTS UP TO 1024, so the frequency is
  *
@@ -121,8 +123,17 @@ void snd_init(void)
 {
     ctrl = VOLUME;                        /* volume up, both voices gated off */
     TED_CTRL = ctrl;
-    TED_V1HI = 0;
-    TED_V2HI = 0;
+    /* READ-MODIFY-WRITE, AND `= 0` HERE COST THE WHOLE DISPLAY. $FF12 bit 2
+       is TED's CHARACTER GENERATOR ROM ENABLE: set, TED enables ROM for its
+       charset fetch; clear, it reads DRAM. Only bits 1-0 are voice 1's
+       frequency. `TED_V1HI = 0` cleared bit 2, so from snd_init() onwards TED
+       drew every glyph out of this program's own RAM -- the screen codes were
+       perfect and the pixels were horizontal bars.
+       It took a SCREENSHOT to see. Reading screen memory says what the
+       characters ARE, never what they LOOK like, and this port had only ever
+       been checked by reading $0C00. */
+    TED_V1HI = (unsigned char)(TED_V1HI & 0xFC);
+    TED_V2HI = (unsigned char)(TED_V2HI & 0xFC);
     acc = 0;
     last_raster = 0;
 }
