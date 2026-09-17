@@ -58,6 +58,7 @@
 #include "../../c128/src/sidfreq.h"
 #include "../../c128/src/music_data.h"
 #include "../../core/farmem.h"
+#include "ted.h"       /* TED_CHGEN_ROM -- $FF12 bit 2 is NOT ours */
 
 #define TED_V1FREQ (*(volatile unsigned char *)0xFF0E)
 #define TED_V2FREQ (*(volatile unsigned char *)0xFF0F)
@@ -84,6 +85,17 @@ uint8_t snd_region = REGION_PAL;
 static uint8_t enabled = 1;
 static unsigned char ctrl = VOLUME;      /* the shadow: $FF11 does not read back
                                             usefully and both voices share it */
+/* $FF10 AND $FF12 ARE SHADOWED, NOT READ-MODIFY-WRITTEN. This file already
+   shadows $FF11 with the note that it "does not read back usefully" -- the
+   same is true of these, and here it matters far more than a lost volume bit:
+   $FF12 BIT 2 IS TED'S CHARACTER GENERATOR ROM ENABLE. A read-modify-write
+   that reads garbage writes garbage back, and the whole display is then drawn
+   out of RAM. Measured on the live machine: after a read-modify-write the
+   register held $D0, bit 2 clear, with vdc_init() having set it.
+   Bit 2 lives in the shadow permanently so every write reasserts it. */
+static unsigned char v1hi = TED_CHGEN_ROM;
+static unsigned char v2hi;
+
 static unsigned int acc, last_raster;
 static unsigned int mus, mus_head, sfx;
 static unsigned char mus_on, mus_ok, note_left, sfx_on, sfx_left;
@@ -108,11 +120,13 @@ static void voice_note(unsigned char ch, unsigned char tenths)
 
     if (ch) {
         TED_V2FREQ = (unsigned char)(n & 0xFF);
-        TED_V2HI   = (unsigned char)((TED_V2HI & 0xFC) | ((n >> 8) & 0x03));
+        v2hi = (unsigned char)((v2hi & 0xFC) | ((n >> 8) & 0x03));
+        TED_V2HI = v2hi;
         ctrl |= V2_ON;
     } else {
         TED_V1FREQ = (unsigned char)(n & 0xFF);
-        TED_V1HI   = (unsigned char)((TED_V1HI & 0xFC) | ((n >> 8) & 0x03));
+        v1hi = (unsigned char)((v1hi & 0xFC) | ((n >> 8) & 0x03));
+        TED_V1HI = v1hi;
         ctrl |= V1_ON;
     }
     ctrl = (unsigned char)((ctrl & 0xF0) | VOLUME);
@@ -132,8 +146,10 @@ void snd_init(void)
        It took a SCREENSHOT to see. Reading screen memory says what the
        characters ARE, never what they LOOK like, and this port had only ever
        been checked by reading $0C00. */
-    TED_V1HI = (unsigned char)(TED_V1HI & 0xFC);
-    TED_V2HI = (unsigned char)(TED_V2HI & 0xFC);
+    v1hi = TED_CHGEN_ROM;              /* frequency bits clear, CHARGEN kept */
+    v2hi = 0;
+    TED_V1HI = v1hi;
+    TED_V2HI = v2hi;
     acc = 0;
     last_raster = 0;
 }

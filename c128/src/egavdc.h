@@ -11,11 +11,27 @@
  * which the MEGA65 build sets after loading EGA's own values into VIC-IV
  * entries 0..15. Everything below is the C128's fixed RGBI chip.
  *
- * If a third target lands here this file has outgrown its name and the shared
- * UI should move out of c128/src. Until then one #ifdef is cheaper than the
- * restructure. */
-#ifdef TREK_COLOUR_IS_EGA
+ * THE THIRD TARGET LANDED. The Plus/4's TED has no palette at all: a colour
+ * byte IS its own definition, LUMINANCE in bits 6-4 and HUE in bits 3-0, so
+ * neither branch below can serve it. TREK_COLOUR_TED defers to the port's own
+ * egated.h.
+ *
+ * AND IT WAS SILENTLY TAKING THE VDC BRANCH. The Plus/4 defined neither macro,
+ * so ui.c compiled the RGBI rotate and wrote VDC indices 0..15 into TED colour
+ * RAM -- where the low nibble is a hue and the high nibble is LUMINANCE, which
+ * was therefore always ZERO. The whole game rendered at the darkest level of a
+ * near-arbitrary hue, and `plus4/src/egated.h` -- checked entry by entry
+ * against tools/check_colours.py -- was never compiled into anything.
+ *
+ * `make ports` passed throughout: check_colours.py compares the port's TABLE
+ * against its own, and a table can be correct and unused.
+ *
+ * This file has now outgrown its name and the shared UI should move out of
+ * c128/src. */
+#if defined(TREK_COLOUR_IS_EGA)
 #define EGA_TO_VDC(e) ((unsigned char)(e))
+#elif defined(TREK_COLOUR_TED)
+#include "egated.h"          /* defines EGA_TO_VDC for itself */
 #else
 
 /* EGA colour index -> VDC colour index.
@@ -59,6 +75,6 @@
 #define EGA_TO_VDC(e) ((unsigned char)(((((unsigned char)(e)) << 1) | \
                                         (((unsigned char)(e)) >> 3)) & 0x0F))
 
-#endif   /* TREK_COLOUR_IS_EGA */
+#endif   /* colour mapping */
 
 #endif

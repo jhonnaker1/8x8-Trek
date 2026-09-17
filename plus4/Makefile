@@ -16,7 +16,13 @@ CC       = $(HOME)/llvm-mos/bin/mos-commodore-clang
 # -DTREK_OVERLAYS cuts the eleven-way split; without it the game links
 # all-resident and overflows by 16,497, which is the staging measurement and
 # is kept reproducible as `make early`.
-CFLAGS   = -Oz -DTREK_40COL -I../c128/src -T plus4.ld
+# -Isrc AND -DTREK_COLOUR_TED, AND WITHOUT THEM THE WHOLE GAME RENDERS DARK.
+# The shared ui.c reaches colour conversion through EGA_TO_VDC in
+# ../c128/src/egavdc.h, which has a branch per platform. This port defined
+# none, so it compiled the C128's RGBI rotate and wrote VDC indices into TED
+# colour RAM -- whose HIGH nibble is LUMINANCE, so everything drew at level 0.
+# -Isrc is what lets egavdc.h reach this port's own src/egated.h.
+CFLAGS   = -Oz -DTREK_40COL -DTREK_COLOUR_TED -Isrc -I../c128/src -T plus4.ld
 # -linit-stack, AND IT WAS NOT HERE. `__do_init_stack` was absent from the
 # binary entirely: the soft stack pointer __rc0/__rc1 was never loaded with
 # __stack, so it held whatever BASIC had left at $02/$03 -- measured on the
