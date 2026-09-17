@@ -18,7 +18,7 @@
 
 __attribute__((used, retain)) void p4_stray_irq(void) { __asm__ volatile("rti"); }
 
-__attribute__((used, retain, section(".lowbss"))) volatile unsigned char M[4];
+__attribute__((used, retain, section(".lowbss"))) volatile unsigned char M[8];
 
 __attribute__((used, retain, naked, section(".init.010")))
 void p4_ram_in(void)
@@ -44,6 +44,16 @@ void p4_ram_in(void)
 #endif
         "lda #$a2\n"
         "sta M+1\n"
+        /* READ THE VECTOR BACK WITH THE PROGRAM'S OWN EYES. VICE's monitor
+           shows a MIXTURE at $FFF6..$FFFF -- bank 0 gives the ROM's bytes for
+           some of it and something else for the rest -- and a conclusion
+           drawn from that view ("$FFFF is overwritten with $11") is a
+           conclusion about the instrument. The CPU's view is the only one
+           that decides what an interrupt does. */
+        "lda $fffe\n"
+        "sta M+4\n"
+        "lda $ffff\n"
+        "sta M+5\n"
         ::: "a", "memory");
 }
 

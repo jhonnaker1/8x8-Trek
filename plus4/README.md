@@ -62,19 +62,44 @@ frame in the middle of the far store and the I/O page.
 platform, and its Makefile says so. Nothing in a map tells you an init library
 is missing, because what is absent is an absence.
 
-### STILL NOT PLAYING, and the remaining thread is a third fault
+### THE THIRD FAULT DOES NOT EXIST -- it was the monitor
 
-The screen stays blank. One reading is unexplained and is **not** either of the
-two above:
+This file previously said `$FFFE/$FFFF` read `$114D` where `p4_stray_irq` was
+at `$104D`, and called it an unexplained overwrite. **That was a conclusion
+about the instrument.**
 
-  * `$FFFE/$FFFF` reads **`$114D`** where `p4_stray_irq` is at `$104D`. The
-    hook's own disassembly stores `#$4D` and `#$10` — the right address — so
-    **something overwrites `$FFFF` with `$11` after startup** and leaves the
-    low byte alone. `$11xx` is where this program's init chain and `main` live.
+VICE's binary monitor shows a MIXTURE at `$FFF6..$FFFF` on this machine: bank 0
+gives the ROM's own bytes for part of it (`8D 3E FF` at `$FFF6` is the KERNAL's
+`STA $FF3E`, and `$FFFC` is the ROM's reset vector) and something else for the
+rest. Reading the same sixteen bytes through each bank shows bank 2 as clean
+ROM -- `$FFFE = $FCB3`, which `src/vecprobe.c` had already measured.
 
-Nothing in `p4mem.c`'s far store reaches there (`FAR_LIMIT` is `$FBFF`), the
-overlay window is at `$CC00`, and the soft stack grows down from `$CC00`. Not
-diagnosed.
+**Asked with the program's own eyes, the vector is right.** A probe that
+reads `$FFFE/$FFFF` itself, immediately after the hook writes them, reports
+`$1059` against a `p4_stray_irq` of `$1059`. The CPU sees what the hook wrote.
+The tell was in the dump all along and I read past it: `$FBF0`, `$FF80`,
+`$FFC0` and `$FFF0` all begin with the identical `FF FF 00 00 00 00`, which is
+a 64-byte period, which is the TED register file.
+
+**This was reported to Jamie as a real fault before it was checked.** Four
+instruments misled this session; this is the one that reached him.
+
+### WHERE IT ACTUALLY IS NOW
+
+With both fixes in, measured on the live machine:
+
+  * the init chain completes and `main()` runs
+  * `__rc0/__rc1` is `$CBCD`, below `__stack` at `$CC00`, and in use
+  * `vdc_init()` has cleared the screen -- after a `LOAD`+`RUN` it would still
+    carry BASIC's own text, and it is 1000 spaces
+  * **`STRINGS.DAT` is in the far store at `$DD00`, byte for byte** -- so the
+    banked KERNAL `LOAD` works through `p4bank.c`'s wrappers
+
+**The screen is blank and no panel has been drawn.** The next suspect is the
+title overlay -- `ovl_load` goes through the same banked `LOAD` -- and after
+that the keyboard, which this port does not have: `p4bank.c` disables
+interrupts, `input.c` reads through `GETIN`, and `GETIN` is filled by the
+KERNAL's IRQ. That cost is written down in `p4bank.c` and has never been paid.
 
 ### And cc65 was asked, which is how the first fault was found
 
