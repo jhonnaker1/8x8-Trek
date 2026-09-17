@@ -74,6 +74,12 @@ PORTS = (
     ("c64",    "verify",  "CC"),
     ("st",     "verify",  "CC"),
     ("iigs",   "verify",  "CC"),
+    # THE PLUS/4 JOINED ON 2026-09-17, the day it first booted. It spent
+    # months in neither this tuple nor RELEASE_PORTS, which was honest while
+    # the port did not start -- but it also meant that when it DID start,
+    # nothing cross-checked it. Being in here is independent of shipping:
+    # this gate asks "does it still build and verify", not "is it released".
+    ("plus4",  "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

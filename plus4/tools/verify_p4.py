@@ -170,6 +170,18 @@ def main():
         print("verify_p4: %s" % b)
     if bad:
         return 1
+    # THE SUMMARY LINES ARE IN THE SHARED SHAPE ON PURPOSE. tools/check_ports.py
+    # surfaces a passing port's numbers by splitting each line on "verify:" and
+    # matching its KEEP list -- so "verify_p4:" does NOT match, and this port
+    # would have joined the gate printing nothing but `ok`. The numbers are the
+    # half of that gate that catches figures going stale while everything still
+    # compiles; a port that shows none of them is in the list without being in
+    # the check.
+    print("plus4 verify: resident $%04X..$%04X, %d bytes spare below the window "
+          "at $%04X" % (LOAD, top, WINDOW - top, WINDOW))
+    if stk is not None and bot is not None:
+        print("plus4 verify: soft stack $%04X..$%04X, %d bytes reserved "
+              "(measured demand 50)" % (bot, stk - 1, stk - bot))
     print("verify_p4: %d checks, all pass" % (3 + len(resident)))
     return 0
 
