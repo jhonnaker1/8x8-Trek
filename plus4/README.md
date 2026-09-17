@@ -223,8 +223,12 @@ cc65 has no such conflict because it banks RAM in first and keeps it in: its
 KERNAL wrappers are four instructions that touch only registers, so nothing
 reads the soft stack while the ROM is mapped.
 
-**Not attempted.** `shift` lives in `libc.a` and whether a strong definition
-here wins the link, or collides, is untested.
+**Attempted, and it does not work** — see below. `shift` lives in `libc.a`, and
+a strong definition here **collides** rather than displacing it: `ld.lld:
+symbol 'shift' is already defined`, with `--allow-multiple-definition` set,
+because the collision is in **LTO** and not in link order. This paragraph said
+"not attempted" for several hours after it had been, which is what a sweep is
+for.
 
 ### The override does not work, and the fix that replaces it is half-right
 

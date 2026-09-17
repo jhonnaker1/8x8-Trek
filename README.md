@@ -7,28 +7,28 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: nine ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: eleven ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
-> the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64** and the
-> **Atari ST/STE** are feature complete and released as
-> [v0.17.0](../../releases/latest), 2026-09-14.
-> The CoCo 3 is the new one, and it is the **most expensive port here** — the
-> opposite of the Falcon it followed. It is the only one that needed **a
-> filesystem written from scratch** (directory, FAT and granule chain on a
-> standalone WD1773 driver, because the game pages the Disk BASIC ROM away and
-> cannot call it), **a first-stage loader** for a 44K image `LOADM` will not
-> place, **far memory in the video card's spare VRAM**, and eleven overlays.
-> Its sound is the SuperSprite's YM2149, at a clock **read out of MAME's device
-> source rather than looked up**. It is the slowest of the eight and it is
-> playable. See [`coco3/README.md`](coco3/README.md).
+> the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
+> **Atari ST/STE**, the **stock CoCo 3** and the **Apple IIgs** are feature
+> complete and released as [v0.19.1](../../releases/latest), 2026-09-16.
+> The **Apple IIgs** is the new one, and it was **ruled out twice before it was
+> tried** — once on colour and once on width. Super Hi-Res 320×200 is exactly
+> 40×25 cells of 8×8, its palette holds **EGA's own sixteen** so brown is brown
+> rather than the olive a C128 renders, and the Ensoniq 5503 gives music and
+> effects a voice each. **There is no ProDOS on its disk**: block 0 is the
+> port's own loader, reading through the drive's firmware, so the disk is ours
+> to give away — the same argument the Atari port's boot record rests on. See
+> [`iigs/README.md`](iigs/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All nine have been played by a person**, and that is where the faults have
-> come from: the CoCo 3's sitting found a console repaint taking **12 seconds**
-> that no benchmark here had ever timed, because the benchmark measured the
-> blit and the blit was a third of the cost. The C64's sitting found nothing —
-> *"its perfect"* — only the second time that has happened here. The first was
-> the C128, and that was the port every other one is a diff against.
+> **All eleven have been played by a person**, and that is where the faults
+> have come from: the CoCo 3's sitting found a console repaint taking **12
+> seconds** that no benchmark here had ever timed, because the benchmark
+> measured the blit and the blit was a third of the cost. The C64's sitting
+> found nothing — *"its perfect"*. And the IIgs's found, in three minutes, the
+> one thing **seventeen automated gates could not see**: `BRIEF.TXT` was never
+> put on the disk, and the briefing skips silently when it is missing.
 > **How to run each release asset, machine by machine, is in
 > [`RUNNING.md`](RUNNING.md)** — emulator command lines included.
 >
@@ -211,7 +211,7 @@ page it across 40-column halves.
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.15.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.15.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The port that **deletes the most**: no overlays, no banking, no filesystem of our own, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
-| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **The slowest of the eight.** See [`coco3/README.md`](coco3/README.md) |
+| **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **It was the slowest port here until the stock CoCo 3 arrived** — that one's string pool lives on the diskette. See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare**, more than any other 6502 port here. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
 | **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Released** — [v0.17.0](../../releases/latest). **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
 
@@ -368,7 +368,8 @@ V9938's sibling chip, and that yields 80×25 with six-pixel cells. The V9958
 driver is the thing that transfers; the text mode was never the plan.
 **MSX2 comes out of this stronger, not weaker.**
 
-**Still live, cheapest first:**
+**Still live, cheapest first** — three unattempted, one parked, and the two
+struck through are shipped:
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
@@ -377,7 +378,7 @@ driver is the thing that transfers; the text mode was never the plan.
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
-| **Apple IIgs** | **STARTED 2026-09-16 — the video question is answered.** Compiled C runs on ROM 03 and draws Super Hi-Res in bank `$E1` through hand-written long addressing, and **320 mode places sixteen colours freely** (the console needs fifteen), counted off the snapshot with the same instrument that counted four in 640 mode. Still to do: ProDOS 8 storage, an Ensoniq 5503 sound driver, keyboard, and whether the image fits `$2000..$BEFF`. See [`iigs/README.md`](iigs/README.md) | `layout40.c`, and SHR's 4bpp **packed** 2-pixels-per-byte format is the CoCo 3 card port's V9958 GRAPHIC6 shape, not the ST's planar one — **no far memory and no overlays at all**, the machine starts at 256K |
+| ~~**Apple IIgs**~~ | **Released** — [v0.19.0](../../releases/latest), and played the day it was finished. The estimate said a hand-built linker config, an Ensoniq driver, ProDOS storage and cross-bank writes. Four of those were right; **ProDOS was not done at all** — the disk carries its own boot block, its own directory and its own reader over the drive firmware, so nothing on it is Apple's. See [`iigs/README.md`](iigs/README.md) | |
 
 **The IIgs's exclusion expired on 2026-09-05 and this table did not notice for
 eleven days.** It went on the width rule — *"320 mode is 16 colours and 40
@@ -477,9 +478,10 @@ palette reprogrammable out of 64 — and those eight carry all eight
 information-bearing colours, Mongol ship types included. It fits with nothing to
 spare; seven decorative colours fold.
 
-**Nothing here is a decision.** The two most recent ports, the Falcon and the
-CoCo 3, were both re-opened against a written argument in this file and both
-shipped. A measurement settles how hard, never whether.
+**Nothing here is a decision.** The Falcon, the CoCo 3 and now the **Apple
+IIgs** were each re-opened against a written argument in this file, and all
+three shipped — the IIgs against two of them, one on colour and one on width.
+A measurement settles how hard, never whether.
 
 
 ### The order, decided 2026-08-23, rewritten 2026-09-05 — HISTORY

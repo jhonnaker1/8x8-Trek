@@ -9705,6 +9705,16 @@ emulator. **Hold one connection open for the whole session.**
 
 ## The IIgs, measured: 640 mode gives FOUR usable colours (2026-09-05)
 
+> **SUPERSEDED AS A RULING, 2026-09-16 — the machine is the ELEVENTH PORT and
+> is released.** Everything below is still true and still measured: 640 mode
+> does give four freely-placeable colours, and that was a real reason. It was a
+> reason about **640 mode**, and the port uses **320**, which gives sixteen —
+> measured with the same instrument, on the same rig. The width rule that made
+> 320 mode inadmissible died when the Atari ST shipped in v0.17.0, and this
+> section was not revisited for eleven days afterwards. See `iigs/README.md`.
+> **A measurement does not expire; the RULE it was taken to serve can.**
+
+
 Booted a real Apple IIgs ROM 03 in MAME and put Super Hi-Res 640 mode on the
 screen directly, the same way the CoCo 3 earned its place. **The IIgs is OUT,
 and for the Atari ST's reason exactly** -- but the hypothesis that reopened it

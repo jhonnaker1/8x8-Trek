@@ -1,8 +1,21 @@
-# EGA Trek on the Apple IIgs — scoping
+# EGA Trek on the Apple IIgs — RELEASED, v0.19.0
 
-**Status: the machine is measured back in, and nothing else exists yet.**
-There is no game here. There are four probes, a link script, a MAME rig and
-one result, and the result is the one the port turns on.
+**The eleventh port. It plays, and Jamie played it the day it was finished** —
+*"it looks, sounds, and plays great"*. Super Hi-Res 320×200 is exactly 40×25
+cells of 8×8; the palette holds EGA's own sixteen; the Ensoniq gives music and
+effects a voice each; and **there is no ProDOS on the disk** — block 0 is this
+port's own loader.
+
+    make game     build build/trek.po
+    make run      boot it, throttled, with sound -- for a person
+    make verify   the static gates: layout and link invariants
+    make gates    the whole emulator suite, six of them arm-checked
+
+Everything below is how it was built, in the order it was learned, and every
+figure in it was measured on the machine rather than reasoned about. **The
+heading of this file said "scoping" for several hours after the port shipped**,
+which is the shape a sweep looks for: status in a heading, outliving the thing
+it describes.
 
 ## What was in doubt, and what the answer is
 
@@ -488,22 +501,20 @@ part of a glyph, in the gap.
 
 ## What has NOT been established
 
-* **A filesystem.** The loader reads a flat run of blocks. The game needs
-  named files — `STRINGS.DAT`, the music, eleven overlays — so either this
-  disk grows a directory of its own (the CoCo 3 and Atari ports both wrote
-  one) or the layout is fixed extents the build computes. Not decided.
-* **Zero page — and the question CHANGED when ProDOS went away.** `iigs.ld`
-  carries `__basic_zp_start = 0x0002`, inherited from `c64.ld` through
-  `plus4.ld`, where that inheritance went unexamined and became the Plus/4's
-  open question. With no MLI there is no ProDOS to collide with, but **the
-  slot firmware's block driver has its own zero-page use** (`$42`..`$47` at
-  minimum, and the screen holes) and the loader calls it. Measure what the
-  driver touches before the game's data lands anywhere near it.
-* **Keyboard, sound, storage, and the console itself.** None attempted.
-* **Whether the image fits.** `$2000..$BEFF` is 40,191 bytes against the C64's
-  `$0801..$CFFF`. The survey's claim that the machine needs *no overlays and
-  no far memory* rests on it starting at 256K — which is true of the machine
-  and says nothing about what a ProDOS 8 program can address without work.
+**Everything that was on this list when the port was scoped has since been
+built** — the filesystem, the keyboard, the sound, the console, and whether the
+image fits. What is left is one thing, and it is the one nobody has measured:
+
+* **Zero page.** `iigs.ld` carries `__basic_zp_start = 0x0002`, inherited from
+  `c64.ld` through `plus4.ld` — where that same inheritance went unexamined and
+  became the Plus/4's open question. There is no ProDOS MLI here to collide
+  with, but **the slot firmware's block driver has its own zero-page use**
+  (`$42`..`$47` at minimum, and the screen holes) and the loader calls it. It
+  has worked on every disk read so far, which is not the same as being safe.
+  Measure what the driver touches, the way `src/gsfarp.c` measured the banks.
+
+* **A real IIgs.** Everything here is MAME 0.289 with a verified romset. No
+  byte of this port has run on the metal.
 
 ## The rig
 

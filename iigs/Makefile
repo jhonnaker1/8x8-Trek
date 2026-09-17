@@ -57,7 +57,7 @@ OVL_NAMES = eval hof front info repair msgs planet cmds title events xtra
 ../c128/src/music_data.c: ../tools/make_music.py
 	cd .. && python3 tools/make_music.py >/dev/null
 
-build/trek.elf: $(GAME_SRC) ../c128/src/music_data.c iigs.ld | build
+build/trek.elf: $(GAME_SRC) ../c128/src/music_data.c iigs.ld Makefile | build
 	$(CC) $(GAME_FLAGS) $(LDFLAGS) -Wl,-Map=build/trek.map $(GAME_SRC) \
 	  -o $@ $(LDLIBS)
 
@@ -177,7 +177,7 @@ play: build/trek.po
 
 all: $(PROBES:%=build/%.bin) build/trek.po
 
-build/%.elf: src/%.c iigs.ld | build
+build/%.elf: src/%.c iigs.ld Makefile | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) $< -o $@ $(LDLIBS)
 
 build/%.bin: build/%.elf
@@ -205,7 +205,7 @@ pagemap: build/gsmap.bin
 # THE BOOT CHAIN, which is the half the Plus/4 never got. Block 0 is ours, it
 # reads the payload off the disk through the slot's ProDOS block driver, and
 # jumps to $2000. No ProDOS anywhere.
-build/boot.bin: src/boot.S boot.ld | build
+build/boot.bin: src/boot.S boot.ld Makefile | build
 	$(CC) -mcpu=mosw65816 -nostdlib -T boot.ld -Wl,--no-check-sections \
 	  src/boot.S -o build/boot.elf
 	$(OBJCOPY) -O binary build/boot.elf $@
@@ -213,7 +213,7 @@ build/boot.bin: src/boot.S boot.ld | build
 # The same block, asking for a block one past the end of the disk -- the only
 # way to make the drive say no, and therefore the only way to execute the
 # failed-read path at all.
-build/bootbad.bin: src/boot.S boot.ld | build
+build/bootbad.bin: src/boot.S boot.ld Makefile | build
 	$(CC) -mcpu=mosw65816 -nostdlib -DSTART_BLOCK=1600 -T boot.ld \
 	  -Wl,--no-check-sections src/boot.S -o build/bootbad.elf
 	$(OBJCOPY) -O binary build/bootbad.elf $@
@@ -265,7 +265,7 @@ ram: build/gsram.bin
 # hearit.py reads the pitch back out of the recording. 440 on voice 1 is the
 # fourth, because "two voices" is a claim and a second oscillator addressed
 # independently is the evidence.
-build/gssndt.bin: src/gssndt.c src/gssnd.c src/gsfar.c src/gsblk.c iigs.ld | build
+build/gssndt.bin: src/gssndt.c src/gssnd.c src/gsfar.c src/gsblk.c iigs.ld Makefile | build
 	$(CC) -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core -DTREK_40COL \
 	  -DGS_SNDTEST -T iigs.ld $(LDFLAGS) src/gssndt.c src/gssnd.c \
 	  src/gsfar.c src/gsblk.c -o build/gssndt.elf $(LDLIBS)
@@ -324,7 +324,7 @@ musicfail: build/stuck.wav
 VIDFLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
            -DTREK_40COL -DTREK_COLOUR_IS_EGA -T iigs.ld
 
-build/gssmoke.bin: src/gssmoke.c src/gsvid.c iigs.ld | build
+build/gssmoke.bin: src/gssmoke.c src/gsvid.c iigs.ld Makefile | build
 	$(CC) $(VIDFLAGS) $(LDFLAGS) src/gssmoke.c src/gsvid.c \
 	  -o build/gssmoke.elf $(LDLIBS)
 	$(OBJCOPY) -O binary build/gssmoke.elf $@
@@ -332,7 +332,7 @@ build/gssmoke.bin: src/gssmoke.c src/gsvid.c iigs.ld | build
 # The same sheet with the box glyphs SHIFTED like the text instead of authored
 # at eight wide -- the obvious wrong answer, kept buildable so the gate can be
 # shown to catch it.
-build/gssmokebad.bin: src/gssmoke.c src/gsvid.c iigs.ld | build
+build/gssmokebad.bin: src/gssmoke.c src/gsvid.c iigs.ld Makefile | build
 	$(CC) $(VIDFLAGS) -DGS_BOX_NAIVE $(LDFLAGS) src/gssmoke.c src/gsvid.c \
 	  -o build/gssmokebad.elf $(LDLIBS)
 	$(OBJCOPY) -O binary build/gssmokebad.elf $@
@@ -366,7 +366,7 @@ sheetfail: build/smokebad.po
 # FILES, WITH NO PRODOS ON THE DISK. gsblk.c is core/storage.h's five plat_*
 # over the slot firmware's block driver plus this port's own directory --
 # mkdisk.py's format, which is atari/src/atarisio.c's at 512 bytes.
-build/gsfile.bin: src/gsfile.c src/gsblk.c iigs.ld | build
+build/gsfile.bin: src/gsfile.c src/gsblk.c iigs.ld Makefile | build
 	$(CC) -mcpu=mosw65816 -Oz -I ../core -T iigs.ld $(LDFLAGS) \
 	  src/gsfile.c src/gsblk.c -o build/gsfile.elf $(LDLIBS)
 	$(OBJCOPY) -O binary build/gsfile.elf $@
@@ -421,22 +421,22 @@ SHARED = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
 EARLYFLAGS = -mcpu=mosw65816 -Oz -I src -I ../c128/src -I ../core \
              -DTREK_40COL -DTREK_OVERLAYS -T iigs.ld
 
-build/early.elf: $(SHARED) src/gsstub.c iigs.ld | build
+build/early.elf: $(SHARED) src/gsstub.c iigs.ld Makefile | build
 	$(CC) $(EARLYFLAGS) $(LDFLAGS) -Wl,-Map=build/early.map \
 	  $(SHARED) src/gsstub.c -o $@ $(LDLIBS)
 
-build/earlyfar.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c src/gsfar.c iigs.ld | build
+build/earlyfar.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c src/gsfar.c iigs.ld Makefile | build
 	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO \
 	  -DGS_REAL_STORAGE -DGS_REAL_FAR $(LDFLAGS) \
 	  -Wl,-Map=build/earlyfar.map $(SHARED) src/gsstub.c src/gsvid.c \
 	  src/gsblk.c src/gsfar.c -o $@ $(LDLIBS)
 
-build/earlyfull.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c iigs.ld | build
+build/earlyfull.elf: $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c iigs.ld Makefile | build
 	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO \
 	  -DGS_REAL_STORAGE $(LDFLAGS) -Wl,-Map=build/earlyfull.map \
 	  $(SHARED) src/gsstub.c src/gsvid.c src/gsblk.c -o $@ $(LDLIBS)
 
-build/earlyvid.elf: $(SHARED) src/gsstub.c src/gsvid.c iigs.ld | build
+build/earlyvid.elf: $(SHARED) src/gsstub.c src/gsvid.c iigs.ld Makefile | build
 	$(CC) $(EARLYFLAGS) -DTREK_COLOUR_IS_EGA -DGS_REAL_VIDEO $(LDFLAGS) \
 	  -Wl,-Map=build/earlyvid.map $(SHARED) src/gsstub.c src/gsvid.c \
 	  -o $@ $(LDLIBS)
