@@ -17,7 +17,17 @@ CC       = $(HOME)/llvm-mos/bin/mos-commodore-clang
 # all-resident and overflows by 16,497, which is the staging measurement and
 # is kept reproducible as `make early`.
 CFLAGS   = -Oz -DTREK_40COL -I../c128/src -T plus4.ld
-LDFLAGS  = -Wl,--no-check-sections
+# -linit-stack, AND IT WAS NOT HERE. `__do_init_stack` was absent from the
+# binary entirely: the soft stack pointer __rc0/__rc1 was never loaded with
+# __stack, so it held whatever BASIC had left at $02/$03 -- measured on the
+# live machine as $FFCD against a __stack of $CC00. Every C call then built
+# its frame in the middle of the far store and the I/O page.
+#
+# The commodore platform links zero-bss on its own and does NOT link this. The
+# Apple IIgs port met the same thing on the `common` platform the same day and
+# its Makefile says so: nothing in a map tells you an init library is missing,
+# because what is absent is an absence.
+LDFLAGS  = -Wl,--no-check-sections -linit-stack
 
 SHARED   = ../c128/src/main.c ../c128/src/layout40.c ../c128/src/ui.c \
            ../c128/src/input.c ../c128/src/music_data.c ../c128/src/storage.c \

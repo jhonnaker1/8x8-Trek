@@ -46,19 +46,53 @@ existed. (The old justification cited `src/wrprobe.c`, which measured `$A000`
 and `$E000` and never touched `$FFFE` — a citation to a measurement of
 somewhere else.)
 
-### STILL NOT PLAYING, and these are the next two threads
+### SECOND FIX: the soft stack was never initialised
 
-The full game gets further and does not run. Two readings from the live
-machine say something is still wrong **after** the fix:
+`__rc0/__rc1` read **`$FFCD`** against a `__stack` of `$CC00`, and
+`__do_init_stack` was **absent from the binary entirely**. The commodore
+platform links `zero-bss` on its own and does **not** link the stack
+initialiser; this port's link line never asked for it. So the soft stack
+pointer held whatever BASIC had left at `$02/$03`, and every C call built its
+frame in the middle of the far store and the I/O page.
 
-  * `__rc0/__rc1`, the soft stack pointer, reads **`$FFCD`** where `__stack` is
-    `$CC00`. Either init-stack did not run or something overwrote it.
-  * `$FFFE` points at **`$114D`** where `p4_stray_irq` is at `$104D` — wrong by
-    exactly `$100`, and the byte there is `$AE`, not the `$40` of an `RTI`.
-    The disk was checked and holds the binary those symbols came from, so it
-    is not staleness.
+`-linit-stack` fixes it: `__rc0/__rc1` now reads `$CBCD`, fifty-one bytes below
+`$CC00` and in use.
 
-Both smell like one fault rather than two. Neither is diagnosed.
+**The Apple IIgs port met the identical thing the same day**, on the `common`
+platform, and its Makefile says so. Nothing in a map tells you an init library
+is missing, because what is absent is an absence.
+
+### STILL NOT PLAYING, and the remaining thread is a third fault
+
+The screen stays blank. One reading is unexplained and is **not** either of the
+two above:
+
+  * `$FFFE/$FFFF` reads **`$114D`** where `p4_stray_irq` is at `$104D`. The
+    hook's own disassembly stores `#$4D` and `#$10` — the right address — so
+    **something overwrites `$FFFF` with `$11` after startup** and leaves the
+    low byte alone. `$11xx` is where this program's init chain and `main` live.
+
+Nothing in `p4mem.c`'s far store reaches there (`FAR_LIMIT` is `$FBFF`), the
+overlay window is at `$CC00`, and the soft stack grows down from `$CC00`. Not
+diagnosed.
+
+### And cc65 was asked, which is how the first fault was found
+
+`cl65 -t plus4` builds and **runs**: a program that writes `$5A` to `$A000` and
+`$A5` to `$E000`, reads both back, and still reaches the KERNAL to `printf`
+them. So the model works on this machine.
+
+**But cc65 is not a different approach — it is this one, done correctly.** Its
+`libsrc/plus4/kbsout.s` is four instructions in a segment commented *"Must go
+into low memory"*: `sta ENABLE_ROM`, `jsr $FFD2`, `sta ENABLE_RAM`, `rts`.
+`kload.s` is the same around `$FFD5`. That is `p4bank.c`'s banked wrappers and
+`plus4.ld`'s `.lowtext`, line for line.
+
+What cc65 actually gave this port was the **reference that located the bug**:
+its crt0 does the charset `jsr $FFD2` *before* banking, and ours did it after.
+Switching toolchains would not have fixed anything structural — and it would
+have cost the 13% llvm-mos is smaller, the overlay sections, and every
+`__attribute__((section))` in the port.
 
 
 
