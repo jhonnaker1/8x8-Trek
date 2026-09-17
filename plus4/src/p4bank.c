@@ -142,10 +142,14 @@ void p4_rom_back(void)
 
 __attribute__((used, section(".lowbss"))) unsigned char kb_a, kb_x, kb_y, kb_st;
 
-/* WHERE DOES IT GO? `?SYNTAX ERROR IN 10` is what BASIC prints when the SYS
-   RETURNS and it resumes a line it can no longer parse -- so the symptom does
-   not say whether main() crashed or finished. .fini.990 runs only on the way
-   out, so P4M[1] separates those two. */
+/* OVERRIDING `shift` DOES NOT WORK, and the error says why: it is an LTO
+ * collision, not a link-order one. Both definitions end up in the same LTO
+ * module and `ld.lld` answers "symbol 'shift' is already defined" with
+ * `--allow-multiple-definition` set. The libc hook is force-linked, not pulled
+ * by reference, so a strong definition here cannot displace it.
+ *
+ * THE CONFLICT IS DISSOLVED INSTEAD OF FOUGHT -- see __stack in plus4.ld.
+ */
 __attribute__((used, retain, section(".lowbss"))) volatile unsigned char P4M[4];
 
 #define BANKED_CALL(vec)                    \
@@ -239,7 +243,7 @@ unsigned char cbm_k_getin(void)  { k_getin();  return kb_a; }
  * overridden"; 2 separates the override from the banked call itself.
  */
 #ifndef P4LOAD
-#define P4LOAD 1
+#define P4LOAD 3
 #endif
 
 #if P4LOAD >= 1

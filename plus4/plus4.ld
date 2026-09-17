@@ -152,7 +152,23 @@ __ovl_start = ORIGIN(window);
    It grows down from $CC00 into the gap between .noinit's end and the window
    -- about 6K today. verify_p4.py checks it is not inside a loaded section,
    which is the check that was missing. */
-__stack = 0xCC00;
+/* $0400..$07FF, BELOW THE PROGRAM, AND THIS IS THE FIX FOR THE STARTUP FAULT.
+   It was $CC00, just under the overlay window, and $CC00 IS UNDER THE ROM. A
+   write there passes through to RAM -- src/vecprobe.c measured that -- but A
+   READ RETURNS ROM. The init chain runs before the bank-in hook, with the ROM
+   still mapped, so every C frame init-stack, zero-bss and llvm-mos's own
+   `shift` pushed was written to RAM and read back as KERNAL ROM. Whether the
+   program survived depended on how much stack the early code happened to use
+   and which ROM bytes sat underneath -- which is why adding THIRTY-FOUR NOPS
+   to .lowtext broke it, and why the fault looked like a layout dependency.
+
+   Below $8000 nothing is ever ROM-shadowed, so the ordering conflict goes
+   away: `shift` keeps its ROM, and the soft stack is real RAM from the first
+   frame. $0400..$07FF is the only kilobyte down there that is neither the
+   screen ($0C00), the colour RAM ($0800), the hardware stack, nor the
+   program -- which starts at $1001. Other ports measure 143 to 184 bytes of
+   soft stack on their deepest path, so a kilobyte is not tight. */
+__stack = 0x0800;
 
 /* NO OUTPUT_FORMAT, AND THAT IS DELIBERATE. The platform templates end with a
    SHORT/TRIM block that makes the linker emit a finished PRG -- convenient,

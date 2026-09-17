@@ -198,6 +198,37 @@ reads the soft stack while the ROM is mapped.
 **Not attempted.** `shift` lives in `libc.a` and whether a strong definition
 here wins the link, or collides, is untested.
 
+### The override does not work, and the fix that replaces it is half-right
+
+**`shift` cannot be overridden.** A strong definition in this port collides
+rather than displacing: `ld.lld: symbol 'shift' is already defined`, and
+`--allow-multiple-definition` does not help because **it is an LTO collision,
+not a link-order one** -- both definitions land in the same LTO module. The
+libc hook is force-linked, not pulled by reference.
+
+**So the conflict was dissolved instead: `__stack` moved below `$8000`.** Below
+there nothing is ever ROM-shadowed, so `shift` keeps its ROM and the soft stack
+is real RAM from the first frame -- no ordering constraint at all. `$0400..
+$07FF` was chosen as the only kilobyte down there that is neither the screen
+(`$0C00`), the colour RAM (`$0800`), the hardware stack, nor the program.
+
+**It changes the failure and does not fix it.** `?SYNTAX ERROR` is gone; the
+machine now enters its monitor with `BREAK` at **`PC 000E`** -- the CPU reached
+zero page, where llvm-mos keeps `__rc0..__rc31`. So `$0400..$07FF` is not the
+free kilobyte it was assumed to be, or the stack is being lost another way.
+**That assumption was not measured** -- it is the only step in this sequence
+that was not, and it is the one that is wrong.
+
+The next move is to measure which of `$0400..$07FF` a Plus/4 actually leaves
+alone, the way `src/gsfarp.c` did for the IIgs's banks: fill it, run, and see
+what survives.
+
+**And `verify_p4.py` had a false positive that this exposed.** It counted
+`.symtab` and `.strtab` -- ELF metadata at VMA 0, thousands of bytes wide -- as
+loaded memory, so it reported `__stack $0800 is inside .symtab ($0000..$193F)`
+for a correct build. A gate that cries wolf about the one layout that fixes the
+fault is worse than no gate. Fixed: sections at VMA 0 are not memory.
+
 ### And cc65 was asked, which is how the first fault was found
 
 `cl65 -t plus4` builds and **runs**: a program that writes `$5A` to `$A000` and

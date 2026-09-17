@@ -109,6 +109,15 @@ def main():
     else:
         print("  __stack             $%04X" % stk)
         for n, (vma, size) in s.items():
+            # NOT-LOADED SECTIONS ARE NOT MEMORY. `.symtab`, `.strtab` and
+            # `.shstrtab` sit at VMA 0 in the map and cover thousands of
+            # bytes; counting them made this check report `__stack $0800 is
+            # inside .symtab ($0000..$193F)` the moment the stack moved below
+            # the program, which is a FALSE POSITIVE on the one layout that
+            # fixes the startup fault. A gate that cries wolf about a correct
+            # build is worse than no gate. Nothing in this port loads at 0.
+            if vma == 0:
+                continue
             if size and not n.startswith(".ovl") and vma <= stk < vma + size:
                 bad.append("__stack $%04X is inside %s ($%04X..$%04X) -- it grows "
                            "DOWN into it" % (stk, n, vma, vma + size - 1))
