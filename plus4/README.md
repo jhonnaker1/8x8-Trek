@@ -15,6 +15,43 @@ the keyboard works, `main()` runs.
 | every label blank | **fixed** — `far_load` gave SETNAM a filename above `$8000` |
 | `BREAK` at `PC 0BFA` | **fixed** — `__zero_bss` tail-jumps to `__memset` ABOVE `$8000` |
 | every glyph drawn as horizontal bars | **fixed** — `snd_init` cleared `$FF12` bit 2, TED's CHARGEN ROM enable |
+| the whole game rendered dark | **fixed** — `egated.h` had never been compiled in |
+| no sound | **not the port** — `vicerc` held `SoundDeviceName="wav"` |
+| music at double speed | **fixed** — a MISCOMPILE in `snd_poll`, plus a 9-bit raster |
+
+## THE TEMPO WAS EXACTLY DOUBLE, AND IT WAS A MISCOMPILE
+
+`snd_poll` detects a frame as "the raster went backwards". Written the obvious
+way:
+
+    r = raster();
+    if (r >= last_raster) { last_raster = r; return; }
+    last_raster = r;
+
+llvm-mos **hoisted the store above the comparison** and then compared the high
+byte against the location it had just written:
+
+    cpx $b742  /  ...  /  stx $b742  /  cpx $b742      <- always equal
+
+so the high byte never discriminated and only the **low bytes** were compared.
+`$FF1D` is only the low eight bits of a nine-bit counter, and on PAL's 312
+lines the low byte goes backwards **twice** per frame. Two frames counted per
+frame, two ticks, double tempo.
+
+**Widening the read to nine bits changed nothing** — measured 99.74 frames a
+second before and after — because the miscompile threw the ninth bit away.
+Both are fixed: `raster()` reads `$FF1C` bit 0 (confirmed by
+`src/rasterprobe.c`, which sampled the counter on the machine at full speed and
+saw a maximum of **311**), and `snd_poll` takes the old value into a local
+before storing, leaving nothing to reorder.
+
+Now 49.94 frames and 18.08 ticks a second against 50.125 and 18.2065.
+
+**`hearit.py` found nothing wrong**: four bursts at 438.4 / 479.9 / 538.0 /
+433.4 Hz against a calibration of 438.3 Hz for A440 — every pitch correct while
+the tune ran at double speed. **A tool that checks pitch is silent about
+tempo.** `tools/tempo_p4.py` is the gate that was missing; it fails if either
+rate is more than 5% out, and refuses to pass a counter that never moved.
 
 ## THE DISPLAY WAS WRONG FOR THE WHOLE SESSION AND NO READ OF $0C00 COULD SEE IT
 

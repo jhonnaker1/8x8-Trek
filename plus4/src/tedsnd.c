@@ -65,7 +65,39 @@
 #define TED_V2HI   (*(volatile unsigned char *)0xFF10)
 #define TED_CTRL   (*(volatile unsigned char *)0xFF11)
 #define TED_V1HI   (*(volatile unsigned char *)0xFF12)
-#define TED_RASTER (*(volatile unsigned char *)0xFF1D)
+#define TED_RASTHI (*(volatile unsigned char *)0xFF1C)   /* bit 0 = line bit 8 */
+#define TED_RASTER (*(volatile unsigned char *)0xFF1D)   /* line bits 7-0     */
+
+/* THE RASTER IS NINE BITS AND $FF1D IS ONLY THE LOW EIGHT, WHICH MADE THE
+ * MUSIC PLAY AT EXACTLY DOUBLE SPEED.
+ *
+ * A PAL frame is 312 lines, so the counter runs 0..311 and its LOW BYTE runs
+ * 0..255 and then 0..55. Frame detection here is "the raster went backwards",
+ * and the low byte alone goes backwards TWICE per frame -- at line 256 and
+ * again at the end. So every frame ticked the tune twice. NTSC's 262 lines
+ * give the same doubling for the same reason, so it was not even a
+ * region-dependent bug; it was uniformly 2x.
+ *
+ * Jamie heard it in one listen: "its too fast". Nothing in this port could --
+ * `hearit.py` reports the PITCH of each burst, and every pitch was right.
+ * TEMPO IS NOT PITCH, and the tool that checks one is silent about the other.
+ *
+ * $FF1C bit 0 is the ninth bit, MEASURED on the live machine rather than read
+ * off a table: sampling $FF1C/$FF1D together returned 257, which the low byte
+ * alone cannot express.
+ *
+ * Read high-low-high, because the two halves are not latched together and a
+ * torn read across line 255 would look like a frame that never happened. */
+static unsigned int raster(void)
+{
+    unsigned char hi1, lo, hi2;
+    do {
+        hi1 = TED_RASTHI;
+        lo  = TED_RASTER;
+        hi2 = TED_RASTHI;
+    } while (hi1 != hi2);
+    return (unsigned int)(((unsigned int)(hi2 & 1) << 8) | lo);
+}
 
 #define V1_ON 0x10
 #define V2_ON 0x20
@@ -97,6 +129,17 @@ static unsigned char v1hi = TED_CHGEN_ROM;
 static unsigned char v2hi;
 
 static unsigned int acc, last_raster;
+
+/* TWO COUNTERS, KEPT, AND tools/tempo_p4.py IS THE GATE THAT READS THEM.
+   Four bytes, and they are what turned "it sounds too fast" into a number:
+   the FRAME detector may fire too often, or the accumulator may turn frames
+   into too many ticks, and burst durations cannot tell those apart. PAL wants
+   50.125 frames and 18.2065 ticks a second.
+   NOTHING ELSE IN THIS PROJECT CHECKS TEMPO. hearit.py reports the PITCH of
+   each burst and every pitch was right while the tune ran at double speed --
+   a tool that checks one is silent about the other. */
+__attribute__((used, retain)) unsigned int snd_frames;
+__attribute__((used, retain)) unsigned int snd_ticks;
 static unsigned int mus, mus_head, sfx;
 static unsigned char mus_on, mus_ok, note_left, sfx_on, sfx_left;
 static unsigned char mus_buf[MUS_BYTES];
@@ -220,9 +263,9 @@ void snd_beep(void)
     if (!enabled) return;
     sfx_on = 0;
     voice_note(1, BEEP_TENTHS);
-    last = TED_RASTER;
+    last = raster();
     while (frames < BEEP_FRAMES) {
-        r = TED_RASTER;
+        r = raster();
         if (r < last) { frames++; guard = 0; }
         else if (++guard == 0) break;
         last = r;
@@ -257,7 +300,7 @@ static void music_tick(void)
 
 void snd_poll(void)
 {
-    unsigned int r;
+    unsigned int r, prev;
 
     if (!enabled || (!mus_on && !sfx_on)) return;
 
@@ -266,13 +309,31 @@ void snd_poll(void)
        long as that is more than twice a frame, and it needs no interrupt of
        our own. Taking the IRQ would mean going further behind a KERNAL this
        port already banks away. */
-    r = TED_RASTER;
-    if (r >= last_raster) { last_raster = r; return; }
+    /* THE OLD VALUE IS TAKEN INTO A LOCAL BEFORE THE STORE, and that is not
+       style -- it is working around a MISCOMPILE that cost exactly a factor
+       of two in tempo.
+       Written the obvious way,
+           if (r >= last_raster) { last_raster = r; return; }
+           last_raster = r;
+       llvm-mos hoisted the store ABOVE the comparison and then compared the
+       high byte against the location it had just written:
+           cpx $b742 / ... / stx $b742 / cpx $b742   <- always equal
+       so the high byte never discriminated and only the LOW bytes were ever
+       compared. That is the 8-bit behaviour, which is why widening the read
+       to nine bits changed nothing at all: 99.74 frames a second against
+       PAL's 50.125, measured, both before and after.
+       Splitting the read from the store leaves the compiler nothing to
+       reorder. */
+    prev = last_raster;
+    r = raster();
     last_raster = r;
+    if (r >= prev) return;
 
+    snd_frames++;
     acc = (unsigned int)(acc + snd_tick_num(snd_region));
     while (acc >= SND_TICK_DEN) {
         acc = (unsigned int)(acc - SND_TICK_DEN);
+        snd_ticks++;
         music_tick();
     }
 }
