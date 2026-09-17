@@ -34,6 +34,27 @@ real floppy, much quicker on an SDC -- and the title screen appears when it
 is done.
 
 
+STORAGE: SDC AND FLOPPY YES, FUJINET AND DRIVEWIRE NO
+
+This build drives the WD1773 disk controller directly. A real floppy works, and
+a CoCo SDC works -- the SDC emulates the controller in silicon, so it looks
+like the hardware this port is talking to.
+
+FujiNet and DriveWire do not, and will not without new code. They are serial
+devices: they hook the Disk BASIC ROM's DSKCON routine, and this port never
+calls DSKCON. Reported by Jamie on real hardware, 2026-09-16.
+
+The reason is not that bank switching was avoided. The game is 55,399 bytes
+spanning $1200..$EA66, and the Disk BASIC ROM lives at $C000..$DFFF -- inside
+that. Map the ROM in and eight kilobytes of the game disappears, possibly
+including the code making the call. Writing our own filesystem COST space; it
+did not save any.
+
+Supporting them would mean speaking the DriveWire protocol ourselves, as a
+second storage backend. Only three functions in coco3storage.c touch the
+controller, so the directory, FAT and granule code would not move.
+
+
 WHAT IS DIFFERENT ABOUT THIS BUILD
 
 The GIME's text mode has no box-drawing characters, no block and no reverse
