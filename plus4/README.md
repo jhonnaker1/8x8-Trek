@@ -161,6 +161,43 @@ The wrapper is left in, with this note, because it is the right fix and the
 port ships nowhere -- `plus4` is in neither `RELEASE_PORTS` nor
 `tools/check_ports.py`.
 
+### THE LAYOUT DEPENDENCY, FOUND: the soft stack is ROM-shadowed at startup
+
+`.init.260` **never runs** -- a marker written as its first act reads `00`. And
+Jamie, watching: **"jam at ce12"**, which is inside the KERNAL's own interrupt
+handler at `$CE00`. So the program dies during `.init.100` (init-stack),
+`.init.200` (zero-bss) or `.init.250` (`shift`) -- all of which run **before**
+the hook, with the ROM still mapped and interrupts still enabled.
+
+**`__stack` is `$CC00`, which is under the ROM.** A write there passes through
+to RAM -- `src/vecprobe.c` measured that. **A READ RETURNS ROM.** So every C
+frame the early init pushes is written to RAM and read back as KERNAL ROM.
+
+That is the layout dependency, and it is not a hardcoded address: **whether
+startup survives depends on how much soft stack the early code happens to use
+and which ROM bytes happen to sit there**, and both move when anything shifts.
+Thirty-four bytes of NOPs change the answer because they change the addresses,
+not because they are code.
+
+### Which means `.init.010` was RIGHT, and `shift` needed the other fix
+
+The two constraints are now both explained and they are not in conflict --
+they were mis-resolved:
+
+  * the hook must run **before** `.init.100`, so the soft stack is in real RAM
+    from the first C frame. `.init.010` did that.
+  * `shift`'s `jsr $FFD2` must happen **with the ROM mapped**. Moving the hook
+    after it satisfied this and broke the first.
+
+**The fix is to bank at `.init.010` and neutralise `shift` itself** -- override
+the symbol, or do the charset call inside the hook with the ROM briefly back.
+cc65 has no such conflict because it banks RAM in first and keeps it in: its
+KERNAL wrappers are four instructions that touch only registers, so nothing
+reads the soft stack while the ROM is mapped.
+
+**Not attempted.** `shift` lives in `libc.a` and whether a strong definition
+here wins the link, or collides, is untested.
+
 ### And cc65 was asked, which is how the first fault was found
 
 `cl65 -t plus4` builds and **runs**: a program that writes `$5A` to `$A000` and

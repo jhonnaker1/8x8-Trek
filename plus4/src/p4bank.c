@@ -103,6 +103,8 @@ void p4_ram_in(void)
         "sta $ffff\n"
         "sta $fffb\n"
         "sta $ff3f\n"                  /* and now the RAM is ours         */
+        "lda #$a1\n"
+        "sta P4M+0\n"
         ::: "a", "memory");
 }
 
@@ -112,7 +114,7 @@ void p4_ram_in(void)
 __attribute__((used, naked, section(".fini.990")))
 void p4_rom_back(void)
 {
-    __asm__ volatile ("sta $ff3e" ::: "memory");
+    __asm__ volatile ("lda #$a2\n" "sta P4M+1\n" "sta $ff3e" ::: "a", "memory");
 }
 
 /* ---------------------------------------------------------------------------
@@ -139,6 +141,12 @@ void p4_rom_back(void)
  */
 
 __attribute__((used, section(".lowbss"))) unsigned char kb_a, kb_x, kb_y, kb_st;
+
+/* WHERE DOES IT GO? `?SYNTAX ERROR IN 10` is what BASIC prints when the SYS
+   RETURNS and it resumes a line it can no longer parse -- so the symptom does
+   not say whether main() crashed or finished. .fini.990 runs only on the way
+   out, so P4M[1] separates those two. */
+__attribute__((used, retain, section(".lowbss"))) volatile unsigned char P4M[4];
 
 #define BANKED_CALL(vec)                    \
     __asm__ volatile (                      \
@@ -231,7 +239,7 @@ unsigned char cbm_k_getin(void)  { k_getin();  return kb_a; }
  * overridden"; 2 separates the override from the banked call itself.
  */
 #ifndef P4LOAD
-#define P4LOAD 3
+#define P4LOAD 1
 #endif
 
 #if P4LOAD >= 1
