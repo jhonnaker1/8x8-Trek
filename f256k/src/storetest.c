@@ -32,7 +32,7 @@
 
 TREK_SIGNATURE;
 __attribute__((used, retain)) volatile unsigned char ran;
-#define NCHECK 10
+#define NCHECK 11
 __attribute__((used, retain)) volatile unsigned char res[NCHECK];
 __attribute__((used, retain)) volatile unsigned int  detail[NCHECK];
 __attribute__((used, retain)) volatile unsigned char done_n;
@@ -40,6 +40,14 @@ __attribute__((used, retain)) volatile unsigned char done_n;
 #define BIG 600
 static unsigned char out_buf[BIG];
 static unsigned char in_buf[BIG + 8];
+
+/* PUSH .bss PAST $A000 ON PURPOSE. The bank probe proved $A000-$BFFF answers
+   a write; this proves the LINKED PROGRAM can live there -- which is a
+   different claim, and the one the 40K in f256k.ld is making. The test's
+   result is unchanged either way, so if the buffers stop reaching that high
+   the check quietly stops meaning anything: hence the assertion below. */
+static unsigned char reach[0x7000];
+__attribute__((used, retain)) volatile unsigned int reach_top;
 
 static const char NAME[] = "TREKTEST.DAT";
 static const char GONE[] = "NOSUCH.DAT";
@@ -91,6 +99,13 @@ int main(void)
     /* THE KEYS GO IN FIRST, before any file work, and are read out after all
        of it. */
     for (i = 0; i < 40000u; i++) f256_pump();     /* let the typing land */
+
+    reach[0] = 0xC3;
+    reach[sizeof reach - 1] = 0x3C;
+    reach_top = (unsigned int)&reach[sizeof reach - 1];
+    check("BSS REACHES ABOVE $A000",
+          reach_top >= 0xA000 && reach[0] == 0xC3 &&
+          reach[sizeof reach - 1] == 0x3C, reach_top);
 
     st = plat_write_all(NAME, out_buf, BIG);
     check("WRITE 600 BYTES", st == STOR_OK, st);

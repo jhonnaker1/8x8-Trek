@@ -39,9 +39,16 @@ __basic_zp_start = 0x0040;
 __basic_zp_end   = 0x00F0;
 
 MEMORY {
-    /* $2000..$9FFF. uno's config stops at $9FFF with __HIMEM__ at $BFFF, so
-       $A000..$BFFF may be reachable too -- NOT ASSUMED until measured. */
-    ram (rw) : ORIGIN = 0x2000, LENGTH = 0x8000
+    /* $2000..$BFFF -- FORTY KILOBYTES, AND THE LAST 8K OF IT IS MEASURED NOW.
+       This said "$A000..$BFFF may be reachable, NOT ASSUMED until measured"
+       from the day the port started. src/bankprobe.c measured it: the active
+       map is MLUT 3, whose slots 0-6 are RAM banks $00-$06, so $A000-$BFFF is
+       bank $05 and it is ours. FoenixMCP's own maps (MLUT 0 and 1) put FLASH
+       in that slot, which is why it needed checking and why the answer is
+       specifically about the map the PROGRAM runs in.
+       Slot 6 ($C000-$DFFF) is not in here: it is the I/O window, and the
+       display driver needs it. Slot 7 is the kernel. */
+    ram (rw) : ORIGIN = 0x2000, LENGTH = 0xA000
 }
 
 __rc0 = __basic_zp_start;

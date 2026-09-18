@@ -102,6 +102,52 @@ And it can fail: with the case fold removed `q` comes back 113 instead of 81,
 and with the arrow mapping removed CRSR UP comes back 16 instead of 1 — two
 breaks, two mismatches, nothing else moved.
 
+## 448 KB OF FREE RAM, AND WHAT IT DOES AND DOES NOT BUY
+
+Measured by `src/bankprobe.c`, not read off a spec:
+
+* **The active map is MLUT 3**, and its slots 0-6 are RAM banks `$00`-`$06`.
+  FoenixMCP's own maps (MLUT 0 and 1) put **flash** in slots 2-5, which is
+  exactly why this needed checking — the answer is specifically about the map
+  the *program* runs in, and the two disagree completely.
+* **`$A000-$BFFF` is RAM and it is ours.** That retires a "NOT ASSUMED until
+  measured" note that had been in the linker script since the port started.
+  The region is now 40 KB, `$2000-$BFFF`, and `make store` asserts `.bss`
+  reaches above `$A000` so the claim cannot quietly stop being true.
+* **64 banks of 8 KB, none aliased.** Verified in two passes — each bank gets
+  its own number written, then *every* bank is re-mapped and re-checked. One
+  pass cannot detect aliasing: two banks sharing a page each verify correctly
+  on the way past.
+* **Eight banks are the machine's working set** (`$00`-`$07`: our address
+  space plus MCP's). The other **56 banks — 448 KB — are free.**
+
+### It does not remove overlays, and it was worth measuring to find that out
+
+An all-resident link of the whole shared UI is **`.text` 58,661 bytes**
+(`.rodata` 1,843, `.bss` 2,190) against **40,960 bytes of address space**. The
+6502 sees 64 KB however much RAM sits behind it, and of those 64 KB slot 6 is
+the I/O window the display driver needs and slot 7 is the kernel. So the code
+still has to be banked.
+
+### What it does remove is the disk
+
+Which is the half that matters for how the game feels:
+
+| | every other 8-bit port | here |
+|---|---|---|
+| `ovl_load(n)` | a disk read, mid-game | **one store to a slot register** |
+| the string pool | far memory, or disk-backed | **a RAM bank** |
+| the briefing | streamed a page at a time | **a RAM bank** |
+| a failed overlay load | must not return — see the C128 | **cannot happen at runtime** |
+
+Everything is read from the SD card **once, at startup**, into banks `$08`
+upward. After that the disk is touched only for save, restore and the hall of
+fame. A stale `OVERLAYS.BIN` becomes a startup check rather than a bug that
+mimics any other bug — which is what it did on the MEGA65.
+
+Not yet measured: `$0400-$1FFF` is another 7 KB of slot 0 that MCP may leave
+alone, which would be resident address space rather than banked.
+
 ## STORAGE IS ASYNCHRONOUS, WHICH NO OTHER PORT HERE HAS TO DEAL WITH
 
 Every other port opens a file and reads it. On the F256 a call only
