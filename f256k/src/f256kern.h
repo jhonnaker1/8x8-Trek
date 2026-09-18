@@ -105,4 +105,13 @@ struct f256_events {
 };
 #define EV(m) ((unsigned char)(unsigned int)(&(((struct f256_events *)0)->m)))
 
+/* A FIXED SIGNATURE THE HOST CAN FENCE ITS READS WITH. In .data, so it is
+   present the moment the PGZ loads. See tools/f256.lua: the kernel's IRQ
+   remaps the MMU sixty times a second, and a read that lands inside it
+   returns $00 for every one of the program's variables. */
+#define TREK_SIG_BYTES 0xE6, 0xA7, 0x5C, 0x13
+#define TREK_SIGNATURE \
+    __attribute__((used, retain)) volatile unsigned char trek_sig[4] = \
+        { TREK_SIG_BYTES }
+
 #endif

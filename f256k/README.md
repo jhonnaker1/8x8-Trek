@@ -13,7 +13,8 @@ shape of the port.
 | frame timer: kernel `SetTimer` query | **60.00 Hz measured**, in the driver |
 | sound: SN76489 PSG | **calibrated at three points**, no driver yet |
 | font: authored box set, screen-code order | **works** -- built at init into font RAM |
-| storage, keyboard, far memory, overlays | **not started** |
+| keyboard: `f256key.c` via the event queue | **works** -- nine keys checked against `input.h`, `make keys` |
+| storage, far memory, overlays | **not started** |
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 
@@ -58,6 +59,47 @@ from ASCII 65..90 — font offsets `$208..$2D7` down to `$08..$D7` — and the b
 set then lands at codes 64..127, `$200..$3FF`, *on top of the letters it was
 just copied from*. Correct, but only because the copy happened first. Three
 passes, none overlapping, no 2K of scratch on a machine that has about forty.
+
+## THE KEYBOARD, AND THE QUEUE IT HAS TO SHARE
+
+One `NextEvent` queue carries keystrokes, every byte of file I/O and the
+kernel's timers. **A key wait that drains it during a load eats the file's
+data events; a file read that drains it while the player is typing eats the
+keys.** So there is exactly one pump in this port — `f256_pump()` in
+`f256key.c` — and it sorts: keys into a ring, everything else held for the
+storage layer. If a second non-key event arrives before the first is claimed,
+`f256_other_lost` counts it, which is the difference between a storage bug
+that shows up as a failed load and one that shows up as a file that is subtly
+short.
+
+Measured with `src/keyprobe.c`, which logs raw event bytes rather than
+summarising them:
+
+| key | raw | ascii | |
+|---|---|---|---|
+| letters | unshifted ASCII | the shifted character | so the port folds case |
+| ENTER | `$94` | `$0D` | |
+| DEL / BKSP | `$92` | `$08` | |
+| RUN/STOP | `$BC` | `$03` | **this keyboard is a C64 layout — there is no ESC key** |
+| CRSR UP | `$B6` | `$10` | matched on **raw**: the ASCII is a control code |
+| CRSR DOWN | `$B7` | `$0E` | other paths could plausibly produce |
+
+`key.PRESSED` (8) and `key.RELEASED` (10) **both** arrive — counting both
+doubles every keystroke — and modifiers come through with `flags` bit 7 set
+and no ASCII, so SHIFT would register as a keystroke of its own if it were not
+dropped.
+
+**Two events are already queued when the game starts**: a `file.CLOSED` from
+pexec closing the PGZ it just loaded, and a timer. Neither is a key, so the
+Amiga's fault — the RETURN that launched the game dismissing the title screen
+— cannot happen here. `kb_init` drains anyway, because "cannot happen" is a
+claim about a queue nobody has looked in lately.
+
+`make keys` types nine chosen keys and checks what `kb_waitkey` returns
+**against `input.h`'s own constants**, not against my judgement of the output.
+And it can fail: with the case fold removed `q` comes back 113 instead of 81,
+and with the arrow mapping removed CRSR UP comes back 16 instead of 1 — two
+breaks, two mismatches, nothing else moved.
 
 ## THE FRAME TIMER IS A KERNEL CALL, NOT A RASTER READ
 
