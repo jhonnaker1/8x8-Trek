@@ -14,17 +14,10 @@
 #include "input.h"
 #include "f256evt.h"
 
-/* The sound driver does not exist yet. Every other port calls snd_poll()
-   INSIDE the key wait, because that loop is where the program spends its idle
-   time and is the driver's only chance to run -- so the call site is written
-   now and the stub goes away when tedsnd's opposite number lands. Writing it
-   later means finding this loop again, and the Plus/4's music played at
-   double speed because a timing detail was not settled at its call site. */
-#ifndef TREK_F256_SOUND
-static void snd_poll(void) { }
-#else
-void snd_poll(void);
-#endif
+/* snd_poll() is called INSIDE the key wait, because that loop is where the
+   program spends every second it is not drawing and is the driver's only
+   chance to run. It is declared in f256evt.h, which also stubs it for the
+   builds that link no sound driver. */
 
 uint16_t kb_entropy = 0;
 

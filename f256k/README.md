@@ -17,7 +17,8 @@ shape of the port.
 | storage: `f256stor.c`, all five `plat_` calls | **works** -- ten checks, `make store` |
 | overlays: 11 images, 11 RAM banks | **works** -- `make check-ovl`, swap is one store |
 | far memory: `f256far.c`, RAM banks | **works** -- nine checks, `make check-far` |
-| sound driver | **not started** |
+| sound: `f256snd.c`, SN76489 | **works** -- pitch to 0.08%, tempo measured, `make check-snd` |
+| the whole game | **LINKS** -- 30,168 of 32,768 resident, 2,592 spare |
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 
@@ -169,6 +170,65 @@ A stale `OVERLAYS.BIN` is caught by a build stamp — the low sixteen bits of
 `ovl_anchor`'s address in the link the images were cut from. Flipping one byte
 of it stops the game with a message instead of jumping into the middle of
 another function, which is what it did on the MEGA65.
+
+## SOUND: THE PSG, AND TWO TOOLS BECAUSE ONE CANNOT SEE BOTH
+
+**The chip is the PSG, not the SID.** The F256K has SID *sockets* — the only
+audio on the board described as optional — while the two SN76489s are inside
+the Beatrix FPGA, so every owner has them. There are two: left at `$D600`,
+right at `$D610`, and **`$D608` writes both**, which is what this driver uses
+so the game sounds the same whatever the mixer at `$D6A1` is set to. That
+register is left as the machine had it — changing someone's stereo routing to
+play a beep is not this program's business.
+
+**N falls as pitch rises, which is the opposite of the Plus/4.** The SN76489
+divides: `f = 111,860.78 / N`, so N is a period, where TED's register counts
+*up* to 1024. `tedsnd.c` warns about getting that backwards — *"a tune that
+plays its intervals inside out, which sounds wrong without sounding obviously
+broken"* — and this is the port where that warning applies in the other
+direction. The numerator is the same 11,186 `tedsnd.c` already carried,
+arrived at from a different chip.
+
+| | wanted | measured | |
+|---|---|---|---|
+| voice 1 | 440 | **440.4 Hz** | +0.08% |
+| voice 1 | 1000 | **999.2 Hz** | −0.08% |
+| voice 1 | 200 | **200.2 Hz** | +0.08% |
+| **voice 2** | 440 | **440.4 Hz** | +0.08% |
+
+Three pitches because one cannot see an octave error, and this project has
+shipped one in each direction. The fourth is on the second generator — a
+driver that wrote both voices to one channel would produce four correct bursts
+and no way to tell.
+
+**The region is not detected, and that is not an omission.** On the Plus/4 and
+the IIgs the region is a fact about the *machine*. Here it is a consequence of
+this program's own choice: `f256vid.c` sets 480 lines, which is 60 Hz.
+Measured at **59.90 frames and 18.200 ticks a second** against 18.2065 wanted
+— 0.04%.
+
+### The controls prove the two tools are complementary
+
+| break | PITCH | TEMPO |
+|---|---|---|
+| invert the formula, TED-style | **OUT** — and *inside out*: 1000 Hz came back **lower** (122) than 440 (145) | ok |
+| double the tick rate | ok — all four within 0.08% | **OUT** — 36.393 Hz, exactly double |
+
+The second row is #42 on this project's list reproduced deliberately: *"every
+burst frequency was right while the tune ran at double speed"*. Neither tool
+alone catches both faults.
+
+### The music plays through a disk load
+
+On the Plus/4 and the CoCo 3 a blocking load stops the music engine, so the
+chip goes on sounding whatever note was gated — a melody becomes a **drone**
+for the length of the read. Jamie heard it on the end-of-game screens and both
+ports grew a `snd_hush`/`snd_unhush` pair for it.
+
+Here storage is asynchronous and **the wait is ours**, so `f256_wait_file`
+polls the sound driver and the tune simply keeps playing. No hush, no resume,
+and nothing to get wrong about which note was held. `snd_poll` counts frames
+**by difference**, so a tune that was not polled for ten frames advances ten.
 
 ## FAR MEMORY HAS NO SLOT OF ITS OWN, SO IT BORROWS THE OVERLAY'S
 

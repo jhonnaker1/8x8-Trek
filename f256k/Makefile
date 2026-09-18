@@ -41,7 +41,7 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin build/%.low
 
-.PHONY: all hello frame keys store ovl far run check check-ovl check-far clean
+.PHONY: all hello frame keys store ovl far snd run check check-ovl check-far check-snd clean
 all: hello
 hello: build/hello.pgz
 frame: build/frametest.pgz
@@ -49,6 +49,7 @@ keys: build/keytest.pgz
 store: build/storetest.pgz
 ovl: build/ovltest.pgz build/ovltest.ovl
 far: build/fartest.pgz build/fartest.ovl build/fartest.dat build/fartest2.dat
+snd: build/sndtest.pgz
 
 build:
 	@mkdir -p build build/snap
@@ -80,6 +81,9 @@ build/storetest.elf: src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c \
 # They are what closed a 1,161-byte resident overflow.
 OVLFLAGS = -DTREK_OVERLAYS -DTREK_OVL_ENEMY -DTREK_OVL_MOVE
 
+# Turns off f256evt.c's snd_poll stub so the real driver can define it.
+SNDFLAGS = -DTREK_F256_SOUND
+
 build/ovltest.elf: src/ovltest.c src/f256vid.c src/f256key.c src/f256evt.c \
                    src/f256stor.c src/f256ovl.c \
                    src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
@@ -103,6 +107,13 @@ build/fartest.elf: src/fartest.c src/f256vid.c src/f256key.c src/f256evt.c \
 
 build/fartest.dat build/fartest2.dat: tools/mkfar.py | build
 	@python3 tools/mkfar.py build/fartest.dat build/fartest2.dat
+
+# sndtest INCLUDES f256snd.c rather than linking it -- see the file. Linking
+# it as well would be two definitions of every symbol in it.
+build/sndtest.elf: src/sndtest.c src/f256vid.c src/f256evt.c src/f256snd.c \
+                   src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(SNDFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/sndtest.c src/f256vid.c src/f256evt.c ../c128/src/music_data.c
 
 build/lowprobe.elf: src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c \
                     src/f256stor.c \
@@ -167,6 +178,21 @@ check-ovl: build/ovltest.pgz build/ovltest.ovl
 
 # Far memory: two tenants, bank straddles, and a read issued from inside an
 # overlay -- the hazard that comes from having no slot to spare.
+# Sound: four calibration tones recorded and measured, then the tempo counted
+# against MAME's own clock. TWO TOOLS BECAUSE ONE CANNOT SEE BOTH -- hearit.py
+# reads pitch and is silent about rate, which is how a tune once played at
+# double speed with every note in tune.
+check-snd: snd
+	@SD_WAV=build/snd.wav \
+	 A_SIG=$$($(NM) build/sndtest.elf | awk '$$3=="trek_sig"{print $$1}') \
+	 A_RAN=$$($(NM) build/sndtest.elf | awk '$$3=="ran"{print $$1}') \
+	 A_RUNNING=$$($(NM) build/sndtest.elf | awk '$$3=="tempo_running"{print $$1}') \
+	 A_FRAMES=$$($(NM) build/sndtest.elf | awk '$$3=="snd_frames"{print $$1}') \
+	 A_TICKS=$$($(NM) build/sndtest.elf | awk '$$3=="snd_ticks"{print $$1}') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/sndtest.pgz sndtest tools/snd.lua
+	@echo "PITCH:"
+	@python3 tools/pitch.py build/snd.wav 440 1000 200 440
+
 check-far: far
 	@SD_EXTRA="build/fartest.ovl:OVERLAYS.BIN build/fartest.dat:FARTEST.DAT build/fartest2.dat:FARTEST2.DAT" \
 	 A_SIG=$$($(NM) build/fartest.elf | awk '$$3=="trek_sig"{print $$1}') \

@@ -53,6 +53,20 @@ extern unsigned char f256_file_lost;
 #define F256_WAIT_TIMEOUT 0xFF
 unsigned char f256_wait_file(unsigned char frames);
 
+/* THE SOUND DRIVER IS POLLED FROM THE FILE WAIT, and that is this machine
+   doing something the Plus/4 and the CoCo 3 could not.
+ *
+ * On those ports a blocking disk load stops the music engine, so the chip goes
+ * on sounding whatever note was gated when the load began -- a melody turns
+ * into a DRONE for the length of the read. Jamie heard it on the end-of-game
+ * screens and both ports grew a snd_hush/snd_unhush pair for it.
+ *
+ * Here storage is asynchronous and the wait is OURS, so the tune simply keeps
+ * playing. No hush, no resume, and nothing to get wrong about which note was
+ * held. It is declared here rather than in sid.h because f256evt.c must be
+ * linkable without a sound driver -- every test in this port does that. */
+void snd_poll(void);
+
 /* The kernel's own frame counter, low byte, 60 Hz. It lives here rather than
    in the video driver because it is a KERNEL CALL, not a video register --
    see f256kern.h on why it is not the raster and not an event. */

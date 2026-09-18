@@ -2,6 +2,13 @@
 #include "input.h"
 #include "f256evt.h"
 
+/* The stub lives HERE, in the file that needs snd_poll for its own wait,
+   rather than in f256key.c where it was -- one definition, one flag, and the
+   tests that link neither sound nor a keyboard still build. */
+#ifndef TREK_F256_SOUND
+void snd_poll(void) { }
+#endif
+
 static struct f256_event ev;
 static volatile unsigned char ev_empty;
 
@@ -127,6 +134,8 @@ unsigned char f256_wait_file(unsigned char frames)
         /* PUMP UNTIL EMPTY BEFORE CHECKING THE CLOCK. The queue can hold the
            answer already, and a version that checked the deadline first would
            make the timeout a race against however much else was queued. */
+        /* The tune advances while the card is thinking. */
+        snd_poll();
         while (f256_pump()) {
             if (f256_file_ready) {
                 f256_file_ready = 0;

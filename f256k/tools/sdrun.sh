@@ -50,9 +50,15 @@ for e in $SD_EXTRA; do
     mcopy -o -i "$WORK/sd.img@@$OFF" "${e%%:*}" "::${e##*:}"
 done
 
+# $SD_WAV records the emulated audio. -nothrottle does not distort it: MAME
+# writes the wav in EMULATED time, so a run at eleven times speed still yields
+# a recording whose frequencies are the machine's.
+WAV=""
+[ -n "$SD_WAV" ] && WAV="-wavwrite $SD_WAV"
+
 if [ -n "$LUA" ]; then
     trap 'rm -rf "$WORK"' EXIT
-    $MAME -nothrottle -harddisk "$WORK/sd.img" -autoboot_script "$LUA"
+    $MAME -nothrottle $WAV -harddisk "$WORK/sd.img" -autoboot_script "$LUA"
 else
     # LEAVE IT RUNNING, and leave the image behind with it -- a machine in an
     # interesting state is the point, and deleting its disk out from under it
