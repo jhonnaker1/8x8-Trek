@@ -11,6 +11,13 @@ local GOT, GOTN, ENT, LOST = sym("A_GOT"), sym("A_GOTN"), sym("A_ENT"), sym("A_L
 local ok = F.launch("keytest")
 if not ok then print("LAUNCH FAILED") manager.machine:exit() return end
 
+-- WAIT FOR kb_init BEFORE TYPING. The signature is in .data and appears when
+-- the PGZ LOADS -- before main() runs and before kb_init drains the queue.
+-- The storage suite learned this the expensive way: three passes then a
+-- failure on an identical binary.
+local RAN = tonumber(os.getenv("A_RAN"), 16)
+for _ = 1, 200 do if F.u8(RAN) == 0x5A then break end emu.wait(0.05) end
+
 local kb = manager.machine.natkeyboard
 local function tap(row, field)
     local p = manager.machine.ioport.ports[":" .. row]

@@ -39,14 +39,15 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # "intermediate" and make deletes them -- and the .elf is where every probe's
 # symbol addresses come from, and the .map is the only place the layout is
 # written down. Losing them turns every debugging session into a rebuild.
-.PRECIOUS: build/%.elf build/%.bin
+.PRECIOUS: build/%.elf build/%.bin build/%.low
 
-.PHONY: all hello frame keys store run check clean
+.PHONY: all hello frame keys store ovl run check check-ovl clean
 all: hello
 hello: build/hello.pgz
 frame: build/frametest.pgz
 keys: build/keytest.pgz
 store: build/storetest.pgz
+ovl: build/ovltest.pgz build/ovltest.ovl
 
 build:
 	@mkdir -p build build/snap
@@ -66,6 +67,25 @@ build/storetest.elf: src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c \
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
 	    src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c src/f256stor.c
 
+# THE OVERLAY BUILD. -DTREK_OVERLAYS turns OVL_CODE from nothing into a
+# section attribute; without it every overlay function is inlined into its
+# resident caller and every image comes out EMPTY -- which mkovl.py refuses by
+# name rather than shipping.
+OVLFLAGS = -DTREK_OVERLAYS
+
+build/ovltest.elf: src/ovltest.c src/f256vid.c src/f256key.c src/f256evt.c \
+                   src/f256stor.c src/f256ovl.c \
+                   src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(OVLFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/ovltest.c src/f256vid.c src/f256key.c src/f256evt.c \
+	    src/f256stor.c src/f256ovl.c
+
+# OVERLAYS.BIN RIDES WITH THE PGZ, so `run` and `check` must put BOTH on the
+# card. The images are cut from the SAME ELF the program came from, which is
+# what makes the stamp meaningful.
+build/%.ovl: build/%.elf
+	@python3 tools/mkovl.py $< $@ --objcopy $(OBJCOPY) --nm $(NM) --window 8192
+
 build/lowprobe.elf: src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c \
                     src/f256stor.c \
                     src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
@@ -80,15 +100,29 @@ build/frametest.elf: src/frametest.c src/f256vid.c src/f256evt.c \
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
 	    src/frametest.c src/f256vid.c src/f256evt.c ../c128/src/layout.c
 
+# TWO SEGMENTS NOW, AND SELECTED BY NAME RATHER THAN BY WHAT IS LEFT OVER.
+# The ELF holds three kinds of thing at three very different addresses: the
+# resident program at $2000, read-only data at $0400 (the low region), and the
+# overlay images at $100000 and up, which no CPU ever sees. A plain
+# `objcopy -O binary` spans ALL of them and produced a 1,129,475-byte PGZ --
+# the gap between $2000 and $100000 written out as zeros.
 build/%.bin: build/%.elf
-	$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) -O binary -j .text -j .data $< $@
+
+build/%.low: build/%.elf
+	$(OBJCOPY) -O binary -j .lowrodata $< $@
 
 # THE ENTRY POINT COMES FROM THE BINARY, NOT FROM A CONSTANT. A PGZ carries its
 # start address in a zero-size trailing segment, and a wrong one gives a file
 # that loads and never runs -- silently.
-build/%.pgz: build/%.bin
+# The low segment is passed only when there IS one: mkpgz would happily write
+# a zero-length segment, and a zero-length segment is how a PGZ says "this is
+# the entry point" -- so an empty .lowrodata would terminate the file early
+# and the program would never load.
+build/%.pgz: build/%.bin build/%.low
 	@python3 tools/mkpgz.py $< $@ --load 0x2000 \
-	    --exec 0x$$($(NM) $(<:.bin=.elf) | awk '$$3 == "_start" { print $$1 }')
+	    --exec 0x$$($(NM) $(<:.bin=.elf) | awk '$$3 == "_start" { print $$1 }') \
+	    $$(test -s $(<:.bin=.low) && echo --extra 0x0400:$(<:.bin=.low))
 
 # A WORKING COPY, ALWAYS: the SD image is the user's and must not be written.
 run: build/$(P).pgz
@@ -100,7 +134,20 @@ clean:
 # An AUTOMATED run: same disk, same pexec launch, but scripted -- the marker is
 # read out of the machine and a snapshot is taken. `run` is for a person and
 # leaves the machine up; `check` is for me and exits.
+# The overlay swap, end to end: eleven images into eleven RAM banks, then
+# every one loaded forwards, backwards and interleaved, checked BY VALUE.
+check-ovl: build/ovltest.pgz build/ovltest.ovl
+	@SD_EXTRA="build/ovltest.ovl:OVERLAYS.BIN" \
+	 A_SIG=$$($(NM) build/ovltest.elf | awk '$$3=="trek_sig"{print $$1}') \
+	 A_RAN=$$($(NM) build/ovltest.elf | awk '$$3=="ran"{print $$1}') \
+	 A_GOT=$$($(NM) build/ovltest.elf | awk '$$3=="got"{print $$1}') \
+	 A_BACK=$$($(NM) build/ovltest.elf | awk '$$3=="got_back"{print $$1}') \
+	 A_MIX=$$($(NM) build/ovltest.elf | awk '$$3=="got_mixed"{print $$1}') \
+	 A_PASS=$$($(NM) build/ovltest.elf | awk '$$3=="pass"{print $$1}') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/ovltest.pgz ovltest tools/ovl.lua
+
 check: build/$(P).pgz
 	@TREK_NAME=$(P) \
 	 TREK_MARKER=$$($(NM) build/$(P).elf | awk '$$3 == "ran" { print $$1 }') \
+	 TREK_SIG=$$($(NM) build/$(P).elf | awk '$$3 == "trek_sig" { print $$1 }') \
 	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/$(P).pgz $(P) tools/run.lua

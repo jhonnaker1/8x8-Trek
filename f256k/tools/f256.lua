@@ -28,11 +28,28 @@ function M.attach(sig_addr)
     return M
 end
 
+-- WITHOUT A SIGNATURE, AGREEMENT IS THE FALLBACK. Probes written before this
+-- file existed carry no signature, and they still must not be read through a
+-- kernel IRQ's memory map. Three reads that agree is weaker than a fence --
+-- the map could be wrong for all three -- but it is far better than one, and
+-- it degrades honestly instead of pretending.
 function M.sig_ok()
+    if not M.sig_addr then return true end
     for i = 1, #M.SIG do
         if M.sp:read_u8(M.sig_addr + i - 1) ~= M.SIG[i] then return false end
     end
     return true
+end
+
+function M.agree(addr)
+    local a = M.sp:read_u8(addr)
+    for _ = 1, 4 do
+        emu.wait(0.002)
+        local b = M.sp:read_u8(addr)
+        if b == a then return a end
+        a = b
+    end
+    return a
 end
 
 -- Read `n` bytes from `addr`, retrying until the signature brackets the read.
@@ -49,13 +66,24 @@ function M.read(addr, n, tries)
     return nil
 end
 
-function M.u8(addr)  local v = M.read(addr, 1); return v and v[1] end
+function M.u8(addr)
+    if not M.sig_addr then return M.agree(addr) end
+    local v = M.read(addr, 1); return v and v[1]
+end
 function M.u16(addr) local v = M.read(addr, 2); return v and (v[1] + v[2] * 256) end
 
 -- Boot, launch by name, and wait for the SIGNATURE -- not for a marker byte.
 function M.launch(name, boot_wait)
     emu.wait(boot_wait or 6)
     local tries = 0
+    -- With no signature there is nothing to watch for, so type once and give
+    -- the machine a fixed moment -- the caller's own marker is then the only
+    -- evidence the program ran, which is why every new probe carries one.
+    if not M.sig_addr then
+        manager.machine.natkeyboard:post("/- " .. name .. "\n")
+        emu.wait(4)
+        return false, 1
+    end
     repeat
         tries = tries + 1
         manager.machine.natkeyboard:post("/- " .. name .. "\n")

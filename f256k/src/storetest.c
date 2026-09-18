@@ -32,7 +32,7 @@
 
 TREK_SIGNATURE;
 __attribute__((used, retain)) volatile unsigned char ran;
-#define NCHECK 11
+#define NCHECK 10
 __attribute__((used, retain)) volatile unsigned char res[NCHECK];
 __attribute__((used, retain)) volatile unsigned int  detail[NCHECK];
 __attribute__((used, retain)) volatile unsigned char done_n;
@@ -40,14 +40,16 @@ __attribute__((used, retain)) volatile unsigned char done_n;
 #define BIG 600
 static unsigned char out_buf[BIG];
 static unsigned char in_buf[BIG + 8];
+/* THE "BSS REACHES ABOVE $A000" CHECK LIVED HERE AND IS GONE, because the
+   claim it made is no longer this file's to make. When it was written, `ram`
+   ran $2000-$BFFF and .bss was at the top of it. The overlay split moved
+   .bss into the low region at $0400 and gave $A000-$BFFF to the window -- so
+   a 28K array here would not reach $A000, it would overflow a 7K region.
 
-/* PUSH .bss PAST $A000 ON PURPOSE. The bank probe proved $A000-$BFFF answers
-   a write; this proves the LINKED PROGRAM can live there -- which is a
-   different claim, and the one the 40K in f256k.ld is making. The test's
-   result is unchanged either way, so if the buffers stop reaching that high
-   the check quietly stops meaning anything: hence the assertion below. */
-static unsigned char reach[0x7000];
-__attribute__((used, retain)) volatile unsigned int reach_top;
+   The claim itself is now carried by a STRONGER test: make check-ovl EXECUTES
+   code at $A000-$BFFF out of eleven different RAM banks. Running there beats
+   storing there. A check kept after its meaning moved is worse than no check
+   -- see the sweep notes on stale assertions. */
 
 static const char NAME[] = "TREKTEST.DAT";
 static const char GONE[] = "NOSUCH.DAT";
@@ -97,15 +99,19 @@ int main(void)
     for (i = 0; i < BIG; i++) out_buf[i] = pat(i);
 
     /* THE KEYS GO IN FIRST, before any file work, and are read out after all
-       of it. */
-    for (i = 0; i < 40000u; i++) f256_pump();     /* let the typing land */
-
-    reach[0] = 0xC3;
-    reach[sizeof reach - 1] = 0x3C;
-    reach_top = (unsigned int)&reach[sizeof reach - 1];
-    check("BSS REACHES ABOVE $A000",
-          reach_top >= 0xA000 && reach[0] == 0xC3 &&
-          reach[sizeof reach - 1] == 0x3C, reach_top);
+       of it.
+     *
+     * PACED BY FRAMES, NOT BY A LOOP COUNT. This was `for (i = 0; i < 40000;
+     * i++) f256_pump();` -- a fixed iteration count standing in for a
+     * duration, which is only a duration for as long as the code around it
+     * stays the same size. The overlay split moved every one of these
+     * functions and the loop stopped being long enough: the keystroke check
+     * failed on a build whose keyboard was provably fine. A frame count means
+     * the same wall time whatever the compiler does. */
+    {
+        unsigned char t0 = f256_frames();
+        while ((unsigned char)(f256_frames() - t0) < 120) f256_pump();
+    }
 
     st = plat_write_all(NAME, out_buf, BIG);
     check("WRITE 600 BYTES", st == STOR_OK, st);

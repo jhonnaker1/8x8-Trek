@@ -19,7 +19,7 @@ if F.u8(RAN) ~= 0x5A then print("program never became ready") end
 manager.machine.natkeyboard:post("ABC")
 
 local labels = {
-    "BSS REACHES ABOVE $A000", "WRITE 600 BYTES", "READ IT BACK", "LENGTH IS 600", "EVERY BYTE MATCHES",
+    "WRITE 600 BYTES", "READ IT BACK", "LENGTH IS 600", "EVERY BYTE MATCHES",
     "MISSING FILE IS NOTFOUND", "TOO BIG FOR BUFFER IS ERROR",
     "REWRITE SHORT", "REPLACED NOT APPENDED", "STREAMED 600 IN 140s",
     "KEYS SURVIVED THE DISK",

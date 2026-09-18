@@ -15,7 +15,8 @@ shape of the port.
 | font: authored box set, screen-code order | **works** -- built at init into font RAM |
 | keyboard: `f256key.c` via the event queue | **works** -- nine keys checked against `input.h`, `make keys` |
 | storage: `f256stor.c`, all five `plat_` calls | **works** -- ten checks, `make store` |
-| far memory, overlays, sound driver | **not started** |
+| overlays: 11 images, 11 RAM banks | **works** -- `make check-ovl`, swap is one store |
+| far memory, sound driver | **not started** |
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 
@@ -101,6 +102,61 @@ claim about a queue nobody has looked in lately.
 And it can fail: with the case fold removed `q` comes back 113 instead of 81,
 and with the arrow mapping removed CRSR UP comes back 16 instead of 1 — two
 breaks, two mismatches, nothing else moved.
+
+## THE OVERLAY SPLIT: ELEVEN BANKS, ONE SLOT, AND A SWAP THAT IS ONE STORE
+
+Every other port copies an image into a window — off disk on the C128 (about a
+sixth of a second), out of banked RAM on the X16 and MEGA65, out of video RAM
+on the Atari. **Here each overlay image *is* an 8K RAM bank and the window is
+the MMU slot they map to, so `ovl_load` is a single store and nothing moves.**
+
+The budget, measured:
+
+| | |
+|---|---|
+| `.text` resident, `$2000-$9FFF` | 31,633 of 32,768 — **1,129 spare** |
+| `.rodata` + `.bss` + soft stack, `$0400-$1FFF` | 4,039 used, 3,129 left to the stack |
+| the window, `$A000-$BFFF` | 8,192 |
+| eleven overlay images | 30,300 total, **largest 3,765** — 4,427 spare in the window |
+
+The 1,129 is tight with sound and far memory still to come. The lever is the
+**window slack**: at 4,427 bytes under the largest image, moving more resident
+code into an existing overlay costs nothing. And `core/overlay.h`'s rules of
+thumb — *"the test is FREQUENCY, not size"*, *"fire_one_torpedo must NOT move
+because firing is the most frequent action"* — are all about the cost of a
+**disk load**. The Atari's note already records that a cheaper swap changes
+which splits are affordable rather than which are correct. A slot store is
+cheaper again. **Rule 4 is unchanged**: cheap swaps do not make it safe for an
+overlay to call another overlay.
+
+`make check-ovl` loads all eleven forwards, backwards, and interleaved
+including the same one twice, and checks **by value** — each overlay function
+returns its own number, and all eleven are linked at `$A000`, so a wrong bank
+still returns cleanly with the wrong answer.
+
+### Three things the controls caught that reading would not have
+
+1. **The test passed with the mapping deliberately broken.** The overlay
+   functions were `return 0xE0 + n;` — constant — and LTO replaced the *calls*
+   with the values it proved they returned. `noinline` stops the body being
+   inlined; it does not stop interprocedural constant propagation. Eleven
+   overlays "verified" without one byte executing from the window. They now
+   read a volatile, which cannot be proved away.
+2. **`.bss` moved to `$0400` and nothing zeroed it.** The CRT clears `c.ld`'s
+   `.bss`, which is now empty. The keyboard suite came back with all nine keys
+   wrong and the values spelled **`keytest`** — it was reading pexec's copy of
+   the filename. `vdc_init` zeroes `__low_bss_start..__low_bss_end` first, and
+   `main()` calls `vdc_init` first, which is checked rather than assumed.
+3. **`make check` reported `$00` for a program that was running.** `.bss` at
+   `$0400` is in slot 0, which the kernel's own maps point at a different
+   bank — so a raw read lands in the kernel's memory as often as ours. The
+   generic checker now reads through `tools/f256.lua`'s signature fence, with
+   a three-read agreement fallback for probes that carry no signature.
+
+A stale `OVERLAYS.BIN` is caught by a build stamp — the low sixteen bits of
+`ovl_anchor`'s address in the link the images were cut from. Flipping one byte
+of it stops the game with a message instead of jumping into the middle of
+another function, which is what it did on the MEGA65.
 
 ## 448 KB OF FREE RAM, AND WHAT IT DOES AND DOES NOT BUY
 

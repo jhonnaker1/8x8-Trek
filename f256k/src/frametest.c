@@ -19,7 +19,9 @@
 #include "../../c128/src/vdc.h"
 #include "../../c128/src/layout.h"
 #include "../../core/ega.h"
+#include "f256kern.h"
 
+TREK_SIGNATURE;
 __attribute__((used, retain)) volatile unsigned char ran;
 __attribute__((used, retain)) volatile unsigned int frames;
 

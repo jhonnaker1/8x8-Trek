@@ -43,6 +43,13 @@ WORK="$(mktemp -d)"
 cp "$SDCARD" "$WORK/sd.img"
 mcopy -o -i "$WORK/sd.img@@$OFF" "$PGZ" "::$NAME.pgz"
 
+# EXTRA FILES RIDE ALONG, as "local/path:DESTNAME" in $SD_EXTRA. The overlay
+# build needs OVERLAYS.BIN beside the program, and a run that copies only the
+# PGZ tests the half of the port that does not need it.
+for e in $SD_EXTRA; do
+    mcopy -o -i "$WORK/sd.img@@$OFF" "${e%%:*}" "::${e##*:}"
+done
+
 if [ -n "$LUA" ]; then
     trap 'rm -rf "$WORK"' EXIT
     $MAME -nothrottle -harddisk "$WORK/sd.img" -autoboot_script "$LUA"

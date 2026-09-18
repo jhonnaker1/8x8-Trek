@@ -329,8 +329,33 @@ void wait_vsync(void)
 
 /* ------------------------------------------------------------------ mode */
 
+/* .bss LIVES AT $0400 AND THE C RUNTIME DOES NOT KNOW. The overlay split moved
+ * every .bss object into the low region to buy back space in $2000-$9FFF, and
+ * -lzero-bss clears c.ld's own .bss -- which is now EMPTY. So nothing zeroes
+ * the real one, and what is actually there is FoenixMCP's leftovers: the
+ * launched program's own filename sits at $0400.
+ *
+ * FOUND BY A TEST, NOT BY READING. The keyboard suite came back with all nine
+ * keys wrong and the values spelled "keytest" -- it was reading pexec's copy
+ * of the filename out of an array nobody had cleared. The linker script's
+ * comment already said this function had to do the zeroing; the function did
+ * not do it.
+ *
+ * FIRST, BEFORE ANYTHING ELSE IN vdc_init, and vdc_init is the first thing
+ * main() calls -- checked in c128/src/main.c, not assumed. */
+extern char __low_bss_start[], __low_bss_end[];
+
+static void zero_low_bss(void)
+{
+    unsigned char *p = (unsigned char *)__low_bss_start;
+    unsigned char *e = (unsigned char *)__low_bss_end;
+    while (p < e) *p++ = 0;
+}
+
 void vdc_init(void)
 {
+    zero_low_bss();
+
     __asm__ volatile ("sei");
     F256_IO = F256_IO_REGS;
     VKY_MCR_L = MCR_TEXT;                    /* text only, no graphics layers */
