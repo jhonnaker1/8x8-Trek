@@ -30,6 +30,7 @@
 #include "../../c128/src/vdc.h"
 #include "f256vid.h"
 #include "f256kern.h"
+#include "f256evt.h"
 
 /* ---------------------------------------------------------------- colour */
 

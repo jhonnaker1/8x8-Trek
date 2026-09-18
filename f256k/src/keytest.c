@@ -21,7 +21,7 @@ __attribute__((used, retain)) volatile unsigned char got[32];
 __attribute__((used, retain)) volatile unsigned char got_n;
 __attribute__((used, retain)) volatile unsigned int  entropy_seen;
 
-extern unsigned char f256_other_lost;
+extern unsigned char f256_file_lost;
 __attribute__((used, retain)) volatile unsigned char lost_seen;
 
 /* scr_put takes a RAW SCREEN CODE, not ASCII -- digits are 48..57 as in
@@ -70,6 +70,6 @@ int main(void)
             got_n++;
         }
         entropy_seen = kb_entropy;
-        lost_seen = f256_other_lost;
+        lost_seen = f256_file_lost;
     }
 }

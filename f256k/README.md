@@ -14,7 +14,8 @@ shape of the port.
 | sound: SN76489 PSG | **calibrated at three points**, no driver yet |
 | font: authored box set, screen-code order | **works** -- built at init into font RAM |
 | keyboard: `f256key.c` via the event queue | **works** -- nine keys checked against `input.h`, `make keys` |
-| storage, far memory, overlays | **not started** |
+| storage: `f256stor.c`, all five `plat_` calls | **works** -- ten checks, `make store` |
+| far memory, overlays, sound driver | **not started** |
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 
@@ -100,6 +101,56 @@ claim about a queue nobody has looked in lately.
 And it can fail: with the case fold removed `q` comes back 113 instead of 81,
 and with the arrow mapping removed CRSR UP comes back 16 instead of 1 — two
 breaks, two mismatches, nothing else moved.
+
+## STORAGE IS ASYNCHRONOUS, WHICH NO OTHER PORT HERE HAS TO DEAL WITH
+
+Every other port opens a file and reads it. On the F256 a call only
+**requests** the work; the answer arrives later as an event, on the same queue
+as the keyboard. So each `plat_` function is a request and a wait, and the
+wait keeps pumping keystrokes into the ring — because the alternative is a
+player who loses everything they typed during a load, with nothing anywhere
+reporting it. **uno's vendored `kernel.c` waits with `default: continue;`**,
+which drops exactly those keys.
+
+Three traps, all in the shape of the API rather than any one call:
+
+1. **A read is two steps.** `File.Read` requests, a `file.DATA` event says how
+   many bytes are ready, and `ReadData` then copies them. Stop after the
+   event and the buffer holds whatever it held before — *and the byte count is
+   still correct*, so nothing looks wrong.
+2. **`delivered == 0` means 256, not EOF.** The count is a byte and a full
+   read wraps it. This port sidesteps the ambiguity rather than handling it:
+   reads are chunked at **255**, so a delivered count of 0 cannot arise. The
+   `delivered ? : 256` in the code is belt-and-braces and is **not exercised
+   by the test** — said plainly rather than implied to be verified.
+3. **One queue for everything.** See `f256evt.c`.
+
+And **every wait has a deadline** — two seconds. The reference spins in
+`for(;;)`; on a machine whose ordinary failure is an absent SD card, that is a
+game that hangs with no message.
+
+### The kernel never sends `file.NOT_FOUND`
+
+It is in the event enum and nothing in FoenixMCP emits it — the same as
+`clock.TICK`, and found the same way: by opening a file that is not there and
+reading the event number back. A missing file arrives as `file.ERROR` (`$38`),
+which is also what a broken card would send.
+
+So the line this port draws is between **an answer and no answer**, which is a
+distinction it can actually make. `file.ERROR` on a read-open is
+`STOR_NOTFOUND` — the drive answered, and it said no. Silence until the
+deadline is `STOR_ERROR` — the drive is not there. `storage.h` blesses exactly
+this. The honest caveat is that a genuine I/O error on a file that *does*
+exist comes out as NOTFOUND; `Directory.Read` could tell them apart by
+scanning, and no caller in this game distinguishes the two codes, so that is
+written down rather than done.
+
+`make store` runs ten checks and they can fail. Skipping step two of the read
+leaves **LENGTH IS 600 passing while EVERY BYTE MATCHES fails at byte 0** —
+the pair discriminates. Dropping non-file events the way the reference does
+fails only the keystroke check. A short write over a long file is verified to
+**replace** rather than append, which would otherwise give a save that loads
+and is wrong.
 
 ## THE FRAME TIMER IS A KERNEL CALL, NOT A RASTER READ
 

@@ -41,11 +41,12 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin
 
-.PHONY: all hello frame keys run check clean
+.PHONY: all hello frame keys store run check clean
 all: hello
 hello: build/hello.pgz
 frame: build/frametest.pgz
 keys: build/keytest.pgz
+store: build/storetest.pgz
 
 build:
 	@mkdir -p build build/snap
@@ -54,17 +55,24 @@ build/%.elf: src/%.c f256k.ld Makefile | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ $<
 
 # kb_waitkey through the real input layer and the real driver.
-build/keytest.elf: src/keytest.c src/f256vid.c src/f256key.c \
-                   src/f256vid.h src/f256kern.h f256k.ld Makefile | build
+build/keytest.elf: src/keytest.c src/f256vid.c src/f256key.c src/f256evt.c \
+                   src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
-	    src/keytest.c src/f256vid.c src/f256key.c
+	    src/keytest.c src/f256vid.c src/f256key.c src/f256evt.c
+
+build/storetest.elf: src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c \
+                     src/f256stor.c \
+                     src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c src/f256stor.c
 
 # The console frame through the REAL shared layout.c and the REAL driver. A
 # pattern rule cannot express this one: it is three sources, not one.
-build/frametest.elf: src/frametest.c src/f256vid.c ../c128/src/layout.c \
-                     src/f256vid.h src/f256kern.h f256k.ld Makefile | build
+build/frametest.elf: src/frametest.c src/f256vid.c src/f256evt.c \
+                     ../c128/src/layout.c \
+                     src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
-	    src/frametest.c src/f256vid.c ../c128/src/layout.c
+	    src/frametest.c src/f256vid.c src/f256evt.c ../c128/src/layout.c
 
 build/%.bin: build/%.elf
 	$(OBJCOPY) -O binary $< $@
