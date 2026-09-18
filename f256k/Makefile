@@ -66,6 +66,12 @@ build/storetest.elf: src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c \
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
 	    src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c src/f256stor.c
 
+build/lowprobe.elf: src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c \
+                    src/f256stor.c \
+                    src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c src/f256stor.c
+
 # The console frame through the REAL shared layout.c and the REAL driver. A
 # pattern rule cannot express this one: it is three sources, not one.
 build/frametest.elf: src/frametest.c src/f256vid.c src/f256evt.c \

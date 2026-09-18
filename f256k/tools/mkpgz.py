@@ -19,6 +19,11 @@ ap.add_argument("binary")
 ap.add_argument("out")
 ap.add_argument("--load", required=True, help="load address, e.g. 0x2000")
 ap.add_argument("--exec", required=True, help="entry point, e.g. 0x2000")
+ap.add_argument("--extra", action="append", default=[], metavar="ADDR:FILE",
+                help="an additional segment, e.g. 0x0400:low.bin. A PGZ can "
+                     "carry any number; whether pexec SURVIVES one landing in "
+                     "its own workspace at $0400 is a separate question, which "
+                     "src/lowload.c asks.")
 a = ap.parse_args()
 
 data = open(a.binary, "rb").read()
@@ -32,6 +37,11 @@ def u24(v):
 with open(a.out, "wb") as f:
     f.write(b"Z")
     f.write(u24(load)); f.write(u24(len(data))); f.write(data)
+    for spec in a.extra:
+        addr, path = spec.split(":", 1)
+        blob = open(path, "rb").read()
+        f.write(u24(int(addr, 0))); f.write(u24(len(blob))); f.write(blob)
+        print("  + segment: %d bytes at %s" % (len(blob), addr))
     f.write(u24(entry)); f.write(u24(0))
 
 print("  %s: %d bytes at $%04X, entry $%04X" % (a.out, len(data), load, entry))

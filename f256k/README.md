@@ -145,8 +145,46 @@ upward. After that the disk is touched only for save, restore and the hall of
 fame. A stale `OVERLAYS.BIN` becomes a startup check rather than a bug that
 mimics any other bug — which is what it did on the MEGA65.
 
-Not yet measured: `$0400-$1FFF` is another 7 KB of slot 0 that MCP may leave
-alone, which would be resident address space rather than banked.
+### `$0400-$1FFF` is ours too — 7 KB more, and it is RESIDENT
+
+Worth more than a bank, because it is always mapped. Measured with
+`src/lowprobe.c`, which has **two halves** for a reason: the Plus/4's
+`$0400-$04FF` looked free to an instrument that counted *writes*, and it was
+free of writes — the ROM only ever **read and executed** the routines living
+there. That is instrument #38 on the list: sound, controlled, complete, and
+answering a question I had not asked.
+
+So this probe fills all 7 KB with a position-dependent pattern and then
+**destroys the region and asks the kernel to work anyway** — file write, read
+back, byte-for-byte check, the streaming path, the event queue and the frame
+timer. All five passed, and **zero of 7,168 bytes were written** by the
+kernel.
+
+Both controls fire. Corrupting three bytes after the fill reports exactly
+three. Skipping the fill reports **7,138 of 7,168** — and the bytes at `$0400`
+read `6C 6F 77 70 72 6F 62 65 2E 70 67 7A`, which is **`lowprobe.pgz`**: that
+region is *pexec's own workspace*, holding the name of the file it is loading.
+
+Which made the next question worth asking rather than assuming: a PGZ can
+carry any number of segments, so can one **load straight into the loader's
+variables while the loader is still running?** `src/lowload.c` says yes — a
+7,168-byte segment at `$0400` arrives **intact, all of it**, and pexec
+survives. No copy-down needed. `tools/mkpgz.py --extra` does it.
+
+| | |
+|---|---|
+| `$0400-$1FFF` | 7,168 — resident, loads directly |
+| `$2000-$BFFF` | 40,960 — resident |
+| **addressable at once** | **48,128** |
+| `.text` of the whole shared UI | 58,661 |
+| must be banked | **10,533** |
+
+With one 8 KB slot given over to an overlay window that is 39,936 resident
+against 18,725 banked — **three banks instead of four**, and fewer switches.
+
+Caveat stated rather than buried: this is the FoenixMCP revision in the MAME
+flash image. A different MCP could put its workspace elsewhere, and neither of
+us has the hardware to check.
 
 ## STORAGE IS ASYNCHRONOUS, WHICH NO OTHER PORT HERE HAS TO DEAL WITH
 
