@@ -24,6 +24,8 @@ LDFLAGS = -Wl,--no-check-sections
 LDLIBS  = -linit-stack -lzero-bss -lcopy-zp-data -lcopy-data
 
 MAME    = $(HOME)/ample/Ample.app/Contents/MacOS/mame64
+# The HOST compiler, for the one check that is arithmetic rather than hardware.
+HOSTCC  = cc
 ROMS    = $(HOME)/Library/Application Support/Ample/roms
 # -window and -skip_gameinfo always; -nothrottle is right for a measurement
 # and wrong for anything a person watches.
@@ -462,9 +464,19 @@ early: build/early.elf build/earlyvid.elf build/earlyfull.elf build/earlyfar.elf
 #   gates    the whole suite on real hardware-in-emulation: colours, the boot
 #            chain, files, the proof sheet, sound, the tune, the briefing, and
 #            the six arm-checks that prove those can fail. Minutes.
-verify: build/trek.elf
+verify: build/trek.elf build/test_gsregion
 	python3 ../c128/tools/layout40_check.py
 	python3 tools/verify_gs.py build/trek.elf --window 0xD000 --org 0x0800
+	@./build/test_gsregion
+
+# THE 50Hz BRANCH SHIPS WITHOUT EVER RUNNING ON A MACHINE HERE. MAME has no
+# 50Hz IIgs -- every apple2gs clone is a ROM revision -- so the region
+# classifier's PAL path cannot be reached by any emulator run. It is pure
+# uint16_t arithmetic, so it is tested natively instead, against the header the
+# driver itself includes rather than a copy. Cheap, static, and it belongs in
+# `verify` rather than `gates` because it needs no emulator.
+build/test_gsregion: tools/test_gsregion.c src/gsregion.h | build
+	$(HOSTCC) -O1 -o $@ $<
 
 gates: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail briefing brieffail
 

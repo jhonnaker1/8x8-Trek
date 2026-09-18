@@ -57,6 +57,15 @@
 #define ADDRLO   (*(volatile unsigned char *)0xC03E)
 #define ADDRHI   (*(volatile unsigned char *)0xC03F)
 #define VBL      (*(volatile unsigned char *)0xC019)
+#include "gsregion.h"
+
+#define VERTCNT  (*(volatile unsigned char *)0xC02E)   /* line bits 8..1 */
+#define HORIZCNT (*(volatile unsigned char *)0xC02F)   /* bit 7 = line bit 0 */
+
+/* What detect_region() saw, kept so a check can report the line range rather
+   than just the verdict -- a threshold landing on the wrong side is exactly
+   the failure that would be invisible otherwise. */
+__attribute__((used, retain)) unsigned int gs_vmin, gs_vmax;
 
 #define DOC_FREQLO 0x00
 #define DOC_FREQHI 0x20
@@ -71,11 +80,38 @@
                                      and full scale on two oscillators at once
                                      clips in the mixer */
 #define BEEP_TENS  44             /* 440Hz, the A every other port beeps */
-#define BEEP_FRAMES 15            /* 250ms at 60Hz */
+#define BEEP_FRAMES_NTSC 15       /* 250ms at 60Hz */
+#define BEEP_FRAMES_PAL  13       /* 250ms at 50Hz -- the Amiga does the same */
 
-/* A IIgs IS NTSC OR PAL AND THIS DOES NOT DETECT WHICH. The DOC's clock is
-   not derived from the video standard -- unlike a SID's -- so the PITCH does
-   not move. Only the TEMPO does, and the machine's home market is NTSC. */
+/* NTSC OR 50Hz, DETECTED FROM THE VGC'S LINE COUNTER.
+ *
+ * This said "does not detect which ... the machine's home market is NTSC", and
+ * that is the same sentence the Plus/4 carried until it was measured. The
+ * DOC's clock is not derived from the video standard, so the PITCH does not
+ * move -- but snd_tick_num() converts FRAMES to the original's 18.2065Hz
+ * ticks, and a 50Hz IIgs has 50 of them a second against 60. The music ran
+ * about 17% slow there. A IIgs sold outside NTSC countries can be switched to
+ * 50Hz from the Control Panel, so this is reachable on real hardware.
+ *
+ * THE COUNTER, from the IIgs Hardware Reference:
+ *
+ *     $C02E  vertical video address DIVIDED BY 2   (line bits 8..1)
+ *     $C02F  bit 7 = LSB of the vertical address; bits 6..0 horizontal
+ *
+ * so the line is ($C02E << 1) | ($C02F >> 7), nine bits. NTSC runs $0FA..$1FF
+ * -- 262 lines. At 50Hz there are 312, so it runs $0C8..$1FF.
+ *
+ * THE MAXIMUM IS $1FF IN BOTH: it is the MINIMUM that discriminates, 250
+ * against 200. (On the Plus/4 it was the maximum, which is why this was read
+ * out of the manual rather than assumed from the sibling port.)
+ *
+ * MAME HAS NO 50Hz IIgs -- every apple2gs clone is a ROM revision -- so the
+ * NTSC branch is measured and the 50Hz branch is not. THAT IS WHY EVERY
+ * UNCERTAIN READING FALLS BACK TO NTSC: an undetected 50Hz machine plays 17%
+ * slow, which is what it does today, while a misdetected 60Hz machine would
+ * play 20% fast and that would be a regression for everybody. src/gsvbl.c
+ * measured $00FA/$01FF under MAME, exactly as documented.
+ */
 uint8_t snd_region = REGION_NTSC;
 
 static uint8_t enabled = 1;
@@ -119,9 +155,36 @@ static void voice_note(unsigned char ch, unsigned char tens)
     doc_reg((unsigned char)(DOC_CTL + ch), 0x00);        /* free-run, running */
 }
 
+static unsigned int vgc_line(void)
+{
+    unsigned char v = VERTCNT, h = HORIZCNT;
+    return (unsigned int)(((unsigned int)v << 1) | (h >> 7));
+}
+
+/* Sample the line counter over about a dozen frames and take the extremes.
+   6000 passes saw 24 frames and reached both ends under MAME. */
+static uint8_t detect_region(void)
+{
+    unsigned int i, l, mn = 0xFFFF, mx = 0;
+
+    for (i = 0; i < 6000u; i++) {
+        l = vgc_line();
+        if (l < mn) mn = l;
+        if (l > mx) mx = l;
+    }
+    gs_vmin = mn;
+    gs_vmax = mx;
+
+    /* The decision lives in gsregion.h so tools/test_gsregion.c can exercise
+       the 50Hz branch, which no machine here can produce. */
+    return gs_classify_region((uint16_t)mn, (uint16_t)mx);
+}
+
 void snd_init(void)
 {
     unsigned int i;
+
+    snd_region = detect_region();
 
     /* A 256-byte square at DOC RAM $0000, which both oscillators point at. */
     SOUNDCTL = 0x60 | MASTER_VOL;            /* RAM, auto-increment */
@@ -210,7 +273,8 @@ void snd_beep(void)
     sfx_on = 0;
     voice_note(1, BEEP_TENS);
     last = (unsigned char)(VBL & 0x80);
-    while (frames < BEEP_FRAMES) {
+    while (frames < (snd_region == REGION_PAL ? BEEP_FRAMES_PAL
+                                              : BEEP_FRAMES_NTSC)) {
         v = (unsigned char)(VBL & 0x80);
         if (v && !last) { frames++; guard = 0; }
         else if (++guard == 0) break;

@@ -527,3 +527,44 @@ is the instrument of record rather than the 0.281 collection, whose
 sets `PB`/`PC`, samples the CPU state, and checks a completion byte **before**
 printing any report the probe wrote — because an output array read out of a
 run that never finished is uninitialised memory presented as a finding.
+
+## PAL/NTSC: DETECTED, 2026-09-17
+
+`gssnd.c` used to say *"A IIgs IS NTSC OR PAL AND THIS DOES NOT DETECT WHICH
+... the machine's home market is NTSC"* -- the same sentence the Plus/4 carried
+until it was measured. The DOC's clock is not derived from the video standard
+so the PITCH never moved, but `snd_tick_num()` converts FRAMES to the original's
+18.2065Hz ticks, and a 50Hz IIgs has 50 a second against 60. **The music ran
+about 17% slow there**, and a IIgs sold outside NTSC countries can be switched
+to 50Hz from the Control Panel.
+
+**The VGC's line counter answers it**, from the Hardware Reference:
+
+    $C02E  vertical video address DIVIDED BY 2   (line bits 8..1)
+    $C02F  bit 7 = LSB of the vertical address; bits 6..0 horizontal
+
+NTSC runs `$0FA..$1FF` (262 lines); 50Hz would run `$0C8..$1FF` (312). **The
+maximum is `$1FF` in both -- it is the MINIMUM that discriminates**, 250 against
+200. On the Plus/4 it was the maximum, which is why this came out of the manual
+rather than from the sibling port.
+
+Measured on the machine: `src/gsvbl.c` and then the running game both report
+`vmin $00FA`, `vmax $01FF`, region NTSC.
+
+**MAME HAS NO 50Hz IIgs** -- every `apple2gs` clone is a ROM revision -- so the
+PAL branch ships without ever executing on a machine here. Two things follow:
+
+  * **Every uncertain reading falls back to NTSC.** An undetected 50Hz machine
+    plays 17% slow, which is what this port did before; a misdetected 60Hz
+    machine would play 20% fast and would be a regression for everybody.
+  * **The decision is split from the sampling.** Sampling is hardware and must
+    be measured; classifying what was sampled is arithmetic, so it lives in
+    `src/gsregion.h` and `tools/test_gsregion.c` exercises it over ten cases
+    including both documented ranges and four kinds of dead register. The
+    driver INCLUDES that header rather than copying it, and `make verify` runs
+    the test. `uint16_t` throughout, because `int` is 16 bits under llvm-mos
+    and 32 on the host.
+
+`tools/bootrun.lua` gained `GS_DUMP` on the way: it could boot the disk and
+print sixteen bytes at `$0800` and nothing else, so anything the RUNNING GAME
+computed was unreadable.
