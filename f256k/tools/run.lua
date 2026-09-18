@@ -25,6 +25,16 @@ local function mark()
     return sp:read_u8(marker)
 end
 
+-- "NOT ZERO" IS NOT "STARTED". The marker's address holds whatever the machine
+-- had there before the PGZ loaded, and one run read $04 out of it and called
+-- that a successful launch -- then reported 0 Hz from a program that had never
+-- run. Wait for a value THIS PROJECT WRITES: $11 on entry, $5A on completion.
+local function signed_in()
+    if marker == 0 then return true end
+    local v = mark()
+    return v == 0x11 or v == 0x5A
+end
+
 emu.wait(6)
 
 local tries, started = 0, false
@@ -33,7 +43,7 @@ repeat
     manager.machine.natkeyboard:post("/- " .. name .. "\n")
     for _ = 1, 6 do
         emu.wait(1)
-        if marker == 0 or mark() ~= 0 then started = true break end
+        if signed_in() then started = true break end
     end
 until started or tries >= 3
 
@@ -42,8 +52,10 @@ emu.wait(3)   -- let it get past whatever it does after signing in
 if marker ~= 0 then
     print(string.format("MARKER $%04X = $%02X   (11=started 5A=finished, %d launch attempt%s)",
                         marker, mark(), tries, tries == 1 and "" or "s"))
-    if mark() == 0 then
-        print("LAUNCH FAILED -- three attempts and the program never signed in.")
+    if not signed_in() then
+        print(string.format(
+            "LAUNCH FAILED -- three attempts, marker never reached $11 or $5A (read $%02X).",
+            mark()))
     end
 else
     print(string.format("(no marker symbol; %d launch attempt%s)", tries, tries == 1 and "" or "s"))

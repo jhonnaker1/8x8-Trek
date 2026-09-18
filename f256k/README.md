@@ -9,9 +9,77 @@ shape of the port.
 |---|---|
 | toolchain: llvm-mos → PGZ → pexec | **works**, `make hello` |
 | rig: MAME `f256k`, Lua, SD-card image | **works**, `make run P=hello` / `make check P=hello` |
-| video: text matrix + per-cell colour | **proved by the hello**, no driver yet |
+| video: `f256vid.c` at 80x30, 8x16 | **works** -- the console draws, `make frame` |
+| frame timer: kernel `SetTimer` query | **60.00 Hz measured**, in the driver |
 | sound: SN76489 PSG | **calibrated at three points**, no driver yet |
+| font: authored box set, screen-code order | **works** -- built at init into font RAM |
 | storage, keyboard, far memory, overlays | **not started** |
+
+## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
+
+640x480 at an 8x8 cell is **80x60**, measured with corner markers rather than
+read off a spec. The console is 80x25. Drawn straight, the game would sit in
+the top third of the screen with 280 of 480 pixels black.
+
+`$D001` bit 2 is Tiny Vicky's **DOUBLE_Y**: the character cell becomes 8x16
+and the grid becomes **80x30**. Verified the same way — a frame drawn at
+80x30 touches all four edges. Two things follow, and the second is the point:
+
+* 25 rows of 30 is a two-row margin, not a 35-row hole.
+* **An 8x16 cell is closer to the original than any other port gets.** EGA
+  Trek runs at 640x350 in an 8x14 cell, and every other 8-bit port here draws
+  it at 8x8 and loses the vertical detail. This one keeps it.
+
+`DOUBLE_X` (bit 1, 40 columns) is deliberately left off — the eighty columns
+are why this machine is worth porting to at all.
+
+The two-row offset lives **in the driver**, not in the layout. `panels[]` is
+measured off the original and shared with eleven other ports; this machine
+being five rows taller than the console is `f256vid.c`'s problem and nobody
+else's.
+
+## THE FONT IS RAM, SO THIS PORT AUTHORS ITS GLYPHS
+
+The machine's font is 2K at `$C000` on I/O page 1, and it is **not CP437** —
+`$C0`-`$DF` are dither patterns and symbols, so there is no box-drawing set to
+borrow. The ASCII half is correct, which is what matters: `$41` reads
+`3C 42 42 7E 42 42 42 00` beside a capital A on screen, and that pairing is
+what proves both the page and the read.
+
+So `vdc_init` rebuilds the font in **C64 screen-code order** — the ASCII half
+moved down, the box set drawn on top, the reverse half generated — which
+leaves the shared `layout.h`'s `G_*` constants working unchanged and gets
+reverse video as a rule rather than 128 more glyphs. The box glyphs are this
+project's own artwork, shared with `atari/src/vbxevid.c` and
+`amiga/src/amigagfx.c`, which drew them first for the same reason.
+
+**The order is what makes it need no scratch buffer.** Codes 1..26 are copied
+from ASCII 65..90 — font offsets `$208..$2D7` down to `$08..$D7` — and the box
+set then lands at codes 64..127, `$200..$3FF`, *on top of the letters it was
+just copied from*. Correct, but only because the copy happened first. Three
+passes, none overlapping, no 2K of scratch on a machine that has about forty.
+
+## THE FRAME TIMER IS A KERNEL CALL, NOT A RASTER READ
+
+`SetTimer` at `$FFF0` with the QUERY bit set queues nothing and returns the
+kernel's own frame counter. **60.00 Hz, measured twice** — 300 frames in 5.000
+emulated seconds, once in a probe and again through `wait_vsync` in the built
+driver, because the two are the same eight lines compiled in different
+translation units and this project has an llvm-mos miscompile on record.
+
+Not the raster, for a reason worth writing down: **MAME's f256k returns
+`m_screen->hpos()` — the horizontal dot position — from the scan-line
+registers at `$D01A`/`$D01B`**, and a hard-coded `0` from the column registers
+at `$D018`/`$D019`. The variable is even named `line` in the source. Two
+attempts to pace off it returned -5944 Hz and 5457 Hz; both were sampling
+noise. On real hardware that register is the scan line, so this is a fact
+about the rig rather than the machine — and the kernel call is the better
+answer either way.
+
+Not an event, either. `clock.TICK` is in the kernel's event enum and **nothing
+emits it**. And a frame wait built on events would pull from the one queue
+that also carries every keystroke and every byte of file data. The tick probe
+counts keys alongside frames to prove the query takes none: zero.
 
 ## THE RIG: MAME, AND WHY THERE IS NOTHING BETTER TO AUTOMATE
 

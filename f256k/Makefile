@@ -19,7 +19,11 @@ OBJCOPY  = $(HOME)/llvm-mos/bin/llvm-objcopy
 NM       = $(HOME)/llvm-mos/bin/llvm-nm
 
 CPU      = -mcpu=mos65c02
-CFLAGS   = $(CPU) -Oz -I src -I ../c128/src -I ../core -T f256k.ld
+# TREK_COLOUR_IS_EGA makes EGA_TO_VDC the IDENTITY. It is the right answer for
+# any target with a programmable palette, and this one has two LUTs to load.
+# The Plus/4 shipped for weeks with its colour header never compiled in and the
+# gate passed the whole time, so this define is not a detail.
+CFLAGS   = $(CPU) -Oz -DTREK_COLOUR_IS_EGA -I src -I ../c128/src -I ../core -T f256k.ld
 LDFLAGS  = -Wl,--no-check-sections -linit-stack -lzero-bss -lcopy-data
 
 # THE RIG. MAME's f256k driver boots, Lua scripting works, and a PGZ reaches it
@@ -37,15 +41,23 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin
 
-.PHONY: all hello run check clean
+.PHONY: all hello frame run check clean
 all: hello
 hello: build/hello.pgz
+frame: build/frametest.pgz
 
 build:
 	@mkdir -p build build/snap
 
 build/%.elf: src/%.c f256k.ld Makefile | build
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ $<
+
+# The console frame through the REAL shared layout.c and the REAL driver. A
+# pattern rule cannot express this one: it is three sources, not one.
+build/frametest.elf: src/frametest.c src/f256vid.c ../c128/src/layout.c \
+                     src/f256vid.h src/f256kern.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/frametest.c src/f256vid.c ../c128/src/layout.c
 
 build/%.bin: build/%.elf
 	$(OBJCOPY) -O binary $< $@
