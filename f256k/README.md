@@ -8,10 +8,45 @@ shape of the port.
 | | state |
 |---|---|
 | toolchain: llvm-mos → PGZ → pexec | **works**, `make hello` |
-| rig: MAME `f256k`, Lua, SD-card image | **works**, `make run P=hello` |
+| rig: MAME `f256k`, Lua, SD-card image | **works**, `make run P=hello` / `make check P=hello` |
 | video: text matrix + per-cell colour | **proved by the hello**, no driver yet |
 | sound: SN76489 PSG | **calibrated at three points**, no driver yet |
 | storage, keyboard, far memory, overlays | **not started** |
+
+## THE RIG: MAME, AND WHY THERE IS NOTHING BETTER TO AUTOMATE
+
+Three F256 emulators exist. **MAME's `f256k` driver (dtremblay's fork) is the
+only one this machine can run, and it is also the only one with a scripting
+interface** — so the choice `commodore-uno` made is the choice there is:
+
+| | | |
+|---|---|---|
+| **MAME `f256k`** (dtremblay) | macOS/Linux/Windows | Lua: memory, registers, breakpoints, key injection, snapshots, `-autoboot_script` |
+| **FoenixIDE** (Trinity-11) | **Windows only** — C#/WinForms `.msi` | GUI debugger; nothing to drive from a script |
+| **Foenijs** (wf2) | browser | `?url=&run=` launches a program, but its debugger is for a human at the keyboard |
+
+MAME is not the compromise here — it is the one with the automation. The
+friction was never MAME; it was **getting the PGZ onto the SD image.**
+`commodore-uno`'s recipe (and this port's first one) attached the image as a
+device and asked `diskutil` to mount it: seconds of disk arbitration per run,
+and a leaked device node whenever a run died mid-way. **`mcopy` writes the FAT
+partition in place instead — 7ms, no mounting, no privileges** — and FoenixMCP
+still reads the same filesystem and pexec still loads the same file. The
+partition offset is read out of the MBR rather than assumed, because 2048 is
+right for this image and would be wrong for the next one.
+
+`make check` is the automated half: it boots, types `/- <name>` at the
+SuperBASIC prompt the way a person does, reads the completion marker, takes a
+snapshot and exits. **The marker's address comes from the ELF**, not a
+constant — a stale one reports somebody else's byte as the answer. Whole cycle,
+including the boot: **3.6 seconds.**
+
+The control matters more than the pass. Launching a name pexec cannot find
+reads `$00` where a real run reads `$5A`, so the rig can tell "ran" from
+"never started" — which is the thing a green light is worthless without.
+
+`make run` leaves the machine up at the prompt, throttled, for a person.
+`make check` is the one that passes `-nothrottle`, and it is never for a human.
 
 ## WHY llvm-mos AND NOT cc65, WHICH IS THE PROVEN ROUTE HERE
 

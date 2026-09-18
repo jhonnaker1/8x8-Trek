@@ -37,7 +37,7 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin
 
-.PHONY: all hello run clean
+.PHONY: all hello run check clean
 all: hello
 hello: build/hello.pgz
 
@@ -63,3 +63,11 @@ run: build/$(P).pgz
 
 clean:
 	rm -rf build
+
+# An AUTOMATED run: same disk, same pexec launch, but scripted -- the marker is
+# read out of the machine and a snapshot is taken. `run` is for a person and
+# leaves the machine up; `check` is for me and exits.
+check: build/$(P).pgz
+	@TREK_NAME=$(P) \
+	 TREK_MARKER=$$($(NM) build/$(P).elf | awk '$$3 == "ran" { print $$1 }') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/$(P).pgz $(P) tools/run.lua
