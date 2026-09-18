@@ -64,7 +64,7 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 # Read out of the linker script, not repeated here -- one number, one home.
 OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1/p' plus4.ld)
 
-.PHONY: all verify early frametest data d64 clean
+.PHONY: all verify early frametest data d64 release clean
 all: $(OUT)
 
 $(OUT): $(SRC) plus4.ld Makefile
@@ -168,6 +168,14 @@ $(D64): $(OUT) data ../c128/src/briefing40.txt verify Makefile
 	    c1541 -attach $(D64) -write build/ovl$$o.prg ovl$$o >/dev/null 2>&1; \
 	done
 	@echo "disk: $(D64)"
+
+# THE RELEASE ARTEFACT: a bare .d64 with its notes beside it, the same shape
+# the C128, C64 and Atari ship. The disk is already named egatrek-plus4.d64,
+# so this only has to place the text file -- and it depends on $(D64), so a
+# release can never be cut from a stale disk.
+release: $(D64)
+	@cp README-release.txt build/egatrek-plus4.txt
+	@ls -l build/egatrek-plus4.d64 build/egatrek-plus4.txt
 
 clean:
 	rm -f build/*.prg build/*.map build/*.raw build/*.pdat build/*.d64

@@ -1,6 +1,6 @@
 # How to run each one
 
-Fifteen assets, eleven machines. Every port plays the same game from the same
+Seventeen assets, twelve machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -8,9 +8,9 @@ image, a MEGA65 ROM, a CoCo 3 ROM — it is yours to supply. The one exception i
 the Falcon, where free [EmuTOS](https://emutos.sourceforge.io/) works and is in
 fact what this port was developed against.
 
-**Four assets are bare disk images, and their READMEs ship beside them** as
+**Five assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The six `.zip` assets carry theirs inside as `README.txt`.
+put one. The seven `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -123,6 +123,29 @@ makes that noticeably quicker. Not required.
 
 SAVE writes `EGATREK.SAV` back to this disk and the hall of fame lives on it,
 so **the disk must not be write protected**.
+
+### `egatrek-plus4.d64` — Commodore Plus/4
+
+    xplus4 -autostart egatrek-plus4.d64:trek4
+
+or, on the machine, put the disk in drive 8 and:
+
+    LOAD "TREK4",8
+    RUN
+
+Plain `LOAD`, not `LOAD ...,8,1` — the program carries its own BASIC line and
+is started with `RUN`, so it wants the ordinary BASIC load.
+
+**Any Plus/4, 50Hz or 60Hz.** The port reads TED's raster counter — 312 lines
+against 262 — and sets the music's tempo to match. **A Commodore 16 will not
+run it**: the game needs the Plus/4's full 64K.
+
+The console is in two halves exactly as on the C64 above — press `C` at the
+`CMD:` prompt for the chart page, any key to come back.
+
+**Quitting resets the machine.** The game runs with RAM mapped over both ROMs,
+so there is no BASIC underneath to return to; `Q` hands the machine back by
+rebooting it, and says so first.
 
 ### `egatrek-mega65.d81` — MEGA65
 

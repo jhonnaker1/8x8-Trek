@@ -98,7 +98,7 @@ tiers:
 running-section:
 	@sed '1s/^# /## /' RUNNING.md
 
-RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64 st coco3gime iigs
+RELEASE_PORTS = c128 x16 mega65 atari amiga falcon coco3 c64 st coco3gime iigs plus4
 
 release:
 	@python3 tools/open_list.py

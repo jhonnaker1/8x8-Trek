@@ -7,22 +7,23 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: eleven ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: twelve ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
 > the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
-> **Atari ST/STE**, the **stock CoCo 3** and the **Apple IIgs** are feature
-> complete and released as [v0.19.1](../../releases/latest), 2026-09-16.
-> The **Apple IIgs** is the new one, and it was **ruled out twice before it was
-> tried** — once on colour and once on width. Super Hi-Res 320×200 is exactly
-> 40×25 cells of 8×8, its palette holds **EGA's own sixteen** so brown is brown
-> rather than the olive a C128 renders, and the Ensoniq 5503 gives music and
-> effects a voice each. **There is no ProDOS on its disk**: block 0 is the
-> port's own loader, reading through the drive's firmware, so the disk is ours
-> to give away — the same argument the Atari port's boot record rests on. See
-> [`iigs/README.md`](iigs/README.md).
+> **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs** and the
+> **Commodore Plus/4** are feature complete and released as
+> [v0.20.0](../../releases/latest), 2026-09-17.
+> The **Plus/4** is the new one, and it is the only port here that was **parked
+> twice before it booted**. The difficulty is invisible in a specification
+> sheet: on a C64 a program can page out BASIC and still call the KERNAL, but
+> `$FF3F` on a Plus/4 removes **both** ROMs at once, so with the game's memory
+> in place there is no KERNAL to call and every system call needs a shim that
+> maps the ROM back for the length of it. **Ask of any candidate what its ROM
+> switch takes away.** TED's two tone generators give music and effects a voice
+> each. See [`plus4/README.md`](plus4/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All eleven have been played by a person**, and that is where the faults
+> **All twelve have been played by a person**, and that is where the faults
 > have come from: the CoCo 3's sitting found a console repaint taking **12
 > seconds** that no benchmark here had ever timed, because the benchmark
 > measured the blit and the blit was a third of the cost. The C64's sitting

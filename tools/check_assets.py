@@ -77,10 +77,30 @@ def main():
         print("check_assets: RUNNING.md says %r machines; RELEASE_PORTS has %d"
               % (said_m, len(ps)))
         ok = False
+    # THE SECOND SENTENCE COUNTS THEM AGAIN AND NOTHING CHECKED IT. Adding the
+    # Plus/4 left "Four assets are bare disk images ... The six .zip assets"
+    # stale while the opening line -- the only one this tool read -- was
+    # correct and green. A count that a check does not reach drifts exactly
+    # like one no tool ever touched; the shape is the target, not the sentence.
+    n_bare, n_zip = len(bare), len(ps) - len(bare)
+    m2 = re.search(r"^\*\*(\w+) assets are bare disk images", text, re.M)
+    m3 = re.search(r"The (\w+) `\.zip` assets carry theirs inside", text)
+    for got, want, what in ((m2, n_bare, "bare disk images"),
+                            (m3, n_zip, "`.zip` assets")):
+        if not got:
+            print("check_assets: RUNNING.md no longer states how many %s there "
+                  "are -- that sentence is part of the count" % what)
+            ok = False
+        elif got.group(1).lower() != WORDS.get(want, str(want)):
+            print("check_assets: RUNNING.md says %r %s; there are %d (%s)"
+                  % (got.group(1), what, want, WORDS.get(want, str(want))))
+            ok = False
+
     if not ok:
         return 1
     print("check_assets: RUNNING.md says %s assets, %s machines -- %d artefacts "
-          "+ %d .txt, and RELEASE_PORTS agrees" % (said_a, said_m, len(ps), len(bare)))
+          "+ %d .txt (%d bare, %d zip), and RELEASE_PORTS agrees"
+          % (said_a, said_m, len(ps), len(bare), n_bare, n_zip))
     return 0
 
 
