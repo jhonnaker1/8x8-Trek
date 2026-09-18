@@ -86,6 +86,14 @@ MEMORY {
     ovlimg8  (rw) : ORIGIN = 0x110000, LENGTH = 0x2000
     ovlimg9  (rw) : ORIGIN = 0x112000, LENGTH = 0x2000
     ovlimg10 (rw) : ORIGIN = 0x114000, LENGTH = 0x2000
+    /* THE TWO OPT-IN OVERLAYS, and this port is the one that can afford them.
+       core/overlay.h enables them per target because they page code on the
+       HOT PATH -- the enemy turn runs on essentially every command and the
+       move command is the most common one a player types. That is ruinous
+       when a swap is a 1541 read and merely costs milliseconds through the
+       Atari's MEMAC window. Here a swap is ONE STORE to an MMU slot. */
+    ovlimg11 (rw) : ORIGIN = 0x116000, LENGTH = 0x2000
+    ovlimg12 (rw) : ORIGIN = 0x118000, LENGTH = 0x2000
 }
 
 __rc0 = __basic_zp_start;
@@ -165,6 +173,8 @@ SECTIONS {
     .ovl_title  ORIGIN(window) : { *(.ovl.title)  } >window AT>ovlimg8
     .ovl_events ORIGIN(window) : { *(.ovl.events) } >window AT>ovlimg9
     .ovl_xtra   ORIGIN(window) : { *(.ovl.xtra)   } >window AT>ovlimg10
+    .ovl_enemy  ORIGIN(window) : { *(.ovl.enemy)  } >window AT>ovlimg11
+    .ovl_move   ORIGIN(window) : { *(.ovl.move)   } >window AT>ovlimg12
 
     /* THE SOFT STACK USED TO BE HERE, IN ram. It moved to the low region when
        $0400-$1FFF was measured -- see .lowstack above. Leaving both in place

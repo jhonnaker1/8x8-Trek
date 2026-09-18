@@ -16,7 +16,8 @@ shape of the port.
 | keyboard: `f256key.c` via the event queue | **works** -- nine keys checked against `input.h`, `make keys` |
 | storage: `f256stor.c`, all five `plat_` calls | **works** -- ten checks, `make store` |
 | overlays: 11 images, 11 RAM banks | **works** -- `make check-ovl`, swap is one store |
-| far memory, sound driver | **not started** |
+| far memory: `f256far.c`, RAM banks | **works** -- nine checks, `make check-far` |
+| sound driver | **not started** |
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 
@@ -112,27 +113,38 @@ the MMU slot they map to, so `ovl_load` is a single store and nothing moves.**
 
 The budget, measured:
 
+The budget with the real overlay loader **and** far memory linked in, and only
+the sound driver still stubbed:
+
 | | |
 |---|---|
-| `.text` resident, `$2000-$9FFF` | 31,633 of 32,768 — **1,129 spare** |
-| `.rodata` + `.bss` + soft stack, `$0400-$1FFF` | 4,039 used, 3,129 left to the stack |
+| `.text` resident, `$2000-$9FFF` | 28,577 of 32,768 — **4,184 spare** |
+| `.rodata` + `.bss` + soft stack, `$0400-$1FFF` | 4,569 used, 2,599 left to the stack |
 | the window, `$A000-$BFFF` | 8,192 |
-| eleven overlay images | 30,300 total, **largest 3,765** — 4,427 spare in the window |
+| **thirteen** overlay images | 35,880 total, **largest 3,929** — 4,263 spare in the window |
 
-The 1,129 is tight with sound and far memory still to come. The lever is the
-**window slack**: at 4,427 bytes under the largest image, moving more resident
-code into an existing overlay costs nothing. And `core/overlay.h`'s rules of
-thumb — *"the test is FREQUENCY, not size"*, *"fire_one_torpedo must NOT move
-because firing is the most frequent action"* — are all about the cost of a
-**disk load**. The Atari's note already records that a cheaper swap changes
-which splits are affordable rather than which are correct. A slot store is
-cheaper again. **Rule 4 is unchanged**: cheap swaps do not make it safe for an
-overlay to call another overlay.
+### Thirteen, because this is the port that can afford the opt-in pair
 
-`make check-ovl` loads all eleven forwards, backwards, and interleaved
+With eleven overlays and the real loaders in, resident overflowed by **1,161
+bytes**. `core/overlay.h` already had the answer: `TREK_OVL_ENEMY` and
+`TREK_OVL_MOVE` are opt-in *per port*, because they page code on the **hot
+path** — the enemy turn runs on essentially every command and the move command
+is the most common one a player types. That is ruinous when a swap is a 1541
+read and costs milliseconds through the Atari's MEMAC window.
+
+**Here a swap is one store to an MMU slot.** Every rule of thumb in that
+header — *"the test is FREQUENCY, not size"*, *"fire_one_torpedo must NOT move
+because firing is the most frequent action"* — rests on the cost of a disk
+load, and that cost is gone. Turning both on moved 5,345 bytes out of resident
+and took a 1,161-byte overflow to 4,184 spare.
+
+**Rule 4 is unchanged**: cheap swaps do not make it safe for an overlay to
+call another overlay.
+
+`make check-ovl` loads all thirteen forwards, backwards, and interleaved
 including the same one twice, and checks **by value** — each overlay function
-returns its own number, and all eleven are linked at `$A000`, so a wrong bank
-still returns cleanly with the wrong answer.
+returns its own number, and all thirteen are linked at `$A000`, so a wrong
+bank still returns cleanly with the wrong answer.
 
 ### Three things the controls caught that reading would not have
 
@@ -157,6 +169,38 @@ A stale `OVERLAYS.BIN` is caught by a build stamp — the low sixteen bits of
 `ovl_anchor`'s address in the link the images were cut from. Flipping one byte
 of it stops the game with a message instead of jumping into the middle of
 another function, which is what it did on the MEGA65.
+
+## FAR MEMORY HAS NO SLOT OF ITS OWN, SO IT BORROWS THE OVERLAY'S
+
+All eight MMU slots are spoken for: slot 0 is zero page, the 6502 stack, MCP
+and this port's low region; slots 1-4 are resident code; slot 5 is the overlay
+window; slot 6 is the I/O window the display needs; slot 7 is the kernel.
+There is no ninth slot, so `far_read` borrows slot 5 and puts the live overlay
+back.
+
+**Borrowing it from inside an overlay is safe, and the reason is worth stating
+because it looks unsafe.** `far_read` is *resident* code, so the call leaves
+the window before the window changes; the return address is on the 6502 stack
+in slot 0, which never moves; and nothing executes from `$A000` between the
+borrow and the return. What would *not* be safe is an overlay holding a
+pointer into far memory across the call — which is why `far_read` copies into
+a caller's buffer, exactly as `farmem.h`'s "read in chunks, not bytes" rule
+already demands.
+
+`make check-far` runs nine checks on two tenants and a 10,000-byte file that
+spans two bank boundaries. Three controls, each firing diagnostically:
+
+| break | what happened |
+|---|---|
+| copy `len` bytes without splitting at the bank edge | fails at detail **`$2000`** — the boundary exactly — while the start and end reads still pass |
+| never restore the window after a borrow | the overlay unmaps the code it is executing from and **returns into data**; the last two checks report "(not reached)" |
+| `far_load` returns 0 instead of appending | the second tenant reads the *first* file's bytes — `farmem.h`'s recorded bug, "the music silently overwrote the prose" |
+
+The briefing is **not** in far memory, and that is a choice rather than an
+oversight: it is streamed through `plat_open`/`plat_read` like every other
+port, because that seam already exists and works. Far offsets are `uint16_t`
+by contract, so the whole store caps at 64K — eight of the forty-five banks
+this port has spare.
 
 ## 448 KB OF FREE RAM, AND WHAT IT DOES AND DOES NOT BUY
 

@@ -28,12 +28,13 @@
 #include "../../core/ega.h"
 #include "../../c128/src/vdc.h"
 #include "f256vid.h"
+#include "f256ovl.h"
 
 /* THE WINDOW IS SLOT 5 ($A000-$BFFF) and the images live in banks $08 up.
    $00-$07 are the machine's working set: our address space plus MCP's, and
    bankprobe.c measured which. */
-#define OVL_SLOT   5
-#define OVL_BANK0  8
+#define OVL_SLOT   F256_WIN_SLOT
+#define OVL_BANK0  F256_OVL_BANK0
 #define MMU_CTRL (*(volatile unsigned char *)0x0000)
 #define MMU_SLOT ((volatile unsigned char *)0x0008)
 
@@ -89,6 +90,24 @@ static void map_window(unsigned char bank)
     MMU_SLOT[OVL_SLOT] = bank;
     MMU_CTRL = save;
     __asm__ volatile ("cli");
+}
+
+/* FAR MEMORY BORROWS THIS WINDOW, because there is no slot left to give it --
+   see f256ovl.h. The live overlay is restored on return, and `live` is the
+   only record of which one that is, which is why these two live here beside
+   it rather than in f256far.c. */
+void f256_win_borrow(unsigned char bank)
+{
+    map_window(bank);
+}
+
+void f256_win_return(void)
+{
+    /* OVL_NONE means no overlay has been loaded yet, so there is nothing to
+       put back -- and mapping bank OVL_BANK0 + 0xFF would be a bank that does
+       not exist. Leaving the borrowed bank mapped is correct in that case:
+       the next ovl_load maps what it wants. */
+    if (live != OVL_NONE) map_window((unsigned char)(OVL_BANK0 + live));
 }
 
 /* Read the images off the card into their banks. Called lazily from

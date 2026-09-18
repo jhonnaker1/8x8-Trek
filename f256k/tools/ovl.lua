@@ -7,10 +7,11 @@ if not F.launch("ovltest") then print("LAUNCH FAILED") manager.machine:exit() re
 for _ = 1, 80 do if F.u8(RAN) == 0x5A then break end emu.wait(0.1) end
 emu.wait(2)
 
-local fwd, back, mix = F.read(GOT, 11), F.read(BACK, 11), F.read(MIX, 8)
+local N = tonumber(os.getenv("A_N") or "13")
+local fwd, back, mix = F.read(GOT, N), F.read(BACK, N), F.read(MIX, 8)
 local bad = 0
 print("overlay  forwards  backwards   (each returns its own number)")
-for i = 1, 11 do
+for i = 1, N do
     local want = 0xE0 + i - 1
     local okf, okb = fwd[i] == want, back[i] == want
     if not (okf and okb) then bad = bad + 1 end

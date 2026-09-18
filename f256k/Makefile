@@ -41,13 +41,14 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin build/%.low
 
-.PHONY: all hello frame keys store ovl run check check-ovl clean
+.PHONY: all hello frame keys store ovl far run check check-ovl check-far clean
 all: hello
 hello: build/hello.pgz
 frame: build/frametest.pgz
 keys: build/keytest.pgz
 store: build/storetest.pgz
 ovl: build/ovltest.pgz build/ovltest.ovl
+far: build/fartest.pgz build/fartest.ovl build/fartest.dat build/fartest2.dat
 
 build:
 	@mkdir -p build build/snap
@@ -71,7 +72,13 @@ build/storetest.elf: src/storetest.c src/f256vid.c src/f256key.c src/f256evt.c \
 # section attribute; without it every overlay function is inlined into its
 # resident caller and every image comes out EMPTY -- which mkovl.py refuses by
 # name rather than shipping.
-OVLFLAGS = -DTREK_OVERLAYS
+# THE TWO OPT-IN OVERLAYS ARE ON HERE, and this is the port that can afford
+# them. overlay.h enables them per target because they page code on the HOT
+# PATH; on a 1541 that is ruinous and through the Atari's MEMAC window it
+# costs milliseconds. Here a swap is one store to an MMU slot -- about ten
+# cycles -- so "the test is FREQUENCY, not size" simply does not bind.
+# They are what closed a 1,161-byte resident overflow.
+OVLFLAGS = -DTREK_OVERLAYS -DTREK_OVL_ENEMY -DTREK_OVL_MOVE
 
 build/ovltest.elf: src/ovltest.c src/f256vid.c src/f256key.c src/f256evt.c \
                    src/f256stor.c src/f256ovl.c \
@@ -85,6 +92,17 @@ build/ovltest.elf: src/ovltest.c src/f256vid.c src/f256key.c src/f256evt.c \
 # what makes the stamp meaningful.
 build/%.ovl: build/%.elf
 	@python3 tools/mkovl.py $< $@ --objcopy $(OBJCOPY) --nm $(NM) --window 8192
+
+build/fartest.elf: src/fartest.c src/f256vid.c src/f256key.c src/f256evt.c \
+                   src/f256stor.c src/f256ovl.c src/f256far.c \
+                   src/f256vid.h src/f256kern.h src/f256evt.h src/f256ovl.h \
+                   f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(OVLFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
+	    src/fartest.c src/f256vid.c src/f256key.c src/f256evt.c \
+	    src/f256stor.c src/f256ovl.c src/f256far.c
+
+build/fartest.dat build/fartest2.dat: tools/mkfar.py | build
+	@python3 tools/mkfar.py build/fartest.dat build/fartest2.dat
 
 build/lowprobe.elf: src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c \
                     src/f256stor.c \
@@ -134,8 +152,8 @@ clean:
 # An AUTOMATED run: same disk, same pexec launch, but scripted -- the marker is
 # read out of the machine and a snapshot is taken. `run` is for a person and
 # leaves the machine up; `check` is for me and exits.
-# The overlay swap, end to end: eleven images into eleven RAM banks, then
-# every one loaded forwards, backwards and interleaved, checked BY VALUE.
+# The overlay swap, end to end: thirteen images into thirteen RAM banks,
+# then every one loaded forwards, backwards and interleaved, checked BY VALUE.
 check-ovl: build/ovltest.pgz build/ovltest.ovl
 	@SD_EXTRA="build/ovltest.ovl:OVERLAYS.BIN" \
 	 A_SIG=$$($(NM) build/ovltest.elf | awk '$$3=="trek_sig"{print $$1}') \
@@ -144,7 +162,19 @@ check-ovl: build/ovltest.pgz build/ovltest.ovl
 	 A_BACK=$$($(NM) build/ovltest.elf | awk '$$3=="got_back"{print $$1}') \
 	 A_MIX=$$($(NM) build/ovltest.elf | awk '$$3=="got_mixed"{print $$1}') \
 	 A_PASS=$$($(NM) build/ovltest.elf | awk '$$3=="pass"{print $$1}') \
+	 A_N=13 \
 	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/ovltest.pgz ovltest tools/ovl.lua
+
+# Far memory: two tenants, bank straddles, and a read issued from inside an
+# overlay -- the hazard that comes from having no slot to spare.
+check-far: far
+	@SD_EXTRA="build/fartest.ovl:OVERLAYS.BIN build/fartest.dat:FARTEST.DAT build/fartest2.dat:FARTEST2.DAT" \
+	 A_SIG=$$($(NM) build/fartest.elf | awk '$$3=="trek_sig"{print $$1}') \
+	 A_RAN=$$($(NM) build/fartest.elf | awk '$$3=="ran"{print $$1}') \
+	 A_RES=$$($(NM) build/fartest.elf | awk '$$3=="res"{print $$1}') \
+	 A_DET=$$($(NM) build/fartest.elf | awk '$$3=="detail"{print $$1}') \
+	 A_N=$$($(NM) build/fartest.elf | awk '$$3=="done_n"{print $$1}') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" build/fartest.pgz fartest tools/far.lua
 
 check: build/$(P).pgz
 	@TREK_NAME=$(P) \

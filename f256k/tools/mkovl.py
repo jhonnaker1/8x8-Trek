@@ -2,9 +2,9 @@
 """Cut the overlay images out of the ELF and write OVERLAYS.BIN.
 
 THE IMAGES ARE PACKED AT THEIR TRUE SIZES, not padded to the window. The
-window is 8K here because an MMU slot is 8K, and the eleven images average
-2,754 bytes -- padding every one of them to the slot would make a 90,112-byte
-file where 30,322 will do, and every byte of it is read off an SD card at
+window is 8K here because an MMU slot is 8K, and the thirteen images average
+2,760 bytes -- padding every one of them to the slot would make a 106,496-byte
+file where 35,880 will do, and every byte of it is read off an SD card at
 startup. The per-image length in the header is what makes that safe.
 
 THE STAMP IS NOT OPTIONAL. An overlay is linked WITH the resident half, so
@@ -19,8 +19,11 @@ import argparse, struct, subprocess, sys, tempfile, os
 
 # The order IS the overlay id -- these are indices into the file. Keep them in
 # step with core/overlay.h, which is where the numbers are defined.
+# THE ORDER IS THE OVERLAY ID -- these are indices into the file. The last two
+# are the opt-in pair, and overlay.h is explicit that ids stay contiguous
+# whichever combination is on, which is why they go on the END.
 SECTIONS = ["eval", "hof", "front", "info", "repair", "msgs",
-            "planet", "cmds", "title", "events", "xtra"]
+            "planet", "cmds", "title", "events", "xtra", "enemy", "move"]
 
 ap = argparse.ArgumentParser()
 ap.add_argument("elf")

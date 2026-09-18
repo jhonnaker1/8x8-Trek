@@ -22,8 +22,8 @@
 
 TREK_SIGNATURE;
 __attribute__((used, retain)) volatile unsigned char ran;
-__attribute__((used, retain)) volatile unsigned char got[11];
-__attribute__((used, retain)) volatile unsigned char got_back[11];
+__attribute__((used, retain)) volatile unsigned char got[OVL_COUNT];
+__attribute__((used, retain)) volatile unsigned char got_back[OVL_COUNT];
 __attribute__((used, retain)) volatile unsigned char got_mixed[8];
 __attribute__((used, retain)) volatile unsigned char pass;
 
@@ -58,6 +58,11 @@ OVLFN("cmds",   t_cmds,   0xE7)
 OVLFN("title",  t_title,  0xE8)
 OVLFN("events", t_events, 0xE9)
 OVLFN("xtra",   t_xtra,   0xEA)
+/* The opt-in pair. They are OVL_BASE_COUNT and OVL_BASE_COUNT+1, which is
+   only true while the Makefile defines both -- overlay.h keeps the ids
+   contiguous by making each one's presence shift the next. */
+OVLFN("enemy",  t_enemy,  0xEB)
+OVLFN("move",   t_move,   0xEC)
 
 /* Resident, and the ONLY place that pairs a load with a call -- overlay.h's
    rule 3. Written as a switch rather than a table of pointers because a
@@ -76,7 +81,9 @@ static unsigned char call_ovl(unsigned char n)
         case OVL_CMDS:   return t_cmds();
         case OVL_TITLE:  return t_title();
         case OVL_EVENTS: return t_events();
-        default:         return t_xtra();
+        case OVL_XTRA:   return t_xtra();
+        case OVL_ENEMY:  return t_enemy();
+        default:         return t_move();
     }
 }
 
@@ -104,11 +111,11 @@ int main(void)
     ran = 0x11;
     vdc_init();
     kb_init();
-    scr_puts(2, 1, "F256K OVERLAY TEST -- ELEVEN BANKS, ONE SLOT", EGA_YELLOW);
+    scr_puts(2, 1, "F256K OVERLAY TEST -- THIRTEEN BANKS, ONE SLOT", EGA_YELLOW);
     ran = 0x5A;
 
     /* Forwards. */
-    for (n = 0; n < 11; n++) {
+    for (n = 0; n < OVL_COUNT; n++) {
         got[n] = fetch(n);
         if (got[n] != (unsigned char)(0xE0 + n)) ok = 0;
         scr_put((unsigned char)(2 + n * 3), 3, hexdig((unsigned char)(got[n] >> 4)), EGA_LTGRAY);
@@ -116,7 +123,7 @@ int main(void)
     }
 
     /* Backwards, because a loader that caches `live` wrongly passes one pass. */
-    for (n = 11; n-- > 0; ) {
+    for (n = OVL_COUNT; n-- > 0; ) {
         got_back[n] = fetch(n);
         if (got_back[n] != (unsigned char)(0xE0 + n)) ok = 0;
     }
@@ -137,7 +144,7 @@ int main(void)
         got_mixed[6] != 0xEA || got_mixed[7] != 0xE8) ok = 0;
 
     pass = ok;
-    scr_puts(2, 6, ok ? "ALL ELEVEN SWAPPED CORRECTLY" : "MISMATCH -- SEE THE HOST",
+    scr_puts(2, 6, ok ? "ALL THIRTEEN SWAPPED CORRECTLY" : "MISMATCH -- SEE THE HOST",
              ok ? EGA_LTGREEN : EGA_LTRED);
     for (;;) { f256_pump(); }
 }
