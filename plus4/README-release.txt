@@ -89,9 +89,9 @@ measured -- its rules read out of the binary and its screens photographed --
 and then reimplemented. The prose, the music and the briefing are this port's
 own work.
 
-The Plus/4 is the twelfth machine this port runs on and much the hardest of
-the 8-bit ones to reach, for a reason that is invisible in a specification
-sheet. On a Commodore 64 a program can page out BASIC and still call the
+The Plus/4 is the twelfth machine this port runs on, and the only one that was
+set aside twice before it booted -- for a reason that is invisible in a
+specification sheet. On a Commodore 64 a program can page out BASIC and still call the
 KERNAL; here the switch is all or nothing, so with the game's own memory in
 place there is no KERNAL to call and every system call has to be wrapped in
 code that maps the ROM back for the length of it. TED's two tone generators

@@ -76,9 +76,9 @@ measured -- its rules read out of the binary and its screens photographed --
 and then reimplemented. The prose, the music and the briefing are this port's
 own work.
 
-The Commodore 64 is the eighth machine this port runs on, and the cheapest of
-them to reach: its screen driver was written for the Commodore 128's
-forty-column mode and runs here unchanged, because a VIC-IIe in forty columns
-and a VIC-II are the same chip. It is also, unexpectedly, the roomiest of the
-8-bit ports -- BASIC's ROM is switched out to give the program its memory, and
-the words you are reading on screen live in the RAM underneath the KERNAL.
+The Commodore 64 is the eighth machine this port runs on, and it took the
+least new code of any of them: its screen driver was written for the Commodore
+128's forty-column mode and runs here unchanged, because a VIC-IIe in forty
+columns and a VIC-II are the same chip. It is also roomier than you would
+expect -- BASIC's ROM is switched out to give the program its memory, and the
+words you are reading on screen live in the RAM underneath the KERNAL.

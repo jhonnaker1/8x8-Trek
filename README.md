@@ -157,7 +157,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all eight released ports. EGA
+**Colour per message is built** (2026-09-10) and ships on all twelve released ports. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -357,7 +357,7 @@ exist.
 |---|---|--:|---|
 | **Plus/4** | TED text, 40×25 | **25** | NOTES item 57's 40×25 family |
 | **MSX2** | **V9938 SCREEN 7 bitmap, 512×212, 6×8 cells → 80×25** | **25** | **the CoCo 3 card port already does exactly this** on the sibling V9958: `coco3vid.c` — *"512 and 8-pixel rows give 26; the console takes 80×25"*, `MARGIN_Y 6` centring 200 lines in 212 |
-| **Foenix F256K** | Vicky text | **UNKNOWN** | **nothing in this repository records it, and there is no emulator or ROM here to ask.** Check before costing it |
+| **Foenix F256K** | MMU far memory. **Its "cc65 rather than llvm-mos" is the same loose phrase the Plus/4 disproved** — llvm-mos has no *platform* for either, and a hand-written link script plus `mos-*-clang` proved to be enough. Cost probably overstated; ask instead **what its MMU takes away** | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | VIC-II text, 40×25 | **25** | a real VIC-II |
 | **Apple IIgs** | SHR 320×200, 8×8 cells | **25** | 200 ÷ 8 |
 
@@ -369,13 +369,13 @@ V9938's sibling chip, and that yields 80×25 with six-pixel cells. The V9958
 driver is the thing that transfers; the text mode was never the plan.
 **MSX2 comes out of this stronger, not weaker.**
 
-**Still live, cheapest first** — three unattempted, one parked, and the two
-struck through are shipped:
+**Still live, cheapest first** — three unattempted; every struck-through row
+is a shipped port.
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
 | ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
-| **Commodore Plus/4** | **PARKED — and this row was wrong.** Video and sound are written and measured; the link script was the easy part. **`$FF3F` removes BOTH ROMs**, where the C64's `$01` leaves the KERNAL mapped — so every KERNAL call needs a banking shim, the 6502's vectors vanish with the ROM, and masking interrupts costs `GETIN`. A fourth seam, bigger than the other three. See [`plus4/README.md`](plus4/README.md) | `layout40.c`, `ui.c`, `strpool.c`, `core/`, and the C64's `storage.c`/`overlay.c` — which did link unchanged |
+| ~~**Commodore Plus/4**~~ | **Released** — [v0.20.0](../../releases/latest), and **this row's costing was wrong**. Video and sound were written and measured in a day; the link script was the easy part. What it never costed is the banking: **`$FF3F` removes BOTH ROMs**, where the C64's `$01` leaves the KERNAL mapped — so every KERNAL call needs a shim, the 6502's vectors vanish with the ROM, and masking interrupts costs `GETIN`. **A fourth seam, bigger than the other three.** See [`plus4/README.md`](plus4/README.md) | `layout40.c`, `ui.c`, `strpool.c`, `core/`, and the C64's `storage.c`/`overlay.c` — which did link unchanged |
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |

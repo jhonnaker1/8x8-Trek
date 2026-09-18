@@ -73,6 +73,6 @@ and then reimplemented. The prose, the music and the briefing are this port's
 own work, and so are the seventeen box-drawing and badge glyphs. The letters
 and digits come from your machine's own ROM font, so no font is shipped.
 
-The ST is the ninth machine this port runs on and the cheapest of them to
-reach: every seam except the video driver was already written for the Atari
-Falcon, and `vc +tos` builds for both.
+The ST is the ninth machine this port runs on and cost exactly one new file:
+every seam except the video driver was already written for the Atari Falcon,
+and `vc +tos` builds for both.

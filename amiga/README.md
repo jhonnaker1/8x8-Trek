@@ -9,7 +9,7 @@ fame, the endgame, play-again, and a clean exit back to the shell.
     # then, at the Amiga shell:
     work:egatrek
 
-## Why this target is the cheapest left
+## Why this target was the cheapest on the list when it was picked
 
 **No overlays, no far memory, no banking.** `core/farmem.h` has said "Amiga —
 no banking needed, a plain array" since the seam was designed, and this machine
