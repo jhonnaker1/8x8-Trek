@@ -1,6 +1,6 @@
 # How to run each one
 
-Seventeen assets, twelve machines. Every port plays the same game from the same
+Eighteen assets, thirteen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Five assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The seven `.zip` assets carry theirs inside as `README.txt`.
+put one. The eight `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -388,6 +388,44 @@ rules are dotted. The badge is a filled rectangle rather than a rounded disc.
 Sound is ONE voice — the CoCo has a DAC, not a sound chip, so an effect
 interrupts the music exactly as the original's PC speaker did. And the string
 pool lives on the diskette, so the drive works while the console draws.
+
+---
+
+### `egatrek-f256k.zip` — Foenix F256K
+
+**An F256K and an SD card. Nothing else** — no SID chips, no expansion. Unzip
+and copy all six files to the **root** of the card, then at the SuperBASIC
+prompt:
+
+    /- egatrek
+
+(`/-` hands off to pexec, which loads and runs `EGATREK.PGZ`.)
+
+`OVERLAYS.BIN` **is not optional and must be the one that came with this
+`EGATREK.PGZ`** — the two are cut from a single build and the game checks a
+stamp in the file. Mixing them stops the game with a message rather than
+running something that would be very hard to explain.
+
+Under **MAME**, with a `f256k` driver and an SD-card image:
+
+    mame f256k -window -harddisk sdcard.img
+
+**640×480 in 8×16 character cells, which is 80×30 — and the console is 80×25**,
+so it fills the screen with a two-row margin. The original ran at 640×350 in an
+8×14 cell, so **this is the closest any of these ports gets to its
+proportions**; every other 8-bit port draws it at 8×8. The palette holds EGA's
+own sixteen colours, brown included.
+
+Sound is the **SN76489 PSG**, two of its three tone channels — music on one and
+effects on the other. The PSGs are inside the machine's FPGA, so this works on
+every F256K; the SID sockets are not used.
+
+**The music keeps playing while the card is read.** On the other 8-bit ports a
+load stops the tune and the last note drones until it finishes; this machine's
+storage is asynchronous, so the game advances the music while it waits.
+
+**This keyboard has no ESC key.** It is a C64 layout: RUN/STOP is what the game
+means by escape, and DEL is backspace.
 
 ---
 

@@ -64,10 +64,16 @@ damaged ship that keeps getting worse if you do not fix it.
 Messages are coloured by the department that speaks them, as the original's
 are.
 
-The MAIN VIEWER shows one page. The original cycles ten; the other nine are
-deferred on every port. Room is not what stops them: what SELECTS the other
-nine was never measured. Orbit selects the one you see, and that is the only
-selector any of these ports knows.
+The MAIN VIEWER shows one page. The original has TEN and picks one AT RANDOM,
+re-rolling every few seconds while it waits for you to type and alternating
+each draw with a view from outside the ship; a player forces a page by typing
+its number. This port draws the orbit page while orbiting and the nearest
+enemy otherwise.
+
+That is a future feature rather than an unknown -- the mechanism was read out
+of the original binary in September 2026. What stops the ten pages is the
+viewer panel's width: two of them are wider than it, and the panel's size is
+shared by every port.
 
 One colour is inexact. The VDC's palette is fixed, and its dark yellow stands
 in for EGA's brown -- fifteen of the sixteen land exactly.

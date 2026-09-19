@@ -198,6 +198,21 @@ check-game: disk
 	 TREK_SIG=$$($(NM) build/$(GAME).elf | awk '$$3 == "trek_sig" { print $$1 }') \
 	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" $(DISK)/EGATREK.PGZ egatrek tools/run.lua
 
+# THE ARTEFACT IS SIX LOOSE FILES IN A ZIP, not a disk image. Every other port
+# ships something a drive can mount; this machine reads a FAT card, and handing
+# someone a .img would make them write a whole card to play a 76K game. The
+# Falcon and the Amiga ship folders for the same reason.
+REL = build/rel
+release: disk
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-f256k
+	@cp $(DISK)/EGATREK.PGZ $(DISK)/OVERLAYS.BIN $(DISK)/STRINGS.DAT \
+	    $(DISK)/MUSIC.DAT $(DISK)/BRIEF.TXT $(DISK)/TREK.SCR \
+	    $(REL)/egatrek-f256k/
+	@cp README-release.txt $(REL)/egatrek-f256k/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-f256k.zip egatrek-f256k
+	@echo "release: build/egatrek-f256k.zip"
+	@unzip -l build/egatrek-f256k.zip | tail -n +4
+
 verify: build/$(GAME).pgz build/$(GAME).ovl build/strings.dat
 	@python3 tools/verify_f256.py
 

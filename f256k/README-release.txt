@@ -1,5 +1,5 @@
-EGA Trek for the Atari Falcon030
-================================
+EGA Trek for the Foenix F256K
+=============================
 
 A remake of EGA Trek, written by Nels Anderson and released as shareware
 between 1988 and 1992. The original is his; this is a port of it to a
@@ -11,39 +11,33 @@ enjoy that, register it. That was always the deal.
 
 RUNNING IT
 
-A Falcon030 with a COLOUR display -- VGA, RGB or a television -- and about
-150K free.
+An F256K with an SD card. Nothing else -- no SID chips, no expansion.
 
-The game asks the machine which monitor it has (VgetMonitor) and picks a mode
-to suit: 640x480 in sixteen colours on VGA, 640x400 interlaced on RGB and on a
-television. All three have been run under Hatari.
+Copy all six files to the ROOT of the card, then at the SuperBASIC prompt:
 
-A TELEVISION WILL FLICKER. An interlaced 400-line picture is what the console
-needs -- 80 columns by 25 rows of 8x16 characters -- and 640x200, the most a
-TV shows without interlace, cannot hold it. That is a property of the display,
-not something the game can fix.
+    /- egatrek
 
-AN ST MONOCHROME MONITOR IS NOT SUPPORTED. The game says so and returns you to
-the desktop rather than painting a screen you could not read.
+(`/-` hands off to pexec, which loads and runs EGATREK.PGZ.)
 
-Copy the whole folder anywhere and run EGATREK.PRG from the desktop. It sets
-the screen mode at startup and PUTS THE OLD ONE BACK when you quit, so you get
-your desktop returned as you left it.
+SIX FILES, and the game wants all of them in the root directory:
 
-RUN IT FROM ITS OWN FOLDER. The four files are opened by bare name through
-GEMDOS, so they are looked for in the current directory -- double-clicking
-EGATREK.PRG from the folder it lives in is what you want. (The Amiga port
-finds its files through PROGDIR: and does not care; this one does.)
-
-FOUR FILES, and the game reads them at startup:
-
-    EGATREK.PRG    the program
+    EGATREK.PGZ    the program
+    OVERLAYS.BIN   the parts of the program that take turns in memory
     STRINGS.DAT    every word on screen
     MUSIC.DAT      the music
-    BRIEF.TXT      the twelve-page briefing, streamed a page at a time
+    BRIEF.TXT      the twelve-page briefing
+    TREK.SCR       the hall of fame, and it ships EMPTY
+
+OVERLAYS.BIN IS NOT OPTIONAL and must be the one that came with this
+EGATREK.PGZ. The two are cut from a single build and the game checks a stamp
+in the file; mixing them stops the game with a message rather than running
+something that would be very hard to explain.
 
 A missing STRINGS.DAT plays with blank labels rather than refusing to start,
 and a missing MUSIC.DAT plays silently.
+
+The game reads the card ONCE, at startup, and then only to save. Everything
+it needs is in RAM after that.
 
 
 PLAYING IT
@@ -53,11 +47,14 @@ game. Type HELP at the command line for the order list.
 
 Commands are typed at CMD: in the COMMAND panel and are not case sensitive.
 The setup prompts are line editors -- type the answer and press RETURN. The
-arrow keys raise and lower shields, which is what the original's own help
+cursor keys raise and lower shields, which is what the original's own help
 screen lists first.
 
-SAVE writes EGATREK.SAV into the same folder and the setup screen offers to
-restore it. The hall of fame is TREK.SCR and is created on first use.
+THIS KEYBOARD HAS NO ESC KEY. It is a C64 layout, so RUN/STOP is what the
+game means by escape, and DEL is backspace.
+
+SAVE writes EGATREK.SAV to the card and the setup screen offers to restore it.
+The hall of fame is TREK.SCR and is updated as people finish games.
 
 
 WHAT IS IN IT
@@ -72,6 +69,18 @@ damaged ship that keeps getting worse if you do not fix it.
 Messages are coloured by the department that speaks them, as the original's
 are.
 
+THE TEXT IS TALLER HERE THAN ON ANY OTHER 8-BIT PORT. The console is 80
+columns by 25 rows, and this machine draws it in 8x16 character cells where
+the others use 8x8. The original ran at 640x350 in an 8x14 cell, so this is
+the closest any of these ports gets to its proportions.
+
+The sixteen colours are EGA's own, loaded into Vicky's palette, so every
+colour is exact -- including the brown that fixed-palette machines render as
+olive.
+
+The box-drawing and badge glyphs are this port's own artwork, built into the
+machine's font memory at startup.
+
 The MAIN VIEWER shows one page. The original has TEN and picks one AT RANDOM,
 re-rolling every few seconds while it waits for you to type and alternating
 each draw with a view from outside the ship; a player forces a page by typing
@@ -83,12 +92,15 @@ of the original binary in September 2026. What stops the ten pages is the
 viewer panel's width: two of them are wider than it, and the panel's size is
 shared by every port.
 
-Sound is the YM2149 on two channels -- a square wave, because the original is
-one square wave out of a PC speaker. Music on one channel and effects on the
-other, so a laser does not cut the music off.
+Sound is the SN76489 PSG, two of its three tone channels: music on one and
+effects on the other, so a laser does not cut the music off. The PSGs are
+inside the machine's FPGA, so this works on every F256K -- the SID sockets are
+not used and do not need to be filled.
 
-The text is the machine's own 8x16 system font, read out of ROM at startup.
-The seventeen box-drawing and badge glyphs are this port's own artwork.
+AND THE MUSIC KEEPS PLAYING WHILE THE CARD IS READ. On the other 8-bit ports
+a load stops the tune dead and the last note drones until it finishes. This
+machine's storage is asynchronous, so the game advances the music while it
+waits.
 
 
 THIS IS NOT NELS ANDERSON'S CODE

@@ -7,23 +7,22 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: twelve ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: thirteen ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
 > the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
-> **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs** and the
-> **Commodore Plus/4** are feature complete and released as
-> [v0.20.0](../../releases/latest), 2026-09-17.
-> The **Plus/4** is the new one, and it is the only port here that was **parked
-> twice before it booted**. The difficulty is invisible in a specification
-> sheet: on a C64 a program can page out BASIC and still call the KERNAL, but
-> `$FF3F` on a Plus/4 removes **both** ROMs at once, so with the game's memory
-> in place there is no KERNAL to call and every system call needs a shim that
-> maps the ROM back for the length of it. **Ask of any candidate what its ROM
-> switch takes away.** TED's two tone generators give music and effects a voice
-> each. See [`plus4/README.md`](plus4/README.md).
+> **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs**, the
+> **Commodore Plus/4** and the **Foenix F256K** are feature complete and
+> released as [v0.21.0](../../releases/latest), 2026-09-18.
+> The **F256K** is the new one, and it is the first machine here where **more
+> RAM did not mean fewer overlays**: it has 448K free and the 6502 still sees
+> only 64K, so the code is still banked — but an overlay swap is **one store to
+> an MMU slot** instead of a disk read, and the game touches the card once at
+> startup and then only to save. It is also the closest any 8-bit port gets to
+> the original's proportions: **8×16 character cells** where every other draws
+> 8×8. See [`f256k/README.md`](f256k/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All twelve have been played by a person**, and that is where the faults
+> **All thirteen have been played by a person**, and that is where the faults
 > have come from: the CoCo 3's sitting found a console repaint taking **12
 > seconds** that no benchmark here had ever timed, because the benchmark
 > measured the blit and the blit was a third of the cost. The C64's sitting
@@ -157,7 +156,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all twelve released ports. EGA
+**Colour per message is built** (2026-09-10) and ships on all thirteen released ports. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -357,7 +356,7 @@ exist.
 |---|---|--:|---|
 | **Plus/4** | TED text, 40×25 | **25** | NOTES item 57's 40×25 family |
 | **MSX2** | **V9938 SCREEN 7 bitmap, 512×212, 6×8 cells → 80×25** | **25** | **the CoCo 3 card port already does exactly this** on the sibling V9958: `coco3vid.c` — *"512 and 8-pixel rows give 26; the console takes 80×25"*, `MARGIN_Y 6` centring 200 lines in 212 |
-| **Foenix F256K** | MMU far memory. **Its "cc65 rather than llvm-mos" is the same loose phrase the Plus/4 disproved** — llvm-mos has no *platform* for either, and a hand-written link script plus `mos-*-clang` proved to be enough. Cost probably overstated; ask instead **what its MMU takes away** | SID at `$D400`, so `sid.c` ports verbatim |
+| ~~**Foenix F256K**~~ | **Released** — [v0.21.0](../../releases/latest), and **this row was wrong on every count it made.** "SID at `$D400` so `sid.c` ports verbatim": the SIDs are *sockets* and the port uses the PSG, the only audio every owner has. "cc65 rather than llvm-mos": llvm-mos builds it, as the Plus/4 predicted. "MMU far memory is a cost": the MMU is the port's biggest **asset**. The one thing this row got right is the question it added last — *what does its MMU take away* — and the answer was **a slot**, because all eight are spoken for and far memory has to borrow the overlay window | `layout.c`, `ui.c`, `strpool.c`, `core/` — the whole 80-column half, unchanged |
 | **CBM-II P500** | VIC-II text, 40×25 | **25** | a real VIC-II |
 | **Apple IIgs** | SHR 320×200, 8×8 cells | **25** | 200 ÷ 8 |
 
@@ -377,7 +376,7 @@ is a shipped port.
 | ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
 | ~~**Commodore Plus/4**~~ | **Released** — [v0.20.0](../../releases/latest), and **this row's costing was wrong**. Video and sound were written and measured in a day; the link script was the easy part. What it never costed is the banking: **`$FF3F` removes BOTH ROMs**, where the C64's `$01` leaves the KERNAL mapped — so every KERNAL call needs a shim, the 6502's vectors vanish with the ROM, and masking interrupts costs `GETIN`. **A fourth seam, bigger than the other three.** See [`plus4/README.md`](plus4/README.md) | `layout40.c`, `ui.c`, `strpool.c`, `core/`, and the C64's `storage.c`/`overlay.c` — which did link unchanged |
 | **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
-| **Foenix F256K** | MMU far memory, and cc65 rather than llvm-mos | SID at `$D400`, so `sid.c` ports verbatim |
+| ~~**Foenix F256K**~~ | **Released** — [v0.21.0](../../releases/latest). See the row above for how wrong this costing was | `layout.c`, `ui.c`, `strpool.c`, `core/` |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
 | ~~**Apple IIgs**~~ | **Released** — [v0.19.0](../../releases/latest), and played the day it was finished. The estimate said a hand-built linker config, an Ensoniq driver, ProDOS storage and cross-bank writes. Four of those were right; **ProDOS was not done at all** — the disk carries its own boot block, its own directory and its own reader over the drive firmware, so nothing on it is Apple's. See [`iigs/README.md`](iigs/README.md) | |
 
@@ -454,10 +453,14 @@ so the CoCo 3's bitmap-with-a-software-font driver is the model rather than a
 rewrite. Z80 and SDCC, and a 64K window over paged RAM means overlays and far
 memory both need doing.
 
-**F256K — three seams.** SID at `$D400`, so `sid.c` ports verbatim, and Vicky's
-per-cell colour text is close to `vic.c`. The costs are the MMU for far memory
-and cc65 instead of llvm-mos — and whether the game fits under cc65 at all is
-genuinely unknown rather than merely tight.
+**F256K — built, and this paragraph was wrong three ways.** It is llvm-mos, not
+cc65; it is the **PSG**, not the SID, because the SIDs are sockets and the PSGs
+are in the FPGA; and the MMU is not a cost but the thing that makes the port
+better than its siblings — an overlay swap is one store. What it did not
+anticipate at all is that **the screen is bigger than the game** (80×60 against
+an 80×25 console) and that fixing it with `DOUBLE_Y` gives an **8×16 cell**,
+closer to the original's 8×14 than any other 8-bit port. See
+[`f256k/README.md`](f256k/README.md).
 
 **CBM-II P500 — one seam, done badly.** A real VIC-II and a real SID, in a bank
 plain pointers cannot reach, so **every screen write goes through a banked
@@ -656,7 +659,7 @@ Message prose in the original is copyrightable, and the shareware notice says
 so itself: it licenses redistribution of the complete unmodified package and
 then ends *"The author retains all other rights to the program."* So the
 extracted string catalogue is used here as a checklist of *which situations
-need a message*, never as text to copy, and the screen captures of the twelve
+need a message*, never as text to copy, and the screen captures of the thirteen
 briefing pages were used as a specification of what each page covers. Every
 word this port puts on screen is its own. The mechanics are a different matter
 and are used freely -- they are facts about a program, and reading them out of
