@@ -2001,7 +2001,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 and 2026-09-18 (2 open of 71 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 and 2026-09-18 and 2026-09-19 (1 open of 71 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -3952,7 +3952,47 @@ nothing counted it and nothing could close it -- which is one of the five ways
 this list's header has been wrong. Both are ALREADY MEASURED: the archaeology
 is done and what is left is building, which is the opposite of the usual shape.
 
-  70. **THE MAIN VIEWER ROTATES, AND OURS DOES NOT.** Read end to end out of
+  70. ~~**THE MAIN VIEWER ROTATES, AND OURS DOES NOT.**~~ **CLOSED
+      2026-09-19 -- JAMIE'S CALL, NOT BEING IMPLEMENTED.** *"i don't want
+      to implement this feature. close item 70"*, asked and answered after
+      the cost below was measured rather than before it. **The measurement
+      stands and is kept precisely so this is not reopened on a guess:**
+
+        * **TEN PAGE ROUTINES ARE ABOUT 4,000 RESIDENT BYTES**, costed from
+          the panel routines that already exist -- lasers 189, status 345,
+          scan 404, planet_list 521, systems 578, chart 663, and today's
+          whole viewer 875. **That fits on THREE of the thirteen ports.**
+          Measured free space on 2026-09-19: CoCo 3 card 9,046, C64 6,112,
+          MEGA65 4,850 -- then IIgs 3,360, F256K 2,588, Plus/4 2,513,
+          Atari 1,932, CoCo 3 GIME 1,596, **C128 1,459**, and the X16 with
+          75 bytes in its largest overlay. **The reference port cannot hold
+          it**, and every port is a diff against the C128.
+        * **AND THE STRINGS DO NOT FIT WHERE THE CODE DOES.** Titles and
+          labels are pooled, so they cost no resident RAM -- but the C64's
+          far store *"holds 7,902 of 8,186, 284 spare"*. Ten titles plus
+          labels exceed that. **The roomiest 6502 port for CODE is the
+          tightest for TEXT**, and it is one of the three that passed above.
+        * **OVERLAYING THEM TURNS AN IDLE ANIMATION INTO A DISK SEEK EVERY
+          5.9 SECONDS.** `ui_draw_viewer` is resident by necessity -- the
+          command loop calls it every turn and an overlay function cannot
+          `ovl_load` itself -- so on most ports a viewer overlay would evict
+          the COMMAND overlay and cost two loads a turn, and the re-roll
+          fires while the player sits still. The music would stutter through
+          every one: the Plus/4 and [[coco3gime-port]] both grew `snd_hush` for
+          exactly that. Only the F256K escapes it -- a swap there is one MMU
+          store -- and it is one of the ports with no room to be resident.
+
+      **The two halves had OPPOSITE cost profiles and the item never said
+      so.** The ROTATION alone -- alternation, the 5.9s re-roll, Random(10),
+      the digit command, the mutant takeover -- is about 300 bytes, needs no
+      disk, and would have fitted on all thirteen; every port already keeps
+      musical tempo, so every port already owns the timebase it wanted. It
+      is the TEN PAGES that do not fit, and they are what makes the feature
+      the feature. Closed as a whole.
+
+      The original's behaviour, for the record:
+
+      Read end to end out of
       the binary (MEASURED.md, "The MAIN VIEWER, read end to end"): the
       original ALTERNATES every draw between a view from outside the ship and
       an instrument page, picks the page with `Random(10)`, **re-rolls every
