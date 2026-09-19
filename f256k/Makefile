@@ -183,11 +183,14 @@ DISK_EXTRA = $(DISK)/OVERLAYS.BIN:OVERLAYS.BIN $(DISK)/STRINGS.DAT:STRINGS.DAT \
              $(DISK)/MUSIC.DAT:MUSIC.DAT $(DISK)/BRIEF.TXT:BRIEF.TXT \
              $(DISK)/TREK.SCR:TREK.SCR
 
-# THE GAME, LEFT RUNNING for a person. Throttled, so it plays at the speed the
-# machine really runs at.
+# THE GAME, LAUNCHED AND THEN LEFT RUNNING for a person. Throttled, so it plays
+# at the speed the machine really runs at, and the script types `/- egatrek` so
+# nobody has to. $SD_HUMAN is what keeps the throttle on with a script driving.
 play: disk
-	@SD_EXTRA="$(DISK_EXTRA)" \
-	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" $(DISK)/EGATREK.PGZ egatrek
+	@SD_HUMAN=1 SD_EXTRA="$(DISK_EXTRA)" TREK_NAME=egatrek \
+	 TREK_SIG=$$($(NM) build/$(GAME).elf | awk '$$3 == "trek_sig" { print $$1 }') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" $(DISK)/EGATREK.PGZ egatrek \
+	     tools/playboot.lua
 
 # And the automated one: boot, launch, wait, snapshot, exit.
 check-game: disk

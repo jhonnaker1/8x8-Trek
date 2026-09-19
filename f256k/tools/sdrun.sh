@@ -56,9 +56,18 @@ done
 WAV=""
 [ -n "$SD_WAV" ] && WAV="-wavwrite $SD_WAV"
 
+# THROTTLE IS A SEPARATE QUESTION FROM WHETHER A SCRIPT IS DRIVING.
+# It used to be welded to it: a script meant -nothrottle, no script meant
+# throttled. That made "launch the game FOR the player and then hand them the
+# keyboard" inexpressible -- so `play` left them at a SuperBASIC prompt with a
+# command to type, which is a thing a person should never have to do. $SD_HUMAN
+# means throttled and audible whatever else is going on.
+THROTTLE="-nothrottle"
+[ -n "$SD_HUMAN" ] && THROTTLE=""
+
 if [ -n "$LUA" ]; then
     trap 'rm -rf "$WORK"' EXIT
-    $MAME -nothrottle $WAV -harddisk "$WORK/sd.img" -autoboot_script "$LUA"
+    $MAME $THROTTLE $WAV -harddisk "$WORK/sd.img" -autoboot_script "$LUA"
 else
     # LEAVE IT RUNNING, and leave the image behind with it -- a machine in an
     # interesting state is the point, and deleting its disk out from under it
