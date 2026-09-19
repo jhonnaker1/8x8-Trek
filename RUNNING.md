@@ -354,7 +354,7 @@ the Amiga and ST builds, not one glyph here comes out of the machine's ROM.
 
 ---
 
-### `egatrek-coco3gime.zip` — Tandy Color Computer 3, **stock**
+### `egatrek-coco-gime.zip` — Tandy Color Computer 3, **stock**
 
 **This is the one a plain CoCo 3 runs.** No card, no expansion: 128K, a disk
 drive, and nothing else. `egatrek-coco-ssfm.zip` above needs a SuperSprite FM+;

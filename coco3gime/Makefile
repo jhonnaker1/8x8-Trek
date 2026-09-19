@@ -148,12 +148,21 @@ verify: disk
 REL = build/release
 
 release: verify
-	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco3gime
-	@cp build/trek.dsk $(REL)/egatrek-coco3gime/TREK.DSK
-	@cp README-release.txt $(REL)/egatrek-coco3gime/README.txt
-	@cd $(REL) && zip -q -r ../egatrek-coco3gime.zip egatrek-coco3gime
-	@echo "release: build/egatrek-coco3gime.zip"
-	@unzip -l build/egatrek-coco3gime.zip | tail -n +4
+	@# THE RULE OWNS build/egatrek-*.zip, so it clears it first -- renaming the
+	@# asset would otherwise leave the OLD name in build/ beside the new one,
+	@# and the root Makefile lists release artefacts with a glob. That is how
+	@# a stray byproduct inflated this project's asset count once already.
+	@rm -f build/egatrek-*.zip
+	@# egatrek-coco-gime, matching egatrek-coco-ssfm. Two CoCo 3 ports ship
+	@# from this repository and the pair is named for what DISTINGUISHES them
+	@# -- the card, or the stock GIME -- rather than for their directories.
+	@# The source directory stays `coco3gime/`; the asset is what people see.
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco-gime
+	@cp build/trek.dsk $(REL)/egatrek-coco-gime/TREK.DSK
+	@cp README-release.txt $(REL)/egatrek-coco-gime/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-coco-gime.zip egatrek-coco-gime
+	@echo "release: build/egatrek-coco-gime.zip"
+	@unzip -l build/egatrek-coco-gime.zip | tail -n +4
 
 clean:
 	rm -f build/*.bin build/*.BIN build/*.dsk build/*.o build/*.s
