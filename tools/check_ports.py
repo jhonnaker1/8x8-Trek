@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build and verify every port, and REPORT THE EXIT STATUS OF EACH.
 
-WHY THIS EXISTS. Checking seven ports by hand means seven shell lines, and the
-convenient shape of that line is `cd x && make verify 2>&1 | tail`. THE PIPE
+WHY THIS EXISTS. Checking the ports by hand means one shell line each -- it was
+seven when this was written and it is thirteen now, which is the point -- and
+the convenient shape of that line is `cd x && make verify 2>&1 | tail`. THE PIPE
 REPORTS TAIL'S STATUS, NOT MAKE'S. A failed build prints its error, scrolls
 past, and reads as a pass -- which is how `make test` went two days without
 compiling on this project, and how tools/budget.py printed "IT LINKS, 327 bytes

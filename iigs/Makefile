@@ -475,7 +475,7 @@ verify: build/trek.elf build/test_gsregion
 # uint16_t arithmetic, so it is tested natively instead, against the header the
 # driver itself includes rather than a copy. Cheap, static, and it belongs in
 # `verify` rather than `gates` because it needs no emulator.
-build/test_gsregion: tools/test_gsregion.c src/gsregion.h | build
+build/test_gsregion: tools/test_gsregion.c src/gsregion.h Makefile | build
 	$(HOSTCC) -O1 -o $@ $<
 
 gates: colours bootcheck failcheck early sheet sheetfail files filesfail sound soundfail game music musicfail briefing brieffail

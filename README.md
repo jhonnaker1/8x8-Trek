@@ -32,8 +32,8 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > **How to run each release asset, machine by machine, is in
 > [`RUNNING.md`](RUNNING.md)** — emulator command lines included.
 >
-> The **Commodore 64** is the new one, and it took **the least new code of any
-> port here** — the opposite of the CoCo 3 it followed. It is the first that is *mostly
+> The **Commodore 64** took **the least new code of any port here** — the
+> opposite of the CoCo 3 it followed. It is the first that is *mostly
 > another port*: `vic.c` was written as the C128's 40-column driver and links
 > into it **unchanged**, and eight more shared files come across behind four
 > `#ifdef` blocks totalling nine lines. Two files are genuinely the C64's,
@@ -196,7 +196,7 @@ part no build check could ever have answered.
 
 ## Targets
 
-**Eight ports, and the rule that used to head this section is gone.** It said
+**The rule that used to head this section is gone.** It said
 80 columns; the C64 shipped at 40 and the console is the same console seen a
 half at a time. What a machine actually has to carry is **enough colour** —
 and, as of 2026-09-14, that no longer separates the candidates either. See
@@ -215,7 +215,7 @@ four page it across 40-column halves.
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.15.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The port that **deletes the most**: no overlays, no banking, no filesystem of our own, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
 | **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **It was the slowest port here until the stock CoCo 3 arrived** — that one's string pool lives on the diskette. See [`coco3/README.md`](coco3/README.md) |
-| **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare**, more than any other 6502 port here. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
+| **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare against the 40-column C128's 304**. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
 | **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Released** — [v0.17.0](../../releases/latest). **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
 | **CoCo 3, stock** | GIME 640×192 text, 8 per-cell colours | 6809 | **Released** — [v0.18.1](../../releases/latest), and **the first port here to run on hardware somebody actually owns** — a real CoCo 3 from a CoCo SDC. It drives the WD1773 directly; FujiNet and DriveWire do not work. The string pool lives on the disk, which is what makes a 45K program, a 4,000-byte screen and 7K of text fit in 64K at once. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) |
 | **Apple IIgs** | Super Hi-Res 320×200, 8×8 cells, EGA's own palette | 65816 | **Released** — [v0.19.0](../../releases/latest). **No ProDOS on the disk**: block 0 is this port's own loader and the slot's block driver reads the game, so there is nothing to type. Ensoniq 5503 on two oscillators. **PAL and NTSC are detected** from the VGC line counter — and the *minimum* discriminates, not the maximum. See [`iigs/README.md`](iigs/README.md) |
@@ -245,11 +245,11 @@ An earlier version of this section said the console needed only eight and gave
 no such distinction. **That sentence was load-bearing for exactly one decision**
 and it kept a machine on the list that could not run the game as designed.
 
-### What is left, and which axis rules the rest out
+### What is left, and which axis ruled the rest out — CLOSED 2026-09-18
 
 Run on 2026-09-14 across [commodore-uno](https://github.com/jhonnaker1/commodore-uno)'s
-lineup, now that 40 columns is a shipped layout. **All eight remaining
-candidates pass the colour check**, so the discriminator is no longer the
+lineup, now that 40 columns is a shipped layout. **All eight candidates then
+outstanding pass the colour check**, so the discriminator is no longer the
 display — it is how much code already exists.
 
 **Out on width or memory:** PET (monochrome as well), **VIC-20** (22 columns,
@@ -375,8 +375,15 @@ V9938's sibling chip, and that yields 80×25 with six-pixel cells. The V9958
 driver is the thing that transfers; the text mode was never the plan.
 **MSX2 comes out of this stronger, not weaker.**
 
-**Still live, cheapest first** — three unattempted; every struck-through row
-is a shipped port.
+**THE LIST IS CLOSED. Jamie ruled out every remaining candidate on
+2026-09-18** — MSX2 and the CBM-II P500 in the table below, and five machines
+that were never surveyed here at all: Thomson MO5/TO7-70, Sharp MZ-700/800,
+Enterprise 64/128, Robotron KC 85/3-4 and the NEC PC-8801. **That is an
+interest decision, not a measurement**, which is why nothing on this page
+reopens it: MSX2 and the P500 still pass every check here and are still not
+going to be built. **Cheapest first**; every struck-through row is a shipped
+port, and the rest is kept for how the costing was done — and for the two rows
+that record how wrong it was.
 
 | Candidate | What it would cost | What already exists |
 |---|---|---|
@@ -615,7 +622,7 @@ cd mega65 && make drive   # headless: script the keys, screenshot the result
 wrong load address, stale overlay images, an overlay calling out of its own
 window — cannot reach the disk.
 
-The other three ports:
+The X16, the Amiga and the Atari:
 
 ```sh
 cd x16 && make game       # build/trekx16.prg -- NOT `make`, which builds the smoke test
@@ -636,6 +643,16 @@ The Amiga needs bebbo's `m68k-amigaos-gcc` at `$AMIGA_TOOLCHAIN` (default
 `make -C atari atr` builds the Atari's disk: one self-booting `.ATR` with no
 Atari code on it — this port's own boot record, directory and storage seam. It
 needed Atari DOS 2.5 until 2026-09-11, which is why it had no release artefact.
+
+**The eight ports not spelled out above build the same way, and this section
+is not going to list them one at a time** — that is how it came to say "the
+other three ports" when there were thirteen. The shape is the same in every
+port directory: **`make release` exists in all thirteen** and builds that
+port's release artefact, **`make verify` in twelve** (the Amiga has nothing
+for one to check, which `tools/check_ports.py` says in full), and the
+toolchain each one wants is named in its own `README.md`. **`make ports`
+from the root runs every port's real gate** and skips any whose cross
+compiler is not installed, naming the variable it looked for.
 
 ## Reference material is not in this repository
 

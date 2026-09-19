@@ -197,8 +197,11 @@ downstream is real.
     + the Ensoniq                 HEADROOM  4,398        cost 838
     + the generated music data    HEADROOM  3,622        cost 776
 
-**3,622 bytes spare with every seam real**, against the C64's 6,112 and the
-40-column C128's 304.
+That build-up was measured on 2026-09-16 and each step's cost still stands;
+**the headroom does not, because it moves every time anything shared grows.**
+It is **3,360 bytes spare with every seam real** as of 2026-09-18 — and
+`make -C iigs verify` prints the live figure, which is the one to use.
+Against the C64's 6,112 and the 40-column C128's 304.
 The C64 shipped with 6,112 spare *after* its drivers were in. What this port
 has that the C64 did not is somewhere to put things: the **2,048-byte message
 log** is in bank 0 today and need not be, the **language card** at `$D000` is

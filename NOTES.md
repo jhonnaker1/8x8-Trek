@@ -1,8 +1,12 @@
 # EGA Trek remake — project notes
 
-Status as of 2026-08-17. The C128-VDC port generates a galaxy, moves the
-ship through it, and fires lasers. Enemies do not shoot back yet, and there
-is no damage, docking, supply or torpedo handling.
+**Current status lives in [README.md](README.md): thirteen ports, all
+released, all played by a person.** The paragraph below is where this file
+started and is kept as one -- everything it says is missing was built.
+
+> Status as of 2026-08-17. The C128-VDC port generates a galaxy, moves the
+> ship through it, and fires lasers. Enemies do not shoot back yet, and there
+> is no damage, docking, supply or torpedo handling.
 
 Constants are no longer uniformly provisional: laser damage, enemy hit
 points, the three energy pools, travel costs, torpedo count and the scoring
@@ -27,6 +31,16 @@ shared core plus a per-platform video/sound/input layer.
 > Now C128 -> MEGA65 -> X16 -> Amiga -> VBXE.**
 > under *Open questions* for the reasoning. Everything below about the C128
 > being first, and about DOS-EGA not being a build target, still stands.
+
+> **AND CLOSED 2026-09-18, BY JAMIE, AFTER THIRTEEN.** Asked what was left on
+> the port list, he ruled out everything on it: *"im not interested in porting
+> to Thomson MO5/TO7-70, Sharp MZ-700/800, Enterprise 64/128, Robotron KC
+> 85/3-4, NEC PC-8801. nor msx2 nor cbm-ii p500"*. **That is an interest
+> decision and not a measurement**, so no finding reopens it -- MSX2 and the
+> P500 pass every check this repo applies and are still not going to be built,
+> and the costing tables in README.md are a record of how the choosing was
+> done rather than a list of work. **Nothing in this file is a reason to
+> propose a target.**
 
 **The original `EGATREK.EXE` is a reference oracle, not something we're remaking.**
 The DOS release already exists (mode 10h, 640×350×16) — no Watcom build of our

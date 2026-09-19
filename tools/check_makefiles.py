@@ -104,6 +104,17 @@ def check_relink(path):
     bad, target, prereqs, n_at = [], None, "", 0
     for n, line in enumerate(lines, 1):
         if line.startswith("\t"):
+            # A COMMENT INSIDE A RECIPE IS PROSE, AND PROSE CONTAINS THE WORD
+            # "as". `\bas\b` is here for the assembler; on 2026-09-18 it matched
+            # "the game writes this one back as people finish games" in an @#
+            # line of f256k's disk rule -- a rule that runs cp, and whose only
+            # compiler is the one in the .elf rule it depends on. The check was
+            # RED for that, and a gate nobody can get to green is a gate that
+            # gets switched off. Comments are skipped at the start of a line
+            # already; a recipe comment is the same thing one tab in.
+            body = line.lstrip("\t").lstrip("@-+").lstrip()
+            if body.startswith("#"):
+                continue
             if (target and target not in phony
                     and COMPILES.search(line) and "Makefile" not in prereqs):
                 bad.append((n_at, target))

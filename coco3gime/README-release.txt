@@ -13,7 +13,7 @@ WHAT YOU NEED
 
 A CoCo 3 with 128K and a disk drive. That is the whole list.
 
-There is a second CoCo 3 build of this game, egatrek-coco3, and it needs a
+There is a second CoCo 3 build of this game, egatrek-coco-ssfm, and it needs a
 SuperSprite FM+ card. This one does not. It uses the CoCo 3's own GIME for
 80x25 text in eight colours and the machine's own 6-bit DAC for sound, so it
 runs on a stock machine -- a real one, a CoCo SDC, or an emulator.

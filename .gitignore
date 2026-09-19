@@ -71,6 +71,18 @@ __pycache__/
 *.pyc
 x16/build/
 
+# AN UNZIPPED ASSET IS NOT A SOURCE DIRECTORY. Every port stages its release
+# into build/release/egatrek-<port>/ and zips from there, so a directory of that
+# name OUTSIDE build/ is somebody's unzipped copy of the asset. Four of them
+# were committed: coco3/egatrek-coco3/ (removed 2026-09-18) and then
+# amiga/, falcon/ and x16/'s, all three landed by one release commit (63215f9)
+# and all three still carrying the MAIN VIEWER paragraph that the same sweep
+# had just corrected in the README-release.txt they were copied from.
+#
+# THAT IS THE HAZARD, not the disk space: a copy of a document inside git looks
+# exactly like the document, and grep finds it.
+egatrek-*/
+
 # MAME STATE, ANYWHERE IN THE TREE. MAME writes cfg/, nvram/ and snap/ into
 # whatever directory it is RUN FROM, so the directory is decided by the rig, not
 # by the port -- and this rule was written per-port FOUR TIMES (iigs/, f256k/,

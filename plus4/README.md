@@ -541,7 +541,7 @@ is already known.
 | Sound | `src/tedsnd.c`, **two voices**, measured 438.3 / 998.4 / 198.7 Hz against 440 / 1000 / 200, plus voice 2 |
 | Far memory | `src/p4mem.c` — **cheaper than the C64's**: the read path does not bank at all |
 | Disk | `make d64` — 11 overlay images, data files, `strings.dat` proven to load: 7,496 bytes, count 334 |
-| Budget | resident to `$AC26`, window `$CC00`, **5,890 bytes spare**, `verify_p4` 15 checks |
+| Budget | resident to `$C22F`, window `$CC00`, **2,513 bytes spare** — measured 2026-09-18, and `make -C plus4 verify` prints it, which is the only figure worth believing. This row said `$AC26` and 5,890 for a while after the port grew past both. `verify_p4` 15 checks |
 
 ## Where it stops
 
