@@ -2001,7 +2001,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 and 2026-09-18 and 2026-09-19 (1 open of 71 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 and 2026-09-18 and 2026-09-19 (1 open of 72 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -4034,6 +4034,54 @@ is done and what is left is building, which is the opposite of the usual shape.
       three, most ports have two and would have to degrade to the fundamental
       -- which is a decision to take once, in the shared layer, rather than
       per port.
+
+  72. ~~**THE MAIN VIEWER'S TITLE PUT A HOLE IN ITS OWN BORDER.**~~ **FIXED
+      2026-09-19, the same day it was found.** `ui_draw_viewer` drew S_232,
+      "STANDARD ORBIT 301", at column 22 of a panel whose right border is
+      column 39. EIGHTEEN characters into SEVENTEEN columns, and `scr_puts`
+      bounds-checks against the SCREEN and never against the panel, so the
+      eighteenth character sat on the border. **Every port, whenever the ship
+      was in orbit** -- `panels[P_VIEWER]` is `{ 21, 11, 19, 7 }` in BOTH
+      layouts, so 40 and 80 columns are identical here -- and it had shipped
+      that way since the orbit page was written.
+
+      **SEEN, NOT INFERRED.** Derived from the source first, then put on a
+      screen before being reported: `ship.orbiting` poked on a running C128
+      with the console photographed, cell (39,12) going from `$5D`, the
+      vertical line, to `$31`, the `1`. Every other row of the panel kept its
+      `$5D`. *The first attempt at that check produced a FALSE POSITIVE* --
+      its settle() returned during setup, so it compared a console against a
+      setup screen and read the panel being drawn for the first time as an
+      overwrite. Reading the rows rather than the verdict line is what caught
+      it. See [[instruments-that-cannot-see]].
+
+      **THE FIX: the page code is not drawn and stays in the pool.** Jamie's
+      call -- `STANDARD ORBIT` is fourteen and fits; `STANDARD ORBIT 30` looks
+      like a typo; widening the panel moves a shared border on thirteen ports
+      to gain one column. The title is cut at the first digit rather than at a
+      length, so any `NAME nnn` title of the original's set would behave the
+      same. `strings.txt` is untouched: its ids are POSITIONAL, and a shorter
+      twin would renumber every string after it.
+
+      **AND IT COST TWO PORTS THEIR MARGIN, which is the shared UI working as
+      designed.** Forty-odd resident bytes on thirteen ports at once:
+
+        * The **X16** dropped to 114 bytes of soft stack against a 144 floor.
+          The window went 3,888 -> 3,856, the same trade as the 64-byte trim
+          of 2026-09-06 -- the window has margin, the low-RAM gap has none.
+          Its `x16.ld` comment still said *"3968, NOT 4032"*, two sizes stale:
+          **a number stated twice goes stale in the copy nothing compiles.**
+        * The **Plus/4** reported `jsr $FF8C at $894C` -- **a phantom.**
+          `verify_p4.py` scans BYTES, not instructions, and inside
+          `walk_path` sits `a4 20 / 8c ff c1` (`ldy $20` then `sty $c1ff`).
+          Read one byte in, that is `20 8C FF`: a perfect `jsr $FF8C`, at an
+          address where no instruction begins. It is llvm-mos's `__rc`
+          prologue, so it was always latent; an edit to `ui.c` shifted the
+          image until it appeared. **Narrowed by the jump table's grid** --
+          every real entry is `$FF81 + 3n` and `$FF8C` is not -- which keeps
+          all fifteen real calls and drops two thirds of the range. Not a
+          cure: a run landing ON the grid would still be reported, and only
+          disassembly rules that out.
 
 **Not on this list, and checked:** the read list, the rig list and the build
 list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports

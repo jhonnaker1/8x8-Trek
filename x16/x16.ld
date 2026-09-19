@@ -30,7 +30,10 @@ __basic_zp_end = 0x0080;
    outgrows it. MUST MATCH OVL_WINDOW in the Makefile,
    which passes it to the loader and enforces it when cutting images: an
    overlay that outgrows this fails the build with its own name. */
-/* 3968, NOT 4032. Trimmed by 64 bytes on 2026-09-06 to pay for the panel
+/* 3856, AND EVERY TRIM HAS BEEN PAID FOR BY NAME. This comment said
+   "3968, NOT 4032" while the number was 3,888 and then 3,856 -- a size
+   stated twice goes stale in the copy nothing compiles. Trimmed by 64
+   bytes on 2026-09-06 to pay for the panel
    junction table in c128/src/layout.c, so that a cosmetic fix did not come
    out of the low-RAM gap -- which on this machine is what the soft stack
    runs in. The largest overlay is msgs at 3,809 bytes plus a two-byte stamp,
@@ -51,7 +54,7 @@ __basic_zp_end = 0x0080;
    1.86x, and the C128 reserves 256 against its measured 143, which is 1.79x.
    The largest overlay is 3,813 with the stamp, so this leaves 75 spare there
    -- the trade is deliberate and both halves are checked by `make verify`. */
-__ovl_size = 0x0f30;
+__ovl_size = 0x0f10;
 
 MEMORY {
     /* GOLDEN RAM, $0400..$07FF. The X16 reserves this kilobyte for
@@ -67,22 +70,22 @@ MEMORY {
 
     /* $0801 up to the window. The stock script gives ram LENGTH 0x96ff ending
        at $9F00 where __stack begins; the window takes the last 4K of that. */
-    ram    (rw)  : ORIGIN = 0x0801, LENGTH = 0x96ff - 0x0f30
+    ram    (rw)  : ORIGIN = 0x0801, LENGTH = 0x96ff - 0x0f10
 
     /* Runs here. Every overlay shares this address -- that is the whole idea. */
-    window (rwx) : ORIGIN = 0x0801 + 0x96ff - 0x0f30, LENGTH = 0x0f30
+    window (rwx) : ORIGIN = 0x0801 + 0x96ff - 0x0f10, LENGTH = 0x0f10
 
-    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = 0x0f30
-    ovlimg1 (rw) : ORIGIN = 0x101000, LENGTH = 0x0f30
-    ovlimg2 (rw) : ORIGIN = 0x102000, LENGTH = 0x0f30
-    ovlimg3 (rw) : ORIGIN = 0x103000, LENGTH = 0x0f30
-    ovlimg4 (rw) : ORIGIN = 0x104000, LENGTH = 0x0f30
-    ovlimg5 (rw) : ORIGIN = 0x105000, LENGTH = 0x0f30
-    ovlimg6 (rw) : ORIGIN = 0x106000, LENGTH = 0x0f30
-    ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x0f30
-    ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x0f30
-    ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x0f30
-    ovlimg10 (rw): ORIGIN = 0x10a000, LENGTH = 0x0f30
+    ovlimg0 (rw) : ORIGIN = 0x100000, LENGTH = 0x0f10
+    ovlimg1 (rw) : ORIGIN = 0x101000, LENGTH = 0x0f10
+    ovlimg2 (rw) : ORIGIN = 0x102000, LENGTH = 0x0f10
+    ovlimg3 (rw) : ORIGIN = 0x103000, LENGTH = 0x0f10
+    ovlimg4 (rw) : ORIGIN = 0x104000, LENGTH = 0x0f10
+    ovlimg5 (rw) : ORIGIN = 0x105000, LENGTH = 0x0f10
+    ovlimg6 (rw) : ORIGIN = 0x106000, LENGTH = 0x0f10
+    ovlimg7 (rw) : ORIGIN = 0x107000, LENGTH = 0x0f10
+    ovlimg8 (rw) : ORIGIN = 0x108000, LENGTH = 0x0f10
+    ovlimg9 (rw) : ORIGIN = 0x109000, LENGTH = 0x0f10
+    ovlimg10 (rw): ORIGIN = 0x10a000, LENGTH = 0x0f10
 }
 
 SECTIONS {
@@ -138,7 +141,7 @@ INCLUDE commodore.ld
    about to run. mega65.ld carries the same warning after that port hit it for
    real: "__stack is $D000 and grows DOWN, so a window at $C000..$CFFF is
    exactly where the stack lives. The screen went purple and stayed there." */
-__stack = 0x0801 + 0x96ff - 0x0f30;
+__stack = 0x0801 + 0x96ff - 0x0f10;
 
 /* NO OUTPUT_FORMAT BLOCK, DELIBERATELY. The stock cx16 script ends with
    SHORT(ORIGIN(ram)) + TRIM(ram), which emits a raw PRG -- and then there is

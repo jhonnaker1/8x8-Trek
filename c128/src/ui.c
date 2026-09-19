@@ -719,8 +719,38 @@ void ui_draw_viewer(void) {
         const Planet *p = &planets[ship.orbiting];
         char row[24];
         unsigned char k = 0;
+        const char *t;
 
-        scr_puts(x, y, S(S_232), COL_LABEL);
+        /* THE PAGE CODE IS NOT DRAWN, and that is a measurement rather than
+           taste. S_232 is "STANDARD ORBIT 301" -- EIGHTEEN characters -- and
+           this panel's interior is SEVENTEEN: panels[P_VIEWER] is
+           { 21, 11, 19, 7 } in BOTH layouts, so its right border sits at
+           column 39 and the eighteenth character landed on it. scr_puts
+           bounds-checks against the SCREEN, never the panel, so nothing
+           stopped it: the box had a one-cell hole in its right edge on every
+           port, at the title row, whenever the ship was in orbit. SEEN on a
+           C128 screen on 2026-09-19 with ship.orbiting poked and the console
+           photographed -- $5D, the vertical line, became $31, the '1' -- not
+           inferred from the arithmetic that predicted it.
+
+           The code STAYS IN THE POOL because it is what the original calls
+           the page, and strings.txt's ids are positional -- adding a shorter
+           twin there would renumber every string after it on thirteen ports.
+           It simply has nowhere to go at seventeen columns.
+
+           Cut at the first digit rather than at a length, so every title in
+           the original's set -- they are all "NAME nnn" -- would behave the
+           same way if one were ever drawn. */
+        t = S(S_232);
+        while (t[k] && k < (unsigned char)(sizeof row - 1)
+               && !(t[k] >= '0' && t[k] <= '9')) {
+            row[k] = t[k];
+            k++;
+        }
+        while (k && row[k - 1] == ' ') k--;
+        row[k] = 0;
+        scr_puts(x, y, row, COL_LABEL);
+        k = 0;
 
         /* Built into a buffer and drawn with scr_puts, NOT written cell by
            cell with scr_put: scr_put takes a raw SCREEN CODE, where a letter

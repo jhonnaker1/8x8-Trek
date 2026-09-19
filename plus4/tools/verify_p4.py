@@ -143,6 +143,32 @@ def main():
             tgt = d[i + 1] | (d[i + 2] << 8)
             if not (0xFF81 <= tgt <= 0xFFF5):
                 continue
+            # AND IT MUST BE ON THE JUMP TABLE'S GRID. Every KERNAL entry is
+            # $FF81 + 3n -- CINT $FF81, IOINIT $FF84, ... CHROUT $FFD2, GETIN
+            # $FFE4 -- so an address in the range that is NOT a multiple of
+            # three off $FF81 is not an entry and no compiler emitted a call
+            # to it.
+            #
+            # THIS SCAN READS BYTES, NOT INSTRUCTIONS, and on 2026-09-19 it
+            # reported `jsr $FF8C at $894C` for this, inside walk_path:
+            #
+            #     894b: a4 20      ldy $20      <- the OPERAND is $20
+            #     894d: 8c ff c1   sty $c1ff    <- opcode $8C, low byte $FF
+            #
+            # Three bytes, `20 8C FF`, starting one into an instruction: a
+            # perfect `jsr $FF8C`, and nothing starts at $894C at all. The
+            # pattern is llvm-mos's __rc save/restore prologue, which this
+            # port is full of, so it was always going to surface -- an
+            # unrelated edit to the shared ui.c shifted the image until it
+            # did. $FF8C is not on the grid; a real entry always is.
+            #
+            # THIS IS A NARROWING, NOT A CURE. A mid-instruction run that
+            # happens to land ON the grid would still be reported, and only
+            # disassembling from a known boundary can rule that out. Worth it
+            # anyway: it removes two thirds of the addresses in the range,
+            # including every one this port's code shape actually produces.
+            if (tgt - 0xFF81) % 3:
+                continue
             found += 1
             addr = LOAD + i - 2
             if lo_start <= addr <= lo_end:

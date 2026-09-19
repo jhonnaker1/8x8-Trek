@@ -23,7 +23,11 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 
 # THE WINDOW SIZE, stated once. x16.ld must carry the same number; this is
 # what the loader compiles against and what the image cutter enforces.
-OVL_WINDOW = 3888
+# 3,856: trimmed by 32 on 2026-09-19 to pay for the MAIN VIEWER title fix in
+# the shared ui.c, which pushed low RAM up and left the soft stack 114 bytes
+# against a 144 floor. Same trade as the 2026-09-06 trim -- the window has
+# margin and the low-RAM gap has none. Largest overlay msgs 3,811 + 2 stamp.
+OVL_WINDOW = 3856
 
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg
