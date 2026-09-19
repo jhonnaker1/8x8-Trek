@@ -71,24 +71,19 @@ __pycache__/
 *.pyc
 x16/build/
 
-# MAME writes these into whatever directory it is run from -- the IIgs rig runs
-# from iigs/, so its own config and battery RAM land there. Emulator state, not
-# port source: a committed nvram/rtc makes every run start from one machine's
-# clock and a committed cfg pins the input map of whoever ran it last.
-iigs/cfg/
-iigs/nvram/
-
-# The F256K port's build tree, like every other port's -- AND MAME'S OWN STATE.
-# Running MAME from this directory drops cfg/ and nvram/ here; they are the
-# emulator's, not the port's, and they were staged for a commit once.
-f256k/build/
-f256k/cfg/
-f256k/nvram/
-
-# AND THE GIME PORT'S, WHICH WERE COMMITTED. coco3gime/cfg/{coco3,default}.cfg
-# and coco3gime/snap/coco3/0000.png were in the tree of a RELEASED port, from
-# before the rule above existed -- three files of one machine's input map and
-# one screenshot nothing referenced. Removed 2026-09-18 by a sweep.
-coco3gime/cfg/
-coco3gime/nvram/
-coco3gime/snap/
+# MAME STATE, ANYWHERE IN THE TREE. MAME writes cfg/, nvram/ and snap/ into
+# whatever directory it is RUN FROM, so the directory is decided by the rig, not
+# by the port -- and this rule was written per-port FOUR TIMES (iigs/, f256k/,
+# coco3gime/, and coco3/.gitignore's own copy) and still missed the one place
+# nobody thinks of as a port: the repository ROOT. Running MAME from there
+# during the GIME MMU debugging committed cfg/{coco3,default}.cfg and FOUR
+# byte-identical copies of a Disk Extended Color BASIC boot screen in 82badfb;
+# the 2026-09-18 sweep removed the coco3gime/ copies and walked past these.
+# Unanchored, so it covers the next rig too, wherever it is run.
+#
+# They are the emulator's, not the port's: a committed nvram/rtc makes every run
+# start from one machine's clock, a committed cfg pins the input map of whoever
+# ran it last, and a committed snap is a screenshot nothing references.
+cfg/
+nvram/
+snap/
