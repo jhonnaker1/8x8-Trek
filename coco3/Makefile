@@ -333,12 +333,25 @@ verify: disk
 REL = build/release
 
 release: check-all
-	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco3
-	@cp build/trek.dsk $(REL)/egatrek-coco3/TREK.DSK
-	@cp README-release.txt $(REL)/egatrek-coco3/README.txt
-	@cd $(REL) && zip -q -r ../egatrek-coco3.zip egatrek-coco3
-	@echo "release: build/egatrek-coco3.zip"
-	@unzip -l build/egatrek-coco3.zip | tail -n +4
+	@# THE RULE OWNS build/egatrek-*.zip, so it clears it first. Renaming the
+	@# asset left the OLD name sitting in build/ beside the new one, and the
+	@# root Makefile lists release artefacts with a glob -- so both would have
+	@# been offered up. A stray build byproduct has inflated this project's
+	@# asset count once already.
+	@rm -f build/egatrek-*.zip
+	@# egatrek-coco-ssfm, NOT egatrek-coco3. Two CoCo 3 ports ship from this
+	@# repository and "coco3" named the one that needs a card nobody has,
+	@# while "coco3gime" named the one that runs on a stock machine -- which
+	@# is backwards as a cue to a player choosing between them. The card is
+	@# what distinguishes this port, so the card is in the name. The source
+	@# directory stays `coco3/`; renaming that would move RELEASE_PORTS,
+	@# check_ports and every path in the notes for no reader's benefit.
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-coco-ssfm
+	@cp build/trek.dsk $(REL)/egatrek-coco-ssfm/TREK.DSK
+	@cp README-release.txt $(REL)/egatrek-coco-ssfm/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-coco-ssfm.zip egatrek-coco-ssfm
+	@echo "release: build/egatrek-coco-ssfm.zip"
+	@unzip -l build/egatrek-coco-ssfm.zip | tail -n +4
 
 check-all: verify vidcheck ovlcheck keycheck writecheck
 	@echo "coco3: every check ran"

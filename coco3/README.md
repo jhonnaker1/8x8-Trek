@@ -29,7 +29,7 @@ make check-all # verify plus the four checks that start MAME
 make sdccheck  # every value written to $FF40, because $43 would drop a CoCo SDC
                # out of FDC emulation. NOT in check-all: it re-runs writecheck's
                # own binary, for a question about a library this port never edits
-make release   # build/egatrek-coco3.zip -- the diskette image and a README
+make release   # build/egatrek-coco-ssfm.zip -- the diskette image and a README
 ```
 
 **`make verify` is what the root `make ports` gate runs**, and it is the cheap
