@@ -1987,7 +1987,7 @@ comparison does not change. If either ever reopened, the honest ordering is
 that the Falcon is a few days with one unmeasured seam, and the CoCo 3 is a
 port.
 
-## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 (0 open of 69 raised)
+## THE OPEN LIST, re-derived 2026-09-09, -10, -11, nine times on 2026-09-12 and seventeen times on 2026-09-13 and twelve times on 2026-09-14 and on 2026-09-16 and 2026-09-18 (2 open of 71 raised)
 
 **Re-derived from the SEVEN ports, not recited from the version below** -- that
 rule exists because "what is left?" is the only moment a list gets read, and
@@ -3929,6 +3929,57 @@ a heading is skimmed and never re-derived -- see the sweep notes below.)
     toolchains gets five skips and a green build, this machine gets five real
     verifies for about ten seconds, and only a port that COULD have been built
     and was not turns `make` red.
+
+### TWO POSSIBLE FUTURE FEATURES (raised 2026-09-18, Jamie's call)
+
+**Neither blocks anything and neither is a defect.** They are here rather than
+in prose because the last time a piece of status lived in prose for a week
+nothing counted it and nothing could close it -- which is one of the five ways
+this list's header has been wrong. Both are ALREADY MEASURED: the archaeology
+is done and what is left is building, which is the opposite of the usual shape.
+
+  70. **THE MAIN VIEWER ROTATES, AND OURS DOES NOT.** Read end to end out of
+      the binary (MEASURED.md, "The MAIN VIEWER, read end to end"): the
+      original ALTERNATES every draw between a view from outside the ship and
+      an instrument page, picks the page with `Random(10)`, **re-rolls every
+      ~5.9 seconds while waiting for input** (108 ticks of the 18.2065 Hz
+      timer) and immediately when an event dirties it, and lets the player
+      force a page by TYPING ITS NUMBER -- `0`-`9` is a command like `M` or
+      `W`. There are TEN pages, not nine. After the death ray mutates the crew
+      a mutant takeover replaces all ten with one of two other displays, 1 in
+      10 per turn to end, and that state is one of five booleans in the save.
+
+      Every port draws STANDARD ORBIT while orbiting and the nearest enemy
+      otherwise. **`ui.c`'s own comment already records that this is not what
+      the original does** -- orbit does not select the page; page 8 checks the
+      orbit flag itself and falls back to page 6.
+
+      **SPLIT THE COST, because the two halves do not cost the same thing.**
+      The ROTATION -- alternation, the re-roll, the random pick, the digit
+      command, the mutant takeover -- is a byte, a counter and a dispatch, and
+      it is portable to all thirteen ports unchanged. The TEN PAGES are the
+      expensive half, and **two of them are wider than the viewer's seventeen
+      columns**.
+
+      That width is `panels[P_VIEWER] = { 21, 11, 19, 7 }` in the SHARED
+      `layout.c`, so it binds identically on every port -- including the F256K
+      with 448K of RAM. **The old deferral said "defer to a roomier target"
+      and a roomier target did not help**, which makes it a LAYOUT decision
+      and not a port one. See [[port-target-tiers]] on a right verdict resting
+      on a stale reason.
+
+  71. **THE DEATH RAY MAKES NO SOUND.** `do_ray` has shipped since 2026-08-29
+      and is silent. The sound was measured BEFORE the command existed and
+      deliberately not built, because it would have been dead code -- see "The
+      procedure at 0x007375" in NOTES: two sweeps, **37Hz to 1000Hz playing f,
+      2f and 3f for 2ms each (about 5.8 seconds)**, then **1200Hz to 3000Hz at
+      1ms a step (about 1.8 seconds)**.
+
+      Portable to every port that has a sound driver, which is all of them.
+      The three-harmonic half wants THREE voices: the F256K's SN76489 has
+      three, most ports have two and would have to degrade to the fundamental
+      -- which is a decision to take once, in the shared layer, rather than
+      per port.
 
 **Not on this list, and checked:** the read list, the rig list and the build
 list, all empty since 2026-09-02 and re-confirmed here. `make tiers` reports
