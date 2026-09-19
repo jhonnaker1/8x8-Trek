@@ -38,9 +38,12 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > into it **unchanged**, and eight more shared files come across behind four
 > `#ifdef` blocks totalling nine lines. Two files are genuinely the C64's,
 > about 215 lines. Against every expectation in its own scope note it is also
-> **the roomiest 8-bit port here** — 6,112 bytes spare where the 40-column
-> C128 has 304, because BASIC's 8K is plain RAM and the overlay window moved
-> into the 4K at `$C000` that nothing ever covers.
+> **roomy, with 6,112 bytes spare where the 40-column C128 has 304**, because
+> BASIC's 8K is plain RAM and the overlay window moved into the 4K at `$C000`
+> that nothing ever covers. (This said "the roomiest 8-bit port here" and was
+> **false when written**: the CoCo 3 card port, released first, has 9,046. The
+> shipped C64 notes were corrected on 2026-09-17 and this sentence — the same
+> claim, one file away — was not.)
 > See [`c64/README.md`](c64/README.md).
 >
 > The **Atari ST and STE** joined on 2026-09-14 and it is **one file** — every
@@ -199,9 +202,9 @@ half at a time. What a machine actually has to carry is **enough colour** —
 and, as of 2026-09-14, that no longer separates the candidates either. See
 *What is left* below.
 
-**Released, in the order they shipped.** Seven of the nine put the console on
-an 80×25 grid of per-cell colour, which is the shape it was designed on; two
-page it across 40-column halves.
+**Released, in the order they shipped.** Nine of the thirteen put the console
+on an 80-column grid of per-cell colour, which is the shape it was designed on;
+four page it across 40-column halves.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
@@ -214,6 +217,10 @@ page it across 40-column halves.
 | **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). The only port with **a filesystem of its own** (Disk BASIC, written from scratch), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **It was the slowest port here until the stock CoCo 3 arrived** — that one's string pool lives on the diskette. See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare**, more than any other 6502 port here. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
 | **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Released** — [v0.17.0](../../releases/latest). **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
+| **CoCo 3, stock** | GIME 640×192 text, 8 per-cell colours | 6809 | **Released** — [v0.18.1](../../releases/latest), and **the first port here to run on hardware somebody actually owns** — a real CoCo 3 from a CoCo SDC. It drives the WD1773 directly; FujiNet and DriveWire do not work. The string pool lives on the disk, which is what makes a 45K program, a 4,000-byte screen and 7K of text fit in 64K at once. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) |
+| **Apple IIgs** | Super Hi-Res 320×200, 8×8 cells, EGA's own palette | 65816 | **Released** — [v0.19.0](../../releases/latest). **No ProDOS on the disk**: block 0 is this port's own loader and the slot's block driver reads the game, so there is nothing to type. Ensoniq 5503 on two oscillators. **PAL and NTSC are detected** from the VGC line counter — and the *minimum* discriminates, not the maximum. See [`iigs/README.md`](iigs/README.md) |
+| **Commodore Plus/4** | TED 40×25 text, 121 colours | 8501 | **Released** — [v0.20.0](../../releases/latest). **Parked twice before it booted.** `$FF3F` removes *both* ROMs where the C64's `$01` leaves the KERNAL mapped, so every system call needs a shim and the port needs its own keyboard seam — a fourth seam, bigger than the other three. TED's two tone generators give music and effects a voice each. See [`plus4/README.md`](plus4/README.md) |
+| **Foenix F256K** | Tiny Vicky 80×30 text at **8×16**, EGA's own palette | W65C02S | **Released** — [v0.21.0](../../releases/latest). **448K of RAM and the code is still banked**, because the 6502 still sees 64K — but a swap is **one store to an MMU slot**, so the card is read once at startup and the music plays through a load. The screen is 80×60 at 8×8, so the port doubles the cell instead: **the closest any 8-bit port gets to the original's 8×14 proportions.** Sound is the SN76489 PSG, which every owner has; the SID sockets are not used. See [`f256k/README.md`](f256k/README.md) |
 
 
 ### How much colour the console actually needs

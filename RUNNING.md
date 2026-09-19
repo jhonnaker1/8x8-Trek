@@ -316,8 +316,8 @@ the disk controller in slot 4, and that order is not a preference:
 **The card is not optional and the port has never run on a real one.** The
 CoCo 3's own video gives eight colours in 80 columns; this wants sixteen per
 pixel and a 512-wide bitmap, and the SuperSprite's V9958 is what provides them.
-Everything here was measured under MAME's `ssfm` emulation. **It is the slowest
-of the seven** and it is playable.
+Everything here was measured under MAME's `ssfm` emulation. **A full console
+repaint takes about four seconds** — playable, and not brisk.
 
 ### `egatrek-iigs.zip` — Apple IIgs
 

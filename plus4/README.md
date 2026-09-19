@@ -1,4 +1,4 @@
-# EGA Trek on the Commodore Plus/4 — IT RUNS, 2026-09-17
+# EGA Trek on the Commodore Plus/4 — RELEASED v0.20.0, 2026-09-17
 
 **Title screen with Anderson's credit, the briefing question, and the setup
 screens — all drawing real text.** The string pool loads, the overlays load,

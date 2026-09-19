@@ -1,14 +1,14 @@
-# EGA Trek on the Foenix F256K — IT PLAYS, 2026-09-18
+# EGA Trek on the Foenix F256K — RELEASED v0.21.0, 2026-09-18
 
 **The game runs.** Title screen, setup, and the nine-panel console with live
 state — short range scan, status, the galaxy chart, gauges, systems, the
 badge and the message log. `make play` boots it; `make check-game` drives it
 from the title into a game and snapshots each step.
 
-It has not been **played** by a person yet, which is a different claim and the
-one that matters: every defect Jamie found in the card-less CoCo 3 lived in
-`ui.c` with live state, and the console bench drew the frame perfectly
-throughout.
+**Jamie played it through on 2026-09-18 and found nothing** — briefing, save
+and restore, the end-of-game screens, the hall of fame, play-again both ways.
+The same checklist found three defects on the Plus/4 the day it shipped.
+Released as v0.21.0.
 
 | | state |
 |---|---|
@@ -16,14 +16,13 @@ throughout.
 | rig: MAME `f256k`, Lua, SD-card image | **works**, `make run P=hello` / `make check P=hello` |
 | video: `f256vid.c` at 80x30, 8x16 | **works** -- the console draws, `make frame` |
 | frame timer: kernel `SetTimer` query | **60.00 Hz measured**, in the driver |
-| sound: SN76489 PSG | **calibrated at three points**, no driver yet |
 | font: authored box set, screen-code order | **works** -- built at init into font RAM |
 | keyboard: `f256key.c` via the event queue | **works** -- nine keys checked against `input.h`, `make keys` |
 | storage: `f256stor.c`, all five `plat_` calls | **works** -- ten checks, `make store` |
-| overlays: 11 images, 11 RAM banks | **works** -- `make check-ovl`, swap is one store |
+| overlays: **13** images, 13 RAM banks | **works** -- `make check-ovl`, swap is one store |
 | far memory: `f256far.c`, RAM banks | **works** -- nine checks, `make check-far` |
 | sound: `f256snd.c`, SN76489 | **works** -- pitch to 0.08%, tempo measured, `make check-snd` |
-| the whole game | **RUNS** -- 30,180 of 32,768 resident, 2,588 spare |
+| the whole game | **RELEASED v0.21.0 and PLAYED** -- 30,180 of 32,768 resident, 2,588 spare |
 | `make verify`, and the cross-port gate | **13 of 13** since 2026-09-18 |
 
 ## THE DISK
@@ -82,9 +81,10 @@ and the grid becomes **80x30**. Verified the same way — a frame drawn at
 are why this machine is worth porting to at all.
 
 The two-row offset lives **in the driver**, not in the layout. `panels[]` is
-measured off the original and shared with eleven other ports; this machine
-being five rows taller than the console is `f256vid.c`'s problem and nobody
-else's.
+measured off the original and shared with the **eight** other ports that draw
+the 80-column console (the 40-column ones carry `layout40.c`'s own table);
+this machine being five rows taller than the console is `f256vid.c`'s problem
+and nobody else's.
 
 ## THE FONT IS RAM, SO THIS PORT AUTHORS ITS GLYPHS
 

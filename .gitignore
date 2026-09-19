@@ -84,3 +84,11 @@ iigs/nvram/
 f256k/build/
 f256k/cfg/
 f256k/nvram/
+
+# AND THE GIME PORT'S, WHICH WERE COMMITTED. coco3gime/cfg/{coco3,default}.cfg
+# and coco3gime/snap/coco3/0000.png were in the tree of a RELEASED port, from
+# before the rule above existed -- three files of one machine's input map and
+# one screenshot nothing referenced. Removed 2026-09-18 by a sweep.
+coco3gime/cfg/
+coco3gime/nvram/
+coco3gime/snap/
