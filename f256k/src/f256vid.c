@@ -31,6 +31,16 @@
 #include "f256vid.h"
 #include "f256kern.h"
 #include "f256evt.h"
+#include "f256kern.h"
+
+/* THE HOST'S READ FENCE, AND IT LIVES HERE SO THE GAME HAS ONE TOO.
+   tools/f256.lua trusts a read only when these four bytes bracket it, because
+   FoenixMCP's IRQ remaps the MMU sixty times a second and a read landing
+   inside the kernel's map returns $00 for every one of this program's
+   variables. It was in each test file separately; the game linked none of
+   them and could not be read at all -- `make check-game` reported LAUNCH
+   FAILED on a program that was drawing its title screen at the time. */
+TREK_SIGNATURE;
 
 /* ---------------------------------------------------------------- colour */
 

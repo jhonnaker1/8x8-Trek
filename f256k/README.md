@@ -1,9 +1,14 @@
-# EGA Trek on the Foenix F256K — STARTED 2026-09-17
+# EGA Trek on the Foenix F256K — IT PLAYS, 2026-09-18
 
-**First light: llvm-mos builds a PGZ that FoenixMCP loads and runs, and it
-draws to the text matrix in colour.** That was the risk worth retiring before
-anything else, because the fallback — cc65 — would have decided the whole
-shape of the port.
+**The game runs.** Title screen, setup, and the nine-panel console with live
+state — short range scan, status, the galaxy chart, gauges, systems, the
+badge and the message log. `make play` boots it; `make check-game` drives it
+from the title into a game and snapshots each step.
+
+It has not been **played** by a person yet, which is a different claim and the
+one that matters: every defect Jamie found in the card-less CoCo 3 lived in
+`ui.c` with live state, and the console bench drew the frame perfectly
+throughout.
 
 | | state |
 |---|---|
@@ -18,7 +23,45 @@ shape of the port.
 | overlays: 11 images, 11 RAM banks | **works** -- `make check-ovl`, swap is one store |
 | far memory: `f256far.c`, RAM banks | **works** -- nine checks, `make check-far` |
 | sound: `f256snd.c`, SN76489 | **works** -- pitch to 0.08%, tempo measured, `make check-snd` |
-| the whole game | **LINKS** -- 30,168 of 32,768 resident, 2,592 spare |
+| the whole game | **RUNS** -- 30,180 of 32,768 resident, 2,588 spare |
+| `make verify`, and the cross-port gate | **13 of 13** since 2026-09-18 |
+
+## THE DISK
+
+Six files, and the names are the ones the **code opens** — grepped out of the
+sources rather than remembered, because a name that does not match is a file
+the game cannot find and this seam reports that as "no save yet".
+
+| | |
+|---|---|
+| `EGATREK.PGZ` | the program, two segments: `$0400` and `$2000` |
+| `OVERLAYS.BIN` | thirteen images with a directory and a build stamp |
+| `STRINGS.DAT` | the prose, with this port's own identity strings |
+| `MUSIC.DAT` | from `make_music.py` — **never** `gen_music.py`, whose output is Anderson's own note data |
+| `BRIEF.TXT` | streamed a page at a time |
+| `TREK.SCR` | the hall of fame, shipped **empty** — an all-zero table is what a fresh install should have |
+
+`make verify` is static — no emulator, because a verify that boots a machine
+makes `make ports` unusable. It checks eight things, every one of them a fault
+this project has shipped somewhere:
+
+* **Where `__stack` points.** Nothing else does, and the Plus/4 had three
+  homes for its soft stack — one inside `.text`, one under a ROM.
+* **That `.lowbss` is bracketed by the symbols that zero it.** `.bss` is at
+  `$0400`, outside anything the C runtime clears, so `vdc_init` zeroes it by
+  hand — and when that drifted the keyboard suite read pexec's copy of the
+  filename out of an uncleared array.
+* **That no two sections overlap**, the low region holding three.
+* **That every overlay fits the window**, and how much is left.
+* **The PGZ itself** — two segments at the right addresses, entry equal to
+  `_start`. A wrong entry gives a file that loads and never runs, silently.
+* **The overlay stamp**, because yesterday's `OVERLAYS.BIN` beside today's
+  program jumps into the middle of another function with no error anywhere.
+* **`STRINGS.DAT`'s count against `STR_COUNT`** — a file from an older tree
+  blanks every label in the game and says nothing.
+
+Three controls, all firing: a flipped stamp byte, a count off by one, and a
+corrupted PGZ entry each produce a named failure.
 
 ## THE SCREEN IS BIGGER THAN THE GAME, AND THAT TURNED OUT TO BE A GIFT
 

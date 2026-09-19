@@ -80,6 +80,13 @@ PORTS = (
     # nothing cross-checked it. Being in here is independent of shipping:
     # this gate asks "does it still build and verify", not "is it released".
     ("plus4",  "verify",  "CC"),
+    # THE F256K JOINED ON 2026-09-18, the day it first played. Same rule as the
+    # Plus/4's above: this gate asks "does it still build and verify", not "is
+    # it released" -- and a port outside it is a port nothing cross-checks.
+    # Its verify prints resident, lowram, soft stack and largest overlay, which
+    # is what KEEP below surfaces; a port that joins without surfacing its
+    # numbers is in the list without being in the check.
+    ("f256k",  "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

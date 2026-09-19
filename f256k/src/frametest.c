@@ -21,7 +21,7 @@
 #include "../../core/ega.h"
 #include "f256kern.h"
 
-TREK_SIGNATURE;
+/* the signature is f256vid.c's now -- one definition for every build */
 __attribute__((used, retain)) volatile unsigned char ran;
 __attribute__((used, retain)) volatile unsigned int frames;
 

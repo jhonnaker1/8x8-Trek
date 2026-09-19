@@ -20,7 +20,7 @@
 #include "f256kern.h"
 #include "f256evt.h"
 
-TREK_SIGNATURE;
+/* the signature is f256vid.c's now -- one definition for every build */
 __attribute__((used, retain)) volatile unsigned char ran;
 __attribute__((used, retain)) volatile unsigned char got[OVL_COUNT];
 __attribute__((used, retain)) volatile unsigned char got_back[OVL_COUNT];

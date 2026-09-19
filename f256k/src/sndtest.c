@@ -21,7 +21,7 @@
  */
 #include "f256snd.c"
 
-TREK_SIGNATURE;
+/* the signature is f256vid.c's now -- one definition for every build */
 __attribute__((used, retain)) volatile unsigned char ran;
 /* The host reads these against its own clock: 60 frames and 18.2065 ticks a
    second is the answer. They are the driver's own counters, not a copy. */

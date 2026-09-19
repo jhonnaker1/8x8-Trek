@@ -41,9 +41,30 @@ MAMEOPT  = -rompath "$(MAME_DIR)" -window -skip_gameinfo -nothrottle
 # written down. Losing them turns every debugging session into a rebuild.
 .PRECIOUS: build/%.elf build/%.bin build/%.low
 
-.PHONY: all hello frame keys store ovl far snd run check check-ovl check-far check-snd clean
-all: hello
+# ----------------------------------------------------------------- THE GAME
+# NOT ../c128/src/storage.c, input.c, sid.c, farmem.c, overlay.c or vdcram.c:
+# every one of those is C128 KERNAL or SID code and this port writes its own.
+# What IS shared is main, the layout, the whole UI, the string pool and all of
+# core/ -- which is the point of the four seams.
+SHARED = ../c128/src/main.c ../c128/src/layout.c ../c128/src/ui.c \
+         ../c128/src/music_data.c ../c128/src/strpool.c \
+         ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c
+PLATFORM = src/f256vid.c src/f256key.c src/f256evt.c src/f256stor.c \
+           src/f256ovl.c src/f256far.c src/f256snd.c src/f256log.c
+GAME_SRC = $(SHARED) $(PLATFORM)
+GAME = egatrek
+
+# What goes on the card, and the names are the ones the CODE OPENS -- grepped
+# out of the sources rather than remembered. A file whose name does not match
+# is a file the game cannot find, and this seam reports that as "no save yet".
+DISK = build/disk
+
+.PHONY: all hello frame keys store ovl far snd game disk run check check-ovl \
+        check-far check-snd verify clean
+all: game
 hello: build/hello.pgz
+game: build/$(GAME).pgz build/$(GAME).ovl
+disk: $(DISK)/EGATREK.PGZ
 frame: build/frametest.pgz
 keys: build/keytest.pgz
 store: build/storetest.pgz
@@ -114,6 +135,68 @@ build/sndtest.elf: src/sndtest.c src/f256vid.c src/f256evt.c src/f256snd.c \
                    src/f256vid.h src/f256kern.h src/f256evt.h f256k.ld Makefile | build
 	$(CC) $(CFLAGS) $(SNDFLAGS) $(LDFLAGS) -Wl,-Map=$(@:.elf=.map) -o $@ \
 	    src/sndtest.c src/f256vid.c src/f256evt.c ../c128/src/music_data.c
+
+build/$(GAME).elf: $(GAME_SRC) src/f256vid.h src/f256kern.h src/f256evt.h \
+                   src/f256ovl.h f256k.ld Makefile | build
+	$(CC) $(CFLAGS) $(OVLFLAGS) $(SNDFLAGS) $(LDFLAGS) \
+	    -Wl,-Map=$(@:.elf=.map) -o $@ $(GAME_SRC)
+
+# ------------------------------------------------------------- THE CARD
+# STRINGS.DAT and MUSIC.DAT come from the shared generators, so this port's
+# prose and music are the same files every other port ships -- there is no
+# F256K override, because at eighty columns there is nothing to shorten.
+# TWICE, and the first pass is not redundant: the bare run regenerates the
+# canonical list and strdata.h, and the --override run applies this port's
+# names on top. Running only the second would build against whatever list was
+# last written by some other port's build.
+build/strings.dat: ../c128/src/strings.txt src/strings.override.txt
+	@mkdir -p build
+	cd .. && python3 tools/gen_strings.py >/dev/null
+	cd .. && python3 tools/gen_strings.py --override f256k/src/strings.override.txt \
+	    f256k/build/strings.dat
+
+# make_music.py, NOT gen_music.py. The latter extracts Anderson's own note
+# data, which is his creative work: gitignored, and it can never ship.
+build/music.dat: ../c128/src/music_data.c
+	@mkdir -p build
+	cd .. && python3 tools/make_music.py >/dev/null
+	@cp ../c128/build/music.dat $@
+
+$(DISK)/EGATREK.PGZ: build/$(GAME).pgz build/$(GAME).ovl build/strings.dat \
+                     build/music.dat ../c128/src/briefing.txt verify
+	@rm -rf $(DISK) && mkdir -p $(DISK)
+	@cp build/$(GAME).pgz $(DISK)/EGATREK.PGZ
+	@cp build/$(GAME).ovl $(DISK)/OVERLAYS.BIN
+	@cp build/strings.dat $(DISK)/STRINGS.DAT
+	@cp build/music.dat   $(DISK)/MUSIC.DAT
+	@cp ../c128/src/briefing.txt $(DISK)/BRIEF.TXT
+	@# THE HALL OF FAME SHIPS EMPTY. The original's TREK.SCR is Anderson's
+	@# file; an all-zero table is what a fresh install should have, and the
+	@# game writes this one back as people finish games.
+	@python3 -c "open('$(DISK)/TREK.SCR','wb').write(bytes(280))"
+	@ls -l $(DISK) | tail -n +2 | awk '{printf "  %-14s %7d\n", $$9, $$5}'
+
+# Every file the game opens, as "local:DESTNAME" for sdrun.sh. Derived from
+# the disk directory rather than listed twice -- a run that copies a stale
+# subset is a run testing something other than the artefact.
+DISK_EXTRA = $(DISK)/OVERLAYS.BIN:OVERLAYS.BIN $(DISK)/STRINGS.DAT:STRINGS.DAT \
+             $(DISK)/MUSIC.DAT:MUSIC.DAT $(DISK)/BRIEF.TXT:BRIEF.TXT \
+             $(DISK)/TREK.SCR:TREK.SCR
+
+# THE GAME, LEFT RUNNING for a person. Throttled, so it plays at the speed the
+# machine really runs at.
+play: disk
+	@SD_EXTRA="$(DISK_EXTRA)" \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" $(DISK)/EGATREK.PGZ egatrek
+
+# And the automated one: boot, launch, wait, snapshot, exit.
+check-game: disk
+	@SD_EXTRA="$(DISK_EXTRA)" TREK_NAME=egatrek \
+	 TREK_SIG=$$($(NM) build/$(GAME).elf | awk '$$3 == "trek_sig" { print $$1 }') \
+	 bash tools/sdrun.sh "$(MAME_DIR)" "$(SDCARD)" $(DISK)/EGATREK.PGZ egatrek tools/run.lua
+
+verify: build/$(GAME).pgz build/$(GAME).ovl build/strings.dat
+	@python3 tools/verify_f256.py
 
 build/lowprobe.elf: src/lowprobe.c src/f256vid.c src/f256key.c src/f256evt.c \
                     src/f256stor.c \

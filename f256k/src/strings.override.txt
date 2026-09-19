@@ -1,0 +1,36 @@
+# Per-port text for the Foenix F256K, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override f256k/src/strings.override.txt OUT
+#
+# IDS THAT ALREADY EXIST, AND NOTHING ELSE -- the generator owns the numbering,
+# so this port builds the same strdata.h and the same STR_COUNT as every other.
+# A hand-appended duplicate once silently stole another string every port drew.
+# STR_COUNT is load-bearing: the binary carries it as an immediate and the
+# STRINGS.DAT beside it is coupled by it, so a mismatch plays with every label
+# BLANK rather than complaining. tools/verify_f256.py checks the pair.
+#
+# Only the strings that NAME THE MACHINE differ.
+
+# The 80-column title bar, which is the one this port actually draws -- unlike
+# the C64 and the Plus/4, which are 40-column builds and reach S_330.
+0	 FOENIX F256K PORT 
+
+# S_330 is the 40-column bar, which this port never compiles. Overridden anyway
+# so that nothing on this disk says C128 about an F256K: a string that is
+# unreachable today is a string somebody reaches tomorrow. Same precedent as
+# c64/ and plus4/.
+330	FOENIX F256K PORT
+
+# The dedication line on the title screen.
+82	TO THE FOENIX F256K.
+
+# THE FAREWELL. The C128 says "BASIC IS ON THE 40-COLUMN SCREEN", which is a
+# sentence about its OTHER display; this machine has one. And plat_exit() here
+# performs a system reset rather than returning to a shell -- it has to, because
+# the font is RAM and this program has overwritten FoenixMCP's own -- so what
+# comes back is a fresh boot, not the prompt the game was started from.
+#
+# It also names the keypress: main() waits for one here and the C128's wording
+# never says so, which leaves the player looking at a dead screen. The MEGA65,
+# the C64 and the Plus/4 all hit that and all three say so.
+10	HIT A KEY AND THE F256K RESTARTS.
