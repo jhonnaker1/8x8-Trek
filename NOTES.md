@@ -12982,3 +12982,130 @@ Two shapes, and only one is worth anything:
 
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.
+
+## SCOPE: an MSX2 port (2026-09-19) -- A RECORD, NOT A CANDIDATE
+
+Asked for by Jamie the day after the port list closed, and filed on the same
+footing as the C64 OS scope above it: **nothing here is a reason to propose
+a target.** MSX2 was one of the seven he ruled out on 2026-09-18, and it was
+ruled out on INTEREST while passing every check this repository applies.
+
+What follows is measured rather than argued, and it lands the opposite way
+round from the C64 OS scope: **the architecture transfers, and the shared half
+already compiles.**
+
+### THE HALF THAT USUALLY COSTS MONTHS COMPILES TODAY
+
+`commodore-uno/msx2` is **C**, not assembly -- `cards.c`, `game.c` and `ai.c`
+are shared verbatim with every other uno port, over an SDCC-built MSX video,
+sound and input layer. So the question is not "can C reach this machine" but
+"does OUR C reach it". Compiled here, 2026-09-19, with an SDCC 4.6.0 already
+installed:
+
+    sdcc -mz80 --std-c99 --opt-code-size --nolospre -I core -I c128/src
+
+    trek.c     18,041      ui.c        13,422
+    planet.c    1,565      main.c      11,826
+    hof.c       1,524      layout.c       475
+    serial.c    2,046      strpool.c      349
+    ----------------------------------------------
+    the whole shared half                49,248 bytes of Z80 code
+
+**Every file compiles. Nothing was modified.** `--std-c99` also disposes of the
+objection that killed cc65 for the [[f256k-scope]]: the shared UI's eight
+`declaration-after-statement` sites are a problem for a C89 compiler and not
+for this one.
+
+**AND `core/` GETS SMALLER.** 23,176 bytes of Z80 against the ~31,000 both
+cc65 and llvm-mos produce for the same `core/` on 6502 -- about 26% less. This
+would be the first target where moving CPU family BUYS space rather than
+costing it.
+
+### THE ONE REAL TOOLCHAIN DEFECT, AND IT IS SDCC'S
+
+**`core/trek.c` crashes the compiler**: *"FATAL Compiler Internal Error in file
+'gen.c' line 8744: Unbalanced stack"*. It is a compiler bug, not our code, and
+it is AVOIDABLE but on a knife edge -- of nine flag combinations tried, only
+two compile:
+
+    --opt-code-speed              COMPILES
+    --nolospre                    COMPILES
+    <default>, --opt-code-size, --nogcse, --no-peep,
+    --max-allocs-per-node 1000, --std-c89, --nogcse --nolospre    ICE
+
+**`--nogcse --nolospre` fails while `--nolospre` alone works**, which is the
+tell that this is a fragile optimiser path rather than a flag with a meaning.
+uno's own Makefile already uses `--opt-code-speed` and so has never hit it.
+**Any edit to `trek.c` could move it**, and a port pinned to two flag spellings
+is a port that can be broken by an unrelated commit.
+
+### WHAT THE MACHINE GIVES, AND MOST OF IT IS ALREADY WRITTEN
+
+  * **The video driver is nearly done.** The V9938's SCREEN 7 is 512x212 in
+    sixteen colours, four bits a pixel -- **the same mode `coco3/src/coco3vid.c`
+    already drives on the V9958**, the V9938's own successor, in 445 lines:
+    *"512 and 8-pixel rows give 26; the console takes 80x25 and the remainder
+    becomes a margin"*, and a **6-pixel cell is exactly three whole bytes** so
+    no cell ever read-modify-writes a byte it shares. That is the single most
+    expensive piece of any bitmap port and it exists.
+  * **128K of VRAM for far memory.** The CoCo 3 card port already puts the
+    string pool in its card's VRAM; the same seam, the same reason.
+  * **The memory mapper, in 16K pages**, which is an overlay mechanism of the
+    [[f256k-port]] kind -- a swap is a port write, not a disk read -- at 16K
+    granularity instead of 8K.
+  * **The rig exists**: openMSX is installed, and uno's Makefile is the model
+    for cartridge layout, `makebin`, and the machine to emulate.
+
+### WHAT IT TAKES AWAY
+
+  * **A fifth CPU family and its toolchain.** Every seam, the linker
+    arrangement, the overlay machinery and the build are new work; only the
+    shared half comes across.
+  * **Video is not memory-mapped.** The VDP is behind I/O ports, so `vdc.h`'s
+    contract survives but every implementation detail underneath it changes.
+  * **49,248 bytes of shared code in a 64K address space**, before a single
+    driver, before the data. Overlays are not optional here; the mapper is
+    what makes them affordable.
+
+### FOUR THINGS THAT BITE, ALL OF THEM ALREADY PAID FOR ONCE
+
+uno's README records these and every one would transfer:
+
+  1. **The command engine and the CPU share the VRAM port.** A fill returns
+     when the blitter STARTS. The symptom is precise and misleading: the first
+     line of text after a clear vanishes and every later line is fine.
+  2. **`NX == 0` means the WHOLE WIDTH, not nothing** -- a one-pixel-wide
+     rectangle truncates to zero bytes and paints a band across the screen.
+  3. **R#15 belongs to the BIOS.** Leaving it pointing at S#2 means the
+     interrupt handler never acknowledges the VDP again and the machine wedges,
+     keyboard and all.
+  4. **DO NOT GUARD THOSE WITH SDCC'S `__critical`.** It compiles to
+     `ld a,i / di / push af / ... / pop af / ret po / ei`, and `ld a,i` carries
+     a documented Z80 erratum: an interrupt accepted during that instruction
+     makes P/V read 0 whatever IFF2 held. The restore then decides interrupts
+     were already off, skips the `ei`, and they stay off for good. **uno's
+     first build survived about seventeen seconds.** openMSX emulates the
+     erratum faithfully, which is the only reason it was findable without real
+     hardware.
+
+### NOT MEASURED, AND THEY ARE THE NEXT THINGS TO MEASURE
+
+  * **The TPA.** How much of the 64K a program actually gets under MSX-DOS is
+    the number that decides the overlay split, and it was not established here.
+  * **SCREEN 7 wants 128K VRAM.** Which MSX2 models that rules out was not
+    checked.
+  * **How it would ship** -- cartridge, as uno does, or a disk image with
+    MSX-DOS -- and therefore what `core/storage.h` sits on.
+  * **No driver was written and nothing was run.** The compile is real; the
+    port is not.
+
+### Verdict
+
+**This is the cheapest candidate ever scoped here, and by some distance.** The
+shared half compiles unmodified today, the video driver exists on a sibling
+chip, far memory and overlays both have hardware for them, the emulator is
+installed and a working C port of the sibling project is on disk to read. The
+costs are a new CPU family, a compiler with a live ICE in our largest file,
+and four hardware traps that are already written down.
+
+**It is still not on the list**, and this file is not a reason to put it there.
