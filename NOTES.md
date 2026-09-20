@@ -12929,8 +12929,30 @@ an app owns. Sampling `$00-$FF` three times while C64 OS idled at Homebase:
 evidence, not proof -- a module could use those bytes only during a call, which
 idle sampling cannot see.
 
-**STATUS: the format question is answered YES; the app has not been observed
-running.** The fixed build was handed over and its result is not recorded here.
+**STATUS: RUN ON THE MACHINE, 2026-09-20.** C64 OS loaded it, relinked it and
+gave it the menu bar. Read out of the running emulator:
+
+    $0900          0A 09 38 09 33 09 B2 02 B2 02   <- this app's own vectors
+    externs $0A60  4C 31 B2 | 4C 37 B2 | 4C 3A B2 | 4C 3D B2 | 4C 40 B2
+                   | 4C 30 A4 | FF
+
+**Every 3-byte descriptor has been rewritten into a `JMP`** -- five into the
+screen module at `$B2xx`, one into the toolkit at `$A430`. The menu bar shows
+the app's own menu. **llvm-mos builds C64 OS applications**, and uno's README
+is wrong about that in general even though it is right about uno.
+
+**What is NOT yet working is the drawing**: the window comes up blank. The
+likely cause is that `drawmain` paints straight at `scrbuf`/`colbuf` while
+C64 OS composites layers over the top -- uno keeps a private off-screen buffer
+and blits, and says so. That is this port's bug, not the toolchain's.
+
+**AND THE HANG THAT PRECEDED ALL THIS WAS A MISSING FILE.** An app bundle needs
+`menu.m`; with only `main.o` in the folder C64 OS stops dead on the loading
+screen with the cassette motor running, because `$01`'s bit 5 is clear in the
+banking value it stops in. The KERNAL's own filename buffer named it -- `$BA`
+said device 10 and `$BB` pointed at `:MENU.M` -- after three sessions of
+theorising about soft stack pointers and zero page. **ASK THE KERNAL WHAT IT IS
+WAITING FOR.**
 
 ### THE RIG, AND FOUR THINGS THAT EACH COST A WRONG READING
 
@@ -12974,8 +12996,9 @@ Two shapes, and only one is worth anything:
     of 6502 assembly**: ten times uno's entire C64 OS port, reusing **none** of
     the byte-identical core that is this project's whole architecture, and
     every later fix would need doing twice.
-  * **In C** -- now known to be possible as far as the binary format goes, and
-    it needs a **~9,000-byte cut to resident** to fit the arena, achieved by
+  * **In C** -- no longer a question: a C application built by llvm-mos has
+    been loaded, relinked and run by C64 OS on 2026-09-20. It needs a
+    **~9,000-byte cut to resident** to fit the arena, achieved by
     pushing roughly three more overlays' worth of code into the window and
     moving the pool and overlay images to the REU. Hard, but arithmetic rather
     than a wall.
