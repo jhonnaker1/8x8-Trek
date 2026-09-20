@@ -12832,3 +12832,153 @@ PREVIOUS build against symbol addresses from the CURRENT one and invented a
 discrepancy that was not there. **Mixing two builds' output is its own way of
 seeing nothing**, and the tell was a rebuild that shifted every address by the
 two bytes an added `.init` section had cost.
+
+## SCOPE: a C64 OS port (2026-09-19) -- A RECORD, NOT A CANDIDATE
+
+Asked for by Jamie the day after the port list closed, and it is filed on the
+same footing as everything else on that closed list: **nothing here is a reason
+to propose a target.** What makes it worth keeping is that one question got a
+real answer, from a real build, and the answer contradicts the sibling
+project's own README.
+
+**AND IT IS NOT A NEW MACHINE.** [C64 OS](https://c64os.com/) is Greg Nacu's
+commercial GUI operating system for a Commodore 64 -- a machine this project
+already ships. That changes which seams are free and which are impossible, and
+it is the first candidate ever considered here where the constraint is another
+program rather than a chip.
+
+### What commodore-uno did, measured
+
+`commodore-uno/c64os` is a real windowed application, not a launcher -- its
+README rules the shortcut out in its first paragraph. It is **6502 assembly**,
+because uno hand-ported its game rules:
+
+    cards.c + game.c + ai.c        325 lines of C
+    engine.s, the hand port      1,004 lines of assembly     3.1x
+    main.s, the C64 OS UI        1,974 lines
+
+### What C64 OS gives free -- more than expected
+
+  * **`screen_cols = 40`, `screen_rows = 25`**, and uno takes a full-screen
+    draw context at offset 0,0. No rows are lost to the menu bar. **That is
+    `layout40.c` exactly**, already shipped on four ports.
+  * **A file API** -- `file`, `dir`, `path` -- so `core/storage.h` has a home.
+  * **THE REU, WITH PER-APP BANK ALLOCATION** (`appreubk`, `reupage`,
+    `reubank`). A better far-memory home than the C64 port's 8,186 bytes under
+    the KERNAL, and it could hold overlay images too. There are even
+    `appfrze`/`appthaw` vectors so the OS can swap a whole app out.
+
+### What it takes away, and this is the blocker
+
+`appbase = $0900`, and the memory map allocates pages **`$09` through `$A0`**:
+
+    $0900..$A0FF   38,912 bytes   the app arena, SHARED with the OS's own allocations
+    $0801..$A798   40,856 bytes   what this project's C64 port already uses resident
+
+**The resident image is ~1,900 bytes larger than the whole arena** before C64
+OS allocates anything for itself. Add the 4K overlay window -- which on the
+bare C64 lives at `$C000`, and `$Cxxx` is where C64 OS's own modules sit -- and
+it is ~6,000 over; add the 2,000-byte off-screen buffer uno keeps (because
+C64 OS re-renders layers on every menu event) and it is ~8,000.
+
+`utilbase = $E000`, which is exactly where the C64 port's 7,902-byte string
+pool lives. That one is survivable: the pool belongs in the REU here.
+
+### THE TOOLCHAIN QUESTION, ANSWERED BY BUILDING ONE
+
+uno's README says C64 OS "predates (and isn't compatible with) the cc65/C
+toolchain every other port in this repo uses". **That is true of uno's
+toolchain and is not a property of C64 OS.** Read out of the SDK, an
+application is:
+
+  * a PRG whose load address is `$0900`;
+  * five vectors at the front -- init, msgcmd, willquit, REU freeze, REU thaw;
+  * a KERNAL link table of 3-byte records (module id, routine selector)
+    terminated by `$FF`, which `init` hands to `initextern` at `$02FC` and
+    which the OS rewrites in place into `JMP`s.
+
+**llvm-mos produces that.** A 339-byte app was built and its header decodes
+structurally identically to uno's own `main.o`:
+
+    load $0900
+    +0 init  $090A   +2 msgcmd $091A   +4 willquit $0919   +6/+8 $02B2 (raw_rts)
+    table   F6 06 00 | F6 0C 00 | F6 0F 00 | F6 12 00 | F6 15 00 | EE 06 00 | FF
+
+Three things it needed, all ordinary here: **`-nostartfiles`** (an app has
+vectors, not a `main`), **`INCLUDE imag-regs.ld`** for the `__rc` file, and
+**`INCLUDE c.ld`** for the standard sections -- the same shape as `f256k.ld`.
+
+**AND THE FIRST BUILD HUNG THE MACHINE AT LOAD**, reproducibly, with no
+debugger attached. The cause is this project's own most-repeated failure:
+`-nostartfiles` drops crt0, and **crt0 is what sets the soft stack pointer**
+(`lda #<__stack / sta __rc0 / lda #>__stack / sta __rc1` -- confirmed by
+disassembling our own C64 port's startup). Measured at rest, `$02/$03` hold
+`00 B0`, so the first C call pushed at **`$B000`, growing down through C64 OS's
+own memory**, outside the arena entirely. It hung before drawing anything,
+which is why the loading screen was the last thing on the display. See
+[[llvm-mos-soft-stack]] -- that is the fourth time.
+
+**ZERO PAGE WAS THE OTHER SUSPECT AND WAS MEASURED RATHER THAN ASSUMED.**
+llvm-mos wants **32 contiguous zero-page bytes**, and uno's own source says, in
+as many words, that under C64 OS *"a runtime pointer needs a zero-page location
+for true (zp),y indirection and none is safely known to be free here"* -- its
+author used self-modifying code rather than claim one byte, and the SDK
+documents routines that TAKE zero-page pointers while never saying which bytes
+an app owns. Sampling `$00-$FF` three times while C64 OS idled at Homebase:
+**only `$A1`, `$A2` and `$CD` change**, and nothing in `$02-$21` moves. That is
+evidence, not proof -- a module could use those bytes only during a call, which
+idle sampling cannot see.
+
+**STATUS: the format question is answered YES; the app has not been observed
+running.** The fixed build was handed over and its result is not recorded here.
+
+### THE RIG, AND FOUR THINGS THAT EACH COST A WRONG READING
+
+  * **The install needs commercial files** -- a purchased C64 OS DHD image and
+    a CMD HD boot ROM -- so this would be the first target where the PLAYER
+    must own third-party software to run the game.
+  * **JiffyDOS's `@` wedge defaults to DEVICE 8**, which in this rig is the
+    host passthrough. The first install went entirely onto the host: the
+    evidence was a `trek/` directory appearing in the host bundle folder, not
+    anything on screen. `@#10` first.
+  * **CMD DOS's COPY IS SAME-DEVICE, AND SAYS `00, OK` WHEN IT IS NOT.**
+    `@c/trek/:main.o=8:main.o` was accepted, reported success and wrote
+    nothing; the directory listed empty afterwards. Another status that means
+    only that the drive did not object. See [[hof-write-witnessed]].
+  * **`c1541` RECOGNISES A `.dhd` and lists its root -- but its `cd` changes
+    the HOST directory**, so it cannot reach `//os/applications` and cannot
+    install an app. There is no host-side install path.
+  * **C64 OS scans the keyboard matrix itself.** It drains the KERNAL buffer as
+    hygiene, so injected keys vanish without effect on every screen, and VICE's
+    binary monitor has no mouse injection -- **the GUI cannot be driven
+    headlessly at all.** Worse, polling the monitor at 4Hz starves VICE's
+    display: the window froze on a stale frame while the CPU ran normally, and
+    that was read as a crash twice before `ps` showed one emulator and the
+    jiffy clock showed it running. See [[instruments-that-cannot-see]].
+
+### And one method note
+
+The link table's selectors were first INFERRED from the byte tail of uno's
+`main.o`. That got the module ids right and **four of five selectors wrong**,
+each off by one slot, because the table's order is not the header's order.
+Reading `os/h/screen.h` fixed it in one look. **Infer the shape, read the
+values.**
+
+### Verdict
+
+Two shapes, and only one is worth anything:
+
+  * **As uno did it** -- hand-port to assembly. 9,247 lines of shared C
+    (`core/` + `ui.c` + `main.c` + `layout40.c` + `strpool.c`) plus 3,213 lines
+    of headers carrying the measured rules, at 3.1x is roughly **29,000 lines
+    of 6502 assembly**: ten times uno's entire C64 OS port, reusing **none** of
+    the byte-identical core that is this project's whole architecture, and
+    every later fix would need doing twice.
+  * **In C** -- now known to be possible as far as the binary format goes, and
+    it needs a **~9,000-byte cut to resident** to fit the arena, achieved by
+    pushing roughly three more overlays' worth of code into the window and
+    moving the pool and overlay images to the REU. Hard, but arithmetic rather
+    than a wall.
+
+**It would also be a fourteenth port of a game that already runs natively on
+that exact machine.** That, and not the byte counts, is the honest summary.
