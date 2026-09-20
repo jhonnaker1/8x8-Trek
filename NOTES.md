@@ -13003,6 +13003,45 @@ each off by one slot, because the table's order is not the header's order.
 Reading `os/h/screen.h` fixed it in one look. **Infer the shape, read the
 values.**
 
+### WHAT IS LEFT, given all of the above is a 386-byte proof and not a port
+
+The experiment settled the toolchain and nothing else. What it proved: the
+binary format, that C64 OS loads and relinks it, that `init` runs, that a
+layer push is accepted, that the draw callback fires, and that C drawing
+through `ctxdraw` reaches the screen. What remains is the port.
+
+  * **THE ~9,000-BYTE CUT, and it is the only item here that is arithmetic
+    rather than work.** The arena is `$0900..$A0FF` = 38,912 bytes SHARED with
+    the OS's own allocations; this project's C64 port measured **40,856
+    resident** on 2026-09-20, plus a 4K window whose `$C000` home is where
+    C64 OS keeps its modules.
+  * **THE INPUT MODEL -- a design decision, not a blocker.** `kb_waitkey()`
+    blocks by contract and C64 OS is event-driven, but it exposes POLLING
+    calls (`readkprnt`/`deqkprnt`, carry set when empty -- how uno drains the
+    queue at startup), so a blocking wait is implementable. **The cost is that
+    C64 OS's own UI is dead while the game waits for a key**, which is most of
+    the game's life: menus would not open mid-turn.
+  * **THE DRAW PATH IS A SYSCALL PER CHARACTER**, and a console repaint is
+    ~1,000 cells. There is a blit path -- `ctx2scr_`, *"copy the draw context
+    to the screen buf"* -- which is what uno uses, with a private 2,000-byte
+    buffer this port has no room for. **Unmeasured, and the first thing to
+    measure**: the CoCo 3's repaint was 12.24 seconds before anybody timed it.
+  * **THE SOFT STACK IS SQUATTING.** `__stack` sits at `$0E51`, outside the
+    pages C64 OS allocated to the app. It did not bite a 386-byte program; a
+    real one must carry its stack inside the loaded image or allocate pages
+    properly. See [[llvm-mos-soft-stack]].
+  * **ZERO PAGE IS UNPROVEN UNDER LOAD.** The 32 imaginary registers at
+    `$02..$21` survived this app. Nothing proves that while C64 OS's modules
+    are doing real work, and uno's author concluded none was safely free.
+  * **NOT STARTED AT ALL**: overlays and far memory (the REU banks and
+    `appfrze`/`appthaw` exist; nothing is designed), sound (there is a
+    `sidplay` service in the SDK, unexplored), storage over the file API, and
+    this port's own `menu.m` and `about.t` -- it currently ships uno's, which
+    is why the menu bar says "Game".
+  * **AND THE RIG NEEDS A HUMAN.** C64 OS scans the keyboard matrix itself and
+    VICE's monitor has no mouse injection, so every test costs a double-click
+    and there is no headless path. Any iteration plan has to budget for that.
+
 ### Verdict
 
 Two shapes, and only one is worth anything:
