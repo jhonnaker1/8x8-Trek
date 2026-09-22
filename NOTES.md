@@ -13021,11 +13021,25 @@ through `ctxdraw` reaches the screen. What remains is the port.
     queue at startup), so a blocking wait is implementable. **The cost is that
     C64 OS's own UI is dead while the game waits for a key**, which is most of
     the game's life: menus would not open mid-turn.
-  * **THE DRAW PATH IS A SYSCALL PER CHARACTER**, and a console repaint is
-    ~1,000 cells. There is a blit path -- `ctx2scr_`, *"copy the draw context
-    to the screen buf"* -- which is what uno uses, with a private 2,000-byte
-    buffer this port has no room for. **Unmeasured, and the first thing to
-    measure**: the CoCo 3's repaint was 12.24 seconds before anybody timed it.
+  * ~~**THE DRAW PATH IS A SYSCALL PER CHARACTER**~~ **MEASURED 2026-09-21,
+    AND IT IS NOT A PROBLEM.** Ten full 40x25 repaints -- positioned per row
+    the way `scr_puts` does, 1,000 `ctxdraw` calls each through the relinked
+    JMP -- took **98 jiffies**, read out of the app's own image rather than
+    off the screen:
+
+        0.196 s per 1,000-cell repaint at PAL   (193 cycles a cell)
+        0.164 s at NTSC
+
+    For scale, the CoCo 3 card port shipped a **12.24-second** repaint that no
+    benchmark here had ever timed, and it is 3.84s now. A fifth of a second
+    through another program's draw context beats two of the shipped ports.
+    **The blit path (`ctx2scr_`, and uno's private 2,000-byte buffer) is not
+    needed**, which also gives back the 2K the scope had been charging for it.
+
+  * **A CASE GOTCHA, FREE WITH THE BENCHMARK:** `d_petscr` translates ASCII
+    through PETSCII, so **UPPERCASE ASCII renders as readable text** and
+    lowercase comes out as graphics glyphs. The first benchmark screen was
+    unreadable prose beside perfectly legible digits for exactly that reason.
   * **THE SOFT STACK IS SQUATTING.** `__stack` sits at `$0E51`, outside the
     pages C64 OS allocated to the app. It did not bite a 386-byte program; a
     real one must carry its stack inside the loaded image or allocate pages
