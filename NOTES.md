@@ -13010,11 +13010,45 @@ binary format, that C64 OS loads and relinks it, that `init` runs, that a
 layer push is accepted, that the draw callback fires, and that C drawing
 through `ctxdraw` reaches the screen. What remains is the port.
 
-  * **THE ~9,000-BYTE CUT, and it is the only item here that is arithmetic
-    rather than work.** The arena is `$0900..$A0FF` = 38,912 bytes SHARED with
-    the OS's own allocations; this project's C64 port measured **40,856
-    resident** on 2026-09-20, plus a 4K window whose `$C000` home is where
-    C64 OS keeps its modules.
+  * **THE RESIDENT CUT -- ANALYSED 2026-09-21, AND IT DOES NOT CLOSE ON THE
+    MACHINERY THAT EXISTS.** The arena is `$0900..$A0FF` = 38,912 bytes SHARED
+    with the OS's own allocations, and the window's `$C000` home on the bare
+    C64 is where C64 OS keeps its modules, so the window has to come out of
+    the arena too.
+
+    **The two hot-path overlays already exist for exactly this case.**
+    `TREK_OVL_ENEMY` and `TREK_OVL_MOVE` are opt-in because they page code on
+    the hot path, *"ruinous on a 1541 and merely costs milliseconds through a
+    MEMAC window"* -- and an REU-backed window is that case. Linked for real
+    on the C64 with thirteen overlays (a scratch linker script and loader; the
+    shipped ones are untouched):
+
+        .text            34,322  ->  28,984      -5,338
+        RESIDENT TOTAL   40,854  ->  35,584      -5,270
+        new .ovl_enemy    3,802   new .ovl_move   1,861
+        largest overlay   3,774  ->  3,802 of 4,096
+
+        needed  35,584 resident + 4,096 window = 39,680
+        arena                                    38,912
+        MARGIN                                     -768
+
+    **768 bytes over, before C64 OS allocates a byte for itself.**
+
+    **IT CLOSES WITH ONE MORE SPLIT, and there is an obvious candidate.**
+    `core/serial.c` is 3,770 bytes of `-fno-lto` .text -- about **2,400 LTO**
+    at this tree's measured 0.636 ratio -- and it runs on SAVE and RESTORE
+    only, which is the same rarity every one of the eleven base overlays was
+    chosen for. Moving it takes the margin to roughly **+1,600**, which is
+    what C64 OS's own allocations would have to fit in. Tight, and real.
+
+    Two smaller candidates behind it: what is left of `hof` (~1,300) and
+    `planet` (~1,450).
+
+    **The replaceable drivers are close to a wash, not a saving.** `vic.c`,
+    `input.c`, `storage.c`, `c64mem.c` and `c64log.c` total 3,066 `-fno-lto`
+    bytes (~1,950 LTO) and C64 OS replaces all five -- but with equivalents
+    over `ctxdraw`, `readkprnt`, the file API and the REU that will cost
+    something similar. **Do not count this as headroom.**
   * **THE INPUT MODEL -- a design decision, not a blocker.** `kb_waitkey()`
     blocks by contract and C64 OS is event-driven, but it exposes POLLING
     calls (`readkprnt`/`deqkprnt`, carry set when empty -- how uno drains the
