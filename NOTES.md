@@ -13003,7 +13003,42 @@ each off by one slot, because the table's order is not the header's order.
 Reading `os/h/screen.h` fixed it in one look. **Infer the shape, read the
 values.**
 
-### WHAT IS LEFT, given all of the above is a 386-byte proof and not a port
+### IT DOES NOT FIT. MEASURED 2026-09-21, AND THIS CLOSES THE QUESTION
+
+Everything below was written against the arena's SIZE. The number that
+decides it is the arena's AVAILABILITY, and C64 OS publishes it: a byte per
+page at `$0800`, indexed by page number, `00` free, `01` system, `02` utility,
+`FF` app. Read at Homebase:
+
+    pages $09..$A0        152 pages    38,912 bytes
+      system               31 pages     7,936    <- the OS keeps this
+      app (Homebase's)     57 pages    14,592    <- reclaimable
+      free                 64 pages    16,384
+    available to an app   121 pages    30,976 bytes
+
+**C64 OS holds 7,936 bytes of the arena for itself**, and that is a FLOOR --
+measured with no utility open, and the system's share grows when one is.
+
+Against the best split this analysis found -- both hot-path overlays on, the
+serialiser moved into a divided `.ovl_front`, a 4,638-byte window:
+
+    needed   resident 32,624 + window 4,638 + stack 256 = 37,518
+    available                                             30,976
+    SHORT BY                                               6,542
+
+**Closing 6,542 more bytes means overlaying the engine and the console draw**
+-- the code that is resident precisely because the overlays call IT. Rule 4
+makes that structurally hard rather than merely tight: a resident function
+that reaches into a window is exactly what the rule forbids, and `core/trek.c`
+is reached from everywhere.
+
+**THE MISTAKE, RECORDED BECAUSE IT WAS MADE THREE TIMES IN ONE DAY:** every
+feasibility figure here was computed against 38,912 -- the size of the arena
+-- when the question was always how much of it an app may have. The page map
+was one boot and one read away the entire time, and it was the cheapest
+measurement in the whole scope.
+
+### WHAT WAS LEFT, when this still looked like it might fit
 
 The experiment settled the toolchain and nothing else. What it proved: the
 binary format, that C64 OS loads and relinks it, that `init` runs, that a
