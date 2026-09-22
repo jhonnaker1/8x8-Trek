@@ -13135,12 +13135,12 @@ Two shapes, and only one is worth anything:
     of 6502 assembly**: ten times uno's entire C64 OS port, reusing **none** of
     the byte-identical core that is this project's whole architecture, and
     every later fix would need doing twice.
-  * **In C** -- no longer a question: a C application built by llvm-mos has
-    been loaded, relinked and run by C64 OS on 2026-09-20. It needs a
-    **~9,000-byte cut to resident** to fit the arena, achieved by
-    pushing roughly three more overlays' worth of code into the window and
-    moving the pool and overlay images to the REU. Hard, but arithmetic rather
-    than a wall.
+  * ~~**In C**~~ -- **the toolchain is no longer a question and the fit is
+    settled the other way.** A C application built by llvm-mos was loaded,
+    relinked and run by C64 OS on 2026-09-20, and it draws a full screen in
+    0.196s. **But the game does not fit**: an app may have 30,976 bytes of the
+    arena and the best split found here needs 37,518. See *"IT DOES NOT FIT"*
+    above. That is a wall, not arithmetic.
 
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.
