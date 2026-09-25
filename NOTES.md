@@ -13415,6 +13415,55 @@ rule 4, the per-function restructure is unnecessary -- but `serial.c`, the
 obvious candidate, is called from resident `save_write` in `ui.c`, which is
 the same trap the C64 OS analysis walked into.
 
+### THE VIDEO DRIVER, WRITTEN AND SEEN (2026-09-24)
+
+`msx2/` now exists -- NOT a port, not in `RELEASE_PORTS` or `make ports`, the
+scope's working half. An MSX-DOS `.COM`: `crt0.s` at `$0100`, the BIOS through
+`CALSLT` at `$001C` (`msxbios.s` -- page 0 is RAM under DOS, where uno's
+cartridge had the BIOS), and `msx2vid.c`.
+
+**The driver is `coco3vid.c`'s LAYOUT with uno's MSX DISCIPLINE.** Same mode on
+the same chip family -- SCREEN 7 is GRAPHIC6, 6-pixel cells are three whole
+bytes, the log in VRAM -- but four of that file's habits would have been bugs,
+because on an MSX **the BIOS interrupt handler reads the VDP every frame** and
+on the CoCo nothing else touched the card:
+
+  * every two-byte latch sequence runs with interrupts off;
+  * `wait_vsync` waits on `JIFFY`, because coco3vid's S#0 poll steals the
+    BIOS's interrupt acknowledgement;
+  * anything selecting S#2 puts R#15 back;
+  * plain `di`/`ei`, never SDCC's `__critical` (the `ld a,i` erratum).
+
+Plus `scr_clear` as ONE HMMV blit using NX=0 for the full 512 on purpose, and
+`scr_puts` indexed rather than pointer-walking, against SDCC 4.6's IY bug.
+
+**FIRST LIGHT, SEEN TWICE**: by Jamie in an openMSX window, and by `make shot`
+from a clean rebuild -- a frame whose corners meet, all fifteen EGA colours
+in order, the 6x8 font, and reverse video by rule.
+
+    msx2vid.c                   1,778 bytes code (font included), 7 data
+    WHOLE GAME, real video      image $0100..$D290 = 53,649
+    MSX-DOS TPA                 55,814
+    LEFT for keyboard, sound, storage, far memory AND the stack   2,165
+
+**Tight, and sound and the stack decide it.** The keyboard can be ~100 bytes
+through the BIOS and the string pool can go to VRAM page 1 as on the CoCo
+card; the C64's SID player was ~775 bytes on a 6502 and nobody has measured a
+stack on this compiler.
+
+**TWO THINGS THAT COST A WRONG READING:**
+
+  * **Under `throttle off` a screenshot LAGS VRAM by tens of seconds.** VRAM had
+    finished drawing by t=25s; `screenshot -raw` was black at 25, 35 and 45 and
+    showed the picture only by 60. I first reported the screenshot as a blind
+    instrument -- a cause named without a test. Jamie said I had not waited
+    long enough; sampling one run at six times showed he was right about the
+    fix and that the mechanism is the renderer, not the program.
+    `tools/shot.tcl` logs VRAM beside the PNG for that reason.
+  * **`-I../coco3/src` for the font also exposed the CoCo's own `string.h`**,
+    which shadows the system one and pulls in `cmoc.h`. The font is included
+    BY PATH.
+
 ### Verdict
 
 ~~**This is the cheapest candidate ever scoped here, and by some distance.**~~
