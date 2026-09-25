@@ -13156,7 +13156,13 @@ What follows is measured rather than argued, and it lands the opposite way
 round from the C64 OS scope: **the architecture transfers, and the shared half
 already compiles.**
 
-### THE HALF THAT USUALLY COSTS MONTHS COMPILES TODAY
+### ~~THE HALF THAT USUALLY COSTS MONTHS COMPILES TODAY~~ -- ONLY WITH OVERLAYS OFF
+
+**CORRECTED 2026-09-24, see "THE OVERLAYS DO NOT TRANSFER" below.** Every
+figure in this section was measured WITHOUT `-DTREK_OVERLAYS`, so each
+`OVL_CODE` expanded to nothing. With overlays on, SDCC rejects the shared
+code outright.
+
 
 `commodore-uno/msx2` is **C**, not assembly -- `cards.c`, `game.c` and `ai.c`
 are shared verbatim with every other uno port, over an SDCC-built MSX video,
@@ -13261,13 +13267,96 @@ uno's README records these and every one would transfer:
   * **No driver was written and nothing was run.** The compile is real; the
     port is not.
 
+### MEASURED 2026-09-24: THE DENOMINATOR, AND THE OVERLAYS DO NOT TRANSFER
+
+**The denominator came first this time**, because C64 OS had just been
+answered "feasible" three times against a number nobody had read. A Philips
+NMS 8250 booted headless in openMSX, Disk BASIC, no disk, read out of memory
+(against a throwaway settings file, so the real one was provably untouched):
+
+    HIMEM $DE79   BOTTOM $8000
+    Main RAM  128K memory mapper, slot 3.2 -- 8 segments of 16K, 4 spare
+    VRAM      128K -- SCREEN 7 is available
+    disk ROM  slot 3.3
+
+    one load, BASIC left in page 1:          $8000..$DE78   24,185 bytes
+    one load, page 1 switched to RAM         $4000..$DE78   40,569 bytes
+      (BIOS kept in page 0; the disk reached through the ROM's own
+       inter-slot hook, so buffers must not live in page 1)
+
+The four spare mapper segments hold overlay images and the string pool for
+nothing. **The mapper's granularity is 16K**, so a MAPPED window would cost
+16K of address space; copying overlays out of mapper RAM into a 4K window,
+the X16's design, is the affordable one.
+
+**THEN THE BLOCKER THIS SCOPE MISSED.** Every overlay in this project is
+`OVL_CODE` -- `__attribute__((noinline, section(...)))`, clang/GCC syntax,
+tagged PER FUNCTION and scattered across shared files (`ui.c` alone feeds six
+overlays). Compiled with `-DTREK_OVERLAYS`, SDCC fails all three:
+
+    core/trek.c:265      OVL_CODE("xtra") void trek_new_game(...   syntax error
+    c128/src/ui.c:1663   ...                                       syntax error
+    c128/src/main.c:51   OVL_STUB(load_eval, OVL_EVAL)             syntax error
+
+**AND SDCC CANNOT EXPRESS THE DESIGN AT ALL.** Its `#pragma codeseg` is
+FILE-SCOPED -- the last one in a file wins for EVERY function in it. Proven
+on five functions with four pragmas: the assembly holds one `.area _OVLHOF`
+containing all five, the two "resident" ones included, and `_CODE` is empty.
+There is no function-sections option, and its `__banked` support keys off
+the same per-file segment.
+
+**z88dk's sccz80 CAN** -- `#pragma codeseg` switched mid-file puts each
+function in its own `SECTION`, and zsdcc on the same file reproduces SDCC's
+last-one-wins, which is the control. sccz80 compiles all eight shared files.
+**But it is 38% bigger:**
+
+                SDCC    sccz80
+    trek       18,041   23,700
+    ui         13,422   20,032
+    main       11,826   16,414
+    (five more)  5,959    7,956
+    TOTAL      49,248   68,102   1.38x, plus a runtime (l_gint, l_div_u...)
+                                 that is NOT counted here
+
+**So the compiler that can express the overlays is big, and the compiler
+that is small cannot express them.** At sccz80's size the Z80 advantage this
+scope was built on is gone -- 68,102 is slightly MORE than the C64's entire
+program, 65,497 including every overlay.
+
+**Two routes, neither cheap:**
+
+  * **SDCC, with the shared source restructured to ONE FILE PER OVERLAY.**
+    Small code, but it moves functions between files that thirteen ports
+    compile -- the largest change to shared source this project would ever
+    have made -- and `static` helpers shared between an overlay and resident
+    code would have to become visible. Resident roughly 25,800 + drivers +
+    data + a 4K window: ~40K against 40,569 -- **tight enough that the
+    denominator, not the numerator, is what to doubt.**
+  * **sccz80, with `OVL_CODE` rewritten as `_Pragma("codeseg ...")`** --
+    which still needs a way to switch BACK after each function, since a
+    prefix macro cannot emit a trailing pragma. ~49-50K resident against
+    40,569: **does not fit a Disk BASIC load.**
+
+**Both resident figures are SCALED from the C64's 52% resident fraction, not
+linked**, and after `serial.c` measured 2,960 against a scaled 2,400 last
+week, that is exactly the kind of figure not to trust.
+
+**STILL NOT MEASURED, and it is now the deciding number**: the TPA under
+MSX-DOS or Nextor, where page 0 is RAM and a program starts at `$0100`. It is
+probably much larger than 40,569 -- but the system files (`NEXTOR.SYS` or
+`MSXDOS2.SYS` plus `COMMAND2.COM`) are not installed, and "probably" is what
+this scope has been wrong about twice.
+
 ### Verdict
 
-**This is the cheapest candidate ever scoped here, and by some distance.** The
-shared half compiles unmodified today, the video driver exists on a sibling
-chip, far memory and overlays both have hardware for them, the emulator is
-installed and a working C port of the sibling project is on disk to read. The
-costs are a new CPU family, a compiler with a live ICE in our largest file,
-and four hardware traps that are already written down.
+~~**This is the cheapest candidate ever scoped here, and by some distance.**~~
+**DOWNGRADED 2026-09-24.** The shared half compiles only with its overlays
+switched off; the small compiler cannot express them, and the one that can
+is 38% bigger. What survives: the video driver exists on a sibling chip, the
+mapper and 128K of VRAM give far memory and overlay storage for free, the
+emulator runs headless, and a working C port of the sibling project is on
+disk. What was added: **either a restructuring of shared source that thirteen
+ports compile, or a compiler whose code does not fit a Disk BASIC load** --
+and an MSX-DOS TPA that decides between them and has not been read.
 
 **It is still not on the list**, and this file is not a reason to put it there.
