@@ -1,9 +1,9 @@
 /* The seams this port has NOT written yet, stubbed against the real headers
-   so a signature cannot drift. Video is real now (msx2vid.c); these go one
-   by one as each driver lands, and `make probe` reports what is left. */
+   so a signature cannot drift. Video (msx2vid.c) and sound (msx2snd.c) are
+   real now; these go one by one as each driver lands, and `make probe`
+   reports what is left. */
 #include <stdint.h>
 #include "input.h"
-#include "sid.h"
 #include "storage.h"
 #include "farmem.h"
 #include "overlay.h"
@@ -11,15 +11,6 @@
 uint16_t kb_entropy;
 void kb_init(void) {}
 char kb_waitkey(void) { return 0; }
-
-void snd_init(void) {}
-void snd_off(void) {}
-void snd_beep(void) {}
-void snd_toggle(void) {}
-uint8_t snd_enabled(void) { return 0; }
-void snd_music(uint8_t t) { (void)t; }
-void snd_effect(uint8_t t) { (void)t; }
-void snd_music_data(unsigned int b, unsigned char ok) { (void)b; (void)ok; }
 
 uint8_t plat_open(const char *n) { (void)n; return 0; }
 uint16_t plat_read(void *b, uint16_t l) { (void)b; (void)l; return 0; }

@@ -1,4 +1,5 @@
-# The MSX2 port, as far as it goes: an MSX-DOS .COM for a V9938 machine.
+# The MSX2 port, as far as it goes: an MSX-DOS .COM for a V9938 machine,
+# with a video driver (msx2vid.c) and a PSG sound driver (msx2snd.c).
 #
 # NOT A PORT YET and not in RELEASE_PORTS or `make ports` -- this directory
 # is the SCOPE's working half (NOTES.md, "SCOPE: an MSX2 port"). Tooling
@@ -7,7 +8,11 @@
 #
 #   make hello   build/HELLO.COM -- the video driver's first-light test
 #   make disk    build/disk/     -- boot files + HELLO.COM + AUTOEXEC.BAT
-#   make probe   link the WHOLE GAME with the real driver and stubs for the
+#   make sound   build/SNDTEST.COM -- the PSG driver's first-sound test, on
+#                its own disk (build/sdisk/)
+#   make listen  boot that disk, record what it plays, and check PITCH and
+#                TEMPO against MUSIC.DAT (tools/listen.py)
+#   make probe   link the WHOLE GAME with the real drivers and stubs for the
 #                rest, and report what is left of the MSX-DOS TPA
 #
 # FLAGS ARE A MAKE VARIABLE, NOT A SHELL ONE: zsh does not word-split an
@@ -33,7 +38,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all hello disk probe shot clean
+.PHONY: all hello disk sound listen probe shot clean
 all: hello
 
 build:
@@ -66,8 +71,55 @@ disk: build/HELLO.COM
 	printf 'HELLO\r\n' > build/disk/AUTOEXEC.BAT
 	@ls build/disk
 
-build/probe.ihx: $(BASE_REL) $(SHARED_REL) build/stubs.rel Makefile
-	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) build/stubs.rel -o $@
+# MUSIC.DAT is this port's own composition, from tools/make_music.py -- never
+# the note data tools/gen_music.py extracts from EGATREK.EXE.
+../c128/build/music.dat:
+	cd .. && python3 tools/make_music.py >/dev/null
+
+# The test links the file in as an array; the game will read it from far
+# memory. build/musicdat.c is a TEST fixture and nothing ships it.
+build/musicdat.c: ../c128/build/music.dat | build
+	python3 -c 'import sys; b=open(sys.argv[1],"rb").read(); print("const unsigned char music_dat[%d] = {%s};" % (len(b), ",".join(map(str,b))))' $< > $@
+build/musicdat.rel: build/musicdat.c
+	$(SDCC) $(CFLAGS) -c $< -o $@
+
+SND_REL = build/crt0.rel build/msx2snd.rel build/music_data.rel build/musicdat.rel build/sndtest.rel
+
+build/SNDTEST.COM: $(SND_REL) Makefile
+	$(SDCC) $(LDFLAGS) $(SND_REL) -o build/sndtest.ihx
+	$(MAKEBIN) -s 65536 -o 256 -p build/sndtest.ihx $@
+	@echo "$@: $$(wc -c < $@) bytes"
+
+sound: build/SNDTEST.COM
+	rm -rf build/sdisk && mkdir -p build/sdisk
+	cp $(TOOLCHAIN)/nextor-boot/* build/sdisk/
+	cp build/SNDTEST.COM build/sdisk/
+	printf 'SNDTEST\r\n' > build/sdisk/AUTOEXEC.BAT
+
+# OVER THE CONTROL CHANNEL, NOT -script. On 2026-09-24 a plain `-script` run
+# stopped emulating (1% CPU, the script's own realtime timer never fired)
+# while the same machine under `-control stdio` + `set power on` ran
+# normally. The control channel starts the machine POWERED OFF; the script
+# powers it on after arming itself.
+# MACHINE=Sony_HB-F1XD EXT='-ext ram512k' reaches the NTSC branch: a 60Hz
+# Japanese MSX2, which has 64K and no mapper, so Nextor needs the cartridge.
+MACHINE ?= Philips_NMS_8250
+EXT ?=
+listen: sound ../c128/build/music.dat
+	@T=$$(mktemp -d); \
+	 cp $(HOME)/.openMSX/share/settings.xml $$T/settings.xml 2>/dev/null || printf '<settings>\n</settings>\n' > $$T/settings.xml; \
+	 rm -f build/listen.txt; \
+	 ( printf '<openmsx-control>\n'; sleep 2; \
+	   printf '<command>source $(CURDIR)/tools/listen.tcl</command>\n'; \
+	   printf '<command>set power on</command>\n'; \
+	   for i in $$(seq 240); do [ -f build/listen.txt ] && break; sleep 1; done ) | \
+	 OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
+	   -machine $(MACHINE) $(EXT) -ext SunriseIDE_Nextor -diska $(CURDIR)/build/sdisk -control stdio >/dev/null 2>&1; \
+	 rm -rf $$T
+	python3 tools/listen.py build/listen.wav ../c128/build/music.dat build/listen.txt
+
+build/probe.ihx: $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/stubs.rel Makefile
+	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/stubs.rel -o $@
 
 probe: build/probe.ihx
 	@python3 tools/probe.py build/probe.map build/stubs.rel $(TPA_TOP)

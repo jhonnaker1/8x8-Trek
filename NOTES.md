@@ -13464,6 +13464,65 @@ stack on this compiler.
     which shadows the system one and pulls in `cmoc.h`. The font is included
     BY PATH.
 
+### THE SOUND DRIVER, WRITTEN AND HEARD BY MEASUREMENT (2026-09-24)
+
+`msx2snd.c` is **`falconsnd.c`'s player on the same chip** -- the ST and the
+Falcon have a YM2149, a licensed AY-3-8910 -- with the clock, the timer and
+the latch discipline changed. Two voices as everywhere: A music, B effects.
+
+**THE PSG'S ADDRESS LATCH IS SHARED WITH THE BIOS, MEASURED rather than
+remembered.** An openMSX watchpoint on port `$A0`, with only HELLO idling,
+logged **1,004 writes in five seconds**, all from the BIOS interrupt handler
+at `$110E` selecting R#15 then R#14 to read the joystick triggers. An
+interrupt between our latch and our data would send our value to R#14, or to
+R#15, which is an OUTPUT port. So every PSG write is a `di`..`ei` pair, like
+the VDP's. **uno's `msxsnd.c` writes the PSG with no such guard** -- a latent
+bug in the sibling, noted here, not fixed from here.
+
+**A JIFFY IS NOT 1/50 OF A SECOND, and the first recording said so.** The
+driver ticks the tracks' 18.2065Hz off `JIFFY`, and its steps were computed
+from round 50 and 60. `make listen` records SNDTEST.COM in openMSX and fits
+the tick rate from every note onset: **+0.35%, fast**. The V9938 runs 1368
+clocks a line at 21.477MHz, 313 lines a PAL frame and 262 an NTSC one --
+**50.159Hz and 59.923Hz** -- and 50.159/50 is the error to the digit. The
+check's 0.5% tolerance had PASSED it; it is 0.1% now, and the corrected steps
+measure −0.02% (PAL) and −0.00% (NTSC).
+
+**`make listen`, what it checks, and that it can fail:**
+
+    beep          440.40Hz, 13 frames PAL / 15 NTSC
+    title track   33 notes in 12s, all present, NINE distinct pitches each
+                  against the period the driver must write -- all 0.00%
+    tick rate     18.20 PAL / 18.21 NTSC, want 18.2065
+    effect        SFX_B's six notes, 240..90Hz, all present
+
+  * the clock constant deliberately 3% wrong: **every pitch FAILED and make
+    went red**; the tempo check had already moved by the predicted ratio;
+  * the NTSC branch was REACHED, not reasoned about: a Sony HB-F1XD, 60Hz,
+    with `-ext ram512k` because it has 64K and Nextor needs a mapper
+    (`make listen MACHINE=Sony_HB-F1XD EXT='-ext ram512k'`).
+
+**MUSIC.DAT is linked into SNDTEST as an array** behind a test-only
+`far_read`, because far memory is not written yet. The game will not do that.
+
+**The openMSX rig changed under me the same evening:** a plain `-script` run
+stopped emulating -- 1% CPU, the script's own `after realtime` never fired,
+`make shot` included, where it had worked hours before. The same machine
+under `-control stdio` and `set power on` ran normally, so `make listen`
+drives it that way. **Cause NOT established**; `make shot` still uses
+`-script` and may need the same change.
+
+    msx2snd.c                   724 bytes code, 25 data
+    WHOLE GAME, video + sound   image $0100..$D572 = 54,387
+    MSX-DOS TPA                 55,814
+    LEFT for keyboard, storage, far memory AND the stack   1,427
+
+Sound cost 738 of the 2,165. **The stack is now the unknown that decides it**
+-- under MSX-DOS it grows down from the top of the TPA into those 1,427 -- and
+nobody has measured one on this compiler. The keyboard through the BIOS and
+far memory in VRAM page 1 are both small; storage through DOS2's handle calls
+is the next largest.
+
 ### Verdict
 
 ~~**This is the cheapest candidate ever scoped here, and by some distance.**~~
