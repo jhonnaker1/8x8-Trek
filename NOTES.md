@@ -13341,11 +13341,45 @@ program, 65,497 including every overlay.
 linked**, and after `serial.c` measured 2,960 against a scaled 2,400 last
 week, that is exactly the kind of figure not to trust.
 
-**STILL NOT MEASURED, and it is now the deciding number**: the TPA under
-MSX-DOS or Nextor, where page 0 is RAM and a program starts at `$0100`. It is
-probably much larger than 40,569 -- but the system files (`NEXTOR.SYS` or
-`MSXDOS2.SYS` plus `COMMAND2.COM`) are not installed, and "probably" is what
-this scope has been wrong about twice.
+**THE TPA, MEASURED THE SAME DAY: 55,814 BYTES.** `MSXDOS2.SYS` and
+`COMMAND2.COM` downloaded from Konamiman/Nextor at tag `v2.1.1` (they are in
+its source tree, not its release assets), booted on the NMS 8250 through
+openMSX's `SunriseIDE_Nextor` extension -- the banner reads *Nextor version
+2.31 alpha 2*, the kernel being the extension ROM's -- to a `C>` prompt:
+
+    page 0 = mapper segment 3, $0005 = C3 (the DOS's JP)
+    BDOS $DB06    TPA $0100..$DB05 = 55,814 bytes
+
+**THE FIRST READING SAID 38,808 AND WAS TWO I/O PORT NUMBERS.** `peek 6` goes
+through the CPU's slot selection at that instant, and a machine idling at
+the prompt is inside the BIOS, so page 0 showed ROM: `$0005..$0007` read
+`1B 98 98` -- the font pointer's high byte and the VDP data ports. It was
+caught only because the probe also printed `$0005` and a DOS puts a `JP`
+there. **Read the RAM through the mapper, and make the instrument vouch for
+itself.** The tool that does both is now `~/msx-toolchain/tools/tpa.sh`.
+
+**What 55,814 does to the two routes -- ESTIMATES, stated as such:**
+
+    SDCC, NO overlays at all
+      shared code (measured)                    49,248
+      MSX drivers + data (not measured)       ~ 10,000
+                                              --------
+                                              ~ 59,000   ~3,500 OVER
+
+    sccz80 with per-function overlays
+      resident (scaled from the C64's 52%)    ~ 54,000   ~1,800 under
+
+**Both land within their own estimation error of the line**, which is
+[[instruments-that-cannot-see]] #61's warning in reverse: the denominator is
+now MEASURED, so the doubt has moved to the numerator. **The next step is a
+real link** -- the whole shared half under SDCC with stub drivers, placed at
+`$0100`, which turns "~59,000" into a number. It needs no emulator.
+
+A route this scope has not tried: SDCC CAN put whole FILES in their own
+segments. If ~3,500 bytes of whole files can be paged without breaking
+rule 4, the per-function restructure is unnecessary -- but `serial.c`, the
+obvious candidate, is called from resident `save_write` in `ui.c`, which is
+the same trap the C64 OS analysis walked into.
 
 ### Verdict
 
