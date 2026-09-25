@@ -19,7 +19,8 @@ for line in open(stubs_rel, errors='replace'):
 used = end - 0x100
 print("  image $0100..$%04X          %6d bytes" % (end - 1, used))
 print("  of which unwritten stubs    %6d" % stubs)
-print("  MSX-DOS TPA $0100..$%04X    %6d" % (tpa_top - 1, tpa_top - 0x100))
+print("  MSX-DOS TPA $0100..$%04X    %6d   AS THE SHELL -- under COMMAND2\n"
+      "                                        it is 1,280 less (make shell)" % (tpa_top - 1, tpa_top - 0x100))
 left = tpa_top - end
 print("  LEFT for the unwritten drivers and the stack: %d bytes%s" %
       (left, "" if left > 0 else "  -- OVER"))

@@ -13350,6 +13350,12 @@ openMSX's `SunriseIDE_Nextor` extension -- the banner reads *Nextor version
     page 0 = mapper segment 3, $0005 = C3 (the DOS's JP)
     BDOS $DB06    TPA $0100..$DB05 = 55,814 bytes
 
+**[CORRECTED 2026-09-25: that is the TPA AT THE PROMPT, and no program ever
+sees it.** COMMAND2 keeps 1,280 bytes resident above whatever it runs; a
+`.COM` launched from the prompt or a batch file gets `($0006) = $D606`,
+**54,534 bytes**. Only a program installed AS the shell gets 55,814. See "THE
+STACK, AND WHO OWNS THE TOP OF THE TPA" below.]
+
 **THE FIRST READING SAID 38,808 AND WAS TWO I/O PORT NUMBERS.** `peek 6` goes
 through the CPU's slot selection at that instant, and a machine idling at
 the prompt is inside the BIOS, so page 0 showed ROM: `$0005..$0007` read
@@ -13517,6 +13523,10 @@ drives it that way. **Cause NOT established**; `make shot` still uses
     MSX-DOS TPA                 55,814
     LEFT for keyboard, storage, far memory AND the stack   1,427
 
+**[2026-09-25: those 1,427 hold only for a game installed AS THE SHELL; under
+COMMAND2 the TPA is 1,280 smaller. See "THE STACK, AND WHO OWNS THE TOP OF
+THE TPA" below.]**
+
 Sound cost 738 of the 2,165. **The stack is now the unknown that decides it**
 -- under MSX-DOS it grows down from the top of the TPA into those 1,427 -- and
 nobody has measured one on this compiler. The keyboard through the BIOS and
@@ -13541,5 +13551,89 @@ is the Amiga's shape and the overlay problem vanishes rather than being
 solved. Tight, with the drivers the one unmeasured piece -- but for the first
 time in this scope both the denominator and the shared numerator are
 MEASURED, not estimated.
+
+### THE STACK, AND WHO OWNS THE TOP OF THE TPA (2026-09-25)
+
+**Set out to measure the stack; found the denominator wrong first.** STKTEST
+printed its own SP as `$D5FC`, 1,290 bytes under the TPA top this scope had
+used since 2026-09-24 -- with the game image already ending at `$D572`. A
+breakpoint at `$0100` on every program start said why:
+
+    MSXDOS2.SYS          entered with ($0006) = $0000
+    COMMAND2.COM         entered with ($0006) = $DB06, SP = $DCFE
+    STKTEST, from AUTOEXEC.BAT OR typed at the prompt   ($0006) = $D606
+
+**COMMAND2 keeps 1,280 bytes resident above any program it runs**, and the
+first of them is a `JP` that `($0006)` points to: **it intercepts every BDOS
+call.** A program that took them anyway (filled with HALT, then exited)
+**never got its prompt back**; one that took them and then called `_OPEN`
+**hung in the call**. The TPA was measured at the prompt, where no program
+is running -- #61's trap again, THE SIZE OF A RESOURCE IS NOT ITS
+AVAILABILITY, on the very number this scope called MEASURED.
+
+    under COMMAND2        TPA 54,534   game image 54,391   LEFT    143
+    AS THE SHELL          TPA 55,814   game image 54,391   LEFT  1,423
+
+(54,391, not the 54,387 of the sound section: `ld sp,(6)` below is 4 bytes.)
+
+**So the game must BE the shell** -- the boot disk's `COMMAND2.COM`, entered
+by MSXDOS2.SYS with the whole TPA and BDOS direct. `make shell` proves it:
+installed that way, `shelltest.c` fills all 1,280 bytes with HALT, reads a
+file through BDOS and prints -- **SHELL OK**. The costs: **it cannot be run
+from a user's own DOS prompt** (143 bytes does not hold a stack), and **quit
+cannot return to DOS**, because there is none; it resets the machine, as a
+cartridge game does. `crt0.s` now does `ld sp,(6)`, because the shell is
+entered with SP at `$DCFE`, up in DOS's own area above the BDOS entry.
+
+**THE STACK ITSELF, in two halves, neither able to see the other's:**
+
+`make stackbound` -- **static**, `tools/stackdepth.py` over the probe link's
+own `.asm`: every frame, the call graph from `main()`, the depth at every
+label carried by the jumps that reach it. It fails on recursion or a call
+through a pointer (there are none), charges SDCC's runtime helpers 16 bytes
+each, and was checked against a hand count of two frames and a known-answer
+file (a 300-byte local: 304; a recursion: rejected). **Its first version
+was wrong by 35 bytes**: under sdcccall(1) the CALLEE pops its stack
+arguments (`pop hl; pop af; jp (hl)`), and counting the caller's pushes
+without seeing them come off put `_ui_info_panel` at 135 when it allocates
+72 + IX. The hand count caught it; the known-answer test could not have.
+
+    deepest path   main > enemy_turn > run_turn > ui_message > ... >
+                   msg_box > put_tenths > put_num > scr_put > glyph_ptr
+    static bound   200 bytes, +2 for crt0's call
+    deepest ENTRY  bios_chgmod 7    kb_waitkey 100    far_read 120
+                   plat_read_all 56    plat_write_all 33
+
+`make stack` -- **dynamic**, STKTEST.COM as the shell: fill 1K below SP with a
+sentinel, run one thing, read how deep it wrote. Against a CONTROL (nothing,
+interrupts off) of 12:
+
+    interrupt handler, 5s, keys typed      14   -- NOT ON OUR STACK
+    BDOS open/read/close                   12   -- NOT ON OUR STACK
+    CHSNS/CHGET via CALSLT                 28, and once 78
+    CHGET waiting in the BIOS              88
+    CHGMOD 0 via CALSLT                   126
+
+**While DOS owns page 0 its interrupt handler and its BDOS switch stacks.**
+**CALSLT puts the BIOS ROM in page 0, and an interrupt then runs the ROM's
+handler on OURS**: a short CHSNS caught one on the first run (78) and missed
+on the second (28) -- a race, not a figure -- so a CHGET that WAITS in the
+BIOS with interrupts on forced it: 88.
+
+**What that decides:** the worst is CHGMOD at the top of `main` -- 9 + 126,
+plus up to 88 if a frame lands inside it, ~223 -- against 202 static on the
+hot path, where no BIOS runs. **~225 bytes; reserve 256.** And the keyboard
+driver must NOT call the BIOS: the handler already fills the key buffer in
+page-3 RAM (`GETPNT`/`PUTPNT`), so reading that directly keeps the ROM's
+handler off the deepest path entirely. From a key loop entered 100 deep,
+CHSNS/CHGET would have been ~188 -- inside the budget, but for nothing.
+
+    AS THE SHELL, LEFT                          1,423
+    stack, reserved                              -256
+    LEFT for keyboard, storage and far memory   ~1,167
+
+**The static bound is not a measurement of the game.** When keyboard,
+storage and far memory exist the game can RUN, and a sentinel fill between
+the image end and SP, read after a session, is the real figure.
 
 **It is still not on the list**, and this file is not a reason to put it there.

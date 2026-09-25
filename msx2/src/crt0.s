@@ -1,6 +1,9 @@
 	;; MSX-DOS .COM startup for SDCC. DOS loads the file at $0100 and jumps
-	;; there with SP already just below BDOS, at the top of the TPA -- so the
-	;; stack is left where DOS put it rather than nominated.
+	;; there. The stack goes at ($0006), the top of the TPA, EXPLICITLY:
+	;; under COMMAND2 that is $D606 and DOS had put SP just below it, but a
+	;; program loaded AS THE SHELL (the boot disk's COMMAND2.COM) is entered
+	;; with SP=$DCFE, up in DOS's own area above the $DB06 BDOS entry --
+	;; measured 2026-09-25. `ld sp,(6)` is right in both.
 	;;
 	;; DOS does NOT zero memory, so _DATA is zeroed and initialisers copied
 	;; here -- the same two fixups uno's cartridge crt0 does, for the same
@@ -20,6 +23,7 @@
 	.area	_HOME
 	.area	_CODE
 init::
+	ld	sp, (0x0006)
 	call	gsinit
 	call	_main
 	ld	c, #0x00		; main returned: _TERM0
