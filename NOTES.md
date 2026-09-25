@@ -13375,6 +13375,40 @@ now MEASURED, so the doubt has moved to the numerator. **The next step is a
 real link** -- the whole shared half under SDCC with stub drivers, placed at
 `$0100`, which turns "~59,000" into a number. It needs no emulator.
 
+**THE REAL LINK, 2026-09-24 -- AND THE ESTIMATE WAS PESSIMISTIC BY ~7K.** The
+whole shared half under SDCC, NO overlays, the 80-column `layout.c`, linked
+behind a minimal `crt0` at `$0100` as an MSX-DOS `.COM`, with the 31 seam
+symbols stubbed in a separate file written against the real headers (SDCC
+has no LTO, so separately compiled stubs cannot fold their callers smaller):
+
+    module        code    data            SDCC areas
+    trek        18,041     712            _CODE   49,630  (constants included)
+    ui          13,420     978            _DATA    2,147
+    main        11,826     112            other       35
+    serial       2,046       6
+    planet       1,565     103            image  $0100..$CB69   51,818
+    hof          1,524       0            minus stubs              -67
+    layout         475       0            shared half + runtime  51,751
+    strpool        349     268
+    runtime        299   (pulled in by the link)
+
+    MSX-DOS TPA $0100..$DB05                             55,814
+    LEFT FOR EVERY DRIVER AND THE STACK                   4,063
+
+**Both halves of the estimate were wrong in the same direction.** Data is
+2,188 bytes, not the ~6,500 carried over from the C64 -- the C64's 2K
+message log sits behind the `vdc_data_*` seam, and on an MSX that seam is
+VRAM, which has 128K. And SDCC's runtime is 299 bytes, not kilobytes.
+
+**THIS BUILD HAS NO OVERLAYS AT ALL, which is the point.** If the MSX
+drivers and the stack fit in 4,063 bytes, the port needs no overlay machinery
+-- the Amiga, Falcon and ST shape -- and SDCC's file-scoped `codeseg`, the
+blocker that downgraded this scope the same morning, stops mattering. Still
+not measured: the drivers themselves. Video is the largest, and its 6x8 font
+can live in VRAM or a mapper segment and cost no TPA bytes; the next step is
+to write that driver and link it. **And `core/trek.c` only compiles under
+`--nolospre` or `--opt-code-speed` -- the live SDCC ICE is on this route.**
+
 A route this scope has not tried: SDCC CAN put whole FILES in their own
 segments. If ~3,500 bytes of whole files can be paged without breaking
 rule 4, the per-function restructure is unnecessary -- but `serial.c`, the
@@ -13390,7 +13424,14 @@ is 38% bigger. What survives: the video driver exists on a sibling chip, the
 mapper and 128K of VRAM give far memory and overlay storage for free, the
 emulator runs headless, and a working C port of the sibling project is on
 disk. What was added: **either a restructuring of shared source that thirteen
-ports compile, or a compiler whose code does not fit a Disk BASIC load** --
-and an MSX-DOS TPA that decides between them and has not been read.
+ports compile, or a compiler whose code does not fit a Disk BASIC load.**
+
+**AND THEN A THIRD ROUTE, THE SAME DAY, WHICH NOW LEADS: no overlays at all.**
+The TPA is 55,814 and the real SDCC link of the whole shared half is 51,751,
+leaving **4,063 bytes for every driver and the stack**. If they fit, the port
+is the Amiga's shape and the overlay problem vanishes rather than being
+solved. Tight, with the drivers the one unmeasured piece -- but for the first
+time in this scope both the denominator and the shared numerator are
+MEASURED, not estimated.
 
 **It is still not on the list**, and this file is not a reason to put it there.
