@@ -1,16 +1,11 @@
 /* The seams this port has NOT written yet, stubbed against the real headers
-   so a signature cannot drift. Video (msx2vid.c) and sound (msx2snd.c) are
-   real now; these go one by one as each driver lands, and `make probe`
-   reports what is left. */
+   so a signature cannot drift. Video (msx2vid.c), sound (msx2snd.c) and the
+   keyboard (msx2input.c) are real now; these go one by one as each driver
+   lands, and `make probe` reports what is left. */
 #include <stdint.h>
-#include "input.h"
 #include "storage.h"
 #include "farmem.h"
 #include "overlay.h"
-
-uint16_t kb_entropy;
-void kb_init(void) {}
-char kb_waitkey(void) { return 0; }
 
 uint8_t plat_open(const char *n) { (void)n; return 0; }
 uint16_t plat_read(void *b, uint16_t l) { (void)b; (void)l; return 0; }

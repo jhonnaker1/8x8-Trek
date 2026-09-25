@@ -13636,4 +13636,41 @@ CHSNS/CHGET would have been ~188 -- inside the budget, but for nothing.
 storage and far memory exist the game can RUN, and a sentinel fill between
 the image end and SP, read after a session, is the real figure.
 
+### THE KEYBOARD DRIVER, TYPED AT THROUGH THE MATRIX (2026-09-25)
+
+`msx2input.c` reads **the BIOS's own key buffer directly** -- the 40-byte ring
+at `KEYBUF` ($FBF0) with `GETPNT`/`PUTPNT`, in page 3 and so RAM whatever page
+0 holds -- and never calls the BIOS. The previous section is why: CHSNS/CHGET
+go through CALSLT, and an interrupt taken inside one runs the ROM's handler on
+our stack (88 bytes), from a loop entered 100 deep. The handler already scans
+the matrix, decodes SHIFT and CAPS and repeats keys; reading its ring is what
+CHGET does inside. `kb_init` sets GETPNT to PUTPNT.
+
+`make kbd` installs KBTEST as the shell and types into openMSX's EMULATED KEY
+MATRIX, so the BIOS queues the keys and the driver reads the ring: the real
+path, nothing poked. It checks the three things a lazy test passes:
+
+  * **kb_init DISCARDS**: an `x` is typed before it runs; without it the
+    first key would be X;
+  * **every mapping**: `a Z 1 , . q SPACE - RETURN ESC BS UP DOWN` read as
+    `65 90 49 44 46 81 32 45 13 27 20 1 2` -- folded, and the two cursor keys
+    that have no ASCII;
+  * **the poll loop runs**: kb_entropy moved.
+
+With folding deliberately removed it FAILED and make went red. **Two
+instrument faults on the way, neither the driver's:** openMSX's `type -`
+types NOTHING, because a leading `-` is where `type` reads its own options
+(the ring went from SPACE straight to RETURN; the minus now goes in as matrix
+row 1 bit 2), and the 40-column screen WRAPPED the result line, so the first
+correct run failed its grep. A timeout now dumps `got`, kb_entropy, both
+pointers and the ring -- which is how the first was found in one run.
+
+    msx2input.c                  130 bytes code, 2 data
+    the key loop's own stack      32 (snd_poll > music_tick > a divide),
+                                  entered 100 deep: ~132, under the 202
+    WHOLE GAME, video + sound + keyboard   image $0100..$D5F5 = 54,518
+    AS THE SHELL, LEFT           1,296
+    stack, reserved               -256
+    LEFT for storage and far memory   ~1,040
+
 **It is still not on the list**, and this file is not a reason to put it there.

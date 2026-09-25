@@ -12,6 +12,7 @@
 #                its own disk (build/sdisk/)
 #   make listen  boot that disk, record what it plays, and check PITCH and
 #                TEMPO against MUSIC.DAT (tools/listen.py)
+#   make kbd     the keyboard driver, typed at through the emulated matrix
 #   make shell   prove a program installed AS COMMAND2.COM owns the whole TPA
 #                (src/shelltest.c) -- under COMMAND2 it gets 1,280 bytes less
 #   make stackbound  a STATIC bound on the game's stack (tools/stackdepth.py)
@@ -46,7 +47,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all hello disk sound listen shell stack stackbound probe shot clean
+.PHONY: all hello disk sound listen kbd shell stack stackbound probe shot clean
 all: hello
 
 build:
@@ -110,6 +111,26 @@ build/STKTEST.COM: $(STK_REL) Makefile
 	$(SDCC) $(LDFLAGS) $(STK_REL) -o build/stktest.ihx
 	$(MAKEBIN) -s 65536 -o 256 -p build/stktest.ihx $@
 
+KB_REL = build/crt0.rel build/msxbios.rel build/msx2vid.rel build/msx2input.rel build/kbtest.rel
+
+build/KBTEST.COM: $(KB_REL) Makefile
+	$(SDCC) $(LDFLAGS) $(KB_REL) -o build/kbtest.ihx
+	$(MAKEBIN) -s 65536 -o 256 -p build/kbtest.ihx $@
+
+# Typed through openMSX's emulated key matrix, so the BIOS handler queues the
+# keys and the driver reads its ring -- the real path, nothing poked. The
+# expected line is the input.h values of: (x discarded) a Z 1 , . q SPACE -
+# RETURN ESC BS UP DOWN.
+KB_WANT = KEYS 65 90 49 44 46 81 32 45 13 27 20 1 2
+kbd: build/KBTEST.COM
+	rm -rf build/kbdisk && mkdir -p build/kbdisk
+	cp $(TOOLCHAIN)/nextor-boot/MSXDOS2.SYS build/kbdisk/
+	cp build/KBTEST.COM build/kbdisk/COMMAND2.COM
+	$(call openmsx_run,build/kbdisk,tools/kbtest.tcl,build/kbtest.txt,KB_GOT=0x$$(awk '$$2=="_got"{print $$1}' build/kbtest.map) KB_ENT=0x$$(awk '$$2=="_kb_entropy"{print $$1}' build/kbtest.map))
+	@grep -v '^ *$$' build/kbtest.txt
+	@# The screen is 40 columns and the line WRAPS -- join it before matching.
+	@tr '\n' ' ' < build/kbtest.txt | tr -s ' ' | grep -q '$(KB_WANT) ' && echo "kbd: PASS" || { echo "kbd: FAIL, want $(KB_WANT)"; false; }
+
 build/SHELLTEST.COM: build/crt0.rel build/shelltest.rel Makefile
 	$(SDCC) $(LDFLAGS) build/crt0.rel build/shelltest.rel -o build/shelltest.ihx
 	$(MAKEBIN) -s 65536 -o 256 -p build/shelltest.ihx $@
@@ -126,7 +147,7 @@ shell: build/SHELLTEST.COM
 # dynamic: what the BIOS, its interrupt handler and BDOS push onto OUR stack,
 # which no reading of our code can see. The budget needs the sum.
 PROBE_ASM = src/msxbios.s build/msx2vid.asm $(SHARED_REL:.rel=.asm) \
-            build/msx2snd.asm build/stubs.asm
+            build/msx2snd.asm build/msx2input.asm build/stubs.asm
 stackbound: build/probe.ihx
 	@python3 tools/stackdepth.py _main $(PROBE_ASM)
 
@@ -144,7 +165,8 @@ stack: build/STKTEST.COM
 # while the same machine under `-control stdio` + `set power on` ran
 # normally. The control channel starts the machine POWERED OFF; the script
 # powers it on after arming itself.
-# $(1) disk dir, $(2) Tcl script, $(3) the file the script writes when done.
+# $(1) disk dir, $(2) Tcl script, $(3) the file the script writes when done,
+# $(4) optional environment for the script.
 define openmsx_run
 	@T=$$(mktemp -d); \
 	 cp $(HOME)/.openMSX/share/settings.xml $$T/settings.xml 2>/dev/null || printf "<!DOCTYPE settings SYSTEM 'settings.dtd'>\n<settings/>\n" > $$T/settings.xml; \
@@ -153,7 +175,7 @@ define openmsx_run
 	   printf '<command>source $(CURDIR)/$(2)</command>\n'; \
 	   printf '<command>set power on</command>\n'; \
 	   for i in $$(seq 240); do [ -f $(3) ] && break; sleep 1; done ) | \
-	 OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
+	 $(4) OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
 	   -machine $(MACHINE) $(EXT) -ext SunriseIDE_Nextor -diska $(CURDIR)/$(1) -control stdio >/dev/null 2>&1; \
 	 rm -rf $$T
 endef
@@ -166,8 +188,8 @@ listen: sound ../c128/build/music.dat
 	$(call openmsx_run,build/sdisk,tools/listen.tcl,build/listen.txt)
 	python3 tools/listen.py build/listen.wav ../c128/build/music.dat build/listen.txt
 
-build/probe.ihx: $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/stubs.rel Makefile
-	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/stubs.rel -o $@
+build/probe.ihx: $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/msx2input.rel build/stubs.rel Makefile
+	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/msx2input.rel build/stubs.rel -o $@
 
 probe: build/probe.ihx
 	@python3 tools/probe.py build/probe.map build/stubs.rel $(TPA_TOP)
@@ -180,7 +202,7 @@ clean:
 shot: disk
 	@T=$$(mktemp -d); \
 	 cp $(HOME)/.openMSX/share/settings.xml $$T/settings.xml 2>/dev/null || printf "<!DOCTYPE settings SYSTEM 'settings.dtd'>\n<settings/>\n" > $$T/settings.xml; \
-	 OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
+	 $(4) OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
 	   -machine Philips_NMS_8250 -ext SunriseIDE_Nextor -diska $(CURDIR)/build/disk \
 	   -script $(CURDIR)/tools/shot.tcl >/dev/null 2>&1; \
 	 rm -rf $$T; cat build/shot.txt; echo "build/shot.png"
