@@ -13729,4 +13729,35 @@ game to the Commodore 128* -- the C128's strings. The MSX2 needs a
 first page takes ~5s to draw; the DOS reads for it are ~0.15s, so it is the
 text path. Not yet measured.
 
+### THE STACK, MEASURED ON THE RUNNING GAME (2026-09-25)
+
+`make stackrun`: at the game's own entry -- a breakpoint at `$0100` that acts
+only when `($0006) = $DB06` -- openMSX fills everything from the image end
+(`$D8CF`) to the stack top with a sentinel, before crt0 runs an instruction.
+The fill costs the game no bytes. A scripted session, then the lowest byte no
+longer the sentinel. Page 3 is RAM whatever page 0 holds, so poke and peek
+are safe there, as they were not in page 0 (#62).
+
+    boot to the title (CHGMOD through CALSLT)     155
+    + setup, a move INTO FIRE, the Mongols' turn  193 .. 208
+    + three laser volleys, SAVE, quit, evaluation,
+      hall of fame, play again, RESTORE           208   -- no deeper
+
+**208 bytes**, between the static bound's hot path (202) and its worst case
+through CHGMOD (~223): the two methods agree. **359 of the 567 were never
+touched.** The static bound stays the limit -- a session reaches only what it
+exercises -- so the reserve stays 256, and ~311 bytes are genuinely spare.
+
+**The session also proved the seams end to end:** SAVE wrote `egatrek.sav`
+(625 bytes) through DOS2 and it came back on the host; RESTORE brought the
+game back exactly (stardate 3510.6, energy 3132, 20 Mongols, quadrant 2.5
+sector 4.4, laser temperature still cooling); the evaluation and the hall of
+fame drew; a replay went round the whole loop.
+
+**AND THE CONSOLE REPAINT TAKES ABOUT TEN SECONDS.** Frames through a restore
+show it filling in over ~10s of emulated time; a dialog takes ~5, a briefing
+page ~5. The C64 OS experiment repainted in 0.196s. It is the text path
+(scr_put a glyph at a time, eight address setups a cell), not the disk. **This
+is now the port's worst defect, and it is not yet measured.**
+
 **It is still not on the list**, and this file is not a reason to put it there.

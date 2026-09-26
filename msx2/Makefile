@@ -15,6 +15,7 @@
 #   make listen  boot that disk, record what it plays, and check PITCH and
 #                TEMPO against MUSIC.DAT (tools/listen.py)
 #   make gameshot  photograph the running game from VRAM (SHOT_TIMES, SHOT_KEYS)
+#   make stackrun  the RUNNING game's stack, by sentinel over a full session
 #   make dostime what one DOS2 call costs -- why storage reads ahead
 #   make kbd     the keyboard driver, typed at through the emulated matrix
 #   make shell   prove a program installed AS COMMAND2.COM owns the whole TPA
@@ -51,7 +52,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all game gameshot dostime hello disk sound listen kbd shell stack stackbound probe shot clean
+.PHONY: all game gameshot stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
 all: hello
 
 build:
@@ -237,8 +238,20 @@ game: build/EGATREK.COM ../c128/build/strings.dat ../c128/build/music.dat
 # typing SHOT_KEYS ("t:text,...") on the way. build/game_<t>.png.
 SHOT_TIMES ?= 30
 SHOT_KEYS ?=
+# STACK=1 also measures the stack: sentinel from the image end up, read at
+# the end of the run (tools/gameshot.tcl).
+STACK_FROM = $(if $(STACK),$(shell python3 tools/probe.py --end build/probe.map))
+# THE SESSION the running game's stack was measured over (2026-09-25): boot,
+# title and music, setup, a move INTO FIRE, three laser volleys and the
+# Mongols' turns, SAVE, quit, evaluation, hall of fame, play again, RESTORE.
+# The galaxy is seeded from key timing, so these times are the galaxy.
+STACK_SESSION = 25:\r,35:n\r,38:n\r,41:jamie\r,44:1\r,47:trek\r,54:m\r,60:2.5 4.4\r,84:l\r,99:500\r,103:500\r,107:500\r,123:\r,136:save\r,152:\r,160:q\r,165:y,197:\r,216:\r,224:y\r,240:\r,250:y\r,256:\r
+stackrun:
+	$(MAKE) gameshot STACK=1 SHOT_TIMES=82,122,150,174,215,280 SHOT_KEYS='$(STACK_SESSION)'
+
 gameshot: game
-	$(call openmsx_run,build/gdisk,tools/gameshot.tcl,build/gameshot_done,SHOT_TIMES='$(SHOT_TIMES)' SHOT_KEYS='$(SHOT_KEYS)')
+	$(call openmsx_run,build/gdisk,tools/gameshot.tcl,build/gameshot_done,SHOT_TIMES='$(SHOT_TIMES)' SHOT_KEYS='$(SHOT_KEYS)' STACK_FROM='$(STACK_FROM)')
+	@[ -z "$(STACK_FROM)" ] || cat build/stack.txt
 	@for t in $$(echo $(SHOT_TIMES) | tr ',' ' '); do python3 tools/vram2png.py build/vram_$$t.bin build/pal_$$t.bin build/game_$$t.png; done
 
 probe: build/probe.ihx

@@ -5,13 +5,23 @@ Reads the linker map for where the image ENDS -- the last byte of any area --
 rather than summing sizes, so gaps and ordering cannot fool it. The stubs are
 subtracted and named, because they are what the unwritten drivers replace."""
 import re, sys
+
+def image_end(mapf):
+    end = 0
+    for line in open(mapf):
+        m = re.match(r'^(_\w+)\s+([0-9A-F]{8})\s+([0-9A-F]{8})\s', line)
+        if m and not m.group(1).startswith('_HEADER'):
+            a, n = int(m.group(2), 16), int(m.group(3), 16)
+            if n: end = max(end, a + n)
+    return end
+
+# --end MAP: print the first byte past the image, for the stack sentinel.
+if sys.argv[1] == "--end":
+    print(hex(image_end(sys.argv[2])))
+    sys.exit(0)
+
 mapf, stubs_rel, tpa_top = sys.argv[1], sys.argv[2], int(sys.argv[3], 0)
-end = 0
-for line in open(mapf):
-    m = re.match(r'^(_\w+)\s+([0-9A-F]{8})\s+([0-9A-F]{8})\s', line)
-    if m and not m.group(1).startswith('_HEADER'):
-        a, n = int(m.group(2), 16), int(m.group(3), 16)
-        if n: end = max(end, a + n)
+end = image_end(mapf)
 stubs = 0
 for line in open(stubs_rel, errors='replace'):
     m = re.match(r'^A (\S+) size (\S+)', line)
