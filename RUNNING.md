@@ -1,6 +1,6 @@
 # How to run each one
 
-Eighteen assets, thirteen machines. Every port plays the same game from the same
+Nineteen assets, fourteen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Five assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The eight `.zip` assets carry theirs inside as `README.txt`.
+put one. The nine `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -112,7 +112,7 @@ badge.
 **Messages arrive on the tactical page**, which is where `C` puts you back, so
 you will not miss one by looking at the chart.
 
-At the `CMD:` prompt, **type `HELP` for the full list of orders**. Every prompt
+At the `CMD:` prompt, type an order and press RETURN — **the briefing explains the orders; there is no `HELP` command**, and one the ship does not know gets NO SUCH ORDER. Every prompt
 in this game is a line editor — type your answer and press RETURN, including
 the ones that ask Y or N. **RUN/STOP is ESC**, which is what the self-destruct
 prompt wants when it offers you a way out.
@@ -426,6 +426,33 @@ storage is asynchronous, so the game advances the music while it waits.
 
 **This keyboard has no ESC key.** It is a C64 layout: RUN/STOP is what the game
 means by escape, and DEL is backspace.
+
+### `egatrek-msx2.zip` — MSX2 **+ MSX-DOS 2** (Nextor)
+
+**An MSX2 with 128K of RAM and an MSX-DOS 2 kernel** — Nextor, which most SD
+and IDE cartridges carry, or the MSX-DOS 2 cartridge. **A stock MSX2 will not
+run it**: without that kernel the machine boots the disk into Disk BASIC and
+the game never starts. Unzip, and boot from `egatrek-msx2.dsk`, a 720K disk
+image. Under [openMSX](https://openmsx.org/), with the NMS 8250's own ROMs:
+
+    openmsx -machine Philips_NMS_8250 -ext SunriseIDE_Nextor -diska egatrek-msx2.dsk
+
+**The game is the disk's `COMMAND2.COM`** — the program MSX-DOS 2 starts after
+it boots — so there is no DOS prompt, and **it cannot be started from one**:
+the command interpreter keeps 1,280 bytes the game needs, and the game says
+*NOT ENOUGH MEMORY FOR EGA TREK* and hands the prompt back. **Quitting
+restarts the game**: MSX-DOS 2 loads the shell again, which is the game.
+
+The boot takes about twenty seconds from a floppy. Played under openMSX on a
+Philips NMS 8250 and a Sony HB-F1XD, each with Nextor; PAL and NTSC both, with
+the music at the same tempo on either. Real hardware and the MSX-DOS 2
+cartridge have not been tried.
+
+**SCREEN 7**, 512×212 in sixteen colours, with EGA's own palette programmed
+into the V9938 and the console drawn in 6×8 cells; a full console takes about
+two seconds. Sound is the PSG, music on one channel and effects on another.
+`MSXDOS2.SYS` is MSX-DOS 2 as Nextor distributes it, included under
+`NEXTOR-LICENSE.txt` beside the disk — free of charge and not for sale.
 
 ---
 

@@ -18,7 +18,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUNNING = os.path.join(ROOT, "RUNNING.md")
 WORDS = {1:"one",2:"two",3:"three",4:"four",5:"five",6:"six",7:"seven",
          8:"eight",9:"nine",10:"ten",11:"eleven",12:"twelve",13:"thirteen",
-         14:"fourteen",15:"fifteen",16:"sixteen",17:"seventeen",18:"eighteen"}
+         14:"fourteen",15:"fifteen",16:"sixteen",17:"seventeen",18:"eighteen",
+         19:"nineteen",20:"twenty",21:"twenty-one",22:"twenty-two",
+         23:"twenty-three",24:"twenty-four",25:"twenty-five"}
+# THE TABLE STOPPED AT EIGHTEEN, and v0.22.0 was the first release with more
+# assets than that: the MSX2 made nineteen, RUNNING.md said "Nineteen", and
+# this failed saying 'nineteen' was not 19 -- because it could not spell 19.
 
 
 def ports():

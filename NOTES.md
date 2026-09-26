@@ -13145,7 +13145,14 @@ Two shapes, and only one is worth anything:
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.
 
-## SCOPE: an MSX2 port (2026-09-19) -- A RECORD, NOT A CANDIDATE
+## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
+
+**RELEASED, the fourteenth port.** Jamie played the release disk on
+2026-09-25 -- *"it works perfect. cut the release"* -- which is his decision to
+add it to a list he had closed on 2026-09-18; the other six candidates that
+day stay ruled out. The sections below are the record in the order it
+happened, and the early ones are superseded by the later: read from the
+bottom for the current state, and `msx2/README.md` for the summary.
 
 Asked for by Jamie the day after the port list closed, and filed on the same
 footing as the C64 OS scope above it: **nothing here is a reason to propose
@@ -13870,4 +13877,40 @@ the DOS 2 cartridge). A 60Hz Sony HB-F1XD + mapper + Nextor gives the same
 nothing -- not an option for a 54K game with three data files, short of a
 banked MegaROM.
 
-**It is still not on the list**, and this file is not a reason to put it there.
+### THE CUT (2026-09-25)
+
+`make release` -> `msx2/build/egatrek-msx2.zip`: the `.dsk`, `README.txt`
+and `NEXTOR-LICENSE.txt`, a folder of the same name, as the other zip ports.
+`make verify` is static and prints the budget and the string count, and was
+shown to FAIL on each -- a 400-byte stack reserve, and a STRINGS.DAT one
+string off. `msx2` joined `RELEASE_PORTS` and `tools/check_ports.py`.
+
+**Reading the shipped READMEs, as the cut is for, found a claim wrong in
+ELEVEN of them**: *"Type HELP at the command line for the order list."* There
+is no HELP command -- typed on the running game it answers *COMPUTER: NO SUCH
+ORDER* -- and the briefing, which the corrected lines now point at, explains
+the orders but never mentions RAY, the death ray. So the correction says
+"explains", not "lists every". And seven carried *"ten of the thirteen
+ports"*, which a fourteenth made wrong; they now say "most of these ports",
+since a count corrected once gets deleted, not renumbered.
+
+**`tools/check_assets.py` could not spell nineteen**: its number-words table
+stopped at eighteen, and this was the first release past that.
+
+**AND THE ROOT GATE WAS RED FOR THE WHOLE MSX2 RUN.** `make all` failed
+`check-makefiles`: `msx2/Makefile`'s rule for the sound test's embedded
+MUSIC.DAT did not list the Makefile as a prerequisite -- written in `e49f008`,
+the sound driver, and every MSX2 commit after it pushed over a red root gate,
+because I ran each port's own targets and never `make all`. The same shape as
+the 49-commit red gate of 2026-09-19; the rule shipped nothing, but the lesson
+is the same one. Fixed, and `make all` exits 0.
+
+**Measured against the published v0.21.0 by content: EVERY binary changed**,
+and for exactly one reason -- the only shared-source commit since the tag is
+`fd88ad7`, item 72, the MAIN VIEWER's orbit title in `ui.c`. STR_COUNT stayed
+334. READMEs changed where the HELP line or the port count was (eleven older
+ones); the stock CoCo 3's and the IIgs's did not. MUSIC.DAT inside the staged
+MSX2 disk is `cc5947dc5e0fb88f` (SHA-1), the composition, read out of the
+image's own FAT; and the STAGED disk, unzipped and booted with the README's
+command line, drew the title and the console.
+

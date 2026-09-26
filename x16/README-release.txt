@@ -36,7 +36,8 @@ will crash the game, so keep the set together.
 PLAYING IT
 
 Answer Y to the briefing at startup; it is twelve pages and explains the whole
-game. Type HELP at the command line for the order list.
+game. The orders are explained there -- there is no HELP command, and an order
+the ship does not know gets NO SUCH ORDER.
 
 Commands are typed at CMD: in the COMMAND panel and are not case sensitive.
 The arrow keys raise and lower shields, which is what the original's own help
@@ -62,12 +63,12 @@ its number. This port draws the orbit page while orbiting and the nearest
 enemy otherwise.
 
 That is a decision rather than an unknown. The mechanism was read out of the
-original binary, the ten pages were then costed, and they are not being
-built. The viewer panel is seventeen columns on every port -- three of the
-ten page titles are wider than that on their own -- and the page routines
-would want about four thousand bytes of memory that ten of the thirteen
-ports do not have. Keeping them on the disk instead would mean a disk read
-every few seconds while you sat thinking about your next order.
+original binary, the ten pages were then costed, and they are not being built.
+The viewer panel is seventeen columns on every port -- three of the ten page
+titles are wider than that on their own -- and the page routines would want
+about four thousand bytes of memory that most of these ports do not have.
+Keeping them on the disk instead would mean a disk read every few seconds
+while you sat thinking about your next order.
 
 SAVE writes EGATREK.SAV into the directory you started from, and the setup
 screen offers to restore it. The hall of fame is TREK.SCR and is created on

@@ -304,7 +304,7 @@ static void hmmc_cell(void) __naked
         out  (0x99), a
         ei
         ld   b, #8
-        jr   5$                 ; row 0's first byte is already gone
+        jr   5$                 ; row 0 first byte is already gone
     3$: xor  a                  ; bits 5/4
         bit  5, (hl)
         jr   z, 4$

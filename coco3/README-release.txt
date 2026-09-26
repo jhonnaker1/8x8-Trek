@@ -87,7 +87,8 @@ Quitting hands the monitor back to the CoCo and restarts BASIC.
 PLAYING IT
 
 Answer Y to the briefing at startup; it is twelve pages and explains the whole
-game. Type HELP at the command line for the order list.
+game. The orders are explained there -- there is no HELP command, and an order
+the ship does not know gets NO SUCH ORDER.
 
 Commands are typed at CMD: in the COMMAND panel and are not case sensitive.
 The setup prompts are line editors -- type the answer and press RETURN.

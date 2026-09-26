@@ -7,13 +7,19 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: thirteen ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: fourteen ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
 > the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
 > **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs**, the
-> **Commodore Plus/4** and the **Foenix F256K** are feature complete and
-> released as [v0.21.0](../../releases/latest), 2026-09-18.
-> The **F256K** is the new one, and it is the first machine here where **more
+> **Commodore Plus/4**, the **Foenix F256K** and the **MSX2** are feature
+> complete and released as [v0.22.0](../../releases/latest), 2026-09-25.
+> The **MSX2** is the new one, and the first **Z80**: SDCC, **no overlays at
+> all**, and a 54K game in a 55,814-byte TPA -- which it gets only by being the
+> boot disk's `COMMAND2.COM`, because the command interpreter keeps 1,280 bytes
+> of it for itself. Far memory is the V9938's second 64K of VRAM, and the
+> console draws with the chip's command engine. It needs an **MSX-DOS 2
+> kernel** (Nextor). See [`msx2/README.md`](msx2/README.md).
+> The **F256K**, before it, was the first machine here where **more
 > RAM did not mean fewer overlays**: it has 448K free and the 6502 still sees
 > only 64K, so the code is still banked — but an overlay swap is **one store to
 > an MMU slot** instead of a disk read, and the game touches the card once at
@@ -22,7 +28,7 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > 8×8. See [`f256k/README.md`](f256k/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All thirteen have been played by a person**, and that is where the faults
+> **All fourteen have been played by a person**, and that is where the faults
 > have come from: the CoCo 3's sitting found a console repaint taking **12
 > seconds** that no benchmark here had ever timed, because the benchmark
 > measured the blit and the blit was a third of the cost. The C64's sitting
@@ -159,7 +165,7 @@ ways, black holes, supernovae, the death ray's five outcomes, tractor beams,
 wear and tear, reinforcements, a spy who sabotages a system, a settlement with
 a clock running against it, and a damaged computer eating your star chart.
 
-**Colour per message is built** (2026-09-10) and ships on all thirteen released ports. EGA
+**Colour per message is built** (2026-09-10) and ships on every released port. EGA
 Trek has no department palette at all -- every message site in the original
 picks its own colour -- so this is a department map plus per-event exceptions,
 attributed by reading every message site in the binary back to the `SetColor`
@@ -202,9 +208,9 @@ half at a time. What a machine actually has to carry is **enough colour** —
 and, as of 2026-09-14, that no longer separates the candidates either. See
 *What is left* below.
 
-**Released, in the order they shipped.** Nine of the thirteen put the console
-on an 80-column grid of per-cell colour, which is the shape it was designed on;
-four page it across 40-column halves.
+**Released, in the order they shipped.** The C64, the ST, the IIgs and the
+Plus/4 page the console across 40-column halves; every other port puts it on
+an 80-column grid of per-cell colour, which is the shape it was designed on.
 
 | Platform | Display | CPU | Status |
 |---|---|---|---|
@@ -221,6 +227,7 @@ four page it across 40-column halves.
 | **Apple IIgs** | Super Hi-Res 320×200, 8×8 cells, EGA's own palette | 65816 | **Released** — [v0.19.0](../../releases/latest). **No ProDOS on the disk**: block 0 is this port's own loader and the slot's block driver reads the game, so there is nothing to type. Ensoniq 5503 on two oscillators. **PAL and NTSC are detected** from the VGC line counter — and the *minimum* discriminates, not the maximum. See [`iigs/README.md`](iigs/README.md) |
 | **Commodore Plus/4** | TED 40×25 text, 121 colours | 8501 | **Released** — [v0.20.0](../../releases/latest). **Parked twice before it booted.** `$FF3F` removes *both* ROMs where the C64's `$01` leaves the KERNAL mapped, so every system call needs a shim and the port needs its own keyboard seam — a fourth seam, bigger than the other three. TED's two tone generators give music and effects a voice each. See [`plus4/README.md`](plus4/README.md) |
 | **Foenix F256K** | Tiny Vicky 80×30 text at **8×16**, EGA's own palette | W65C02S | **Released** — [v0.21.0](../../releases/latest). **448K of RAM and the code is still banked**, because the 6502 still sees 64K — but a swap is **one store to an MMU slot**, so the card is read once at startup and the music plays through a load. The screen is 80×60 at 8×8, so the port doubles the cell instead: **the closest any 8-bit port gets to the original's 8×14 proportions.** Sound is the SN76489 PSG, which every owner has; the SID sockets are not used. See [`f256k/README.md`](f256k/README.md) |
+| **MSX2** + MSX-DOS 2 (Nextor) | V9938 SCREEN 7, 512×212, 80×25 in 6×8 cells, EGA's own palette | Z80 | **Released** — [v0.22.0](../../releases/latest). **The first Z80, and no overlays at all**: SDCC cannot express this project's per-function overlays, and the whole game plus every driver fits the TPA with 343 bytes to spare — **as the boot disk's `COMMAND2.COM`**, because the command interpreter keeps 1,280 bytes of any program it runs. Far memory in VRAM page 1; the console drawn by the V9938's command engine, one HMMC a character; the PSG on two channels. **A stock MSX2 cannot run it** — the disk needs Nextor or the MSX-DOS 2 cartridge. See [`msx2/README.md`](msx2/README.md) |
 
 
 ### How much colour the console actually needs
@@ -375,13 +382,15 @@ V9938's sibling chip, and that yields 80×25 with six-pixel cells. The V9958
 driver is the thing that transfers; the text mode was never the plan.
 **MSX2 comes out of this stronger, not weaker.**
 
-**THE LIST IS CLOSED. Jamie ruled out every remaining candidate on
-2026-09-18** — MSX2 and the CBM-II P500 in the table below, and five machines
+**THE LIST WAS CLOSED on 2026-09-18, when Jamie ruled out every remaining
+candidate** — MSX2 and the CBM-II P500 in the table below, and five machines
 that were never surveyed here at all: Thomson MO5/TO7-70, Sharp MZ-700/800,
-Enterprise 64/128, Robotron KC 85/3-4 and the NEC PC-8801. **That is an
+Enterprise 64/128, Robotron KC 85/3-4 and the NEC PC-8801. **That was an
 interest decision, not a measurement**, which is why nothing on this page
-reopens it: MSX2 and the P500 still pass every check here and are still not
-going to be built. **Cheapest first**; every struck-through row is a shipped
+reopens it. **One exception, and it was his: the MSX2.** He asked for a scope
+the next day and then for the work, played the result on 2026-09-25 -- *"it
+works perfect. cut the release"* -- and it shipped as v0.22.0. The P500 and the
+five unsurveyed machines stay ruled out. **Cheapest first**; every struck-through row is a shipped
 port, and the rest is kept for how the costing was done — and for the two rows
 that record how wrong it was.
 
@@ -389,7 +398,7 @@ that record how wrong it was.
 |---|---|---|
 | ~~**CoCo 3, no SuperSprite**~~ | **Released** — [v0.18.1](../../releases/latest), and **run on a real CoCo 3 from a CoCo SDC**, the first port here to reach hardware that is actually owned. The estimate said video, sound and far memory; all three were written. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) | |
 | ~~**Commodore Plus/4**~~ | **Released** — [v0.20.0](../../releases/latest), and **this row's costing was wrong**. Video and sound were written and measured in a day; the link script was the easy part. What it never costed is the banking: **`$FF3F` removes BOTH ROMs**, where the C64's `$01` leaves the KERNAL mapped — so every KERNAL call needs a shim, the 6502's vectors vanish with the ROM, and masking interrupts costs `GETIN`. **A fourth seam, bigger than the other three.** See [`plus4/README.md`](plus4/README.md) | `layout40.c`, `ui.c`, `strpool.c`, `core/`, and the C64's `storage.c`/`overlay.c` — which did link unchanged |
-| **MSX2** | a fifth CPU family and its toolchain | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
+| ~~**MSX2**~~ | **Released** — [v0.22.0](../../releases/latest). *"A fifth CPU family and its toolchain"* was right and cheap -- SDCC was already installed. What it missed was the **memory**: SDCC cannot express this project's per-function overlays, so the game runs with none, and fits only **as the boot disk's shell**, because the command interpreter keeps 1,280 bytes of any program it runs. See [`msx2/README.md`](msx2/README.md) | the CoCo 3's V9958 driver — the V9938 is its sibling, and it gives **80×25** through SCREEN 7's bitmap with six-pixel cells, which is the card port's exact arrangement. `layout.c`, not `layout40.c` |
 | ~~**Foenix F256K**~~ | **Released** — [v0.21.0](../../releases/latest). See the row above for how wrong this costing was | `layout.c`, `ui.c`, `strpool.c`, `core/` |
 | **CBM-II P500** | **every screen write banked** — the opposite of the C64's "it is the same driver" | a real VIC-II and a real SID |
 | ~~**Apple IIgs**~~ | **Released** — [v0.19.0](../../releases/latest), and played the day it was finished. The estimate said a hand-built linker config, an Ensoniq driver, ProDOS storage and cross-bank writes. Four of those were right; **ProDOS was not done at all** — the disk carries its own boot block, its own directory and its own reader over the drive firmware, so nothing on it is Apple's. See [`iigs/README.md`](iigs/README.md) | |
@@ -644,12 +653,12 @@ The Amiga needs bebbo's `m68k-amigaos-gcc` at `$AMIGA_TOOLCHAIN` (default
 Atari code on it — this port's own boot record, directory and storage seam. It
 needed Atari DOS 2.5 until 2026-09-11, which is why it had no release artefact.
 
-**The eight ports not spelled out above build the same way, and this section
-is not going to list them one at a time** — that is how it came to say "the
-other three ports" when there were thirteen. The shape is the same in every
-port directory: **`make release` exists in all thirteen** and builds that
-port's release artefact, **`make verify` in twelve** (the Amiga has nothing
-for one to check, which `tools/check_ports.py` says in full), and the
+**The ports not spelled out above build the same way, and this section is
+not going to list or count them** — that is how it came to say "the other
+three ports" when there were thirteen. The shape is the same in every port
+directory: **`make release` exists in every one** and builds that port's
+release artefact, **`make verify` in every one but the Amiga** (which has
+nothing for one to check, as `tools/check_ports.py` says in full), and the
 toolchain each one wants is named in its own `README.md`. **`make ports`
 from the root runs every port's real gate** and skips any whose cross
 compiler is not installed, naming the variable it looked for.

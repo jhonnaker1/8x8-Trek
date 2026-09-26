@@ -6,6 +6,8 @@
 # outside the repository lives in ~/msx-toolchain (Nextor boot files, the
 # TPA tool); the compiler is Homebrew's SDCC.
 #
+#   make verify  the static gate `make ports` runs -- budget and string count
+#   make release build/egatrek-msx2.zip -- the disk, README, Nextor's licence
 #   make game    build/gdisk/ -- THE GAME: MSXDOS2.SYS, the game installed as
 #                COMMAND2.COM, and its data files
 #   make dsk     build/egatrek-msx2.dsk -- THE RELEASE DISK IMAGE
@@ -55,8 +57,8 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all game dsk dskshot memcheck gameshot profile stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
-all: hello
+.PHONY: all verify release game dsk dskshot memcheck gameshot profile stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
+all: game
 
 build:
 	mkdir -p build
@@ -97,7 +99,7 @@ disk: build/HELLO.COM
 # memory. build/musicdat.c is a TEST fixture and nothing ships it.
 build/musicdat.c: ../c128/build/music.dat | build
 	python3 -c 'import sys; b=open(sys.argv[1],"rb").read(); print("const unsigned char music_dat[%d] = {%s};" % (len(b), ",".join(map(str,b))))' $< > $@
-build/musicdat.rel: build/musicdat.c
+build/musicdat.rel: build/musicdat.c Makefile
 	$(SDCC) $(CFLAGS) -c $< -o $@
 
 SND_REL = build/crt0.rel build/msx2snd.rel build/music_data.rel build/musicdat.rel build/sndtest.rel
@@ -257,6 +259,27 @@ memcheck: build/EGATREK.COM
 	$(call openmsx_run,build/pdisk,tools/memcheck.tcl,build/memcheck_done)
 	@grep -v '^ *$$' build/memcheck.txt
 	@grep -q 'NOT ENOUGH MEMORY' build/memcheck.txt && grep -q 'EGATREK .COM' build/memcheck.txt && echo "memcheck: PASS (refused, and DOS survived)"
+
+# THE GATE `make ports` RUNS: static, no emulator, and it prints the numbers
+# -- the budget against the stack reserve, and the string count the binary
+# and STRINGS.DAT must agree on (tools/verify_msx2.py).
+verify: build/probe.ihx build/strings.dat
+	@python3 tools/verify_msx2.py build/probe.map src/crt0.s ../c128/src/strdata.h build/strings.dat $(TPA_TOP)
+
+# THE RELEASE ASSET: a zip of a folder of the same name, as the other zip ports
+# ship -- the disk image, the README, and Nextor's licence, which MSXDOS2.SYS
+# may be redistributed under only WITH its notice. The rule clears its own old
+# zips first: the root Makefile globs build/egatrek-*.zip.
+REL = build/rel
+release: dsk verify
+	@rm -f build/egatrek-*.zip
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-msx2
+	@cp $(DSK) $(REL)/egatrek-msx2/
+	@cp README-release.txt $(REL)/egatrek-msx2/README.txt
+	@cp NEXTOR-LICENSE.txt $(REL)/egatrek-msx2/NEXTOR-LICENSE.txt
+	@cd $(REL) && zip -q -r ../egatrek-msx2.zip egatrek-msx2
+	@echo "release: build/egatrek-msx2.zip"
+	@unzip -l build/egatrek-msx2.zip | tail -n +4
 
 # BOOT THE IMAGE, not the directory it was made from: the staged artefact is
 # what gets played. Title, then setup and the console.

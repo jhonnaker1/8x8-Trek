@@ -50,9 +50,10 @@ Nothing is lost, only moved -- every panel of the eighty-column console is on
 one page or the other. Messages arrive on the tactical page, which is where
 any key puts you back, so you will not miss one by looking at the chart.
 
-At the CMD: prompt, type HELP for the full list of orders. Every prompt in
-this game is a line editor -- type your answer and press RETURN, including
-the ones that ask Y or N.
+At the CMD: prompt, type an order and press RETURN. The briefing explains the
+orders -- there is no HELP command, and one the ship does not know gets NO
+SUCH ORDER. Every prompt in this game is a line editor -- type your answer and
+press RETURN, including the ones that ask Y or N.
 
 
 WHAT IS IN THE FOLDER
