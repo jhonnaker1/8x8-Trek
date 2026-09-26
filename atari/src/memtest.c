@@ -15,7 +15,8 @@
  * so it costs nothing there; it costs a misread screenshot here.
  *
  * IT PLANTS ITS OWN PATTERN rather than loading a file, because the storage
- * seam is still stubbed. That is not a weaker test of the addressing: far_load
+ * seam was still stubbed when this was written (it is real now -- atarisio.c,
+ * shipped in v0.13.0). That is not a weaker test of the addressing: far_load
  * pushes bytes through far_write, which is what this uses, so what is exercised
  * is the same arithmetic on the same window. What it does NOT cover is
  * far_load's chunking against a real file, and that waits on storage.

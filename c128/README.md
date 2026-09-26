@@ -29,8 +29,8 @@ it here along with every other port's gate and checks the exit status.
 Run `make verify`; it is the only authority, and every number below moves.
 
 ```
-lowram (writable data) 2172 of 2304 used, 132 free
-resident $1c01..$a94d, 1459 bytes free below the window at $af00
+lowram (writable data) 2172 of 2304 used, 132 free          (2026-09-26)
+resident $1c01..$a9c7, 1337 bytes free below the window at $af00
 11 overlays at $af00, distinct load addresses, largest 3892 of 4094 bytes
 ```
 

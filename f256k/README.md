@@ -167,6 +167,9 @@ the sound driver still stubbed:
 | the window, `$A000-$BFFF` | 8,192 |
 | **thirteen** overlay images | 35,880 total, **largest 3,929** — 4,263 spare in the window |
 
+That was before the sound driver. **`make verify` prints the live budget** —
+on 2026-09-26, 30,291 resident and **2,477 spare**, largest overlay unchanged.
+
 ### Thirteen, because this is the port that can afford the opt-in pair
 
 With eleven overlays and the real loaders in, resident overflowed by **1,161

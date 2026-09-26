@@ -3627,7 +3627,7 @@ static void test_game_state_and_score(void) {
         ok(sh.rate_pts == 0,                  "sheet: no rate credit unfinished");
         ok(sh.mongol_pts == 0 && sh.commander_pts == 0, "sheet: nothing killed");
         ok(sh.rescues == 0 && sh.enemy_bases == 0 && sh.stars == 0,
-           "sheet: the three unimplemented items are zero");
+           "sheet: no rescues, enemy bases or stars in this game");
         ok(sh.ship_lost_pts == -200,          "sheet: the ship-loss penalty");
         ok(sh.total == -930,                  "sheet: total matches the original");
         ok(sh.total == sh.ship_lost_pts + sh.rescue_pts + sh.incomplete_pts

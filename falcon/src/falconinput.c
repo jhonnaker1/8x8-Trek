@@ -21,8 +21,8 @@
  *   snd_poll() is the sound driver's only chance to run. On the ATARI 8-bit
  *   port it was missing from BOTH loops of kb_waitkey and the port shipped
  *   SILENT -- the driver had even been dead-stripped, so nothing pointed at
- *   the cause. It is called here from the first build, while the driver it
- *   calls is still a stub, precisely so that adding the real one is not also
+ *   the cause. It was called here from the first build, while the driver it
+ *   called was still a stub, precisely so that adding the real one is not also
  *   a chance to forget this.
  */
 #include <stdint.h>

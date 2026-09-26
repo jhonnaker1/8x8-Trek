@@ -115,7 +115,8 @@ reaches 59. The serialiser is about 2.5K of code.
 **The size is a ratio, not a round number**: 184 against 86 is 2.14×, where the
 C128 reserves 256 against its measured 143, which is 1.79×. It costs the
 largest overlay 80 of its 155 spare bytes, leaving 75, and `make verify` checks
-both halves.
+both halves. (43 since 2026-09-19, when the window gave the soft stack 32
+bytes -- `make verify` prints the live figure.)
 
 **And the resource is managed now, not merely reported.** `verify_prg.py`
 carries the measured demand and a floor of 144 and fails below either. The old

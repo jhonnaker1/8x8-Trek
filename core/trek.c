@@ -2883,9 +2883,12 @@ void trek_score_sheet(ScoreSheet *s) {
     uint16_t elapsed = (uint16_t)(ship.stardate - STARDATE_START);
     uint16_t kills   = (uint16_t)(ship.killed + ship.killed_cmd);
 
-    /* Mechanisms that do not exist yet. Written out rather than left to a
-       memset so it is obvious they are zero by absence, not by outcome.
-       Stars left this list on 2026-08-29 when SEC_NOVA was built. */
+    /* Written out rather than left to a memset, so it is obvious which are
+       zero by ABSENCE and which by outcome. Only enemy bases is still a
+       mechanism that does not exist; rescues joined on 2026-08-26 with the
+       planet model (planet.c counts them) and stars on 2026-08-29 when
+       SEC_NOVA was built. This comment said all three were missing for a
+       month after two of them were not. */
     s->rescues     = ship.rescues;
     s->rescue_pts  = ship.lost ? 0
                    : (int16_t)(ship.rescues * SCORE_PER_RESCUE);

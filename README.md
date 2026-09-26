@@ -44,7 +44,8 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > into it **unchanged**, and eight more shared files come across behind four
 > `#ifdef` blocks totalling nine lines. Two files are genuinely the C64's,
 > about 215 lines. Against every expectation in its own scope note it is also
-> **roomy, with 6,112 bytes spare where the 40-column C128 has 304**, because
+> **roomy, with 6,112 bytes spare at its release where the 40-column C128 had 304**
+> (5,991 on 2026-09-26; `make -C c64 verify` prints the live figure), because
 > BASIC's 8K is plain RAM and the overlay window moved into the 4K at `$C000`
 > that nothing ever covers. (This said "the roomiest 8-bit port here" and was
 > **false when written**: the CoCo 3 card port, released first, has 9,046. The
@@ -428,7 +429,7 @@ output is a measurement, and this one was a recollection.**
 
 The C64 measured it, so this is arithmetic rather than an estimate.
 
-**What comes free: 10,557 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
+**What comes free: 10,560 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
 and `core/` entire — plus, on anything VIC-shaped, `vic.c`, `input.c`, `sid.c`,
 `storage.c` and `overlay.c` as well. **What the C64 wrote: 882 lines, of which
 222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 660 are a linker

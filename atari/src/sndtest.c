@@ -24,8 +24,9 @@
 
 #define CMD ((volatile unsigned char *)0x0600)
 
-/* A TRACK PLANTED BY HAND, because the storage seam is still stubbed and
-   MUSIC.DAT cannot be read yet. Two notes at the extremes of what the real
+/* A TRACK PLANTED BY HAND, because when this was written the storage seam
+   was still stubbed and MUSIC.DAT could not be read (atarisio.c has read it
+   since v0.13.0; the plant stays, as a known input). Two notes at the extremes of what the real
    music uses -- 930 Hz is its highest and 90 Hz its lowest -- so the pitch
    check covers the whole range the divide has to serve, and a zero pair ends
    it so the loop-back path is exercised too. Durations are player ticks at
