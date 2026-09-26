@@ -13760,4 +13760,44 @@ page ~5. The C64 OS experiment repainted in 0.196s. It is the text path
 (scr_put a glyph at a time, eight address setups a cell), not the disk. **This
 is now the port's worst defect, and it is not yet measured.**
 
+### THE REPAINT, PROFILED: 8.5 SECONDS TO 3.0 (2026-09-25)
+
+**Research first** (msx.org, Grauw's V9938 timing measurements, and the
+MSX2ANSI library -- 80x25, 16 colours, SCREEN 7, SDCC, GPL-3.0, read for
+technique only): sprites off gives the CPU 88 VRAM slots a line instead of 31
+and roughly doubles the blitter; one HMMC per character instead of an address
+set per row; the inner loop in assembly; HMMV for anything blank.
+
+**Then measured before changing anything.** `make profile` samples the PC
+every 2ms of emulated time, with page 0's slot (a page-0 PC is the BIOS or the
+game depending on it), and maps samples to functions through RELOCATED
+LISTINGS (`-Wl-u`), which name static functions too -- the listing link is
+checked to produce the identical image. Over the first console draw:
+
+    8.5s of drawing: scr_put ~55%, vdp_write_at_hl ~13%, glyph_ptr 3-25%,
+                     the BIOS interrupt handler a steady ~9% (idle too)
+    3,970 scr_put calls, ~2.1ms each -- and 2,667 OF THEM FROM NINE CALLS
+    TO scr_fill_rect, every one filling a panel with SPACES
+
+**A blank cell is one colour, so a rectangle of them is one HMMV** -- the
+command `scr_clear` already used, now a shared helper. That took the draw to
+3.5s. The profile then put `glyph_ptr` at 25-35%: fourteen box glyphs searched
+linearly and COPIED for every border cell, where a border is one glyph forty
+times running. A one-entry cache and a pointer instead of a copy: 3.0s.
+
+**Both proved pixel-identical, not eyeballed**: the same save restored on the
+old driver and the new, VRAM dumped after both finished -- all 54,272 bytes
+equal, on a console with 9,274 non-zero bytes. A restored game is the
+fixture because a NEW game's galaxy is seeded from key timing, and a faster
+draw changes the timing.
+
+    first console draw        8.5s -> 3.5s (HMMV fills) -> 3.0s (box cache)
+    cost                      +147 bytes (fill path), -33 (cache): 453 LEFT
+                              (make's 1-second timestamps gave three wrong
+                              readings of this first -- delete the .rel)
+
+**What is left is the per-character path itself**: `scr_put`'s eight address
+setups, for the ~1,300 characters that are real text, borders and bars. That
+is the MSX2ANSI shape -- sprites off, one HMMC a character, in assembly.
+
 **It is still not on the list**, and this file is not a reason to put it there.

@@ -15,6 +15,7 @@
 #   make listen  boot that disk, record what it plays, and check PITCH and
 #                TEMPO against MUSIC.DAT (tools/listen.py)
 #   make gameshot  photograph the running game from VRAM (SHOT_TIMES, SHOT_KEYS)
+#   make profile   where the time goes: PC samples mapped to functions
 #   make stackrun  the RUNNING game's stack, by sentinel over a full session
 #   make dostime what one DOS2 call costs -- why storage reads ahead
 #   make kbd     the keyboard driver, typed at through the emulated matrix
@@ -52,7 +53,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all game gameshot stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
+.PHONY: all game gameshot profile stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
 all: hello
 
 build:
@@ -232,6 +233,7 @@ game: build/EGATREK.COM ../c128/build/strings.dat ../c128/build/music.dat
 	cp ../c128/build/strings.dat build/gdisk/STRINGS.DAT
 	cp ../c128/build/music.dat build/gdisk/MUSIC.DAT
 	cp ../c128/src/briefing.txt build/gdisk/BRIEF.TXT
+	@[ -z "$(GAME_SAVE)" ] || cp $(GAME_SAVE) build/gdisk/egatrek.sav
 	@ls -l build/gdisk
 
 # Photograph the running game from VRAM (tools/vram2png.py) at SHOT_TIMES,
@@ -246,6 +248,20 @@ STACK_FROM = $(if $(STACK),$(shell python3 tools/probe.py --end build/probe.map)
 # Mongols' turns, SAVE, quit, evaluation, hall of fame, play again, RESTORE.
 # The galaxy is seeded from key timing, so these times are the galaxy.
 STACK_SESSION = 25:\r,35:n\r,38:n\r,41:jamie\r,44:1\r,47:trek\r,54:m\r,60:2.5 4.4\r,84:l\r,99:500\r,103:500\r,107:500\r,123:\r,136:save\r,152:\r,160:q\r,165:y,197:\r,216:\r,224:y\r,240:\r,250:y\r,256:\r
+# WHERE THE TIME GOES: PC samples every PROF_STEP between PROF_FROM and
+# PROF_TO, mapped to functions through relocated listings (-Wl-u). The
+# listing link must produce the SAME image as the game, and is checked.
+PROF_FROM ?= 47.5
+PROF_TO   ?= 64
+PROF_STEP ?= 0.002
+PROF_KEYS ?= 25:\r,35:n\r,38:n\r,41:jamie\r,44:1\r,47:trek\r
+profile: game
+	sdasz80 -l -o build/crt0_l.rel src/crt0.s && sdasz80 -l -o build/msxbios_l.rel src/msxbios.s
+	cd build && $(SDCC) $(LDFLAGS) -Wl-u crt0_l.rel msxbios_l.rel $(notdir $(filter-out build/crt0.rel build/msxbios.rel,$(BASE_REL)) $(SHARED_REL) $(DRV_REL)) stubs.rel -o prof.ihx
+	cmp build/prof.ihx build/probe.ihx
+	$(call openmsx_run,build/gdisk,tools/profile.tcl,build/profile_done,SHOT_KEYS='$(PROF_KEYS)' PROF_FROM=$(PROF_FROM) PROF_TO=$(PROF_TO) PROF_STEP=$(PROF_STEP))
+	python3 tools/profile.py build/profile.txt build/probe.map build/*.rst
+
 stackrun:
 	$(MAKE) gameshot STACK=1 SHOT_TIMES=82,122,150,174,215,280 SHOT_KEYS='$(STACK_SESSION)'
 

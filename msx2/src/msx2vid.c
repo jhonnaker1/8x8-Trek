@@ -185,45 +185,67 @@ void wait_vsync(void)
    NX = 0 MEANS THE WHOLE WIDTH -- the trap uno recorded, used on purpose here,
    because 512 does not fit NX's nine bits and "0" is how the V9938 spells it.
    Callers that write VRAM afterwards go through vdp_idle(). */
-void scr_clear(void)
+/* ONE HMMV: a rectangle of VRAM filled with one byte by the command engine.
+   DX and NX are PIXELS, two to a byte, so both must be even here -- and NX=0
+   means the whole 512, used deliberately by scr_clear. */
+static void hmmv(unsigned int dx, unsigned char dy, unsigned int nx,
+                 unsigned char ny, unsigned char fill)
 {
     vdp_idle();
     vdp_reg(17, 36);                /* R#17: indirect pointer -> R#36 (DX) */
     IRQ_OFF();
-    VDP_REGI = 0;   VDP_REGI = 0;   /* R#36/37 DX = 0 */
-    VDP_REGI = 0;   VDP_REGI = 0;   /* R#38/39 DY = 0 */
-    VDP_REGI = 0;   VDP_REGI = 0;   /* R#40/41 NX = 0: the whole 512 */
-    VDP_REGI = SCR_LINES; VDP_REGI = 0;   /* R#42/43 NY = 212 */
-    VDP_REGI = 0;                   /* R#44 colour: black, both pixels */
+    VDP_REGI = (unsigned char)dx;   VDP_REGI = (unsigned char)(dx >> 8);
+    VDP_REGI = dy;                  VDP_REGI = 0;
+    VDP_REGI = (unsigned char)nx;   VDP_REGI = (unsigned char)(nx >> 8);
+    VDP_REGI = ny;                  VDP_REGI = 0;
+    VDP_REGI = fill;                /* R#44: the byte, two pixels */
     VDP_REGI = 0;                   /* R#45 argument */
     VDP_REGI = 0xC0;                /* R#46 HMMV -- starts it */
     IRQ_ON();
     log_mode = MODE_NONE;
 }
 
+void scr_clear(void)
+{
+    hmmv(0, 0, 0, SCR_LINES, 0);    /* NX = 0: the whole 512 */
+}
+
+/* THE BOX GLYPHS WERE A QUARTER OF A REPAINT. After the fills became a blit,
+   `make profile` put glyph_ptr at 25-35% of the console draw: fourteen box
+   glyphs searched linearly and then COPIED, for every border cell -- and a
+   border is the same glyph forty times running. So the last one found is
+   remembered, and a plain glyph is returned where it lies; only reverse
+   video still needs the scratch copy, to invert it. */
+static unsigned char box_code = 0xFF;
+static const unsigned char *box_row;
+
 static const unsigned char *glyph_ptr(unsigned char ch, unsigned char *scratch)
 {
     unsigned char base = (unsigned char)(ch & 0x7F);
+    const unsigned char *g;
     unsigned char j, i;
 
-    if (!(ch & 0x80) && base < FONT_CODES)
-        return font6x8[base];
-
     if (base < FONT_CODES) {
-        for (j = 0; j < FONT_CELL_H; j++) scratch[j] = font6x8[base][j];
+        g = font6x8[base];
+    } else if (base == box_code) {
+        g = box_row;
     } else {
         for (i = 0; i < (unsigned char)FONT_BOX_COUNT; i++)
             if (font_box[i].code == base) break;
         if (i < (unsigned char)FONT_BOX_COUNT) {
-            for (j = 0; j < FONT_CELL_H; j++) scratch[j] = font_box[i].row[j];
+            box_code = base;
+            g = box_row = font_box[i].row;
         } else {
             /* The missing-glyph marker, loud on purpose: a hollow box. */
             for (j = 0; j < FONT_CELL_H; j++)
                 scratch[j] = (unsigned char)((j == 0 || j == FONT_CELL_H - 1) ? 0x3F : 0x21);
+            g = scratch;
         }
     }
-    if (ch & 0x80)
-        for (j = 0; j < FONT_CELL_H; j++) scratch[j] = (unsigned char)(~scratch[j] & 0x3F);
+    if (!(ch & 0x80))
+        return g;
+    for (j = 0; j < FONT_CELL_H; j++)
+        scratch[j] = (unsigned char)(~g[j] & 0x3F);
     return scratch;
 }
 
@@ -269,10 +291,28 @@ void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char col
     }
 }
 
+/* TWO-THIRDS OF A CONSOLE REPAINT WAS THIS LOOP. `make profile` sampled the
+   first console draw: 8.5 seconds, 3,970 scr_put calls, and 2,667 of them
+   from nine calls here -- every one filling a panel with SPACES, each blank
+   cell drawn as eight address setups and 24 bytes of zero through the CPU.
+   A blank cell is one colour, so a rectangle of them is ONE HMMV: the
+   background byte for a space, the foreground pair for a reverse space.
+   Anything else still goes a cell at a time. */
+#define SC_BLANK 32
+
 void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w, unsigned char h,
                    unsigned char ch, unsigned char color)
 {
     unsigned char i, j;
+
+    if ((ch & 0x7F) == SC_BLANK && w && h) {
+        set_pair((unsigned char)(color & 0x0F));
+        hmmv((unsigned int)(MARGIN_X + x + x + x) * 2,
+             (unsigned char)(MARGIN_Y + (y << 3)),
+             (unsigned int)w * 6, (unsigned char)(h << 3),
+             (ch & 0x80) ? pair[3] : 0);
+        return;
+    }
     for (j = 0; j < h; j++)
         for (i = 0; i < w; i++)
             scr_put((unsigned char)(x + i), (unsigned char)(y + j), ch, color);
