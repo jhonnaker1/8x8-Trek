@@ -14,7 +14,8 @@
    shell: ($0006) = $DB06, no COMMAND2 in memory, BDOS direct. This is that
    test: it fills $D606..$DB05 with HALT -- the worst garbage there is --
    then reads a file and prints, and prints "OK" only if both worked. Then
-   it spins, because a shell has nothing to return to; the game will reset.
+   it spins, because a shell has nothing to return to. (The game's own quit
+   _TERM0s, and MSX-DOS 2 reloads the shell -- the game -- measured.)
 
    `make shell` builds the disk and reads the screen. */
 static const char fname[] = "MSXDOS2.SYS";

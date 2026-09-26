@@ -9,7 +9,7 @@
 #     machine gives a program that is the number that decides.
 #   * cc65 would put C89 on the SHARED half forever -- ui.c has eight
 #     declaration-after-statement sites and the root `c89-check` guards core/
-#     only. One port must not constrain twelve ports' shared sources.
+#     only. One port must not constrain every other port's shared sources.
 #
 # There is no `f256` platform in llvm-mos, so f256k.ld, tools/mkpgz.py and the
 # kernel shim are this port's own -- the Plus/4's pattern, which proved a

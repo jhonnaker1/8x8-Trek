@@ -68,7 +68,7 @@ MEMORY {
        than a bank because it is always mapped. */
     low (rw) : ORIGIN = 0x0400, LENGTH = 0x1C00
 
-    /* Where every overlay RUNS. All eleven share this address; that is the
+    /* Where every overlay RUNS. All of them share this address; that is the
        idea. It is slot 5, so mapping a bank here is a single store. */
     window (rwx) : ORIGIN = 0xA000, LENGTH = 0x2000
 

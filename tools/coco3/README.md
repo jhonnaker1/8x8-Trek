@@ -143,7 +143,8 @@ is all code -- a font announces itself as regular columnar shapes and there
 are none. The GIME's text character generator is internal silicon, not a
 table the CPU can read.
 
-Every other port borrows the machine's own glyphs at runtime: the Amiga takes
+Every port before this one borrowed the machine's own glyphs at runtime (the
+MSX2, later, reuses THIS font): the Amiga takes
 topaz, the Falcon reads Line-A's 8x16, the Atari 8-bit copies the OS ROM font,
 and the Commodore ports use the chargen ROM. **This target has nothing to
 borrow**, and 80 columns in 512 pixels needs SIX-pixel cells, which no stock

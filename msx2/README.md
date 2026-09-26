@@ -41,8 +41,9 @@ channel (`-script` runs stalled on 2026-09-24, cause unknown):
 **No overlays.** SDCC's `#pragma codeseg` is file-scoped, so it cannot express
 this project's per-function overlays; z88dk's compiler can, at 1.38x the code.
 The whole shared half with no overlays linked at 51,751 bytes, and every driver
-then fitted: **343 bytes spare** above a 256-byte stack reserve, against a
-stack measured at 208 on the running game.
+then fitted: **343 bytes spare** above a 256-byte stack reserve at v0.22.0
+(2026-09-25; `make verify` prints the live figure), against a stack measured
+at 208 on the running game.
 
 **The game is the shell.** A program COMMAND2 runs gets `($0006) = $D606`;
 COMMAND2 itself gets `$DB06`. The 1,280 bytes between are COMMAND2's resident
@@ -61,7 +62,7 @@ mapper, because the code spans all four pages.
 
 **The console is drawn by the V9938's command engine**: HMMV for every blank
 rectangle, and one HMMC a character from `hmmc_cell`, in assembly, with
-sprites off. A full console is about two seconds; it was 8.5.
+sprites off. A full console took about two seconds at v0.22.0; it was 8.5.
 
 **Timing is the BIOS's JIFFY**, and a jiffy is 50.159Hz or 59.923Hz, not 50
 or 60 — the V9938's 1368 clocks a line at 21.477MHz. The music measured 0.35%

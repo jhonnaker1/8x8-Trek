@@ -74,8 +74,8 @@ and the grid becomes **80x30**. Verified the same way — a frame drawn at
 
 * 25 rows of 30 is a two-row margin, not a 35-row hole.
 * **An 8x16 cell is closer to the original than any other port gets.** EGA
-  Trek runs at 640x350 in an 8x14 cell, and every other 8-bit port here draws
-  it at 8x8 and loses the vertical detail. This one keeps it.
+  Trek runs at 640x350 in an 8x14 cell, and the other 8-bit ports here draw
+  it at 8x8 or 6x8 and lose the vertical detail. This one keeps it.
 
 `DOUBLE_X` (bit 1, 40 columns) is deliberately left off — the eighty columns
 are why this machine is worth porting to at all.
@@ -150,7 +150,7 @@ breaks, two mismatches, nothing else moved.
 
 ## THE OVERLAY SPLIT: ELEVEN BANKS, ONE SLOT, AND A SWAP THAT IS ONE STORE
 
-Every other port copies an image into a window — off disk on the C128 (about a
+Every other port WITH overlays copies an image into a window — off disk on the C128 (about a
 sixth of a second), out of banked RAM on the X16 and MEGA65, out of video RAM
 on the Atari. **Here each overlay image *is* an 8K RAM bank and the window is
 the MMU slot they map to, so `ovl_load` is a single store and nothing moves.**
@@ -336,7 +336,7 @@ still has to be banked.
 
 Which is the half that matters for how the game feels:
 
-| | every other 8-bit port | here |
+| | the C128, the reference | here |
 |---|---|---|
 | `ovl_load(n)` | a disk read, mid-game | **one store to a slot register** |
 | the string pool | far memory, or disk-backed | **a RAM bank** |
@@ -513,8 +513,8 @@ about the thing everyone quotes:
     the ~40K this machine gives a program, that is the number that decides.
   * **And cc65 would put C89 on the SHARED half forever.** `c128/src/ui.c` has
     eight `declaration-after-statement` sites; every other shared file is
-    already C89 and so is `core/`. One port must not constrain twelve ports'
-    shared sources in perpetuity — though **extending the root `c89-check` to
+    already C89 and so is `core/`. One port must not constrain every other
+    port's shared sources in perpetuity — though **extending the root `c89-check` to
     the shared half is worth doing anyway**, since it guards `core/` only and
     the shared UI drifted to C99 with nothing noticing.
 

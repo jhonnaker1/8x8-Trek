@@ -1,7 +1,9 @@
-/* Eleven overlays, eleven banks, and a swap that is one store.
+/* One bank per overlay -- OVL_COUNT of them, thirteen since the two opt-in
+ * hot-path overlays joined (it said eleven after that) -- and a swap that is
+ * one store.
  *
  * WHAT MAKES THIS TEST WORTH ANYTHING is that every overlay function returns
- * ITS OWN NUMBER. All eleven are linked at the same address, $A000, so if the
+ * ITS OWN NUMBER. All of them are linked at the same address, $A000, so if the
  * window is pointed at the wrong bank the call still succeeds, still returns,
  * and returns the WRONG VALUE -- which is precisely the failure mode
  * overlay.h describes as "the call went to the address trek_score_sheet has
@@ -9,7 +11,7 @@
  * CPU ran into unwritten bytes". A test that only checked it did not crash
  * would pass on a completely wrong mapping.
  *
- * It also swaps BACKWARDS through all eleven and then interleaves, because a
+ * It also swaps BACKWARDS through all of them and then interleaves, because a
  * loader that caches `live` wrongly works perfectly on a single pass.
  */
 #include <stdint.h>

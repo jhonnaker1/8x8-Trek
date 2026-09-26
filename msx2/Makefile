@@ -1,10 +1,10 @@
-# The MSX2 port, as far as it goes: an MSX-DOS .COM for a V9938 machine,
-# with a video driver (msx2vid.c) and a PSG sound driver (msx2snd.c).
-#
-# NOT A PORT YET and not in RELEASE_PORTS or `make ports` -- this directory
-# is the SCOPE's working half (NOTES.md, "SCOPE: an MSX2 port"). Tooling
-# outside the repository lives in ~/msx-toolchain (Nextor boot files, the
-# TPA tool); the compiler is Homebrew's SDCC.
+# The MSX2 port -- the fourteenth, released v0.22.0 (2026-09-25): an MSX-DOS 2
+# .COM for a V9938 machine, installed as the boot disk's COMMAND2.COM. Every
+# seam is real (msx2vid, msx2snd, msx2input, msx2storage, msx2farmem); see
+# README.md for why it is shaped as it is, and NOTES.md's "SCOPE: an MSX2
+# port" for the record. Tooling outside the repository lives in
+# ~/msx-toolchain (Nextor boot files, the TPA tool); the compiler is
+# Homebrew's SDCC.
 #
 #   make verify  the static gate `make ports` runs -- budget and string count
 #   make release build/egatrek-msx2.zip -- the disk, README, Nextor's licence
@@ -28,8 +28,8 @@
 #   make stackbound  a STATIC bound on the game's stack (tools/stackdepth.py)
 #   make stack   what the BIOS, its interrupt handler and BDOS add to it,
 #                measured by sentinel in STKTEST.COM
-#   make probe   link the WHOLE GAME with the real drivers and stubs for the
-#                rest, and report what is left of the MSX-DOS TPA
+#   make probe   link the whole game -- every driver real, only the unused
+#                overlay stub left -- and report what is left of the TPA
 #
 # FLAGS ARE A MAKE VARIABLE, NOT A SHELL ONE: zsh does not word-split an
 # unquoted $FLAGS, and that silently dropped half a measurement once.
@@ -95,7 +95,7 @@ disk: build/HELLO.COM
 ../c128/build/music.dat:
 	cd .. && python3 tools/make_music.py >/dev/null
 
-# The test links the file in as an array; the game will read it from far
+# The test links the file in as an array; the game reads it from far
 # memory. build/musicdat.c is a TEST fixture and nothing ships it.
 build/musicdat.c: ../c128/build/music.dat | build
 	python3 -c 'import sys; b=open(sys.argv[1],"rb").read(); print("const unsigned char music_dat[%d] = {%s};" % (len(b), ",".join(map(str,b))))' $< > $@
@@ -189,7 +189,9 @@ stack: build/STKTEST.COM
 # stopped emulating (1% CPU, the script's own realtime timer never fired)
 # while the same machine under `-control stdio` + `set power on` ran
 # normally. The control channel starts the machine POWERED OFF; the script
-# powers it on after arming itself.
+# powers it on after arming itself. [2026-09-25: `make shot`, which still
+# uses -script, ran normally again -- the stall was one evening's, cause
+# never found. The control channel stays: it has never stalled.]
 # $(1) disk dir, $(2) Tcl script, $(3) the file the script writes when done,
 # $(4) optional environment for the script.
 define openmsx_run

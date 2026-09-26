@@ -413,7 +413,7 @@ Under **MAME**, with a `f256k` driver and an SD-card image:
 **640×480 in 8×16 character cells, which is 80×30 — and the console is 80×25**,
 so it fills the screen with a two-row margin. The original ran at 640×350 in an
 8×14 cell, so **this is the closest any of these ports gets to its
-proportions**; every other 8-bit port draws it at 8×8. The palette holds EGA's
+proportions**; the other 8-bit ports draw it at 8×8 or 6×8. The palette holds EGA's
 own sixteen colours, brown included.
 
 Sound is the **SN76489 PSG**, two of its three tone channels — music on one and

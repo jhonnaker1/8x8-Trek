@@ -72,8 +72,8 @@ are.
 
 THE TEXT IS TALLER HERE THAN ON ANY OTHER 8-BIT PORT. The console is 80
 columns by 25 rows, and this machine draws it in 8x16 character cells where
-the others use 8x8. The original ran at 640x350 in an 8x14 cell, so this is
-the closest any of these ports gets to its proportions.
+the others use 8x8 or 6x8. The original ran at 640x350 in an 8x14 cell, so
+this is the closest any of these ports gets to its proportions.
 
 The sixteen colours are EGA's own, loaded into Vicky's palette, so every
 colour is exact -- including the brown that fixed-palette machines render as

@@ -24,6 +24,11 @@
  *                    makes paging on the hot path affordable there.]
  *     CoCo 3      8K pages through the MMU   (target dropped 2026-09-05)
  *     F256        8K pages through the MMU   (target dropped 2026-09-05)
+ *                    [CORRECTED 2026-09-25: both shipped, and neither this
+ *                    way. The CoCo 3 card port keeps far memory in the
+ *                    SuperSprite's VRAM, the stock CoCo 3 reads it off the
+ *                    disk, the F256K keeps it in RAM banks -- and the MSX2,
+ *                    later, in the V9938's VRAM page 1.]
  *     MEGA65      no banking needed -- a plain array
  *     Amiga       no banking needed -- a plain array
  *

@@ -3,9 +3,10 @@
    can be checked against MUSIC.DAT for PITCH and TEMPO both. A pitch check
    is silent about tempo (the X16 played every note right at double speed).
 
-   Far memory is not written yet, so this links MUSIC.DAT into the program
-   and gives the driver a far_read over it. The game will not do that: it
-   costs the whole file, and the budget is what far memory is for. */
+   It predates far memory, and still links MUSIC.DAT into the program with
+   a far_read over it -- so it tests the driver ALONE. The game reads the
+   file from VRAM page 1 (msx2farmem.c); linking it in would cost the whole
+   file, and the budget is what far memory is for. */
 #include <string.h>
 #include "sid.h"
 #include "farmem.h"

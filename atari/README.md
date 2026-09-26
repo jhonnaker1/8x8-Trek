@@ -229,7 +229,7 @@ while the program's own segments are being read in. See `atari.ld`.
 
 ## The two levers that close it
 
-Every other port's overlay budget is governed by "an overlay swap is a disk
+The disk-overlay ports' budgets are governed by "an overlay swap is a disk
 load, so never page anything on the hot path." **Here a swap is a copy out of
 VRAM**, which is what makes both of these affordable and neither of them
 affordable anywhere else.
@@ -287,7 +287,7 @@ assumed: `c128/build/trek128.prg` hashes the same before and after.
 
 ## OVERLAYS.BIN is PACKED, and the bug that made it necessary
 
-Every other port pads each overlay image to the window and indexes the file as
+The other overlay ports pad each overlay image to the window and indexes the file as
 `which * OVL_SIZE`. Thirteen windows of 4,608 is 59,904 bytes, and with the
 string pool and the music ahead of it in the far store that is **67,600 —
 past the 65,535 the seam's 16-bit offsets can address.**

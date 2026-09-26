@@ -602,7 +602,7 @@ stopped being true the day Atari DOS was dropped:
     atari  1,932 free  + 1,577 low data + 14 lowram
     mega65 4,997 free
 
-## SCOPE: the CoCo 3 + SuperSprite FM+ (written 2026-09-11)
+## SCOPE: the CoCo 3 + SuperSprite FM+ (written 2026-09-11, RELEASED v0.15.0)
 
 **~~Scoped at Jamie's request. It does NOT re-open the target.~~ THE TARGET WAS
 RE-OPENED 2026-09-11 -- Jamie's call: "start the coco 3 with supersprite fm+
@@ -1676,7 +1676,7 @@ All three changes are in shared sources and all seven ports still build.
  Then video, then far memory into the card's VRAM,
 then the rest. The `make early` pattern exists and transfers.
 
-## SCOPE: the ATARI FALCON (written 2026-09-11)
+## SCOPE: the ATARI FALCON (written 2026-09-11, RELEASED v0.14.0)
 
 **~~Scoped at Jamie's request. It does NOT re-open the target.~~ THE TARGET
 WAS RE-OPENED THE SAME DAY -- Jamie's call, 2026-09-11: "start the falcon
@@ -6413,7 +6413,7 @@ Reseeding before each draw fixes the table entry, so the only thing varying is
 the mean, and a larger mean must never give a smaller draw. That catches
 wrapping and passes the honest short tail.
 
-## Front end and sound — not started (added 2026-08-19)
+## Front end and sound — not started (added 2026-08-19; BOTH BUILT since -- the title, setup, briefing, music and effects ship on every port)
 
 Everything so far is the console. The original wraps it in a front end the
 port has none of, and makes noise the port does not. Captured from the running
@@ -10146,7 +10146,7 @@ and the MEGA65 is the reason to believe it.** Its screen layer really was a
 never freed a descriptor, a raster counter that wrapped twice per frame. Budget
 the X16 for its own three of those, not for the seven files above.
 
-## SCOPE: Atari 800XL + VBXE (written 2026-09-05, BUILT 2026-09-09)
+## SCOPE: Atari 800XL + VBXE (written 2026-09-05, BUILT 2026-09-09, RELEASED v0.13.0)
 
 > **THE PORT EXISTS NOW AND `atari/README.md` IS THE AUTHORITY.** What follows
 > is the scope as it was written before a line of it was built, kept because
@@ -10284,7 +10284,7 @@ not CBM), and that it needs hardware the base machine does not have.
 
 **Nothing here is a decision. The row question comes first.**
 
-## SCOPE: the Foenix F256K (written 2026-09-05, DROPPED the same day -- see "THREE TARGETS DROPPED" above; kept for the toolchain reasoning)
+## SCOPE: the Foenix F256K (written 2026-09-05, DROPPED the same day -- see "THREE TARGETS DROPPED" above; kept for the toolchain reasoning) -- and RE-OPENED later, BUILT and RELEASED v0.21.0
 
 **The hardest of the remaining 65xx targets, and the toolchain IS the port.**
 
@@ -12098,7 +12098,7 @@ screen access pattern. **Item 57 carries the machine ranking.**
   to move `ui.c` out of `c128/src`.
 * Nothing here has been compiled, drawn or timed.
 
-## SCOPE: a 40-column C64 port (2026-09-13)
+## SCOPE: a 40-column C64 port (2026-09-13, BUILT and RELEASED v0.16.0 -- see the next section)
 
 Asked for by Jamie after the 40-column derivation and the machine ranking in
 item 57. **Nothing below has been compiled.** Line counts are measured off
@@ -13524,6 +13524,9 @@ stopped emulating -- 1% CPU, the script's own `after realtime` never fired,
 under `-control stdio` and `set power on` ran normally, so `make listen`
 drives it that way. **Cause NOT established**; `make shot` still uses
 `-script` and may need the same change.
+**[2026-09-25, the sweep: `make shot` -- still on `-script` -- ran normally,
+exit 0, VRAM drawn. The stall was that evening's, not a permanent change; its
+cause is still not established.]**
 
     msx2snd.c                   724 bytes code, 25 data
     WHOLE GAME, video + sound   image $0100..$D572 = 54,387

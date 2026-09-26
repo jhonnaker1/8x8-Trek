@@ -735,7 +735,7 @@ void ui_draw_viewer(void) {
 
            The code STAYS IN THE POOL because it is what the original calls
            the page, and strings.txt's ids are positional -- adding a shorter
-           twin there would renumber every string after it on thirteen ports.
+           twin there would renumber every string after it on every port.
            It simply has nowhere to go at seventeen columns.
 
            Cut at the first digit rather than at a length, so every title in

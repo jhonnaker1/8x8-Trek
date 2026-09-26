@@ -2,7 +2,7 @@
 """A static bound on the Z80 stack the game can use, from SDCC's own .asm.
 
 Under MSX-DOS the stack grows down from the top of the TPA into whatever the
-image leaves, so it comes out of the same bytes as every unwritten driver,
+image leaves, so it comes out of the same bytes as every driver,
 and nobody had measured it on this compiler. The game cannot RUN yet (no
 keyboard, storage or far memory), so a sentinel fill is not available; this
 is the half that can be done now.
