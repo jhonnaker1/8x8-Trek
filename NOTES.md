@@ -13576,6 +13576,10 @@ AVAILABILITY, on the very number this scope called MEASURED.
 
 (54,391, not the 54,387 of the sound section: `ld sp,(6)` below is 4 bytes.)
 
+**DECIDED 2026-09-25, Jamie: the game ships AS THE SHELL.** *"that's fine.
+its the only way to have enough memory."* Not runnable from a DOS prompt, and
+quit resets the machine -- accepted costs, not open questions.
+
 **So the game must BE the shell** -- the boot disk's `COMMAND2.COM`, entered
 by MSXDOS2.SYS with the whole TPA and BDOS direct. `make shell` proves it:
 installed that way, `shelltest.c` fills all 1,280 bytes with HALT, reads a
@@ -13672,5 +13676,57 @@ pointers and the ring -- which is how the first was found in one run.
     AS THE SHELL, LEFT           1,296
     stack, reserved               -256
     LEFT for storage and far memory   ~1,040
+
+### STORAGE AND FAR MEMORY -- AND THE GAME RUNS (2026-09-25)
+
+**Every seam is real now** but the overlay stub, which nothing calls. `make
+game` builds the game disk -- MSXDOS2.SYS, the game AS `COMMAND2.COM`,
+STRINGS.DAT, MUSIC.DAT, BRIEF.TXT -- and the game boots, draws the title from
+strings in far memory, plays the title track, runs the briefing, takes every
+setup answer and reaches THE CONSOLE with every panel drawn.
+
+**Storage, `msx2storage.c`: DOS2 handles, called direct** (the game is the
+shell). Two things measured on the way:
+
+  * **A DOS2 call costs ~5ms.** `dostime.c` read BRIEF.TXT at 64 bytes a
+    call in 75 frames and at ONE byte a call in 2,735 -- and ui_briefing()
+    reads one byte a call. So `plat_read` has a 64-byte read-ahead; without
+    it the briefing would take 55 seconds.
+  * **`_READ` does NOT preserve B.** DOSTIME's first version wrote B back
+    after every call; the second read used handle 0, standard input, and sat
+    in CHGET. Found by a breakpoint on `$0005` logging each call's C/B/DE --
+    after I had misread a dump for the second time this week (#62: `peek`
+    reads the CPU's view, and a CPU in the BIOS shows ROM where the
+    program's variables are).
+
+**Far memory, `msx2farmem.c`: VRAM PAGE 1**, 64K SCREEN 7 never displays. NOT
+the memory mapper: the code spans all four pages, so mapping a RAM segment in
+would unmap code; VRAM needs only an address set. `vram_far_at()` lives in
+`msx2vid.c` and INVALIDATES THE LOG'S CACHED VDP ADDRESS -- a string fetched
+mid-redraw would otherwise move the pointer under a log run. The mapper is
+kept for paging CODE if the budget ever needs it: SDCC's `codeseg` is
+file-scoped, so whole files could live in segments.
+
+**The picture comes from VRAM, not the renderer**: `tools/vram2png.py`
+decodes SCREEN 7 and the V9938 palette out of a dump, and `make gameshot
+SHOT_TIMES=... SHOT_KEYS=...` types and photographs. openMSX's screenshot
+needs a renderer this rig does not start, and lags VRAM anyway.
+
+**The title music plays, read out of the PSG itself**: from t=24 channel A
+steps through periods for 290, 440, 391 and 592Hz with tone A on and volume
+12. It starts only when the title is fully drawn -- ~24 seconds after power-on,
+after a 53K floppy load -- and stops at the first key, as the original does.
+
+    msx2storage.c                485 code, 72 data (the read-ahead)
+    msx2farmem.c                 146 code, 2 data
+    WHOLE GAME                   image $0100..$D8CE = 55,247
+    AS THE SHELL, LEFT             567
+    stack, measured ~225 statically -- the RUNNING game can now be measured
+
+**Still wrong, seen on the title:** it says *C128-VDC PORT* and *a port of his
+game to the Commodore 128* -- the C128's strings. The MSX2 needs a
+`strings.override.txt`, as the other ports have. **And slow:** the briefing's
+first page takes ~5s to draw; the DOS reads for it are ~0.15s, so it is the
+text path. Not yet measured.
 
 **It is still not on the list**, and this file is not a reason to put it there.

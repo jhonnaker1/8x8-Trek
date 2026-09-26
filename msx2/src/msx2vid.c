@@ -36,6 +36,7 @@
 #include <stdint.h>
 
 #include "vdc.h"
+#include "msx2.h"
 /* BY PATH, not -I../coco3/src: that directory also holds the CoCo's own
    string.h, which shadows the system one and drags in cmoc.h. */
 #include "../../coco3/src/font6x8.h"
@@ -323,6 +324,18 @@ unsigned char vdc_data_read(void)
     v = VDP_DATA;
     log_off++;
     return v;
+}
+
+void vram_far_at(unsigned int off, unsigned char write)
+{
+    vdp_idle();
+    IRQ_OFF();
+    VDP_ADDR = (unsigned char)(0x04 | (off >> 14));     /* A16 = 1: page 1 */
+    VDP_ADDR = 0x80 | 14;
+    VDP_ADDR = (unsigned char)(off & 0xFF);
+    VDP_ADDR = (unsigned char)(((off >> 8) & 0x3F) | write);
+    IRQ_ON();
+    log_mode = MODE_NONE;
 }
 
 /* C128-only: that machine's CRTC registers. */

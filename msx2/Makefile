@@ -6,12 +6,16 @@
 # outside the repository lives in ~/msx-toolchain (Nextor boot files, the
 # TPA tool); the compiler is Homebrew's SDCC.
 #
+#   make game    build/gdisk/ -- THE GAME: MSXDOS2.SYS, the game installed as
+#                COMMAND2.COM, and its data files
 #   make hello   build/HELLO.COM -- the video driver's first-light test
 #   make disk    build/disk/     -- boot files + HELLO.COM + AUTOEXEC.BAT
 #   make sound   build/SNDTEST.COM -- the PSG driver's first-sound test, on
 #                its own disk (build/sdisk/)
 #   make listen  boot that disk, record what it plays, and check PITCH and
 #                TEMPO against MUSIC.DAT (tools/listen.py)
+#   make gameshot  photograph the running game from VRAM (SHOT_TIMES, SHOT_KEYS)
+#   make dostime what one DOS2 call costs -- why storage reads ahead
 #   make kbd     the keyboard driver, typed at through the emulated matrix
 #   make shell   prove a program installed AS COMMAND2.COM owns the whole TPA
 #                (src/shelltest.c) -- under COMMAND2 it gets 1,280 bytes less
@@ -47,7 +51,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all hello disk sound listen kbd shell stack stackbound probe shot clean
+.PHONY: all game gameshot dostime hello disk sound listen kbd shell stack stackbound probe shot clean
 all: hello
 
 build:
@@ -131,6 +135,20 @@ kbd: build/KBTEST.COM
 	@# The screen is 40 columns and the line WRAPS -- join it before matching.
 	@tr '\n' ' ' < build/kbtest.txt | tr -s ' ' | grep -q '$(KB_WANT) ' && echo "kbd: PASS" || { echo "kbd: FAIL, want $(KB_WANT)"; false; }
 
+# What one DOS2 call costs: BRIEF.TXT read at 64 bytes a call and at one.
+# The reason msx2storage.c has a read-ahead (~5ms a call, measured).
+build/DOSTIME.COM: build/crt0.rel build/dostime.rel Makefile
+	$(SDCC) $(LDFLAGS) build/crt0.rel build/dostime.rel -o build/dostime.ihx
+	$(MAKEBIN) -s 65536 -o 256 -p build/dostime.ihx $@
+
+dostime: build/DOSTIME.COM
+	rm -rf build/tdisk && mkdir -p build/tdisk
+	cp $(TOOLCHAIN)/nextor-boot/MSXDOS2.SYS build/tdisk/
+	cp build/DOSTIME.COM build/tdisk/COMMAND2.COM
+	cp ../c128/src/briefing.txt build/tdisk/BRIEF.TXT
+	$(call openmsx_run,build/tdisk,tools/dostime.tcl,build/dostime.txt)
+	@grep -v '^ *$$' build/dostime.txt
+
 build/SHELLTEST.COM: build/crt0.rel build/shelltest.rel Makefile
 	$(SDCC) $(LDFLAGS) build/crt0.rel build/shelltest.rel -o build/shelltest.ihx
 	$(MAKEBIN) -s 65536 -o 256 -p build/shelltest.ihx $@
@@ -147,7 +165,8 @@ shell: build/SHELLTEST.COM
 # dynamic: what the BIOS, its interrupt handler and BDOS push onto OUR stack,
 # which no reading of our code can see. The budget needs the sum.
 PROBE_ASM = src/msxbios.s build/msx2vid.asm $(SHARED_REL:.rel=.asm) \
-            build/msx2snd.asm build/msx2input.asm build/stubs.asm
+            build/msx2snd.asm build/msx2input.asm build/msx2storage.asm \
+            build/msx2farmem.asm build/stubs.asm
 stackbound: build/probe.ihx
 	@python3 tools/stackdepth.py _main $(PROBE_ASM)
 
@@ -174,7 +193,7 @@ define openmsx_run
 	 ( printf '<openmsx-control>\n'; sleep 2; \
 	   printf '<command>source $(CURDIR)/$(2)</command>\n'; \
 	   printf '<command>set power on</command>\n'; \
-	   for i in $$(seq 240); do [ -f $(3) ] && break; sleep 1; done ) | \
+	   for i in $$(seq 600); do [ -f $(3) ] && break; sleep 1; done ) | \
 	 $(4) OUTDIR=$(CURDIR)/build /Applications/openMSX.app/Contents/MacOS/openmsx -setting $$T/settings.xml \
 	   -machine $(MACHINE) $(EXT) -ext SunriseIDE_Nextor -diska $(CURDIR)/$(1) -control stdio >/dev/null 2>&1; \
 	 rm -rf $$T
@@ -188,8 +207,39 @@ listen: sound ../c128/build/music.dat
 	$(call openmsx_run,build/sdisk,tools/listen.tcl,build/listen.txt)
 	python3 tools/listen.py build/listen.wav ../c128/build/music.dat build/listen.txt
 
-build/probe.ihx: $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/msx2input.rel build/stubs.rel Makefile
-	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) build/msx2snd.rel build/msx2input.rel build/stubs.rel -o $@
+DRV_REL = build/msx2snd.rel build/msx2input.rel build/msx2storage.rel build/msx2farmem.rel
+
+build/probe.ihx: $(BASE_REL) $(SHARED_REL) $(DRV_REL) build/stubs.rel Makefile
+	$(SDCC) $(LDFLAGS) $(BASE_REL) $(SHARED_REL) $(DRV_REL) build/stubs.rel -o $@
+
+# THE GAME. The probe link IS the game now -- every seam is real but the
+# overlay stub, which nothing calls -- so this is that image as a .COM.
+build/EGATREK.COM: build/probe.ihx
+	$(MAKEBIN) -s 65536 -o 256 -p build/probe.ihx $@
+	@echo "$@: $$(wc -c < $@) bytes"
+
+../c128/build/strings.dat: ../c128/src/strings.txt ../tools/gen_strings.py
+	cd .. && python3 tools/gen_strings.py >/dev/null
+
+# THE GAME DISK. The game is the SHELL (decided 2026-09-25): MSXDOS2.SYS
+# loads COMMAND2.COM, and this is it. The data files sit beside it on the
+# boot drive, where bare names find them.
+game: build/EGATREK.COM ../c128/build/strings.dat ../c128/build/music.dat
+	rm -rf build/gdisk && mkdir -p build/gdisk
+	cp $(TOOLCHAIN)/nextor-boot/MSXDOS2.SYS build/gdisk/
+	cp build/EGATREK.COM build/gdisk/COMMAND2.COM
+	cp ../c128/build/strings.dat build/gdisk/STRINGS.DAT
+	cp ../c128/build/music.dat build/gdisk/MUSIC.DAT
+	cp ../c128/src/briefing.txt build/gdisk/BRIEF.TXT
+	@ls -l build/gdisk
+
+# Photograph the running game from VRAM (tools/vram2png.py) at SHOT_TIMES,
+# typing SHOT_KEYS ("t:text,...") on the way. build/game_<t>.png.
+SHOT_TIMES ?= 30
+SHOT_KEYS ?=
+gameshot: game
+	$(call openmsx_run,build/gdisk,tools/gameshot.tcl,build/gameshot_done,SHOT_TIMES='$(SHOT_TIMES)' SHOT_KEYS='$(SHOT_KEYS)')
+	@for t in $$(echo $(SHOT_TIMES) | tr ',' ' '); do python3 tools/vram2png.py build/vram_$$t.bin build/pal_$$t.bin build/game_$$t.png; done
 
 probe: build/probe.ihx
 	@python3 tools/probe.py build/probe.map build/stubs.rel $(TPA_TOP)
