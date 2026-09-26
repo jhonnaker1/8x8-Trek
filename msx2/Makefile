@@ -220,17 +220,21 @@ build/EGATREK.COM: build/probe.ihx
 	$(MAKEBIN) -s 65536 -o 256 -p build/probe.ihx $@
 	@echo "$@: $$(wc -c < $@) bytes"
 
-../c128/build/strings.dat: ../c128/src/strings.txt ../tools/gen_strings.py
+# STRINGS.DAT carries this port's machine-naming overrides. The generator
+# runs plain first, because it also writes c128/src/strdata.h, which ui.c
+# compiles against -- the ids and STR_COUNT must be the ones the binary has.
+build/strings.dat: ../c128/src/strings.txt src/strings.override.txt ../tools/gen_strings.py | build
 	cd .. && python3 tools/gen_strings.py >/dev/null
+	cd .. && python3 tools/gen_strings.py --override msx2/src/strings.override.txt msx2/build/strings.dat
 
 # THE GAME DISK. The game is the SHELL (decided 2026-09-25): MSXDOS2.SYS
 # loads COMMAND2.COM, and this is it. The data files sit beside it on the
 # boot drive, where bare names find them.
-game: build/EGATREK.COM ../c128/build/strings.dat ../c128/build/music.dat
+game: build/EGATREK.COM build/strings.dat ../c128/build/music.dat
 	rm -rf build/gdisk && mkdir -p build/gdisk
 	cp $(TOOLCHAIN)/nextor-boot/MSXDOS2.SYS build/gdisk/
 	cp build/EGATREK.COM build/gdisk/COMMAND2.COM
-	cp ../c128/build/strings.dat build/gdisk/STRINGS.DAT
+	cp build/strings.dat build/gdisk/STRINGS.DAT
 	cp ../c128/build/music.dat build/gdisk/MUSIC.DAT
 	cp ../c128/src/briefing.txt build/gdisk/BRIEF.TXT
 	@[ -z "$(GAME_SAVE)" ] || cp $(GAME_SAVE) build/gdisk/egatrek.sav

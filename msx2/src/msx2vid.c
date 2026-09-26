@@ -50,6 +50,7 @@ __sfr __at 0x9B VDP_REGI;
 #define IRQ_ON()  __asm ei __endasm
 
 /* The BIOS handler increments this every VBLANK. */
+#define RG8SAV (*(volatile unsigned char *)0xFFE7)
 #define JIFFY (*(volatile unsigned int *)0xFC9E)
 
 extern void bios_chgmod(unsigned char mode);
@@ -88,37 +89,12 @@ static unsigned char log_mode;
 
 /* Two pixels at a time out of a four-entry table, rebuilt only when the
    colour changes. */
-static unsigned char pair[4];
-static unsigned char pair_fg = 0xFF;
-
-static void set_pair(unsigned char fg)
-{
-    if (fg == pair_fg) return;
-    pair_fg = fg;
-    pair[0] = 0;
-    pair[1] = fg;
-    pair[2] = (unsigned char)(fg << 4);
-    pair[3] = (unsigned char)((fg << 4) | fg);
-}
 
 static void vdp_reg(unsigned char r, unsigned char v)
 {
     IRQ_OFF();
     VDP_ADDR = v;
     VDP_ADDR = (unsigned char)(0x80 | r);
-    IRQ_ON();
-}
-
-/* The WHOLE address sequence -- R#14 and both address bytes -- in one
-   interrupts-off window: the handler's S#0 read resets the latch pairing, so
-   it must not land between any of these. */
-static void vdp_write_at_hl(unsigned char line, unsigned char col)
-{
-    IRQ_OFF();
-    VDP_ADDR = (unsigned char)(line >> 6);
-    VDP_ADDR = 0x80 | 14;
-    VDP_ADDR = col;
-    VDP_ADDR = (unsigned char)((line & 0x3F) | 0x40);
     IRQ_ON();
 }
 
@@ -158,6 +134,14 @@ void vdc_init(void)
        right on every MSX2 variant and hides the sprites. Under MSX-DOS page 0
        is RAM, so bios_chgmod() goes through CALSLT -- see msxbios.s. */
     bios_chgmod(7);
+
+    /* SPRITES OFF. The game has none, and a V9938 with sprites enabled gives
+       the CPU 31 VRAM access slots a line and the command engine about half
+       its speed; with them disabled, 88 (Grauw's measurements). R#8 bit 1,
+       SPD -- and the BIOS's own copy in RG8SAV too, which is what anything
+       that rewrites R#8 from the BIOS would put back. */
+    RG8SAV |= 0x02;
+    vdp_reg(8, RG8SAV);
 
     vdp_reg(7, 0x00);               /* border black */
     vdp_reg(16, 0x00);              /* palette pointer, auto-increments */
@@ -249,28 +233,120 @@ static const unsigned char *glyph_ptr(unsigned char ch, unsigned char *scratch)
     return scratch;
 }
 
+/* ONE HMMC A CHARACTER, the shape MSX2ANSI uses (read, not copied -- it is
+   GPL-3.0). The old path set the VRAM address for each of a cell's 8 rows --
+   eight latch sequences under di -- and pushed 3 bytes after each, in C:
+   ~2.1ms a character in `make profile`. HMMC is ONE command for the 6x8 cell
+   (3 bytes by 8 lines); its first byte rides in R#44 as the command starts
+   and the other 23 follow through the indirect port, and the VDP does every
+   address. The ISR cannot disturb the stream: it touches port $99, and R#17
+   and port $9B are ours.
+
+   Each byte is two pixels from two glyph bits, tested IN PLACE with
+   `bit n,(hl)`: bits 5/4, 3/2, 1/0 of a row, the higher one the left pixel
+   (high nibble). D = fg << 4 and E = fg, so there is no table. ~60 cycles a
+   byte, far above the V9938's worst slot gap with sprites off -- the first
+   byte cannot be outrun.
+
+   hc_* are this function's arguments, as globals, so the calling convention
+   is not in question. */
+static const unsigned char *hc_g;
+static unsigned int  hc_dx;
+static unsigned char hc_dy, hc_fg;
+
+static void hmmc_cell(void) __naked
+{
+    __asm
+        ld   hl, (_hc_g)
+        ld   a, (_hc_fg)
+        ld   e, a
+        add  a, a
+        add  a, a
+        add  a, a
+        add  a, a
+        ld   d, a               ; D = fg << 4, E = fg
+        ld   c, #0x9B
+        di
+        ld   a, #36             ; R#17 = 36, auto-increment
+        out  (0x99), a
+        ld   a, #0x80+17
+        out  (0x99), a
+        ld   a, (_hc_dx)
+        out  (c), a             ; R#36 DX
+        ld   a, (_hc_dx+1)
+        out  (c), a             ; R#37
+        ld   a, (_hc_dy)
+        out  (c), a             ; R#38 DY
+        xor  a
+        out  (c), a             ; R#39
+        ld   a, #6
+        out  (c), a             ; R#40 NX = 6 pixels
+        xor  a
+        out  (c), a             ; R#41
+        ld   a, #8
+        out  (c), a             ; R#42 NY = 8 lines
+        xor  a
+        out  (c), a             ; R#43
+        bit  5, (hl)            ; the first byte: row 0, bits 5/4
+        jr   z, 1$
+        or   d
+    1$: bit  4, (hl)
+        jr   z, 2$
+        or   e
+    2$: out  (c), a             ; R#44 CLR, the first two pixels
+        xor  a
+        out  (c), a             ; R#45 ARG
+        ld   a, #0xF0
+        out  (c), a             ; R#46 HMMC -- starts
+        ld   a, #0x80+44        ; R#17 = 44, NO auto-increment
+        out  (0x99), a
+        ld   a, #0x80+17
+        out  (0x99), a
+        ei
+        ld   b, #8
+        jr   5$                 ; row 0's first byte is already gone
+    3$: xor  a                  ; bits 5/4
+        bit  5, (hl)
+        jr   z, 4$
+        or   d
+    4$: bit  4, (hl)
+        jr   z, 11$
+        or   e
+    11$: out (c), a
+    5$: xor  a                  ; bits 3/2
+        bit  3, (hl)
+        jr   z, 6$
+        or   d
+    6$: bit  2, (hl)
+        jr   z, 7$
+        or   e
+    7$: out  (c), a
+        xor  a                  ; bits 1/0
+        bit  1, (hl)
+        jr   z, 8$
+        or   d
+    8$: bit  0, (hl)
+        jr   z, 9$
+        or   e
+    9$: out  (c), a
+        inc  hl
+        djnz 3$
+        ret
+    __endasm;
+}
+
 void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char color)
 {
     unsigned char rows[FONT_CELL_H];
-    const unsigned char *g;
-    unsigned char r, bits, line, col;
 
     if (x >= VDC_COLS || y >= VDC_ROWS) return;
 
-    g = glyph_ptr(ch, rows);
-    set_pair((unsigned char)(color & 0x0F));
-    line = (unsigned char)(MARGIN_Y + (y << 3));
-    col  = (unsigned char)(MARGIN_X + x + x + x);
-
-    vdp_idle();
-    for (r = 0; r < FONT_CELL_H; r++) {
-        bits = g[r];
-        vdp_write_at_hl(line, col);
-        VDP_DATA = pair[bits >> 4];
-        VDP_DATA = pair[(bits >> 2) & 3];
-        VDP_DATA = pair[bits & 3];
-        line++;
-    }
+    hc_g  = glyph_ptr(ch, rows);
+    hc_fg = (unsigned char)(color & 0x0F);
+    hc_dx = (unsigned int)(MARGIN_X + x + x + x) * 2;
+    hc_dy = (unsigned char)(MARGIN_Y + (y << 3));
+    vdp_idle();                     /* a new command waits for the last */
+    hmmc_cell();
     log_mode = MODE_NONE;
 }
 
@@ -306,11 +382,11 @@ void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w, unsigned c
     unsigned char i, j;
 
     if ((ch & 0x7F) == SC_BLANK && w && h) {
-        set_pair((unsigned char)(color & 0x0F));
+        unsigned char fg = (unsigned char)(color & 0x0F);
         hmmv((unsigned int)(MARGIN_X + x + x + x) * 2,
              (unsigned char)(MARGIN_Y + (y << 3)),
              (unsigned int)w * 6, (unsigned char)(h << 3),
-             (ch & 0x80) ? pair[3] : 0);
+             (ch & 0x80) ? (unsigned char)((fg << 4) | fg) : 0);
         return;
     }
     for (j = 0; j < h; j++)

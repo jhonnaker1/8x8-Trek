@@ -27,7 +27,9 @@ def name(pc):
     i = bisect.bisect_right(addrs, pc) - 1
     return labels[addrs[i]] if i >= 0 else "?"
 
-samples = [l.split() for l in open(prof)]
+samples = [l.split() for l in open(prof) if not l.startswith("#")]
+for l in open(prof):
+    if l.startswith("#"): print(l[2:].rstrip())
 c = collections.Counter()
 for t, pc, slot in samples:
     pc, slot = int(pc, 16), int(slot)

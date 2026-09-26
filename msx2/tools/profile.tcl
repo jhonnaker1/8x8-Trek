@@ -15,6 +15,7 @@ foreach p [split $::env(SHOT_KEYS) ","] {
 proc sample {} {
     puts $::out [format "%.4f %04X %d" [machine_info time] [reg PC] [expr {[debug read ioports 0xA8] & 3}]]
     if {[machine_info time] < $::env(PROF_TO)} { after time $::env(PROF_STEP) sample } else {
+        puts $::out [format "# VDP R#8 = %02X (bit 1 set: sprites OFF)" [debug read {VDP regs} 8]]
         close $::out; close [open "$::dir/profile_done" w]; exit
     }
 }

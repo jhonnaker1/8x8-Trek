@@ -13800,4 +13800,45 @@ draw changes the timing.
 setups, for the ~1,300 characters that are real text, borders and bars. That
 is the MSX2ANSI shape -- sprites off, one HMMC a character, in assembly.
 
+### ONE HMMC A CHARACTER, SPRITES OFF: 3.0 SECONDS TO 2.0 (2026-09-25)
+
+The research's two remaining items, done together and proved together:
+
+  * **Sprites off**: R#8 bit 1, and the BIOS's copy in RG8SAV. Read back
+    from the running game: R#8 = `$0A`.
+  * **`scr_put` is one HMMC in assembly** (`hmmc_cell`): one command for the
+    6x8 cell, its first byte in R#44 as the command starts, the other 23
+    through the indirect port with R#17 = 44 and auto-increment OFF. No
+    address set per row, no di/ei per row. Each byte's two pixels are glyph
+    bits tested IN PLACE (`bit n,(hl)`) against D = fg << 4 and E = fg -- no
+    table, so `set_pair` and `pair[]` are gone, and so is `vdp_write_at_hl`.
+    ~60 cycles a byte, far above the V9938's worst access-slot gap.
+
+**Pixel-identical again**: the same restored save, all 54,272 bytes of VRAM
+equal to the ORIGINAL driver's -- and because the new path is the only
+thing that draws, that is also the proof it draws everything.
+
+    first console draw     8.5s -> 3.5 -> 3.0 -> 2.0s, 4.25x
+    bytes                  the asm is SMALLER than the C it replaced:
+                           439 left (453 before, 567 before the fills)
+
+What remains: `hmmc_cell` ~45% (the 24 bytes themselves) and the C setup
+around it -- `glyph_ptr`, `scr_put` -- ~25%. Diminishing returns from here;
+a string path that streams a whole `scr_puts` would be the next.
+
+### THE MACHINE'S OWN NAME, AND WHAT QUIT DOES (2026-09-25)
+
+`msx2/src/strings.override.txt` overrides the four strings that name the
+machine -- S_0 and S_330 (the title bars), S_82 (the dedication), S_10 (the
+farewell) -- and `build/strings.dat` is built from it; the game disk used the
+C128's until now and its title said *C128-VDC PORT*. S_139 *COMMODORE* stays:
+it is the naval rank in the hall of fame, not the computer.
+
+**The farewell says what quitting DOES, measured**: after the key, plat_exit's
+`_TERM0` makes MSXDOS2.SYS load the shell again -- and the shell is the game --
+so the title is back ~25 seconds later, with no reboot. Not the reset the
+2026-09-25 decision expected, and a better outcome: the same place, sooner.
+S_10 reads *HIT A KEY AND THE GAME RESTARTS.* Photographed, with the title's
+*MSX2 PORT* and *TO THE MSX2.*
+
 **It is still not on the list**, and this file is not a reason to put it there.
