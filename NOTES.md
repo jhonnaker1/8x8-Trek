@@ -13841,4 +13841,33 @@ so the title is back ~25 seconds later, with no reboot. Not the reset the
 S_10 reads *HIT A KEY AND THE GAME RESTARTS.* Photographed, with the title's
 *MSX2 PORT* and *TO THE MSX2.*
 
+### THE RELEASE DISK AND THE MEMORY CHECK (2026-09-25)
+
+**`make dsk` -> `build/egatrek-msx2.dsk`**: 720K, FAT12, an MSX-DOS 2 BOOT
+SECTOR -- openMSX's `diskmanipulator` default, driven over the control
+channel with the machine never powered on (`tools/mkdsk.py`; any `nok` fails
+the build). A plain FAT12 image has no MSX boot code and drops to Disk BASIC.
+Holds MSXDOS2.SYS, the game as COMMAND2.COM, STRINGS/MUSIC/BRIEF. **`make
+dskshot` boots the IMAGE, not the directory**: title, setup, the console.
+
+MSXDOS2.SYS may ship: Nextor's LICENSE.md (MSX Licensing Corporation's terms
+for the MSX-DOS code) permits free, non-commercial redistribution with the
+notice included -- the release zip must carry it.
+
+**The memory check, in `crt0.s`, before any C**: `($0006)` must clear the
+linker's own `s__HEAP` by the 256-byte stack reserve, or the game prints
+*NOT ENOUGH MEMORY FOR EGA TREK. BOOT ITS OWN DISK. PRESS A KEY.*, waits and
+`_TERM0`s. Both paths run for real: as the shell it passes and draws the
+title; typed at a COMMAND2 prompt (1,280 bytes less) it refuses and returns
+to `C>`, and `DIR` afterwards shows DOS intact. msx.org's own advice on MSX-DOS
+TPA is the same -- it varies with DOS, drive count and batch files, so check
+at run time. 96 bytes: **343 LEFT**.
+
+**Measured hardware requirement**: a stock NMS 8250 with no Nextor boots this
+disk into Disk BASIC 1.0 -- the game needs an **MSX-DOS 2 kernel** (Nextor or
+the DOS 2 cartridge). A 60Hz Sony HB-F1XD + mapper + Nextor gives the same
+`$DB06` and boots it. **uno's MSX2 build is a 16K CARTRIDGE** and needs
+nothing -- not an option for a 54K game with three data files, short of a
+banked MegaROM.
+
 **It is still not on the list**, and this file is not a reason to put it there.

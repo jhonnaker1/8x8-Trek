@@ -8,6 +8,8 @@
 #
 #   make game    build/gdisk/ -- THE GAME: MSXDOS2.SYS, the game installed as
 #                COMMAND2.COM, and its data files
+#   make dsk     build/egatrek-msx2.dsk -- THE RELEASE DISK IMAGE
+#   make memcheck  the memory check REFUSING, run from a COMMAND2 prompt
 #   make hello   build/HELLO.COM -- the video driver's first-light test
 #   make disk    build/disk/     -- boot files + HELLO.COM + AUTOEXEC.BAT
 #   make sound   build/SNDTEST.COM -- the PSG driver's first-sound test, on
@@ -53,7 +55,7 @@ SHARED = ../core/trek.c ../core/planet.c ../core/hof.c ../core/serial.c \
          ../c128/src/strpool.c ../c128/src/music_data.c
 SHARED_REL = $(addprefix build/,$(notdir $(SHARED:.c=.rel)))
 
-.PHONY: all game gameshot profile stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
+.PHONY: all game dsk dskshot memcheck gameshot profile stackrun dostime hello disk sound listen kbd shell stack stackbound probe shot clean
 all: hello
 
 build:
@@ -240,10 +242,34 @@ game: build/EGATREK.COM build/strings.dat ../c128/build/music.dat
 	@[ -z "$(GAME_SAVE)" ] || cp $(GAME_SAVE) build/gdisk/egatrek.sav
 	@ls -l build/gdisk
 
+# THE RELEASE DISK: a 720K image with an MSX-DOS 2 boot sector, the game as
+# its COMMAND2.COM, and the data -- the same files `game` puts in build/gdisk.
+# `make dskshot` boots the IMAGE, not the directory, and photographs it.
+DSK = build/egatrek-msx2.dsk
+dsk: game
+	python3 tools/mkdsk.py $(DSK) build/gdisk/MSXDOS2.SYS build/gdisk/COMMAND2.COM \
+	    build/gdisk/STRINGS.DAT build/gdisk/MUSIC.DAT build/gdisk/BRIEF.TXT
+
+memcheck: build/EGATREK.COM
+	rm -rf build/pdisk && mkdir -p build/pdisk
+	cp $(TOOLCHAIN)/nextor-boot/* build/pdisk/
+	cp build/EGATREK.COM build/pdisk/
+	$(call openmsx_run,build/pdisk,tools/memcheck.tcl,build/memcheck_done)
+	@grep -v '^ *$$' build/memcheck.txt
+	@grep -q 'NOT ENOUGH MEMORY' build/memcheck.txt && grep -q 'EGATREK .COM' build/memcheck.txt && echo "memcheck: PASS (refused, and DOS survived)"
+
+# BOOT THE IMAGE, not the directory it was made from: the staged artefact is
+# what gets played. Title, then setup and the console.
+dskshot: dsk
+	$(MAKE) gameshot SHOT_DISK=$(DSK) SHOT_TIMES=24,62 SHOT_KEYS='25:\r,35:n\r,38:n\r,41:jamie\r,44:1\r,47:trek\r'
+
 # Photograph the running game from VRAM (tools/vram2png.py) at SHOT_TIMES,
 # typing SHOT_KEYS ("t:text,...") on the way. build/game_<t>.png.
 SHOT_TIMES ?= 30
 SHOT_KEYS ?=
+# The disk to boot: the directory by default, or the release image --
+# `make dskshot` -- which is the artefact a player gets.
+SHOT_DISK ?= build/gdisk
 # STACK=1 also measures the stack: sentinel from the image end up, read at
 # the end of the run (tools/gameshot.tcl).
 STACK_FROM = $(if $(STACK),$(shell python3 tools/probe.py --end build/probe.map))
@@ -270,7 +296,7 @@ stackrun:
 	$(MAKE) gameshot STACK=1 SHOT_TIMES=82,122,150,174,215,280 SHOT_KEYS='$(STACK_SESSION)'
 
 gameshot: game
-	$(call openmsx_run,build/gdisk,tools/gameshot.tcl,build/gameshot_done,SHOT_TIMES='$(SHOT_TIMES)' SHOT_KEYS='$(SHOT_KEYS)' STACK_FROM='$(STACK_FROM)')
+	$(call openmsx_run,$(SHOT_DISK),tools/gameshot.tcl,build/gameshot_done,SHOT_TIMES='$(SHOT_TIMES)' SHOT_KEYS='$(SHOT_KEYS)' STACK_FROM='$(STACK_FROM)')
 	@[ -z "$(STACK_FROM)" ] || cat build/stack.txt
 	@for t in $$(echo $(SHOT_TIMES) | tr ',' ' '); do python3 tools/vram2png.py build/vram_$$t.bin build/pal_$$t.bin build/game_$$t.png; done
 

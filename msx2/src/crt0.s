@@ -9,7 +9,9 @@
 	;; here -- the same two fixups uno's cartridge crt0 does, for the same
 	;; reason: nothing else will.
 	.module crt0
+STACK_RESERVE = 256		; bytes; see the memory check in init
 	.globl	_main
+	.globl	s__HEAP
 	.globl	s__DATA
 	.globl	l__DATA
 	.globl	s__INITIALIZED
@@ -24,10 +26,40 @@
 	.area	_CODE
 init::
 	ld	sp, (0x0006)
+
+	;; THE MEMORY CHECK. The stack grows down from ($0006) into whatever the
+	;; image leaves, and the game needs 256 bytes of it -- 208 measured on the
+	;; running game, ~225 the static worst case (NOTES, "THE STACK"). How much
+	;; there IS depends on the machine: every disk interface and driver
+	;; takes page-3 work area and lowers ($0006), and so does COMMAND2 if the
+	;; game is run from a prompt instead of installed as the shell (1,280
+	;; bytes). s__HEAP is the linker's end of the image, so this cannot go
+	;; stale behind a build. Too little: say so, wait for a key, _TERM0 --
+	;; which returns to a prompt, or, as the shell, reloads and says it again.
+	ld	hl, (0x0006)
+	ld	de, #s__HEAP + STACK_RESERVE
+	or	a
+	sbc	hl, de
+	jr	c, nomem
 	call	gsinit
 	call	_main
 	ld	c, #0x00		; main returned: _TERM0
 	jp	0x0005
+
+nomem:
+	ld	de, #nomem_msg
+	ld	c, #0x09		; _STROUT
+	call	0x0005
+	ld	c, #0x08		; _INNOE: wait for a key, no echo
+	call	0x0005
+	ld	c, #0x00		; _TERM0
+	jp	0x0005
+nomem_msg:
+	.ascii	"NOT ENOUGH MEMORY FOR EGA TREK."
+	.db	13, 10
+	.ascii	"BOOT ITS OWN DISK. PRESS A KEY."
+	.db	13, 10
+	.ascii	"$"
 
 	.area	_INITIALIZER
 	.area	_GSINIT
