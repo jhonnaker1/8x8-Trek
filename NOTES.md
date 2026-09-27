@@ -13013,7 +13013,11 @@ each off by one slot, because the table's order is not the header's order.
 Reading `os/h/screen.h` fixed it in one look. **Infer the shape, read the
 values.**
 
-### IT DOES NOT FIT. MEASURED 2026-09-21, AND THIS CLOSES THE QUESTION
+### ~~IT DOES NOT FIT. MEASURED 2026-09-21, AND THIS CLOSES THE QUESTION~~
+
+**REOPENED 2026-09-26 -- with REU-backed overlays that may call each other it
+fits, by a trial link; see "THE TRIAL LINK" below.** This section's page map
+stands; its "best split" was bounded by the disk-overlay rules.
 
 Everything below was written against the arena's SIZE. The number that
 decides it is the arena's AVAILABILITY, and C64 OS publishes it: a byte per
@@ -13191,19 +13195,90 @@ A bare C64 gives a program everything but zero page, the screen and I/O:
 BASIC's ROM banks out, and writes land in the RAM under the KERNAL. C64 OS is
 itself a large program in that same 64K, and it keeps `$C000` up for its
 modules, `$E000` up for utilities, and 7,936 bytes inside the arena too. The
-REU can take the far store, but code has to run from main RAM, and the code
-alone -- 32,624 resident with the two hot-path overlays out, plus a 4,638
-window -- is larger than everything C64 OS lets an app have.
+REU can take the far store, but code has to run from main RAM, and under the
+DISK overlay rules the code alone -- 32,624 resident with the two hot-path
+overlays out, plus a 4,638 window -- is larger than everything C64 OS lets an
+app have. (REU overlays change that: see "THE TRIAL LINK" below.)
 
-**What it did not touch is the verdict.** uno's `main.o` is 13,091 bytes and
+**What it did not touch is the page map.** uno's `main.o` is 13,091 bytes and
 never met the arena's limit; nothing it learned moves the page map. The
 input model does not transfer either: uno rewrote its game as a state machine
 driven by key events, which it can because its `main.c` is its own. EGA
 Trek's `ui.c` is shared and blocks in `kb_waitkey()`.
 
+### THE TRIAL LINK, 2026-09-26: WITH REU OVERLAYS IT FITS, WITH ~7,200 SPARE
+
+Asked for by Jamie after the section above. The 37,518 was the best split
+**under the disk-overlay rules**, which exist because a load from a 1541
+costs seconds: an overlay may not call another (rule 2), and anything called
+from everywhere stays resident. **An REU copies about a byte a cycle, so a
+4K swap is ~4ms**, and at that price an overlay CAN call another -- through a
+resident thunk that pushes the live id, swaps the callee in, calls it and
+swaps the caller back. That lets the engine and the console drawing leave
+resident memory, which is exactly what the section above said would be needed.
+
+**Method, on a scratch copy of the tree** (the repo is untouched):
+`OVL_CODE("group")` added to named functions -- which also stops LTO inlining
+them, so the cost of un-inlining is IN the figures -- the C64 link script
+given one section per group, and the C64 port linked for real with the two
+hot-path overlays on. The baseline reproduced 2026-09-21 exactly (`.text`
+28,984, resident 35,584) before anything moved. Eight new groups:
+
+    view   2,107   ui_draw_viewer ui_draw_chart ui_draw_scan
+    panel  2,446   ui_draw_all _systems _status _position _lasers gauge_row
+    nav    3,274   trek_move_warp _impulse walk_path path_dist warp_energy
+                   warp_hundredths enter_black_hole do_warp
+    time   1,451   trek_advance_time trek_enter_quadrant
+    turn   2,922   run_turn trek_run_events
+    laser  1,996   do_lasers trek_laser_damage trek_fire_laser _begin_volley
+    torp   3,012   do_torpedo trek_fire_torpedo
+    cmdx      60   do_chart do_repair do_info do_planets
+
+    resident 35,584 -> 20,476; largest overlay still .ovl_enemy, 3,802 of 4,096
+
+`cell_glyph`, `advance_hundredths` and `clear_panel` were moved out and then
+BACK: each is called per cell or per step from a different overlay, where a
+thunk would swap on every call. **52 overlay functions are called from
+outside their own overlay** and need a thunk, and **none has its address
+taken**, so nothing reaches a window through a pointer.
+
+**THE CALL GRAPH HAD TO COME FROM RELOCATIONS.** The first count said two
+thunks, because every overlay starts at `$C000` and the disassembler names a
+window address after whatever symbol it finds there -- the same trap
+`tools/overlay_check.py` documents. Linked with `-Wl,--emit-relocs`, each call
+names `section+offset`, which is unambiguous; that gave 55, then 52.
+
+    resident, as linked                                          20,476
+      message log -> the REU                                     -2,048
+      BASIC header                                                  -12
+      disk ovl_load + 14 load_ stubs (measured)                    -379
+      REU overlay manager + 52 six-byte thunks       ESTIMATE      +470
+      C64 OS shim: uno's app.s code 398 + data 448 + header 10     +856
+      drivers -> C64 OS equivalents                  taken as a wash  0
+    window (largest overlay 3,802)                                4,096
+    soft stack (C64 measured 144)                                   256
+    NEEDED                                                       23,715
+    available to an app at Homebase, measured 2026-09-21         30,976
+    MARGIN                                                       +7,261
+
+**+5,213 even if the message log stays resident.** The margin is what C64
+OS's own allocations may grow into when a utility is open, and that growth
+has never been measured.
+
+**WHAT THE TRIAL DID NOT PROVE.** The overlay manager is unwritten: it must
+preserve A, X, Y and the argument registers through a swap, keep its own
+return stack, and allocate REU banks through C64 OS. Its 470 bytes are an
+estimate. The swap COUNT per turn is unmeasured -- `ui_draw_all` calls into
+`view` three times a repaint, and `nav` calls `time` -- and it takes a running
+build to count. And nothing here changes the other costs: `kb_waitkey()`
+blocks, so C64 OS's menus are dead while the game waits; the player must own
+C64 OS and a CMD HD ROM; and every test needs a human double-click.
+
 ### Verdict
 
-Two shapes, and only one is worth anything:
+**CORRECTED 2026-09-26: memory is no longer the wall.** With REU-backed
+overlays the trial link needs 23,715 of 30,976. What remains is an unbuilt
+overlay manager, and the costs above. The shapes as first weighed:
 
   * **As uno did it** -- hand-port to assembly. 9,247 lines of shared C
     (`core/` + `ui.c` + `main.c` + `layout40.c` + `strpool.c`) plus 3,213 lines
@@ -13214,9 +13289,10 @@ Two shapes, and only one is worth anything:
   * ~~**In C**~~ -- **the toolchain is no longer a question and the fit is
     settled the other way.** A C application built by llvm-mos was loaded,
     relinked and run by C64 OS on 2026-09-20, and it draws a full screen in
-    0.196s. **But the game does not fit**: an app may have 30,976 bytes of the
+    0.196s. ~~**But the game does not fit**: an app may have 30,976 bytes of the
     arena and the best split found here needs 37,518. See *"IT DOES NOT FIT"*
-    above. That is a wall, not arithmetic.
+    above. That is a wall, not arithmetic.~~ **It fits with REU overlays:
+    23,715 of 30,976 -- see "THE TRIAL LINK".**
 
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.
