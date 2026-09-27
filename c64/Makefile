@@ -63,7 +63,9 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 # Read out of the linker script, not repeated here -- one number, one home.
 OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1/p' c64.ld)
 
-# $(1) = the ELF to cut every overlay out of. Lifted from c128/Makefile
+# $(1) = the ELF to cut every overlay out of; $(2) = where the images go and
+# $(3) = which overlays, both defaulting to the release build's -- the REU
+# build passes its own. Lifted from c128/Makefile
 # including its two scars: a shell loop rather than $(foreach), because
 # foreach joins with a space and silently loses one objcopy; and a STAMP on
 # every image -- the low sixteen bits of ovl_load's address in the link it was
@@ -71,14 +73,14 @@ OVL_WINDOW := $(shell sed -n 's/.*window (rwx).*LENGTH = \(0x[0-9A-Fa-f]*\).*/\1
 # images beside today's program jump into the middle of some other function.
 define OVL_IMAGES
 	@stamp=`$(NM) $(1) | awk '$$3 == "ovl_load" { print $$1 }'`; \
-	for o in $(OVERLAYS); do \
-	    $(OBJCOPY) --dump-section=.ovl_$$o=build/ovl_$$o.raw $(1) /dev/null || exit 1; \
+	for o in $(or $(3),$(OVERLAYS)); do \
+	    $(OBJCOPY) --dump-section=.ovl_$$o=$(or $(2),build)/ovl_$$o.raw $(1) /dev/null || exit 1; \
 	    python3 -c "import sys; \
 	        n = sys.argv[1]; a = int(sys.argv[2], 16); \
-	        d = open('build/ovl_%s.raw' % n, 'rb').read(); \
+	        d = open('$(or $(2),build)/ovl_%s.raw' % n, 'rb').read(); \
 	        w = int('$(OVL_WINDOW)', 16); \
 	        d = d + bytes([a & 0xFF, (a >> 8) & 0xFF]); \
-	        open('build/ovl%s.prg' % n, 'wb').write(bytes([0x00,0xC0]) + d); \
+	        open('$(or $(2),build)/ovl%s.prg' % n, 'wb').write(bytes([0x00,0xC0]) + d); \
 	        print('  overlay %s: %d bytes + stamp, window is %d' % (n, len(d) - 2, w)); \
 	        sys.exit('overlay %s does not fit the window' % n) if len(d) > w else None" $$o $$stamp || exit 1; \
 	done
@@ -157,7 +159,7 @@ build/music.dat: ../c128/build/music.dat ../tools/make_music.py
 	cd .. && python3 tools/make_music.py >/dev/null
 
 # $(1) = the .d64, $(2) = the program PRG, $(3) = the ELF the overlays come
-# from. THE IMAGES ARE CUT HERE, in the disk rule, and not left to the link
+# from; $(4) and $(5) are OVL_IMAGES's $(2) and $(3). THE IMAGES ARE CUT HERE, in the disk rule, and not left to the link
 # rule: build/ovl*.prg is shared between the release and debug builds and
 # whichever linked last wins, so a disk that merely depends on the PRG can
 # pick up the OTHER build's overlays when the PRG is already up to date.
@@ -167,7 +169,7 @@ build/music.dat: ../c128/build/music.dat ../tools/make_music.py
 # deliberately-broken probe reported a PASS in this very directory on
 # 2026-09-14. Formatting is the only way -write can be trusted.
 define MAKE_D64
-	$(call OVL_IMAGES,$(3))
+	$(call OVL_IMAGES,$(3),$(4),$(5))
 	@rm -f $(1)
 	c1541 -format "ega trek 64,01" d64 $(1) >/dev/null
 	c1541 -attach $(1) -write $(2) trek64 >/dev/null
@@ -189,8 +191,8 @@ define MAKE_D64
 	@python3 -c "d = open('build/music.dat','rb').read(); \
 	    open('build/music.pdat','wb').write(bytes([0x00,0xE0]) + d)"
 	c1541 -attach $(1) -write build/music.pdat music.dat >/dev/null
-	@for o in $(OVERLAYS); do \
-	    c1541 -attach $(1) -write build/ovl$$o.prg ovl$$o >/dev/null; \
+	@for o in $(or $(5),$(OVERLAYS)); do \
+	    c1541 -attach $(1) -write $(or $(4),build)/ovl$$o.prg ovl$$o >/dev/null; \
 	done
 	@echo "disk: $(1)"
 endef
@@ -215,6 +217,9 @@ $(DEBUG_D64): $(DEBUG_OUT) build/strings.dat build/music.dat ../c128/src/briefin
 release: $(D64)
 	@cp README-release.txt build/egatrek-c64.txt
 	@ls -l build/egatrek-c64.d64 build/egatrek-c64.txt
+
+# The REU build lives in reu.mk -- see the top of that file for why.
+include reu.mk
 
 # THE CHECKS THE COMPILER STRUCTURALLY CANNOT MAKE. `d64` depends on this so a
 # binary that cannot run can never reach a disk -- the same wiring the MEGA65

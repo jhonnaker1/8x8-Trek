@@ -130,7 +130,7 @@ static uint16_t enemy_strength(uint8_t type) {
 
 uint16_t trek_enemy_full_hp(uint8_t type) { return enemy_strength(type); }
 
-void trek_enter_quadrant(void) {
+OVL_CODE_REU("time") void trek_enter_quadrant(void) {
     uint8_t q = (uint8_t)((ship.quad_y << 3) | ship.quad_x);
     uint8_t i, n, cell;
 
@@ -477,7 +477,7 @@ void trek_turn_end(void) {
                                  ? ship.laser_heat - LASER_HEAT_COOL_TURN : 0);
 }
 
-void trek_advance_time(uint16_t tenths) {
+OVL_CODE_REU("time") void trek_advance_time(uint16_t tenths) {
     /* EVERY DECLARATION IS UP HERE, and that is a portability rule rather than
        a style. cc65 is C89 and rejects a declaration after a statement, and it
        is the toolchain the F256 currently needs. This block used to sit below
@@ -1195,7 +1195,7 @@ static void run_spy(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
-uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
+OVL_CODE_REU("turn") uint8_t trek_run_events(TrekEvent *ev, uint8_t max) {
     uint8_t n = 0;
     /* Before the scheduled events: the ship is already gone, and anything the
        schedule has to say about bases is happening to someone else. */
@@ -1402,7 +1402,7 @@ static void advance_hundredths(uint16_t h) {
  * The fraction is found by ADDING, for the same reason as the walk: there are
  * only seventeen possible answers, and sixteen subtractions cost less code
  * than one 16-bit divide. */
-static uint16_t path_dist(uint8_t dy, uint8_t dx) {
+OVL_CODE_REU("nav") static uint16_t path_dist(uint8_t dy, uint8_t dx) {
     uint16_t v, r, sq, d, t;
     uint8_t frac;
 
@@ -1437,7 +1437,7 @@ uint8_t trek_block_y, trek_block_x;
    that falls inside the CURRENT quadrant -- the only one with a sector map;
    the destination is not generated until arrival. Returns 1 if an object
    stopped it, in which case trek_block_y/x name that object's sector. */
-static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
+OVL_CODE_REU("nav") static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
     uint8_t ay0 = (uint8_t)((ship.quad_y << 3) | ship.sec_y);
     uint8_t ax0 = (uint8_t)((ship.quad_x << 3) | ship.sec_x);
     uint8_t upy = (uint8_t)(ay1 >= ay0), upx = (uint8_t)(ax1 >= ax0);
@@ -1523,7 +1523,7 @@ static uint8_t walk_path(uint8_t ay1, uint8_t ax1) {
  *
  * Called with the ship already standing in the hole's cell, because that is
  * what the walk reports. Returns the MOVE_ code for the caller. */
-static uint8_t enter_black_hole(void) {
+OVL_CODE_REU("nav") static uint8_t enter_black_hole(void) {
     uint8_t q, tries;
 
     if (trek_rand_n(HOLE_FATAL_OF_N) == 0) {
@@ -1552,7 +1552,7 @@ static uint8_t enter_black_hole(void) {
     return MOVE_HOLE_THROWN;
 }
 
-uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
+OVL_CODE_REU("nav") uint8_t trek_move_impulse(uint8_t sy, uint8_t sx) {
     uint16_t d16, cost;
     uint8_t blocked;
 
@@ -1663,7 +1663,7 @@ uint8_t trek_move_delta(int16_t dy, int16_t dx) {
    exactly, and `(wc * g) >> 3` is `(wc>>3)*g + (((wc&7)*g)>>3)` exactly.
    NO 32-BIT ARITHMETIC -- core/trek.c has none and is not about to gain any
    for a formula that fits with one more line. */
-static uint16_t warp_energy(uint16_t d88) {
+OVL_CODE_REU("nav") static uint16_t warp_energy(uint16_t d88) {
     uint16_t d44 = (uint16_t)(d88 >> 4);                      /* max 178 */
     uint16_t wc  = (uint16_t)(((uint16_t)ship.warp *
                                (uint16_t)ship.warp) / 10);    /* max 1000 */
@@ -1722,14 +1722,14 @@ static uint8_t warp_strain(uint16_t d16) {
     return loss;
 }
 
-static uint16_t warp_hundredths(uint16_t d16) {
+OVL_CODE_REU("nav") static uint16_t warp_hundredths(uint16_t d16) {
     uint16_t den = (uint16_t)(((uint16_t)ship.warp * (uint16_t)ship.warp) >> 1);
     uint16_t num = (uint16_t)(43u * d16);
     if (den == 0) den = 1;
     return (uint16_t)((num / den) * 10u + ((num % den) * 10u) / den);
 }
 
-uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
+OVL_CODE_REU("nav") uint8_t trek_move_warp(uint8_t qy, uint8_t qx, uint8_t sy, uint8_t sx) {
     uint16_t d16, cost;
     uint8_t ay1, ax1;
 
@@ -1898,7 +1898,7 @@ static void kill_enemy(uint8_t cell) {
 /* MEASURED exactly; see trek.h and MEASURED.md. Distance is applied before
    efficiency so that the readings, all of which were taken at 100%, come
    back bit for bit. */
-uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
+OVL_CODE_REU("laser") uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
     uint16_t f = laser_factor(dist);
 
     if (f == 0 || eff_pct == 0 || energy == 0) return 0;
@@ -1913,10 +1913,10 @@ uint16_t trek_laser_damage(uint16_t energy, uint8_t eff_pct, uint16_t dist) {
    was wrong: MEASURED 2026-08-24, heat accumulates ACROSS volleys within a
    quadrant visit and is cleared by LEAVING the quadrant. Jamie watched the
    gauge do it. trek_enter_quadrant() clears it now. */
-void trek_laser_begin_volley(void) {
+OVL_CODE_REU("laser") void trek_laser_begin_volley(void) {
 }
 
-uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
+OVL_CODE_REU("laser") uint8_t trek_fire_laser(uint8_t sy, uint8_t sx, uint16_t energy,
                         uint16_t *damage) {
     uint8_t cell;
     uint16_t d, dealt;
@@ -2670,7 +2670,7 @@ static uint8_t star_supernova(uint8_t sy, uint8_t sx, uint16_t *damage) {
     return TORP_NOVA;
 }
 
-uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
+OVL_CODE_REU("torp") uint8_t trek_fire_torpedo(uint8_t sy, uint8_t sx, uint16_t *damage) {
     int16_t  y, x, stepy, stepx;
     uint8_t  m, cy, cx, cell, c;
     uint16_t fy, fx, q, base, dmg, wobble;

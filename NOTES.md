@@ -13274,11 +13274,122 @@ build to count. And nothing here changes the other costs: `kb_waitkey()`
 blocks, so C64 OS's menus are dead while the game waits; the player must own
 C64 OS and a CMD HD ROM; and every test needs a human double-click.
 
+### THE REU OVERLAY MANAGER, BUILT AND CHECKED ON THE BARE C64, 2026-09-26
+
+Asked for by Jamie straight after the trial link. It is built as a second
+C64 program, `make -C c64 d64-reu`, rather than inside C64 OS, because the
+bare C64 in VICE can be driven headlessly and compared against the shipping
+build, and C64 OS cannot (see "THE RIG NEEDS A HUMAN" above). What C64 OS
+keeps is the thunks and the DMA; only the one-time load is the bare machine's.
+`c64/README.md`, "The REU build", is the summary.
+
+**THE SHAPE.** Seven groups -- view, panel, nav, time, turn, laser, torp -- are
+`OVL_CODE_REU` in the shared sources, a macro that is empty unless
+`TREK_OVL_REU` is defined; twenty overlays in all. `c64/src/c64reu.c` loads
+every image from the disk once, checks its stamp, and stashes it in the REU;
+after that `ovl_load` does nothing. `c64/tools/reu_thunks.py` patches the
+LINKED ELF: from the relocations `-Wl,--emit-relocs` keeps, every JSR or JMP
+that crosses into another overlay is pointed at a six-byte thunk --
+`jsr ovl_far` plus the id and the address. `c64/src/reuovl.s` is `ovl_far`.
+If the callee's image is in the window it jumps there. If not, it pushes
+what is loaded, DMAs the callee in, calls, DMAs the pushed image back and
+returns, carrying A, X and Y both ways.
+
+**WHY AFTER THE LINK.** Under LTO most callees are static functions that
+nothing in the source can rename, and the compiler emits a plain `jsr`. The
+linker is the only party that knows where every call is, and with
+`--emit-relocs` it leaves that behind. The patch refuses on a function pointer
+into an overlay, and on an operand that does not already hold the address its
+relocation predicts -- its own check that it read the ELF right. Switch jump
+tables are the one legitimate cross-section reference: resident `.rodata`
+pointing into the middle of the function that reads them, 150 entries,
+present in the disk build all along.
+
+**IT ALWAYS PUTS BACK WHAT WAS LOADED, EVEN FOR A RESIDENT CALLER.** The first
+design skipped the restore when the immediate caller was resident, and that
+is wrong: a resident helper called from overlay A returns INTO A.
+
+**THE SHARED SOURCES DID NOT CHANGE FOR ANY OTHER PORT, proved two ways.**
+Each tag sits on its function's own definition line, so no line number moves.
+Preprocessed with and without the change, main.c, ui.c and trek.c give
+identical token streams in all four overlay configurations -- and differ with
+TREK_OVL_REU on, so the comparison can fail. And the C64 release PRG built
+from the tagged tree is byte-identical to the morning's, and its .d64 to the
+one before the Makefile's macros took a directory.
+
+**MEASURED:**
+
+    thunks              48 of 64 slots, 70 calls patched
+    reu_xfer            63 bytes      ovl_far        143
+    thunk table        384 (288 used)  tables       153 .bss
+    ovl_load + init    681, against the disk loader's 314
+    resident        21,823 (report_size.py), against the release's 40,856
+    largest overlay  3,802 of 4,096 (.ovl_enemy, unchanged)
+
+**THE TEST, `make -C c64 reucheck`.** One game played on the disk build and on
+the REU build, headless and in warp, every screen compared in characters AND
+colours: chart, repair, info, a warp speed, an impulse move, a warp into
+another quadrant, a laser kill, a torpedo -- whose `fire_one_torpedo` in
+OVL_REPAIR calls `trek_fire_torpedo` in OVL_TORP, a nested swap -- the planet
+list, the message log, shields, docking, and a second warp. **35 screens, all
+identical.** The galaxy is pinned without touching the game: `input.c` returns
+an injected key BEFORE `kb_entropy` counts, so the harness writes
+`kb_entropy` and the password's RETURN while VICE is stopped, and both builds
+get one seed.
+
+**AND IT WAS MADE TO FAIL.** With the DMA that puts the caller back replaced by
+NOPs, the very first console differs -- the panels blank, and the message line
+reading "CLEAN MISS, SIR!", prose from whatever image the window held. The
+first sabotaged run also found a bug in the HARNESS: it waited for ever for
+a crashed machine to take a key. It gives up after 30 seconds now.
+
+**THE C64 OS BUDGET, NOW FROM A REAL LINK:**
+
+    resident                                     21,823
+      message log -> the REU                     -2,048
+      BASIC header                                  -12
+      C64 OS shim (uno's app.s, measured)          +856
+      drivers -> C64 OS equivalents             a wash
+    window                                        4,096
+    soft stack                                      256
+    NEEDED                                       24,971
+    available                                    30,976
+    MARGIN                                       +6,005   (the trial said +7,261)
+
+The 1,256 over the trial are its estimate meeting the build: the full
+64-slot thunk table, the manager and its tables at 743 against 470, and the
+one-time loader 367 over the disk `ovl_load`. Sixteen unused thunk slots are
+96 bytes nobody has taken back yet.
+
+**TIMED AT 1x, the same game on both builds** (VICE, stock 1541, each step
+from its first key until the screen stops changing, less the harness's own
+8-second wait):
+
+    to the title             disk  4.8s     REU 47.3s   all 20 images loaded once
+    the game after it        disk 50.0s     REU 24.6s
+    a command that loads     disk 2.8-5.9s  REU 0.5-1.5s
+      an overlay (repair, info, plan, msgs, dock, torpedo, both warps)
+    a laser or torpedo step  disk 0.2-0.7s  REU 0.5-1.1s  nested swaps, ~0.3s
+
+**Twice as fast after a 42-second start.** Those real-time runs also compare
+35 of 35 identical. The FIRST real-time comparison did not, and the REU build
+was not why: at 1x the DISK build sits silent for over three seconds while
+the 1541 loads, so a 3-second quiet window recorded a blank title and a warp
+not yet made. The disk build's two recordings disagreed with each other in
+exactly those steps; the REU build's agreed with its warp run everywhere.
+
+**WHAT IS STILL NOT BUILT:** everything that is C64 OS's rather than the
+C64's -- the app header and link table, loading the images through C64 OS's
+file API into REU banks it allocates, drawing into its buffers, and the
+blocking `kb_waitkey()` that would leave its menus dead. The manager itself
+is done and checked.
+
 ### Verdict
 
 **CORRECTED 2026-09-26: memory is no longer the wall.** With REU-backed
-overlays the trial link needs 23,715 of 30,976. What remains is an unbuilt
-overlay manager, and the costs above. The shapes as first weighed:
+overlays the real link needs 24,971 of 30,976, and the overlay manager is
+built and checked -- see the two sections above. What remains is the C64 OS
+side, and the costs above. The shapes as first weighed:
 
   * **As uno did it** -- hand-port to assembly. 9,247 lines of shared C
     (`core/` + `ui.c` + `main.c` + `layout40.c` + `strpool.c`) plus 3,213 lines
@@ -13292,7 +13403,7 @@ overlay manager, and the costs above. The shapes as first weighed:
     0.196s. ~~**But the game does not fit**: an app may have 30,976 bytes of the
     arena and the best split found here needs 37,518. See *"IT DOES NOT FIT"*
     above. That is a wall, not arithmetic.~~ **It fits with REU overlays:
-    23,715 of 30,976 -- see "THE TRIAL LINK".**
+    24,971 of 30,976 by the real link -- see "THE REU OVERLAY MANAGER".**
 
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.

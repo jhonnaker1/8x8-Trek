@@ -141,7 +141,7 @@ static unsigned char cell_glyph(unsigned char c, unsigned char *color) {
     }
 }
 
-void ui_draw_scan(void) {
+OVL_CODE_REU("view") void ui_draw_scan(void) {
     ON_PAGE(P_SCAN);
     const Panel *p = &panels[P_SCAN];
     unsigned char row, col, glyph, color;
@@ -195,7 +195,7 @@ void ui_draw_scan(void) {
    enemies, base type, stars (manual l.286-292). Unscanned quadrants show
    dots. Quadrants holding enemies are highlighted red, bases orange -- both
    from core/ega.h. */
-void ui_draw_chart(void) {
+OVL_CODE_REU("view") void ui_draw_chart(void) {
     ON_PAGE(P_CHART);
     const Panel *p = &panels[P_CHART];
     unsigned char row, col, q, color;
@@ -284,7 +284,7 @@ void ui_draw_chart(void) {
 
 /* -------------------------------------------------------------- status */
 
-void ui_draw_status(void) {
+OVL_CODE_REU("panel") void ui_draw_status(void) {
     ON_PAGE(P_STATUS);
     const Panel *p = &panels[P_STATUS];
     unsigned char lx = (unsigned char)(p->x + 2);
@@ -490,7 +490,7 @@ static void draw_reserve(void) {
                 SYS_BAR_GLYPH, b < fill ? color : COL_GRID);
 }
 
-void ui_draw_systems(void) {
+OVL_CODE_REU("panel") void ui_draw_systems(void) {
     ON_PAGE(P_SYSTEMS);
     const Panel *p = &panels[P_SYSTEMS];
     unsigned char i, c, r, b, x, y, pct, fill, color;
@@ -592,7 +592,7 @@ static void put_gauge_num(unsigned char x, unsigned char y, uint16_t v,
     put_num(x, y, v, LAS_VAL_W, color);
 }
 
-static void gauge_row(unsigned char x, unsigned char y, const char *label,
+OVL_CODE_REU("panel") static void gauge_row(unsigned char x, unsigned char y, const char *label,
                       uint16_t value, uint16_t full, unsigned char color) {
     unsigned char fill = gauge_fill(value, full);
     unsigned char b;
@@ -604,7 +604,7 @@ static void gauge_row(unsigned char x, unsigned char y, const char *label,
     put_gauge_num((unsigned char)(x + 5 + LAS_BAR_W + 1), y, value, color);
 }
 
-void ui_draw_lasers(void) {
+OVL_CODE_REU("panel") void ui_draw_lasers(void) {
     ON_PAGE(P_LASERS);
     const Panel *p = &panels[P_LASERS];
     unsigned char x = (unsigned char)(p->x + 1);
@@ -668,7 +668,7 @@ static unsigned char nearest_enemy(uint16_t *dist) {
     return best;
 }
 
-void ui_draw_viewer(void) {
+OVL_CODE_REU("view") void ui_draw_viewer(void) {
     ON_PAGE(P_VIEWER);
     const Panel *p = &panels[P_VIEWER];
     unsigned char x = (unsigned char)(p->x + 1);
@@ -1194,7 +1194,7 @@ void ui_ack(uint8_t n) {
    it -- these two were on the STATUS panel here until a capture showed
    otherwise. Drawn separately from ui_read_command so that reading a command
    does not wipe it. */
-void ui_draw_position(void) {
+OVL_CODE_REU("panel") void ui_draw_position(void) {
     ON_PAGE(P_COMMAND);
     const Panel *p = &panels[P_COMMAND];
     unsigned char x = (unsigned char)(p->x + 2);
@@ -1572,7 +1572,7 @@ void ui_dialog_close(void) {
    page (see ON_PAGE above), so this list does not have to know which panels
    are where -- which is exactly the knowledge that drifted twice while the
    40-column layout was being moved around. */
-void ui_draw_all(void) {
+OVL_CODE_REU("panel") void ui_draw_all(void) {
     draw_console();
     ui_draw_scan();
     ui_draw_chart();

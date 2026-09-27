@@ -17,6 +17,8 @@ make d64-debug  # the instrumented disk tools/play.py drives
 make verify     # the cheap gate, no emulator: what `make ports` runs
 make writecheck # write 600 bytes and read them back IN ONE RUN
 make run        # x64sc, autostart
+make d64-reu    # the REU build -- NOT a release; see below
+make reucheck   # play one game on both builds and compare every screen
 python3 tools/boot.py        # boot the disk, screenshot it, LEAVE IT RUNNING
 python3 tools/play.py        # drive past setup to the console, and leave it
 ```
@@ -112,6 +114,63 @@ The answer turned out to be the cheap one: a plain 2K array in `.noinit`,
 because of the spare room above. It could have gone under the KERNAL beside
 the pool; it does not, because there is no room there and because every read
 would cost an interrupts-off bank switch.
+
+## The REU build — not a release
+
+`make d64-reu` builds a second C64 program whose overlays **may call each
+other**. It exists for one reason: C64 OS gives an app 30,976 bytes, and this
+game fits in that only if the engine and the console drawing leave resident
+memory — which the disk overlays forbid, because a swap from a 1541 costs
+seconds. From an REU it is a DMA. See `NOTES.md`, *"THE TRIAL LINK"* and
+*"THE REU OVERLAY MANAGER"*.
+
+It is the same C as the release, with three differences:
+
+* **Seven more overlays** — view, panel, nav, time, turn, laser, torp — marked
+  `OVL_CODE_REU` in the shared sources, where the macro is empty on every
+  other port. Twenty in all, each inside the 4K window at `$C000`.
+* **`src/c64reu.c` replaces the disk loader.** The first `ovl_load` loads all
+  twenty images from the disk once, checks each one's stamp, and stashes it
+  in the REU at 4K per image. After that `ovl_load` does nothing.
+* **The link is patched after it is made.** `tools/reu_thunks.py` reads the
+  relocations `-Wl,--emit-relocs` leaves in the ELF, and points every JSR or
+  JMP that crosses into another overlay at a six-byte thunk. It refuses to
+  patch on a function pointer into an overlay, or on an operand that does not
+  hold what its relocation predicts. Calls inside one overlay stay direct.
+
+`src/reuovl.s` is the manager. A thunk is `jsr ovl_far` followed by the
+overlay id and the function's address. If that overlay is already in the
+window it jumps straight there. Otherwise it pushes the id that is loaded,
+DMAs the callee in, calls it, DMAs the pushed one back and returns. A, X and
+Y survive both ways, and no zero page is touched.
+
+**It always puts back what was loaded, even for a resident caller.** A
+resident helper called from overlay A returns into A, so its call into B must
+leave A in the window afterwards.
+
+**Measured 2026-09-26:**
+* 48 thunks, 70 calls patched, and 150 jump-table entries left alone. Switch
+  tables sit in resident `.rodata` and point into their own function, which is
+  the only code that reads them.
+* The manager is 63 bytes of `reu_xfer`, 143 of `ovl_far`, 288 of thunks and
+  153 of tables.
+* The resident program is 21,823 bytes, against the release's 40,856 (`report_size.py`).
+
+**Twice as fast once started.** Timed at 1x, the scripted game after the
+title took 24.6 seconds against the disk build's 50.0: every command that
+loads an overlay drops from 3-6 seconds to about one. The price is paid once,
+at the title: 47 seconds to load all twenty images from a stock 1541.
+
+It needs a 128K 1700 or larger (`make runreu` boots one in VICE). With no REU
+it says so and stops.
+
+**`make reucheck` is the test.** It plays one pinned game on the disk build and
+on the REU build: the chart, two moves, a laser kill, a torpedo, docking and
+the modal screens. It compares every screen in characters and colours. The
+galaxy is pinned by writing `kb_entropy` and the password's RETURN while VICE
+is stopped, so both builds play the same game with no change to the code. All
+35 screens match. With the DMA that puts the caller back removed, the very
+first console differs.
 
 ## Watch out for
 

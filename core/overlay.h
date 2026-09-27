@@ -177,7 +177,39 @@
 #define OVL_N_MOVE      0
 #endif
 
-#define OVL_COUNT  (OVL_BASE_COUNT + OVL_N_ENEMY + OVL_N_MOVE)
+/* THE REU GROUPS, and they break rule 2 on purpose.
+ *
+ * With an REU behind the window a swap is a DMA of about a byte a cycle --
+ * ~4ms for a full 4K -- and at that price an overlay MAY call another. It
+ * does so through a resident thunk the build patches into every such call
+ * after the link (c64/tools/reu_thunks.py): the thunk swaps the callee in,
+ * calls it, and swaps the caller back. That is what lets the engine and the
+ * console drawing leave resident memory, which is the only way this game
+ * fits inside C64 OS -- see NOTES.md, "THE TRIAL LINK".
+ *
+ * Nothing but an REU build defines TREK_OVL_REU, and OVL_CODE_REU expands to
+ * NOTHING everywhere else: every other port compiles these functions exactly
+ * as before. It needs both hot-path groups above, because it is the same
+ * argument taken further. */
+#ifdef TREK_OVL_REU
+#if !defined(TREK_OVL_ENEMY) || !defined(TREK_OVL_MOVE)
+#error "TREK_OVL_REU needs TREK_OVL_ENEMY and TREK_OVL_MOVE"
+#endif
+#define OVL_VIEW        (OVL_BASE_COUNT + 2)  /* viewer, chart, scan */
+#define OVL_PANEL       (OVL_BASE_COUNT + 3)  /* ui_draw_all and the side panels */
+#define OVL_NAV         (OVL_BASE_COUNT + 4)  /* warp and impulse movement */
+#define OVL_TIME        (OVL_BASE_COUNT + 5)  /* the clock, and entering a quadrant */
+#define OVL_TURN        (OVL_BASE_COUNT + 6)  /* run_turn, trek_run_events */
+#define OVL_LASER       (OVL_BASE_COUNT + 7)  /* LASERS, both halves */
+#define OVL_TORP        (OVL_BASE_COUNT + 8)  /* TORPEDO, both halves */
+#define OVL_CODE_REU(sec) OVL_CODE(sec)
+#define OVL_N_REU       7
+#else
+#define OVL_CODE_REU(sec)
+#define OVL_N_REU       0
+#endif
+
+#define OVL_COUNT  (OVL_BASE_COUNT + OVL_N_ENEMY + OVL_N_MOVE + OVL_N_REU)
 
 #define OVL_NONE   0xFF
 

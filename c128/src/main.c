@@ -733,7 +733,7 @@ OVL_CODE("planet") static uint8_t do_use(void) {
    "Lasers overheat", and the routine that starts 0x09A0 prints "ENERGY TORPEDO
    CONTROL" and "Number to fire". Each effect belongs to the command whose code
    launches it. */
-static void do_lasers(void) {
+OVL_CODE_REU("laser") static void do_lasers(void) {
     uint8_t cell, y, x, found = 0;
     unsigned char what;
     uint16_t energy, dealt;
@@ -1029,7 +1029,7 @@ OVL_CODE_MOVE static void do_move(const char *line) {
     move_absolute(d, n);
 }
 
-static void do_warp(const char *line) {
+OVL_CODE_REU("nav") static void do_warp(const char *line) {
     uint8_t d[4];
     uint8_t n = grab_digits(line, d, 4);
     uint8_t tenths;
@@ -1626,7 +1626,7 @@ static uint8_t turn_sfx;
    clock routine (fn 0x02013A) directly rather than going through the turn,
    and that routine drives repairs and the life-support drain and nothing
    else -- so scheduled events still land, and nobody fires. */
-static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
+OVL_CODE_REU("turn") static void run_turn(uint8_t player_fired, uint8_t enemy_acts) {
     TrekEvent ev[12];
     uint8_t n, i, k;
     /* `emit` replaces three `continue` statements inside the switch below.
@@ -1874,7 +1874,7 @@ OVL_CODE("repair") static void fire_one_torpedo(uint8_t sy, uint8_t sx) {
 
    "t35" still fires one straight at 3,5. That shortcut is ours, not the
    original's, and costs nothing to keep. */
-static void do_torpedo(const char *line) {
+OVL_CODE_REU("torp") static void do_torpedo(const char *line) {
     uint8_t d[8];
     uint8_t n = grab_digits(line, d, 8);
     uint8_t salvo = 1, shot;

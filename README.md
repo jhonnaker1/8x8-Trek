@@ -431,9 +431,10 @@ The C64 measured it, so this is arithmetic rather than an estimate.
 
 **What comes free: 10,560 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
 and `core/` entire — plus, on anything VIC-shaped, `vic.c`, `input.c`, `sid.c`,
-`storage.c` and `overlay.c` as well. **What the C64 wrote: 882 lines, of which
-222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 660 are a linker
-script, a Makefile and two verify tools.
+`storage.c` and `overlay.c` as well. **What the C64 wrote: 887 lines, of which
+222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 665 are a linker
+script, a Makefile and two verify tools. (The REU build's own files are not
+counted: it is not part of the port. See `c64/reu.mk`.)
 
 **The seams are 34 functions across six headers**, and a port fills every one
 of them somehow — by writing it, or by linking somebody else's:
