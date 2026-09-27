@@ -4,8 +4,8 @@
    control/data ports and the RAM accessors moved to vdcram.c, which both
    C128 screen drivers link -- see that file for why the scratch seam is
    not part of the 80-column picture. */
-#define VIC_RASTER   (*(unsigned char *)0xD012)
-#define C128_CLKRATE (*(unsigned char *)0xD030)
+#define VIC_RASTER   (*(volatile unsigned char *)0xD012)
+#define C128_CLKRATE (*(volatile unsigned char *)0xD030)
 
 /* The VIC-IIe keeps rastering at the normal rate even while the VDC drives
    the visible display, so its raster register is a free frame-rate timer.

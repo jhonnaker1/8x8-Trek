@@ -50,7 +50,8 @@ Two files are actually the C64's, and both replace a piece of C128 hardware:
 
 ## The memory map, and why this is the roomier machine
 
-Measured, not argued:
+Measured, not argued, at release (v0.16.0, 2026-09-14). `make verify` prints
+the live figure: 40,856 resident and 5,991 spare on 2026-09-26.
 
 |  | resident | region | spare |
 |---|---:|---:|---:|
@@ -74,7 +75,7 @@ out of `ram`, here they are the untouchable page at `$C000`.
 
 What is tight instead is the far store: 8,186 bytes holding 7,902, with 284
 spare. `make verify` fails the build when they stop fitting. The escape hatch
-is the 6,112 bytes above — `MUSIC.DAT` can become resident data again. Do not
+is the spare room above — `MUSIC.DAT` can become resident data again. Do not
 solve it by shortening the prose.
 
 ## Far memory is a memcpy here
@@ -108,7 +109,7 @@ the 8563 is in the machine even when it is not driving the monitor. **A C64
 has no such chip.**
 
 The answer turned out to be the cheap one: a plain 2K array in `.noinit`,
-because of the 6,112 bytes above. It could have gone under the KERNAL beside
+because of the spare room above. It could have gone under the KERNAL beside
 the pool; it does not, because there is no room there and because every read
 would cost an interrupts-off bank switch.
 

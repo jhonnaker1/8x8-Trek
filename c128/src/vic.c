@@ -10,10 +10,10 @@
  * the video chip. See NOTES.md item 57. */
 
 #define VIC_RASTER  (*(volatile unsigned char *)0xD012)
-#define VIC_BORDER  (*(unsigned char *)0xD020)
-#define VIC_BGND    (*(unsigned char *)0xD021)
-#define VIC_MEMPTR  (*(unsigned char *)0xD018)
-#define C128_CLKRATE (*(unsigned char *)0xD030)
+#define VIC_BORDER  (*(volatile unsigned char *)0xD020)
+#define VIC_BGND    (*(volatile unsigned char *)0xD021)
+#define VIC_MEMPTR  (*(volatile unsigned char *)0xD018)
+#define C128_CLKRATE (*(volatile unsigned char *)0xD030)
 
 #define VIC_BLACK 0
 

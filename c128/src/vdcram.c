@@ -22,8 +22,6 @@
 
 #define VDC_CTRL (*(volatile unsigned char *)0xD600)
 #define VDC_DATA (*(volatile unsigned char *)0xD601)
-#define VIC_RASTER (*(unsigned char *)0xD012)
-#define C128_CLKRATE (*(unsigned char *)0xD030)
 
 static void wait_ready(void) {
     while (!(VDC_CTRL & 0x80)) {}

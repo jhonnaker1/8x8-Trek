@@ -12927,7 +12927,8 @@ documents routines that TAKE zero-page pointers while never saying which bytes
 an app owns. Sampling `$00-$FF` three times while C64 OS idled at Homebase:
 **only `$A1`, `$A2` and `$CD` change**, and nothing in `$02-$21` moves. That is
 evidence, not proof -- a module could use those bytes only during a call, which
-idle sampling cannot see.
+idle sampling cannot see. **AND IT WAS WRONG -- see "WHAT UNO'S C PORT
+SETTLED" below: C64 OS's IRQ decrements `$02` and `$09`.**
 
 **STATUS: RUN ON THE MACHINE, 2026-09-20.** C64 OS loaded it, relinked it and
 gave it the menu bar. Read out of the running emulator:
@@ -12939,7 +12940,9 @@ gave it the menu bar. Read out of the running emulator:
 **Every 3-byte descriptor has been rewritten into a `JMP`** -- five into the
 screen module at `$B2xx`, one into the toolkit at `$A430`. The menu bar shows
 the app's own menu. **llvm-mos builds C64 OS applications**, and uno's README
-is wrong about that in general even though it is right about uno.
+is wrong about that in general even though it is right about uno. (uno has
+since shipped a whole C game this way, `commodore-uno/c64os-llvm`, 2026-09-26;
+its assembly port's README still carries the sentence.)
 
 **AND IT DRAWS.** The window shows
 
@@ -12986,7 +12989,14 @@ WAITING FOR.**
     only that the drive did not object. See [[hof-write-witnessed]].
   * **`c1541` RECOGNISES A `.dhd` and lists its root -- but its `cd` changes
     the HOST directory**, so it cannot reach `//os/applications` and cannot
-    install an app. There is no host-side install path.
+    install an app. ~~There is no host-side install path.~~ **There is, and
+    uno found it (2026-09-26): a BASIC installer run in VICE in warp mode
+    OPENs each file on device 8 and writes it to device 10 byte by byte, then
+    reads it back and compares.** No CMD COPY, so no cross-device lie; and the
+    readback is the witness. `make install` in `commodore-uno/c64os-llvm`.
+    Its other lesson: an interrupted install leaves a zero-block unclosed
+    `main.o`, and C64 OS answers that SILENTLY -- the File Manager unloads
+    and comes back, exactly like an app that crashed on launch.
   * **C64 OS scans the keyboard matrix itself.** It drains the KERNAL buffer as
     hygiene, so injected keys vanish without effect on every screen, and VICE's
     binary monitor has no mouse injection -- **the GUI cannot be driven
@@ -13109,11 +13119,22 @@ through `ctxdraw` reaches the screen. What remains is the port.
     through PETSCII, so **UPPERCASE ASCII renders as readable text** and
     lowercase comes out as graphics glyphs. The first benchmark screen was
     unreadable prose beside perfectly legible digits for exactly that reason.
-  * **THE SOFT STACK IS SQUATTING.** `__stack` sits at `$0E51`, outside the
+  * ~~**THE SOFT STACK IS SQUATTING.**~~ **SOLVED by uno, 2026-09-26: C64
+    OS allocates the pages the app's FILE covers and no more**, so `.bss`,
+    `.noinit` and a reserved `.stack` section must all be inside the loaded
+    file, ending in one real byte so `TRIM` writes them. Loading them as
+    zeros also stands in for crt0's zero-bss. The original note: `__stack` sits at `$0E51`, outside the
     pages C64 OS allocated to the app. It did not bite a 386-byte program; a
     real one must carry its stack inside the loaded image or allocate pages
     properly. See [[llvm-mos-soft-stack]].
-  * **ZERO PAGE IS UNPROVEN UNDER LOAD.** The 32 imaginary registers at
+  * ~~**ZERO PAGE IS UNPROVEN UNDER LOAD.**~~ **DISPROVED by uno: `$02-$21`
+    is C64 OS's timers, exception handler and screen-layer pointers, and its
+    IRQ decrements `$02` and `$09` while C runs** -- in uno that moved the
+    soft stack pointer and scattered stray bytes through the program. The
+    registers belong at `$4E-$6D` (BASIC's float accumulators; nothing on the
+    IRQ or NMI path touches them, checked by crawling every reachable
+    instruction in a RAM snapshot), swapped at every OS/C crossing. The map
+    is on the C64 OS disk: `//os/docs/memory.t`. The original note: The 32 imaginary registers at
     `$02..$21` survived this app. Nothing proves that while C64 OS's modules
     are doing real work, and uno's author concluded none was safely free.
   * **NOT STARTED AT ALL**: overlays and far memory (the REU banks and
@@ -13124,6 +13145,61 @@ through `ctxdraw` reaches the screen. What remains is the port.
   * **AND THE RIG NEEDS A HUMAN.** C64 OS scans the keyboard matrix itself and
     VICE's monitor has no mouse injection, so every test costs a double-click
     and there is no headless path. Any iteration plan has to budget for that.
+
+### WHAT UNO'S C PORT SETTLED, 2026-09-26 -- AND WHAT IT DID NOT
+
+`commodore-uno/c64os-llvm` is a complete C64 OS application in C, built by
+llvm-mos from this scope's 339-byte proof, played through in VICE. Every
+open engineering question above now has a measured answer:
+
+  * **zero page**: `$4E-$6D`, not `$02-$21` (corrected inline above);
+  * **the soft stack and `.bss`**: inside the file (corrected inline above);
+    uno measured 34 bytes of a 512-byte stack;
+  * **drawing**: straight into C64 OS's buffers at `$0400`/`$D800`, no
+    syscall per cell. The draw callback runs with I/O OUT (`$01` = `$34`),
+    so `$D800` there is C64 OS's colour buffer in RAM; key and menu
+    handlers run with it in (`$36`);
+  * **the buffers are not the screen**: the VIC shows `$DC00`, and C64 OS
+    copies its buffers there only at the end of an event. A chain of turns
+    inside one keypress -- which is every EGA Trek combat and move -- shows
+    nothing until it ends, so uno copies them itself (`os_present`);
+    `redraw_` would re-enter C from C, which llvm-mos's static frames forbid;
+  * **install**: a verified host path exists (corrected inline above), and
+    `menu.m`/`about.t` must be SEQ, as every app C64 OS ships has them;
+  * **`volatile`**: uno's `sid.c` raster wait folded to `jmp .` without it.
+    That sent this repo looking: `c128/src/vdc.c` read `$D012` in a loop
+    through a non-`volatile` pointer. It never shipped broken -- nothing
+    calls the 80-column `wait_vsync`, and the linked binary holds one `$D012`
+    read, in `sid.c` -- but it is `volatile` now, with `vic.c`'s stores, and
+    both C128 binaries changed only in the ORDER of the `$D030` read-modify-
+    write (same bytes, same effect; the C64's is identical).
+
+**WHY THE BARE C64 FITS AND C64 OS DOES NOT**, side by side (the C64's
+live `make verify`, 2026-09-26; C64 OS's page map, 2026-09-21):
+
+    the game's RAM          bare C64                  under C64 OS
+    program (resident)      $0801..$BEFF   46,847     pages $09..$A0, 30,976
+                                                      of 38,912 free to an app
+    soft-stack guard        $BF00           256       inside the above
+    overlay window          $C000          4,096      C64 OS's modules live
+                                                      there; inside the above
+    far store (strings,     $E000 under    8,186      utilbase $E000 is C64
+      music)                the KERNAL                OS's; the REU instead
+    TOTAL THE GAME HAS      ~59,000                   30,976 + the REU
+
+A bare C64 gives a program everything but zero page, the screen and I/O:
+BASIC's ROM banks out, and writes land in the RAM under the KERNAL. C64 OS is
+itself a large program in that same 64K, and it keeps `$C000` up for its
+modules, `$E000` up for utilities, and 7,936 bytes inside the arena too. The
+REU can take the far store, but code has to run from main RAM, and the code
+alone -- 32,624 resident with the two hot-path overlays out, plus a 4,638
+window -- is larger than everything C64 OS lets an app have.
+
+**What it did not touch is the verdict.** uno's `main.o` is 13,091 bytes and
+never met the arena's limit; nothing it learned moves the page map. The
+input model does not transfer either: uno rewrote its game as a state machine
+driven by key events, which it can because its `main.c` is its own. EGA
+Trek's `ui.c` is shared and blocks in `kb_waitkey()`.
 
 ### Verdict
 
