@@ -13442,6 +13442,59 @@ side, and the costs above. The shapes as first weighed:
 **It would also be a fourteenth port of a game that already runs natively on
 that exact machine.** That, and not the byte counts, is the honest summary.
 
+## C64 OS PORT: WHAT C64 OS 1.09 ITSELF SAYS (2026-09-27)
+
+Jamie: *"now work on the c64os version"*, starting from `c64reu/`. Before any
+code, the questions the 2026-09-20 scope left open were answered from C64 OS
+1.09 itself: Jamie's `C64OS-1.09-clean.dmg` holds the whole system tree as
+host files (mounted read-only; PC64 `.P00`/`.S00` wrappers, 26-byte header,
+PETSCII text), and a headless boot of uno's rig (`c64os.dhd`, 16MB REU,
+JiffyDOS, CMD HD on device 10, `-keybuf 'load"c64os",10'`, warp) reached the
+home app in 40 seconds and answered the monitor.
+
+**THE REU, per Jamie and per the system.** C64 OS keeps bank 0 as its work
+bank and one bank per fast-app-switching slot; Jamie's image has 8 slots, so
+`$0282` (first application bank) reads 9, and `$0281` (banks) reads 0 --
+256, wrapped, for 16MB. Banks an app may OWN come from `bkalloc_`, offset $09
+in `memory.lib` (not in the KERNAL): X = banks wanted, Y <- first bank, carry
+set on failure; they are tagged with the app's freeze bank (`$0286`) and
+freed when it quits, and `bkfree_` ($06) gives them back early. `reuconf_`
+(KERNAL memory module, $18) offsets past the reserved banks but OWNS nothing,
+so two apps using it would share banks. **The game allocates its two banks
+with `bkalloc_`, and when that fails it must tell the player to leave banks
+outside the fast-app-switching slots** -- Jamie's words: *"the user will need
+to leave some slots open."* Source: [Fast App Switching](https://c64os.com/post/fastappswitching),
+[Programmer's Guide, memory](https://c64os.com/c64os/programmersguide/usingkernal_memory),
+and `//os/h/memory.t` in 1.09.
+
+**MEMORY, from `//os/docs/memory.t`:** app space `$090A..$A4FF` (the page map
+at `$0809` covers `$09..$A0`), the C64 OS KERNAL `$A500..$CFFF`, its charset in
+RAM at `$D000`, the colour BUFFER at `$D800` under I/O, the real screen at
+`$DC00`, utilities `$E000..$FF3F`. Zero page `$4E-$6D` is BASIC's float
+workspace -- uno's choice, confirmed. The page map with App Launcher running:
+
+    $0900-$19FF  app (17)      $6900        system (1)
+    $1A00-$68FF  free (79)     $6A00-$79FF  app (16)
+    $7A00-$84FF  system (11)   $8500-$A0FF  free (28)
+
+**IF `$6900` STAYS ALLOCATED WHILE ANOTHER APP RUNS, the largest file that
+loads at `$0900` is 24,576 bytes**, against an estimated ~25,200 for the game
+with its window and stack inside the file. Unmeasured: the next step is a
+probe app that reads the page map from inside.
+
+**THE CHARSET HAS NO BOX-DRAWING GLYPHS.** Dumped from `$D000` of the running
+system: screen codes 0-31 lowercase, 32-95 ASCII punctuation, digits and
+capitals, 96-127 the OS's icons, 128-255 the reverse of all of it. None of
+the eleven line glyphs in `c128/src/layout.h` exist, nor G_BAR, G_SHIP or the
+half blocks; G_BLOCK (reverse space) does. The plan is to borrow icon slots
+while the game is frontmost and restore them on freeze and quit -- which
+slots the OS itself draws with is not yet known.
+
+**A HEADLESS LAUNCH, probably.** `//os/settings/homebase.t` names the home
+app ("File Manager" in 1.09-clean, "App Launcher" in uno's image; `$02E9`
+holds it at run time). Naming the game there on the TEST disk should boot
+straight into it -- which would retire "THE RIG NEEDS A HUMAN". Unproven.
+
 ## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
 
 **RELEASED, the fourteenth port.** Jamie played the release disk on
