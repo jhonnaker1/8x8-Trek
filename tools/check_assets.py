@@ -64,7 +64,9 @@ def main():
     assets = len(ps) + len(bare)
 
     text = open(RUNNING).read()
-    m = re.search(r"^(\w+) assets, (\w+) machines\.", text, re.M)
+    # [\w-], NOT \w: WORDS spells 21-25 with a hyphen, and the first release
+    # to reach twenty-one assets found this regex could not read its own table.
+    m = re.search(r"^([\w-]+) assets, ([\w-]+) machines\.", text, re.M)
     if not m:
         print("check_assets: RUNNING.md does not open by counting itself -- "
               "that sentence IS the check, so its absence is a failure")
@@ -88,8 +90,8 @@ def main():
     # correct and green. A count that a check does not reach drifts exactly
     # like one no tool ever touched; the shape is the target, not the sentence.
     n_bare, n_zip = len(bare), len(ps) - len(bare)
-    m2 = re.search(r"^\*\*(\w+) assets are bare disk images", text, re.M)
-    m3 = re.search(r"The (\w+) `\.zip` assets carry theirs inside", text)
+    m2 = re.search(r"^\*\*([\w-]+) assets are bare disk images", text, re.M)
+    m3 = re.search(r"The ([\w-]+) `\.zip` assets carry theirs inside", text)
     for got, want, what in ((m2, n_bare, "bare disk images"),
                             (m3, n_zip, "`.zip` assets")):
         if not got:

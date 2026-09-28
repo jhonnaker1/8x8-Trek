@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Patch the REU build's cross-overlay calls into thunks, in the linked ELF.
 
-    reu_thunks.py build/reu/trek64.elf
+    reu_thunks.py build/trekreu.elf
 
 WHY AFTER THE LINK. The REU build lets one overlay call another -- see
 src/reuovl.s -- but the compiler emits a plain `jsr f` for every call, and

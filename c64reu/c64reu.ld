@@ -1,4 +1,5 @@
-/* The REU build's link script: c64.ld with twenty overlays instead of eleven.
+/* The C64 + REU port's link script: ../c64/c64.ld with twenty overlays
+ * instead of eleven.
  *
  * EVERYTHING ELSE IS c64.ld's AND IS NOT RESTATED -- read that file for the
  * memory map and why it is shaped this way. What differs is only the overlay

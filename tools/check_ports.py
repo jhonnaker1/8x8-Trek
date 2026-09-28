@@ -92,6 +92,10 @@ PORTS = (
     # boot disk's shell; its verify is static and prints the budget against
     # crt0's stack reserve, and the string count -- see msx2/tools/verify_msx2.py.
     ("msx2",   "verify",  "SDCC"),
+    # The fifteenth: the C64 with its overlays in an REU, where one may call
+    # another. Its verify reads the thunks back out of the link as well as
+    # the memory map -- see c64reu/tools/verify_c64reu.py.
+    ("c64reu", "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

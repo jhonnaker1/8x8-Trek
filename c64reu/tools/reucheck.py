@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Play one scripted game on a C64 disk and record every screen.
 
-    reucheck.py DISK.d64 MAP OUT.json [--reu] [--realtime] [--cmd=NAME=KEYS ...]
+    reucheck.py DISK.d64 MAP OUT.json [--reu] [--realtime] [--prg=NAME] [--cmd=NAME=KEYS ...]
     reucheck.py --compare A.json B.json
 
 THE ORACLE FOR THE REU BUILD. Run it on the disk build and on the REU build
@@ -35,7 +35,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(ROOT, "c64", "tools"))   # boot.decode
 import vice_mon                       # noqa: E402
 from boot import decode               # noqa: E402
 
@@ -142,6 +142,8 @@ def main():
     extra = [tuple(s.split("=", 1)) for s in
              (a[len("--cmd="):] for a in sys.argv if a.startswith("--cmd="))]
     steps = STEPS + (extra or GAME)
+    prg = ([a[len("--prg="):] for a in sys.argv if a.startswith("--prg=")]
+           or ["trek64"])[0]
     inject = symbol(mapfile, "kb_inject")
     entropy = symbol(mapfile, "kb_entropy")
 
@@ -155,7 +157,7 @@ def main():
         cmd += ["-reu", "-reusize", "128"]
     else:
         cmd += ["+reu"]
-    vice = subprocess.Popen(cmd + ["-autostart", os.path.abspath(d64) + ":trek64"],
+    vice = subprocess.Popen(cmd + ["-autostart", os.path.abspath(d64) + ":" + prg],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     record = []
     try:

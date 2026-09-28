@@ -182,7 +182,7 @@
  * With an REU behind the window a swap is a DMA of about a byte a cycle --
  * ~4ms for a full 4K -- and at that price an overlay MAY call another. It
  * does so through a resident thunk the build patches into every such call
- * after the link (c64/tools/reu_thunks.py): the thunk swaps the callee in,
+ * after the link (c64reu/tools/reu_thunks.py): the thunk swaps the callee in,
  * calls it, and swaps the caller back. That is what lets the engine and the
  * console drawing leave resident memory, which is the only way this game
  * fits inside C64 OS -- see NOTES.md, "THE TRIAL LINK".

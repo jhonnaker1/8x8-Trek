@@ -13277,20 +13277,20 @@ C64 OS and a CMD HD ROM; and every test needs a human double-click.
 ### THE REU OVERLAY MANAGER, BUILT AND CHECKED ON THE BARE C64, 2026-09-26
 
 Asked for by Jamie straight after the trial link. It is built as a second
-C64 program, `make -C c64 d64-reu`, rather than inside C64 OS, because the
+C64 program -- now the port `c64reu/`, see below -- rather than inside C64 OS, because the
 bare C64 in VICE can be driven headlessly and compared against the shipping
 build, and C64 OS cannot (see "THE RIG NEEDS A HUMAN" above). What C64 OS
 keeps is the thunks and the DMA; only the one-time load is the bare machine's.
-`c64/README.md`, "The REU build", is the summary.
+`c64reu/README.md` is the summary.
 
 **THE SHAPE.** Seven groups -- view, panel, nav, time, turn, laser, torp -- are
 `OVL_CODE_REU` in the shared sources, a macro that is empty unless
-`TREK_OVL_REU` is defined; twenty overlays in all. `c64/src/c64reu.c` loads
+`TREK_OVL_REU` is defined; twenty overlays in all. `c64reu/src/c64reu.c` loads
 every image from the disk once, checks its stamp, and stashes it in the REU;
-after that `ovl_load` does nothing. `c64/tools/reu_thunks.py` patches the
+after that `ovl_load` does nothing. `c64reu/tools/reu_thunks.py` patches the
 LINKED ELF: from the relocations `-Wl,--emit-relocs` keeps, every JSR or JMP
 that crosses into another overlay is pointed at a six-byte thunk --
-`jsr ovl_far` plus the id and the address. `c64/src/reuovl.s` is `ovl_far`.
+`jsr ovl_far` plus the id and the address. `c64reu/src/reuovl.s` is `ovl_far`.
 If the callee's image is in the window it jumps there. If not, it pushes
 what is loaded, DMAs the callee in, calls, DMAs the pushed image back and
 returns, carrying A, X and Y both ways.
@@ -13326,7 +13326,7 @@ one before the Makefile's macros took a directory.
     resident        21,823 (report_size.py), against the release's 40,856
     largest overlay  3,802 of 4,096 (.ovl_enemy, unchanged)
 
-**THE TEST, `make -C c64 reucheck`.** One game played on the disk build and on
+**THE TEST, `make -C c64reu reucheck`.** One game played on the disk build and on
 the REU build, headless and in warp, every screen compared in characters AND
 colours: chart, repair, info, a warp speed, an impulse move, a warp into
 another quadrant, a laser kill, a torpedo -- whose `fire_one_torpedo` in
@@ -13385,6 +13385,38 @@ C64's -- the app header and link table, loading the images through C64 OS's
 file API into REU banks it allocates, drawing into its buffers, and the
 blocking `kb_waitkey()` that would leave its menus dead. The manager itself
 is done and checked.
+
+### IT IS ITS OWN PORT NOW: `c64reu/`, 2026-09-27
+
+Jamie played the REU build -- *"it is a nice port"* -- and asked for it to be
+*"its own c64-reu version in its own right. then we can use it for the C64os
+port."* So it moved out of `c64/` into `c64reu/`, the fifteenth port: its own
+Makefile, link script, verify, README and release disk (`egatrek-c64reu.d64`
++ `.txt`), in RELEASE_PORTS and in `make ports`. **The C64 port went back to
+exactly what it was before the REU work** -- its Makefile byte-identical to
+the one before, its port cost back to 882 lines -- and `c64reu` links its
+`c64mem.c` and `c64log.c` from `../c64/src` rather than copying them.
+
+Two things the move found:
+
+  * **tools/check_assets.py could not read twenty-one.** Its number table
+    spelled 21-25 with a hyphen and its regexes were `\w+`, so the first
+    count past twenty failed as "RUNNING.md does not open by counting
+    itself". `[\w-]+` now, and a wrong hyphenated count still fails.
+  * **The test disk carries the C64's text, not this port's**, because
+    `reucheck` compares the title too: the four strings that name the
+    machine are the only difference, and they are not what is under test.
+    The release disk's title was read off a booted machine separately.
+
+`verify_c64reu.py` imports `verify_c64.py`'s parsers rather than copying
+them or editing them -- `check_portcost` counts that file as the C64's cost.
+Its own checks: twenty ids with none missing, twenty images inside a 128K
+REU, and every filled thunk read back out of the link as `jsr ovl_far` to a
+function start in its overlay. With one thunk's target moved a byte, that
+check names the slot and fails.
+
+**Not yet released**: it goes out with the next release, which Jamie cuts.
+**Not yet on real hardware**: VICE's REU only.
 
 ### Verdict
 

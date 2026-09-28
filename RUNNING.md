@@ -1,6 +1,6 @@
 # How to run each one
 
-Nineteen assets, fourteen machines. Every port plays the same game from the same
+Twenty-one assets, fifteen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -8,7 +8,7 @@ image, a MEGA65 ROM, a CoCo 3 ROM — it is yours to supply. The one exception i
 the Falcon, where free [EmuTOS](https://emutos.sourceforge.io/) works and is in
 fact what this port was developed against.
 
-**Five assets are bare disk images, and their READMEs ship beside them** as
+**Six assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
 put one. The nine `.zip` assets carry theirs inside as `README.txt`.
 
@@ -123,6 +123,26 @@ makes that noticeably quicker. Not required.
 
 SAVE writes `EGATREK.SAV` back to this disk and the hall of fame lives on it,
 so **the disk must not be write protected**.
+
+### `egatrek-c64reu.d64` — Commodore 64 with an REU
+
+    x64sc -reu -reusize 128 -autostart egatrek-c64reu.d64:trekreu
+
+or, on the machine, put the disk in drive 8 and:
+
+    LOAD "TREKREU",8,1
+    RUN
+
+**The Commodore 64 above, with its code in a RAM Expansion Unit** — a 1700,
+1764, 1750 or anything that emulates one; 128K is enough. Without one it says
+so and stops. It plays exactly the C64 game, on the same two-page console.
+
+**It takes a while to start, and then it is fast.** Before the title it reads
+all twenty of its code overlays into the REU — the screen counts them — about
+47 seconds with JiffyDOS. After that it never loads code from the disk again:
+an order that took three to six seconds on the C64 disk takes about one.
+
+**Tested in VICE, not yet on a real REU.**
 
 ### `egatrek-plus4.d64` — Commodore Plus/4
 

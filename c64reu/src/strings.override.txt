@@ -1,0 +1,22 @@
+# Per-port text for the Commodore 64 with an REU, applied to
+# c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override c64reu/src/strings.override.txt OUT
+#
+# The C64's own overrides (c64/src/strings.override.txt), with the machine
+# named as this port needs it: the same C64, and an REU it cannot start
+# without. IDS THAT ALREADY EXIST, AND NOTHING ELSE -- see that file, and
+# NOTES.md item 60, for why the numbering is the generator's alone.
+
+# The title bar. The 40-column build draws S_330, not S_0 -- see ui_title().
+330	COMMODORE 64 + REU PORT
+
+# S_0 is the 80-column title bar, never compiled here; overridden so nothing
+# on this disk names another machine.
+0	 COMMODORE 64 + REU PORT
+
+# The dedication line, drawn at x=0 on row 23 of the 40-column title.
+82	TO THE COMMODORE 64 WITH AN REU.
+
+# The farewell: plat_exit() jumps through the reset vector, as on the C64.
+10	HIT A KEY AND THE 64 RESTARTS.

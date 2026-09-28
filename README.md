@@ -26,6 +26,12 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > startup and then only to save. It is also the closest any 8-bit port gets to
 > the original's proportions: **8×16 character cells** where every other draws
 > 8×8. See [`f256k/README.md`](f256k/README.md).
+> A **fifteenth, the Commodore 64 with an REU**, is built and played and goes
+> out with the next release: the C64 port with its twenty overlays in an REU,
+> where one overlay may call another, so the engine and the console drawing
+> leave resident memory — **21,823 bytes resident against 40,856**, and twice
+> as fast once started. It is also the shape of the game that fits inside
+> **C64 OS**. See [`c64reu/README.md`](c64reu/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
 > **All fourteen have been played by a person**, and that is where the faults
@@ -223,6 +229,7 @@ an 80-column grid of per-cell colour, which is the shape it was designed on.
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The port that **deletes the most**: no overlays, no banking, no filesystem of our own, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
 | **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). **A filesystem of its own** (Disk BASIC's, written from scratch, and shared with the stock CoCo 3 port), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **It was the slowest port here until the stock CoCo 3 arrived** — that one's string pool lives on the diskette. See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare against the 40-column C128's 304**. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
+| **Commodore 64 + REU** | VIC-II 40×25 text, 16 colours per cell | 6510 + REU | **Built and played; in the next release.** The C64 port with its overlays in an REU: twenty of them, and **one may call another** through a thunk the build patches into the linked ELF, so the engine and the console drawing leave resident memory — **21,823 bytes resident against the C64's 40,856**. Twice as fast once started, after a 47-second load. `make reucheck` plays one pinned game on both and compares every screen. See [`c64reu/README.md`](c64reu/README.md) |
 | **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Released** — [v0.17.0](../../releases/latest). **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
 | **CoCo 3, stock** | GIME 640×192 text, 8 per-cell colours | 6809 | **Released** — [v0.18.1](../../releases/latest), and **the first port here to run on hardware somebody actually owns** — a real CoCo 3 from a CoCo SDC. It drives the WD1773 directly; FujiNet and DriveWire do not work. The string pool lives on the disk, which is what makes a 45K program, a 4,000-byte screen and 7K of text fit in 64K at once. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) |
 | **Apple IIgs** | Super Hi-Res 320×200, 8×8 cells, EGA's own palette | 65816 | **Released** — [v0.19.0](../../releases/latest). **No ProDOS on the disk**: block 0 is this port's own loader and the slot's block driver reads the game, so there is nothing to type. Ensoniq 5503 on two oscillators. **PAL and NTSC are detected** from the VGC line counter — and the *minimum* discriminates, not the maximum. See [`iigs/README.md`](iigs/README.md) |
@@ -431,10 +438,9 @@ The C64 measured it, so this is arithmetic rather than an estimate.
 
 **What comes free: 10,560 lines.** `ui.c`, `main.c`, `layout40.c`, `strpool.c`
 and `core/` entire — plus, on anything VIC-shaped, `vic.c`, `input.c`, `sid.c`,
-`storage.c` and `overlay.c` as well. **What the C64 wrote: 887 lines, of which
-222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 665 are a linker
-script, a Makefile and two verify tools. (The REU build's own files are not
-counted: it is not part of the port. See `c64/reu.mk`.)
+`storage.c` and `overlay.c` as well. **What the C64 wrote: 882 lines, of which
+222 are C** — `c64mem.c` (159) and `c64log.c` (63). The other 660 are a linker
+script, a Makefile and two verify tools.
 
 **The seams are 34 functions across six headers**, and a port fills every one
 of them somehow — by writing it, or by linking somebody else's:

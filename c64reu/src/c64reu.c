@@ -9,7 +9,7 @@
 /* The REU build's overlays: every image loaded from the disk ONCE, into the
  * REU, and swapped into the window by DMA from then on.
  *
- * This file replaces c128/src/overlay.c in `make reu` and nowhere else. The
+ * This file replaces c128/src/overlay.c in this port and nowhere else. The
  * swapping itself is src/reuovl.s: a thunk on every call that crosses from
  * one overlay into another, patched in after the link by tools/reu_thunks.py.
  * What is left for C is getting the images into the REU in the first place.
@@ -23,10 +23,10 @@
  * call. The first call does the one-time load instead; main() makes it,
  * before any overlay has run, so the window is free.
  *
- * WHY LOAD FROM THE DISK AT ALL, when C64 OS will hand an app REU banks
- * directly: the bare C64 is where this can be driven headlessly and compared
- * screen for screen against the shipping disk build. Only the loop below is
- * the bare machine's; the thunks and reu_xfer are the part C64 OS keeps. */
+ * THE LOOP BELOW IS THE ONLY PART THAT IS THIS MACHINE'S. A C64 OS port
+ * would fill the REU through C64 OS's file API, into banks C64 OS allocates
+ * it, and keep the thunks and reu_xfer as they are -- which is why the
+ * manager is in its own file. */
 
 #define DEV      8
 #define LFN_OVL  1
