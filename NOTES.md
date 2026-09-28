@@ -13361,7 +13361,9 @@ The 1,256 over the trial are its estimate meeting the build: the full
 one-time loader 367 over the disk `ovl_load`. Sixteen unused thunk slots are
 96 bytes nobody has taken back yet.
 
-**TIMED AT 1x, the same game on both builds** (VICE, stock 1541, each step
+**TIMED AT 1x, the same game on both builds** (VICE with Jamie's vicerc:
+JiffyDOS on the C64 AND on the 1541-II -- first written up as "a stock
+1541", which his own launch log contradicted the next day; each step
 from its first key until the screen stops changing, less the harness's own
 8-second wait):
 

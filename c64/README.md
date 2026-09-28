@@ -159,7 +159,8 @@ leave A in the window afterwards.
 **Twice as fast once started.** Timed at 1x, the scripted game after the
 title took 24.6 seconds against the disk build's 50.0: every command that
 loads an overlay drops from 3-6 seconds to about one. The price is paid once,
-at the title: 47 seconds to load all twenty images from a stock 1541.
+at the title: 47 seconds to load all twenty images, with JiffyDOS on both the
+C64 and a 1541-II (VICE, Jamie's settings) -- a stock drive would be slower.
 
 It needs a 128K 1700 or larger (`make runreu` boots one in VICE). With no REU
 it says so and stops.
