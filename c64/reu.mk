@@ -72,5 +72,9 @@ reucheck: $(DEBUG_D64) build/reu-debug/egatrek-c64-reu.d64
 	python3 tools/reucheck.py --compare build/reucheck-disk.json build/reucheck-reu.json
 
 # A 128K 1700, the smallest REU made: twenty 4K images need 80K.
+#
+# +saveres, OR VICE WRITES THIS COMMAND LINE INTO ~/.config/vice/vicerc on
+# exit. The first `make runreu` did exactly that: Jamie's C64 came back up
+# with a 128K REU switched on where his own settings had a 16MB one off.
 runreu: build/reu/egatrek-c64-reu.d64
-	$(X64) -reu -reusize 128 -autostart $(CURDIR)/$<:trek64
+	$(X64) +saveres -reu -reusize 128 -autostart $(CURDIR)/$<:trek64

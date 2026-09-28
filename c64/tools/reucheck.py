@@ -146,7 +146,9 @@ def main():
     entropy = symbol(mapfile, "kb_entropy")
 
     # --realtime drops warp, for timing a build rather than checking it.
-    cmd = ["x64sc"] + ([] if "--realtime" in sys.argv else ["-warp"]) + [
+    # +saveres: VICE writes its command line into vicerc on exit otherwise.
+    # This script kills it, which skips the save, but a kill is not a promise.
+    cmd = ["x64sc", "+saveres"] + ([] if "--realtime" in sys.argv else ["-warp"]) + [
            "-binarymonitor",
            "-binarymonitoraddress", "ip4://127.0.0.1:%d" % vice_mon.PORT]
     if reu:
