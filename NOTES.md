@@ -13532,10 +13532,22 @@ digits and space, and two reversed icons. **No normal-video icon slot
 (96-127) appeared**, so those are what the console's box glyphs borrow.
 Dropdown menus and utilities may use some; restore on freeze and quit.
 
-**THE KEY IS NOT YET UNDERSTOOD.** `$41` written to `$0277` with `$C6 = 1`
-produced one Kprnt event -- but with `$09`. Either Jamie pressed a key, or
-the buffer is not laid out as assumed. Settle it before any test types
-commands through it.
+**THE KEY, SETTLED BY A SECOND RUN.** Jamie pressed nothing. `$41` written
+to `$0277` with `$C6 = 1` raised one Kprnt event, but **the callback's A is
+not the key: it was `$09` both times.** The second probe read the queue in
+the callback: `$41` and `$42` injected (`$C6 = 2`) gave ONE event, in which
+`readkprnt_` returned **A = `$41`**, X = `$02`, Y = `$07`. So:
+
+  * **the key comes from `readkprnt_`/`deqkprnt_`, never from A** -- which
+    is why uno's app.s says main.c "prefers the queue";
+  * **one event per batch**: the second key raised no event of its own, so a
+    handler that reads one key and returns strands the rest. The game polls
+    the queue in `kb_waitkey()`, so it does not depend on events at all;
+  * **a script can type**: writing C64 OS's key buffer and count while VICE
+    is stopped is the kb_inject of this port. One key at a time, waiting for
+    `$C6` to fall back, is the safe shape.
+
+X and Y are not decoded; X = `$02` may be the modifier state.
 
 ## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
 

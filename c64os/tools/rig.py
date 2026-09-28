@@ -4,7 +4,7 @@
     rig.py install BUNDLE APP            copy BUNDLE/{main.o,menu.m,about.t}
                                          to //os/applications/APP on the work
                                          disk and verify every byte
-    rig.py boot [--key=HEX] [--wait=S] [--jam] [--human]
+    rig.py boot [--key=HEX,HEX..] [--wait=S] [--jam] [--human]
                                          boot C64 OS, find the probe's record,
                                          and print what the running system
                                          says; --jam catches a JAM in the
@@ -211,20 +211,26 @@ def boot(wait, key, jam=False, human=False):
                 print(textmon(["r", "chis 120", "d a970 a9a0"]))
         else:
             rec = 0x0900 + at
-            if key is not None:
+            if key:
                 # C64 OS's printable-key event buffer and its count; the
-                # machine is stopped between the two writes and the resume.
-                for addr, val in ((0x0277, key), (0x00C6, 1)):
+                # machine is stopped between the writes and the resume.
+                writes = [(0x0277 + i, k) for i, k in enumerate(key)]
+                for addr, val in writes + [(0x00C6, len(key))]:
                     body = (bytes([0]) + struct.pack("<HH", addr, addr) + bytes([0])
                             + struct.pack("<H", BANK_RAM) + bytes([val]))
                     mon.cmd(vice_mon.CMD_MEM_SET, body)
                 mon.resume()
                 time.sleep(3)
-            r = mon.mem_get(rec, len(MAGIC) + 8, bank=BANK_RAM)[len(MAGIC):]
+            r = mon.mem_get(rec, len(MAGIC) + 8 + 20, bank=BANK_RAM)[len(MAGIC):]
             print("rig: probe record at $%04X, found after %.0fs" % (rec, took))
-            print("  inits %d  draws %d  keys %d  last key $%02X" %
-                  (r[0], r[1] | r[2] << 8, r[3], r[4]))
+            print("  inits %d  draws %d  key events %d" % (r[0], r[1] | r[2] << 8, r[3]))
             print("  $01 at init $%02X, in draw $%02X, in kprnt $%02X" % (r[5], r[6], r[7]))
+            if key:
+                print("  injected: %s" % " ".join("$%02X" % k for k in key))
+            for i in range(min(r[3], 4)):
+                e = r[8 + i * 5:13 + i * 5]
+                print("  event %d: callback A=$%02X  readkprnt A=$%02X X=$%02X Y=$%02X%s"
+                      % (i + 1, e[0], e[1], e[2], e[3], "  (queue EMPTY)" if e[4] else ""))
         pm = mon.mem_get(0x0809, 0x98, bank=BANK_RAM)
         runs, start = [], 0
         for i in range(1, len(pm) + 1):
@@ -258,7 +264,7 @@ def main():
     if a[:1] == ["install"] and len(a) == 3:
         return install(a[1], a[2])
     if a[:1] == ["boot"]:
-        key = int(opt["--key"], 16) if opt.get("--key") else None
+        key = [int(k, 16) for k in opt["--key"].split(",")] if opt.get("--key") else []
         human = "--human" in opt
         return boot(float(opt.get("--wait") or (600 if human else 90)), key,
                     "--jam" in opt, human)
