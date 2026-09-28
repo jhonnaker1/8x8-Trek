@@ -13490,10 +13490,52 @@ half blocks; G_BLOCK (reverse space) does. The plan is to borrow icon slots
 while the game is frontmost and restore them on freeze and quit -- which
 slots the OS itself draws with is not yet known.
 
-**A HEADLESS LAUNCH, probably.** `//os/settings/homebase.t` names the home
-app ("File Manager" in 1.09-clean, "App Launcher" in uno's image; `$02E9`
-holds it at run time). Naming the game there on the TEST disk should boot
-straight into it -- which would retire "THE RIG NEEDS A HUMAN". Unproven.
+~~**A HEADLESS LAUNCH, probably.**~~ **TRIED THE SAME DAY, AND IT DOES NOT
+WORK.** `//os/settings/homebase.t` names the home app ("File Manager" in
+1.09-clean, "App Launcher" in uno's image; `$02E9` holds it at run time), and
+naming the probe there crashes C64 OS's BOOTER: a JAM at `$A98C`, reached
+by `JMP $A98A` at `$14D7` about 24 million cycles in, identically every run,
+before any app starts -- a breakpoint on the probe's init never fired. The
+file rewritten with its ORIGINAL "App Launcher" bytes boots cleanly, so the
+install mechanism is not the fault; the booter only takes names it knows.
+(One wrong turn first: the file is the bare name with NO carriage return,
+and BASIC's PRINT# had added one. Fixing that changed nothing.) At the JAM
+`$00` read `$0A` where the 6510's data direction is normally `$2F`, so the
+`$26` written to `$01` could not bank BASIC out -- BASIC ROM was what sat at
+`$A98A`. **The launch stays a double-click by Jamie**: `c64os/tools/rig.py
+boot --human` boots at 1x and waits for it, then reads the probe back.
+
+### THE PROBE'S ANSWERS, 2026-09-27
+
+`c64os/probe/` is a 128-byte assembly app: one layer, and a record in its
+own memory that `c64os/tools/rig.py` finds by its magic. Installed headless
+(`rig.py install`, byte-verified), launched by Jamie's double-click
+(`rig.py boot --human --key=41`), found 53 seconds after boot:
+
+    inits 1  draws 1  keys 1  last key $09     (see below)
+    $01: init $36, draw $34, kprnt $36         -- uno's finding, confirmed
+    page map while the probe runs:
+      $0900        app (the probe, one page)
+      $0A00-$79FF  FREE, 112 pages
+      $7A00 $7D00  system    $7E00 app    $7F00-$84FF system
+      $8500-$A0FF  free, 28 pages
+    REU: first app bank 9; the probe froze into bank 3
+
+**IT FITS.** The `$6900` system page was App Launcher's and went with it, so
+a file at `$0900` may run to `$79FF`: 113 pages, 28,928 bytes, against an
+estimated ~25,200 for the game with its window and stack inside the file.
+
+**C64 OS's OWN BARS ARE IN REVERSE VIDEO.** Row 0 (the menu bar) used
+`81 82 85 8F 92 A0 B1 B3 B5 D0 F2` and row 24 (the status bar)
+`85 86 89 8B 8C 8E 8F A0 AC B0 B1 B2 B8 BA CB CF EE` -- reversed letters,
+digits and space, and two reversed icons. **No normal-video icon slot
+(96-127) appeared**, so those are what the console's box glyphs borrow.
+Dropdown menus and utilities may use some; restore on freeze and quit.
+
+**THE KEY IS NOT YET UNDERSTOOD.** `$41` written to `$0277` with `$C6 = 1`
+produced one Kprnt event -- but with `$09`. Either Jamie pressed a key, or
+the buffer is not laid out as assumed. Settle it before any test types
+commands through it.
 
 ## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
 
