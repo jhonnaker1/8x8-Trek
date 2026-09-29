@@ -209,7 +209,36 @@
 #define OVL_N_REU       0
 #endif
 
-#define OVL_COUNT  (OVL_BASE_COUNT + OVL_N_ENEMY + OVL_N_MOVE + OVL_N_REU)
+/* C64 OS'S OWN GROUPS: main() itself, the dialog helpers, and the file code.
+   C64 OS keeps its drivers, libraries and menus in pages from about $6F up,
+   and loads an app's file over whatever is there -- the first game file ran
+   to $79FF and landed on the mouse driver (NOTES.md, "THE FILE WAS TOO
+   BIG"). These three move 5K of code only overlays call, or main alone
+   calls, out of the file. Empty everywhere but C64 OS. */
+#ifdef TREK_C64OS
+#define OVL_MAIN        (OVL_BASE_COUNT + 9)
+#define OVL_DLG         (OVL_BASE_COUNT + 10)
+#define OVL_IO          (OVL_BASE_COUNT + 11)
+#define OVL_CODE_OS(sec) OVL_CODE(sec)
+#define OVL_N_OS        3
+#else
+#define OVL_CODE_OS(sec)
+#define OVL_N_OS        0
+#endif
+
+/* trek_wreck_system's home: OVL_ENEMY everywhere but C64 OS, where the enemy
+   group came out 96 bytes over the 4K window -- C64 OS leaves the compiler no
+   zero page, and code grows without it. Moving the 1,054-byte wreck into
+   OVL_TIME fits it with room, and the REU manager makes the call between the
+   two a thunk rather than a rule broken. Empty-handed elsewhere: this names
+   OVL_CODE_ENEMY, token for token, on every other port. */
+#ifdef TREK_C64OS
+#define OVL_CODE_WRECK  OVL_CODE("time")
+#else
+#define OVL_CODE_WRECK  OVL_CODE_ENEMY
+#endif
+
+#define OVL_COUNT  (OVL_BASE_COUNT + OVL_N_ENEMY + OVL_N_MOVE + OVL_N_REU + OVL_N_OS)
 
 #define OVL_NONE   0xFF
 

@@ -1325,7 +1325,7 @@ void ui_read_command(char *buf, uint8_t max) {
 
 static unsigned char dlg_row;      /* next free line inside the box */
 
-static void dlg_frame(const char *title) {
+OVL_CODE_OS("dlg") static void dlg_frame(const char *title) {
     unsigned char x, y;
 
     for (y = 0; y < DLG_H; y++) {
@@ -1392,7 +1392,7 @@ static unsigned char wrap_cut(const char *text, unsigned char w) {
 }
 
 /* Draws `text` at (x,y) wrapped to `w`, and returns the rows it used. */
-static unsigned char wrap_puts(unsigned char x, unsigned char y, unsigned char w,
+OVL_CODE_OS("dlg") static unsigned char wrap_puts(unsigned char x, unsigned char y, unsigned char w,
                                const char *text, unsigned char colour) {
     unsigned char used = 0, i, cut;
     while (*text) {
@@ -1407,7 +1407,7 @@ static unsigned char wrap_puts(unsigned char x, unsigned char y, unsigned char w
     return used;
 }
 
-void ui_dialog_line(const char *text) {
+OVL_CODE_OS("dlg") void ui_dialog_line(const char *text) {
     while (*text) {
         unsigned char i, cut = wrap_cut(text, DLG_ROOM);
         for (i = 0; i < cut; i++) dlg_wrap[i] = text[i];
@@ -1421,7 +1421,7 @@ void ui_dialog_line(const char *text) {
     }
 }
 #else
-void ui_dialog_line(const char *text) {
+OVL_CODE_OS("dlg") void ui_dialog_line(const char *text) {
     dlg_room();
     scr_puts((unsigned char)(DLG_X + DLG_PAD), (unsigned char)(DLG_Y + dlg_row),
              text, COL_MSG);
@@ -1434,7 +1434,7 @@ void ui_dialog_line(const char *text) {
 /* Returns 1 normally, 0 if the player pressed ESC. A RETURN VALUE and not an
    out-parameter on purpose: cc65 -O has crashed outright on an out-parameter
    in this codebase before, and it is recorded as a trap to avoid. */
-static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max) {
+OVL_CODE_OS("dlg") static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t max) {
     unsigned char n = 0;
     char c;
 
@@ -1467,7 +1467,7 @@ static uint8_t read_field(unsigned char x0, unsigned char y, char *buf, uint8_t 
 
 /* Same, but ESC abandons the prompt and returns 0. Only self destruct wants
    this -- EGA Trek's own prompt says "Hit ESC to abort". */
-uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max) {
+OVL_CODE_OS("dlg") uint8_t ui_dialog_ask_esc(const char *prompt, char *buf, uint8_t max) {
     unsigned char y;
 #ifdef TREK_40COL
     unsigned char px = (unsigned char)(DLG_PAD + strlen(prompt) + 1);
@@ -1523,7 +1523,7 @@ void ui_dialog_ask(const char *prompt, char *buf, uint8_t max) {
  * Anything but Y is no, RETURN included -- the same rule as ui_confirm() and
  * ui_play_again(), so that a RETURN never means yes on one screen and no on
  * the next. */
-uint8_t ui_dialog_yes(const char *prompt) {
+OVL_CODE_OS("dlg") uint8_t ui_dialog_yes(const char *prompt) {
     char buf[4];
 
     ui_dialog_ask(prompt, buf, sizeof buf);
@@ -1538,7 +1538,7 @@ uint8_t ui_dialog_yes(const char *prompt) {
  * read -- a weapons exchange, an energy transfer. It is wrong for SAVE:
  * MEASURED, the original's save box closes the moment it has a file name and
  * asks for nothing more. Jamie noticed the extra keystroke immediately. */
-void ui_dialog_dismiss(void) {
+OVL_CODE_OS("dlg") void ui_dialog_dismiss(void) {
     unsigned char x, y;
 
     for (y = 0; y < DLG_H; y++)
@@ -1548,7 +1548,7 @@ void ui_dialog_dismiss(void) {
     ui_draw_all();
 }
 
-void ui_dialog_close(void) {
+OVL_CODE_OS("dlg") void ui_dialog_close(void) {
     unsigned char x, y;
 
     dlg_room();
@@ -1623,7 +1623,7 @@ static uint16_t repair_tenths(unsigned char pts, unsigned char rate) {
 }
 
 /* n.n in three cells. The other put_tenths() pads to six for stardates. */
-static void put_time(unsigned char x, unsigned char y, uint16_t tenths,
+OVL_CODE_OS("repair") static void put_time(unsigned char x, unsigned char y, uint16_t tenths,
                      unsigned char color) {
     if (tenths > 99) { scr_puts(x, y, "***", color); return; }
     scr_put(x,                      y, (unsigned char)(SC_DIGIT0 + tenths / 10), color);
@@ -1982,7 +1982,7 @@ static uint8_t TREK_LOW io_buf[IO_BUF_SIZE];
    the caller's buffer is shorter than the field and reading past it drags in
    whatever follows -- which put a self-destruct password in the hall of fame
    once already. */
-static void save_put(unsigned char *dst, const char *src, unsigned char n) {
+OVL_CODE_OS("io") static void save_put(unsigned char *dst, const char *src, unsigned char n) {
     unsigned char i;
     char c = 1;
     for (i = 0; i < n; i++) {
@@ -2059,7 +2059,7 @@ void ui_save_game(const Setup *s) {
    live run on 2026-08-21 and archived to reference/shots. The name is what the
    hall of fame records; the password is what S)elf will be gated on. */
 
-static uint8_t ask_yes(unsigned char y, const char *prompt) {
+OVL_CODE_OS("dlg") static uint8_t ask_yes(unsigned char y, const char *prompt) {
     char buf[4];
     /* FLUSH LEFT AT FORTY COLUMNS. The briefing question is 34 characters, so
        at the 80-column indent of 2 its answer field would start at 37 and run
@@ -2290,7 +2290,7 @@ void ui_setup(Setup *s) {
 
 /* Right-aligned signed number, for the score column. put_num() is unsigned and
    pads on the left, which is what the counts want but not the points. */
-static void put_signed(unsigned char x, unsigned char y, int16_t v,
+OVL_CODE_OS("dlg") static void put_signed(unsigned char x, unsigned char y, int16_t v,
                        unsigned char w, unsigned char color) {
     unsigned char buf[7], n = 0;
     uint16_t m = (uint16_t)(v < 0 ? -v : v);
@@ -2325,7 +2325,7 @@ static void put_signed(unsigned char x, unsigned char y, int16_t v,
 /* Returns the number of rows used -- 1 always at eighty columns, sometimes 2
    at forty. The callers advance by it rather than by a fixed ++, so a row
    that needs the extra line cannot silently overwrite the next one. */
-static unsigned char ev_row(unsigned char y, const char *count, const char *item,
+OVL_CODE_OS("dlg") static unsigned char ev_row(unsigned char y, const char *count, const char *item,
                             int16_t pts, unsigned char color) {
     unsigned char i, x;
     unsigned char used = 1;
@@ -2352,7 +2352,7 @@ static unsigned char ev_row(unsigned char y, const char *count, const char *item
 
 /* A count as text, so a row can print "0.00" for the rate and plain integers
    everywhere else through the same path. */
-static void ev_count(char *buf, uint16_t v) {
+OVL_CODE_OS("dlg") static void ev_count(char *buf, uint16_t v) {
     uint8_t n = 0, i;
     char tmp[6];
     do { tmp[n++] = (char)('0' + (v % 10)); v /= 10; } while (v && n < 5);
@@ -2665,7 +2665,7 @@ static const char banner_text[] = "EGATREK";       /* index into the font */
 static const unsigned char banner_gap = 3;         /* blank cols between EGA and TREK */
 #endif
 
-static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
+OVL_CODE_OS("title") static void banner_letter(unsigned char bx, unsigned char by, unsigned char idx,
                           unsigned char color) {
     unsigned char r, c;
     for (r = 0; r < 5; r++) {

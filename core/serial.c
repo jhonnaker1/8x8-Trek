@@ -14,7 +14,7 @@ static const uint8_t *in;
 static void put8(uint8_t v)  { out[pos++] = v; }
 
 /* Low byte first, always. See the byte-order rule in serial.h. */
-static void put16(uint16_t v) {
+OVL_CODE_OS("io") static void put16(uint16_t v) {
     out[pos++] = (uint8_t)(v & 0xFF);
     out[pos++] = (uint8_t)(v >> 8);
 }
@@ -23,7 +23,7 @@ static uint8_t get8(void) { return in[pos++]; }
 
 /* Shifts, never a cast to uint16_t*. A cast would read the host's own order
    and work perfectly on the machine that wrote the file. */
-static uint16_t get16(void) {
+OVL_CODE_OS("io") static uint16_t get16(void) {
     uint16_t lo = in[pos++];
     return (uint16_t)(lo | ((uint16_t)in[pos++] << 8));
 }
@@ -108,7 +108,7 @@ struct save_size_check {
    free and these two are a fraction of that -- the cheaper side to spend from,
    and the window that grows every time the save record does is the wrong one
    to keep filling. */
-static void put_bits(const uint8_t *a) {                            /* 64 flags -> 8 bytes */
+OVL_CODE_OS("io") static void put_bits(const uint8_t *a) {                            /* 64 flags -> 8 bytes */
     uint8_t i, b;
     for (i = 0; i < GAL_CELLS; i += 8) {
         b = 0;
@@ -116,7 +116,7 @@ static void put_bits(const uint8_t *a) {                            /* 64 flags 
         put8(b);
     }
 }
-static void get_bits(uint8_t *a) {
+OVL_CODE_OS("io") static void get_bits(uint8_t *a) {
     uint8_t i, b;
     for (i = 0; i < GAL_CELLS; i += 8) {
         b = get8();

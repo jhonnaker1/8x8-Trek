@@ -52,11 +52,15 @@ REU_LENH  = 0xDF08
 REU_IMR   = 0xDF09
 REU_ACR   = 0xDF0A
 
-WINDOW_HI = 0xC0        ; the window is $C000 -- c64reu.ld
+; THE WINDOW'S PAGE comes from the linker: $C000 on the bare C64 (c64reu.ld),
+; wherever the resident image ends under C64 OS (c64os/c64os.ld). Its low byte
+; is always 0 -- both scripts page-align it, and reu_xfer relies on that.
 OVL_NONE  = 0xFF
 MAXOVL    = 32          ; table size; c64reu.c asserts OVL_COUNT fits
 RSDEPTH   = 16          ; nested cross-overlay calls; deeper is a halt
-NTHUNKS   = 64
+.ifndef NTHUNKS
+NTHUNKS   = 64          ; C64 OS asks for more: -Wa,--defsym,NTHUNKS=80
+.endif
 
 	.section .text.reuovl,"ax",@progbits
 
@@ -85,7 +89,7 @@ reu_xfer:
 	sta REU_REUL
 	sta REU_IMR
 	sta REU_ACR
-	lda #WINDOW_HI
+	lda #mos16hi(__ovl_start)
 	sta REU_C64H
 	lda ovl_rhi,y
 	sta REU_REUH

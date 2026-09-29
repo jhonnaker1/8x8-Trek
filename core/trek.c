@@ -106,7 +106,7 @@ static void reveal_around(uint8_t qy, uint8_t qx) {
 /* Picks a random free sector and returns its index, or 0xFF if the quadrant
    is somehow full. Bounded retries rather than a scan, since a quadrant
    holds at most a handful of objects out of 64 cells. */
-uint8_t trek_free_sector(void) {
+OVL_CODE_OS("time") uint8_t trek_free_sector(void) {
     uint8_t tries, i;
     for (tries = 0; tries < 100; tries++) {
         i = trek_rand_n(QUAD_CELLS);
@@ -118,7 +118,7 @@ uint8_t trek_free_sector(void) {
     return 0xFF;
 }
 
-static uint16_t enemy_strength(uint8_t type) {
+OVL_CODE_OS("info") static uint16_t enemy_strength(uint8_t type) {
     switch (type) {
         case SEC_BATTLESHIP: return HP_BATTLESHIP_AT(ship.level);
         case SEC_COMMAND:    return HP_COMMAND_AT(ship.level);
@@ -1119,7 +1119,7 @@ static void run_pod(TrekEvent *ev, uint8_t *n, uint8_t max) {
     if (ship.shields == 0) { ship.lost = 1; ship.lost_how = LOSS_POD; }
 }
 
-uint8_t trek_events_due(void) {
+OVL_CODE_OS("turn") uint8_t trek_events_due(void) {
     uint8_t i;
     for (i = 0; i < SCHED_COUNT; i++)
         if (sched[i] <= ship.stardate) return 1;
@@ -1341,7 +1341,7 @@ uint8_t trek_set_warp(uint8_t tenths) {
  * one-sector hop costs 0.0417 stardates. Truncating each move to a tenth
  * would make short hops free forever, which is a mechanic, not a rounding
  * error. The remainder lives in ship.time_frac and is saved with the game. */
-static void advance_hundredths(uint16_t h) {
+OVL_CODE_OS("nav") static void advance_hundredths(uint16_t h) {
     h = (uint16_t)(h + ship.time_frac);
     ship.time_frac = (uint8_t)(h % 10u);
     trek_advance_time((uint16_t)(h / 10u));
@@ -2076,7 +2076,7 @@ static void erode_chart(TrekEvent *ev, uint8_t *n, uint8_t max) {
     }
 }
 
-OVL_CODE_ENEMY void trek_wreck_system(uint8_t which, uint16_t hits,
+OVL_CODE_WRECK void trek_wreck_system(uint8_t which, uint16_t hits,
                        TrekEvent *ev, uint8_t *n, uint8_t max) {
     uint16_t factor, divisor, off, q, r;
     int16_t  left;
@@ -2554,7 +2554,7 @@ static const uint8_t atan_deg[17] = {
     0, 4, 7, 11, 14, 17, 21, 24, 27, 29, 32, 35, 37, 39, 41, 43, 45
 };
 
-uint16_t trek_bearing(uint8_t sy, uint8_t sx) {
+OVL_CODE_OS("view") uint16_t trek_bearing(uint8_t sy, uint8_t sx) {
     uint8_t up, right;      /* screen rows grow downwards; bearings do not */
     uint16_t dy, dx, a;
 

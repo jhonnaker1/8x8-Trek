@@ -13549,6 +13549,111 @@ the callback: `$41` and `$42` injected (`$C6 = 2`) gave ONE event, in which
 
 X and Y are not decoded; X = `$02` may be the modifier state.
 
+### THE GAME, AND WHY ITS FIRST FILE CRASHED C64 OS, 2026-09-28
+
+`c64os/` builds the game as a C64 OS app: `c64reu`'s C and REU overlay
+manager, with `src/app.s` (header, link table, OS crossings), `osvid.c`
+(C64 OS's buffers, fifteen borrowed icon slots for the box glyphs),
+`osinput.c` (`readkprnt_`), `osfile.c` (appfileref path prefix, two
+`bkalloc_` banks, far store and message log in the REU) and `osovl.c`
+(c64reu's one-time load). The first file was 28,928 bytes, `$0900-$79FF`.
+
+**IT CRASHED THE SAME WAY EVERY TIME -- a JAM at `$0106` -- AND THE JAM WAS
+THE END OF A CHAIN, NOT ITS START.** Each run cost Jamie a double-click, so
+`rig.py watch` grew until one run said everything: a stage byte the game
+writes as it starts, VICE's log, a text monitor connected at boot, a
+watchpoint on the REU command register, a breakpoint on C64 OS's exception
+entry (`$03DF`), and a dump of C64 OS's page map as the app arrives. What
+they showed: the game's file covered the mouse driver's page (`$0801` =
+`$6F`); `loadlib_` found no four free pages for memory.lib and raised; and
+the exceptions cascaded -- the try stack at `$C7` ran empty -- until the CPU
+jammed. The JAM's own address says nothing about the cause.
+
+**THE CAUSE: THE FILE WAS TOO BIG FOR WHERE C64 OS PUTS ITS OWN PAGES.**
+C64 OS does not refuse an app larger than its free space: it loads over
+what is there. Its drivers, libraries and menus land from about `$6F` up,
+and not in the same pages every boot -- `$6F` (the mouse driver) in one,
+`$76` and `$7D` in another, `$7A`/`$7D` when the probe ran. The probe's
+"`$0A00-$79FF` free" was true and irrelevant: free is not yours. This is
+the 2026-09-21 mistake again, measuring space rather than availability.
+
+**THE FIX: 21,248 bytes, `$0900-$5BFF`**, leaving `$5C-$A0` to C64 OS.
+Three C64 OS-only overlay groups (`OVL_CODE_OS`, empty on every other
+port): `main` -- main() itself, called from app.s through a thunk after
+`c64os_start()` fills the REU, since main cannot load overlays over the
+window it runs from -- `dlg` (dialog helpers, read_field, the input
+parsers, the eval rows) and `io` (save and hall-of-fame file code); and
+nine single-caller helpers moved into their callers' overlays. 73 thunks
+(reuovl.s's table size is now overridable; c64reu keeps 64), 272 calls.
+
+**TWO MISTAKES CAUGHT BEFORE COMMIT, by hashing the other ports:**
+`storage.c`'s scratch buffer had been given the filename buffer's size
+(24 for 20) on every port -- the C128's binaries changed, the C64's did not,
+and a bisect across the seven shared files found it.
+Byte-identical after: C64 .d64, c64reu, both C128 builds.
+
+**RUN, 2026-09-28: NO CRASH.** The resized file loaded, ran, loaded
+memory.lib, and stopped at its own "needs two free REU banks" screen. The
+banks had been granted. `bkalloc_` scans the bank map from `appreubk`
+(`$0282`, 9 with eight switching slots), marks what it finds with the app's
+`reufrzbk`, and returns the first bank MINUS appreubk -- 0 for bank 9 --
+which the header's "Y <- start bank number (normal)" does not make plain,
+and which the game read as its own "0 = failed". The rig's log had the
+answer (the second of three REU transfers it traced ends in `SBC $0282`);
+the first reading looked at the first transfer only and went looking for a
+full bank map. The game now adds appreubk and takes `$FF` for failure.
+
+**THE NEXT RUN LOADED ALL 23 IMAGES, STARTED main(), AND JAMMED AT `$0056`**
+-- the same exception cascade, one layer further in. `far_load` staged each
+256 bytes of STRINGS.DAT through the overlay window, which its comment
+called free "at startup, before the first overlay is loaded". That stopped
+being true when main() became an overlay: main is AT `$4B00`, the window's
+first byte, so the read overwrote main's own first page and main returned
+into prose. It now stages through app.s's `bounce`. A comment that states
+why something is safe is a claim about the whole program, and the program
+changed under it. (The rig's exception breakpoint could not show the first
+BRK: v6 deleted every checkpoint after 40 REU transfers, and 23 images are
+46. v7 stops the REU trace after four and re-arms the exception break.)
+
+**THE TITLE SCREEN, 2026-09-28.** The next launch drew EGA Trek's title
+inside C64 OS -- "C64 OS PORT", the logo, Nels Anderson's credit, "PRESS
+RETURN TO BEGIN" -- with no exception raised. Jamie: "it worked!" Four
+fixes got it there from the first file: the file resized under C64 OS's
+system pages, bkalloc_'s relative bank, far_load's buffer out of the
+window, and a rig that could see all three. Not yet tried: RETURN, play,
+save, the hall of fame, quitting back to C64 OS.
+
+**PLAYED, 2026-09-28.** Briefing, the main screens, load and save, "play
+again" all worked. Three things did not, each a C64 OS contract read wrong:
+
+- **ESC.** C64 OS's keyboard driver (read off the disk image -- the scan
+  code table `03 04 05 06 3F` is in the driver, not the headers) sends F1-F7
+  and RUN/STOP, and anything with CTRL or C=, to the COMMAND queue
+  (`readkcmd_`), the rest to the printable one. VICE's Esc is RUN/STOP. The
+  game read only the printable queue; it now reads both, and skips CTRL/C=,
+  which are C64 OS's menu shortcuts.
+- **QUITTING.** `quitapp_` does not quit: it points the event loop's break
+  vector (`$0336`) at run-home, and the loop resets that vector at the
+  start of every pass. Called from init -- where the game runs -- the first
+  pass wiped it, and C64 OS went on running the game as the current app.
+  app_exit now marks a redraw and returns; layer_draw, inside the first
+  pass, makes the request. The menu's Quit is answered in app_msgcmd, as
+  uno does.
+- **`@` DREW AS A BACKQUOTE, TWICE.** C64 OS's font (//os/charsets/
+  charset.o, 96 glyphs) is the C64's LOWERCASE screen-code layout with ASCII
+  symbols: `@` at 0, lowercase 1-26, `[ \ ] ^ _` at 27-31, a BACKQUOTE at
+  64, capitals 65-90. The first guess called it ASCII and moved the raw
+  codes 0-31 up by 64 -- the same backquote came back, because the string
+  path, not the raw one, draws "@ 10 EACH": scr_puts passed ASCII `@` (64)
+  straight through. It now moves 64 and 91-95 down by 64. Read the font,
+  not the symptom: the second fix came from drawing charset.o's glyphs.
+
+**NO SOUND, NOT YET EXPLAINED.** The driver runs -- rig v8 read
+c128/src/sid.c's statics at every key: MUSIC.DAT in the far store, the
+title track on and advancing, effects starting in combat, `$01` = `$36` --
+and VICE's log shows its audio open. rig v9 records VICE's output to a WAV
+(`rig.py loudness`), so the next run says whether sound leaves the SID.
+
 ## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
 
 **RELEASED, the fourteenth port.** Jamie played the release disk on

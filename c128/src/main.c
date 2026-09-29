@@ -118,7 +118,7 @@ static uint8_t word_is(const char *line, const char *word) {
 /* Collects the digits out of a command line, ignoring any separators the
    player chose to use. The original is equally relaxed: "you can use
    whatever is most convenient for separators" (manual l.538). */
-static uint8_t grab_digits(const char *s, uint8_t *out, uint8_t max) {
+OVL_CODE_OS("dlg") static uint8_t grab_digits(const char *s, uint8_t *out, uint8_t max) {
     uint8_t n = 0;
     unsigned char u;
 
@@ -172,7 +172,7 @@ static uint8_t put_str(char *buf, const char *s) {
    grab_digits does. Saturates rather than wrapping: a captain who types
    nine digits gets everything the banks hold, not a 16-bit wrap to nearly
    nothing. */
-static uint16_t grab_num(const char *s) {
+OVL_CODE_OS("dlg") static uint16_t grab_num(const char *s) {
     uint16_t v = 0;
     unsigned char u;
     uint8_t d;
@@ -192,7 +192,7 @@ static uint16_t grab_num(const char *s) {
 }
 
 /* A stardate as t.d into a buffer, for messages that carry a deadline. */
-static uint8_t put_tenths_str(char *p, uint16_t tenths) {
+OVL_CODE_OS("msgs") static uint8_t put_tenths_str(char *p, uint16_t tenths) {
     uint8_t k = put_u16(p, (uint16_t)(tenths / 10));
     p[k++] = '.';
     p[k++] = (char)('0' + (tenths % 10));
@@ -1966,7 +1966,7 @@ OVL_CODE_REU("torp") static void do_torpedo(const char *line) {
     ui_dialog_close();
 }
 
-int main(void) {
+OVL_CODE_OS("main") int main(void) {
     unsigned char c;
     int16_t final_score;
 

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Patch the REU build's cross-overlay calls into thunks, in the linked ELF.
 
-    reu_thunks.py build/trekreu.elf
+    reu_thunks.py build/trekreu.elf [-DNAME ...]
+
+Extra -D flags reach the preprocessor that reads the ids: C64 OS's build
+passes -DTREK_C64OS, which adds three groups of its own.
 
 WHY AFTER THE LINK. The REU build lets one overlay call another -- see
 src/reuovl.s -- but the compiler emits a plain `jsr f` for every call, and
@@ -125,9 +128,11 @@ class Elf(object):
 
 
 def main():
-    if len(sys.argv) != 2:
+    args = [a for a in sys.argv[1:] if not a.startswith("-D")]
+    DEFINES.extend(a for a in sys.argv[1:] if a.startswith("-D"))
+    if len(args) != 1:
         sys.exit(__doc__.strip().splitlines()[2])
-    elf = Elf(sys.argv[1])
+    elf = Elf(args[0])
     idx = {s["nm"]: i for i, s in enumerate(elf.sh)}
     ovl = {i: s["nm"][5:] for i, s in enumerate(elf.sh)
            if s["nm"].startswith(".ovl_")}

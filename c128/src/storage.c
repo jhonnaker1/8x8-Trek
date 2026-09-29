@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "../../core/storage.h"
+#include "../../core/overlay.h"
 
 /* The C128 half of the disk seam: KERNAL file I/O behind core/storage.h.
  *
@@ -28,12 +29,25 @@
  * one. That is the trap this file exists to absorb.
  */
 
+/* C64 OS: the device, and a "<partition>//path/:" prefix, come from C64 OS's
+   own record of where the app was launched from -- c64os/src/osfile.c. */
+#ifdef TREK_C64OS
+#include "../../c64os/src/c64os.h"
+#define DEV      c64os_dev
+#define NAME_ROOM 64
+#define CMD_ROOM  64
+#else
 #define DEV      8
+#define NAME_ROOM 24
+#define CMD_ROOM  20            /* scratch()'s, and not NAME_ROOM: the first
+                                   version shared one size and grew every
+                                   other port's frame by four bytes */
+#endif
 #define LFN_DATA 2
 #define LFN_CMD  15
 
 /* Long enough for "0:" + a 16-character CBM name + ",S,W" + NUL. */
-static char fname[24];
+static char fname[NAME_ROOM];
 
 /* SETBNK, and it is NOT optional on this machine.
  *
@@ -85,7 +99,12 @@ static const char *cbm_name(const char *name, char mode) {
     char *p = fname;
 
     /* No '@' -- see scratch() above for why replace is not used. */
+#ifdef TREK_C64OS
+    strcpy(p, c64os_prefix());
+    p += strlen(p);
+#else
     *p++ = '0'; *p++ = ':';
+#endif
     strcpy(p, name);
     p += strlen(name);
     *p++ = ','; *p++ = 'S';
@@ -186,10 +205,16 @@ static void cmd_send(const char *cmd) {
  * The file lands on the disk correctly and plat_write_all reports STOR_ERROR,
  * which is exactly what happened the first time SAVE ran end to end. */
 static void scratch(const char *name) {
-    char cmd[20];
+    char cmd[CMD_ROOM];
     char *p = cmd;
 
+#ifdef TREK_C64OS
+    *p++ = 'S';
+    strcpy(p, c64os_prefix());
+    p += strlen(p);
+#else
     *p++ = 'S'; *p++ = '0'; *p++ = ':';
+#endif
     strcpy(p, name);
     cmd_send(cmd);
     (void)cmd_status();          /* consume it; the value is not interesting */
@@ -202,7 +227,7 @@ static uint8_t classify(unsigned char code) {
     return STOR_ERROR;
 }
 
-uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) {
+OVL_CODE_OS("io") uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) {
     unsigned char *p = (unsigned char *)buf;
     uint16_t n = 0;
     unsigned char st;
@@ -262,7 +287,7 @@ uint8_t plat_read_all(const char *name, void *buf, uint16_t max, uint16_t *got) 
  * image.** Reading a .d64 that VICE is managing answers a different question
  * from the one being asked. See NOTES.md.
  */
-uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
+OVL_CODE_OS("io") uint8_t plat_write_all(const char *name, const void *buf, uint16_t len) {
     const unsigned char *p = (const unsigned char *)buf;
     uint16_t i;
     unsigned char st;

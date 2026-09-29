@@ -1,0 +1,20 @@
+# Per-port text for C64 OS, applied to c128/src/strings.txt by:
+#
+#     python3 tools/gen_strings.py --override c64os/src/strings.override.txt OUT
+#
+# The C64's overrides (c64/src/strings.override.txt) with the machine named
+# as this port needs it. IDS THAT ALREADY EXIST, AND NOTHING ELSE -- see that
+# file, and NOTES.md item 60, for why the numbering is the generator's alone.
+
+# The title bar. The 40-column build draws S_330, not S_0 -- see ui_title().
+330	C64 OS PORT
+
+# S_0 is the 80-column title bar, never compiled here; overridden so nothing
+# in this bundle names another machine.
+0	 C64 OS PORT 
+
+# The dedication line, drawn at x=0 on row 23 of the 40-column title.
+82	TO C64 OS.
+
+# The farewell. plat_exit() returns to C64 OS rather than resetting a C64.
+10	HIT A KEY TO RETURN TO C64 OS.

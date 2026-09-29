@@ -1,4 +1,5 @@
 #include "hof.h"
+#include "overlay.h"
 
 #define PAD '.'
 
@@ -7,7 +8,7 @@ uint8_t hof_index(uint8_t level, uint8_t place) {
     return (uint8_t)(place * HOF_RANKS + (level - 1));
 }
 
-void hof_clear(HofEntry *tbl) {
+OVL_CODE_OS("hof") void hof_clear(HofEntry *tbl) {
     uint8_t i, j;
     for (i = 0; i < HOF_ENTRIES; i++) {
         for (j = 0; j < HOF_NAME; j++) tbl[i].name[j] = PAD;
