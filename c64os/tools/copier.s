@@ -10,7 +10,7 @@
 ; top of BASIC below the buffers):
 ;
 ;     SYS 49152   copy  logical file 1 -> logical file 2, to the end
-;     SYS 49155   read logical file 3 through: its length at $C3F0/1, the
+;     SYS 49155   read logical file 3 through: its length at $C3F0/1/$C3F6, the
 ;                 16-bit sum of its bytes at $C3F3/4, and $C3F2 nonzero on a
 ;                 read error
 ;
@@ -32,6 +32,9 @@ DIFF    = 0xC3F2
 DIFFAT  = 0xC3F3
 CHANERR = 0xC3F5        ; nonzero: a CHKIN or CHKOUT failed (the carry), and
                         ; which: $01/$03 input from file 1/3, $02 output to 2
+COUNTHI = 0xC3F6        ; the length's third byte. The first archive over 64K
+                        ; (egatrek.car, 102,523 bytes) read back as 36,987
+                        ; with the right sum: the count had wrapped.
 
     .section .text,"ax",@progbits
     jmp     copy
@@ -77,6 +80,7 @@ verify:
     lda     #0
     sta     COUNT
     sta     COUNT+1
+    sta     COUNTHI
     sta     DIFF
     sta     DIFFAT
     sta     DIFFAT+1
@@ -93,6 +97,8 @@ verify:
 2:  inc     COUNT
     bne     3f
     inc     COUNT+1
+    bne     3f
+    inc     COUNTHI
 3:  lda     STATUS
     beq     1b
     and     #0xBF               ; anything but end-of-file is an error

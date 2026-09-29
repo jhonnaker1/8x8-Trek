@@ -7,13 +7,24 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: fourteen ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: sixteen ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
 > the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
 > **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs**, the
-> **Commodore Plus/4**, the **Foenix F256K** and the **MSX2** are feature
-> complete and released as [v0.22.0](../../releases/latest), 2026-09-25.
-> The **MSX2** is the new one, and the first **Z80**: SDCC, **no overlays at
+> **Commodore Plus/4**, the **Foenix F256K**, the **MSX2**, the **Commodore 64
+> with an REU** and **C64 OS** are feature complete and released as
+> [v0.23.0](../../releases/latest), 2026-09-28.
+> **The two new ones are one game in two shapes.** The **C64 with an REU** is
+> the C64 port with its twenty overlays in an REU, where one overlay may call
+> another, so the engine and the console drawing leave resident memory —
+> **21,823 bytes resident against 40,856**, and twice as fast once started.
+> **C64 OS** is that game made into a C64 OS application: it ships as a `.car`
+> archive C64 OS unpacks into its Applications, takes two REU banks from C64
+> OS, and plays on C64 OS's screen, font, keys and files — in a file that has to
+> end below `$5C00`, because C64 OS loads an app over its own pages rather than
+> refuse one. See [`c64reu/README.md`](c64reu/README.md) and
+> [`c64os/README.md`](c64os/README.md).
+> The **MSX2**, before them, was the first **Z80**: SDCC, **no overlays at
 > all**, and a 54K game in a 55,814-byte TPA (343 bytes spare at v0.22.0) -- which it gets only by being the
 > boot disk's `COMMAND2.COM`, because the command interpreter keeps 1,280 bytes
 > of it for itself. Far memory is the V9938's second 64K of VRAM, and the
@@ -26,15 +37,9 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > startup and then only to save. It is also the closest any 8-bit port gets to
 > the original's proportions: **8×16 character cells** where every other draws
 > 8×8. See [`f256k/README.md`](f256k/README.md).
-> A **fifteenth, the Commodore 64 with an REU**, is built and played and goes
-> out with the next release: the C64 port with its twenty overlays in an REU,
-> where one overlay may call another, so the engine and the console drawing
-> leave resident memory — **21,823 bytes resident against 40,856**, and twice
-> as fast once started. It is also the shape of the game that fits inside
-> **C64 OS**. See [`c64reu/README.md`](c64reu/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All fourteen have been played by a person**, and that is where the faults
+> **All sixteen have been played by a person**, and that is where the faults
 > have come from: the CoCo 3's sitting found a console repaint taking **12
 > seconds** that no benchmark here had ever timed, because the benchmark
 > measured the blit and the blit was a third of the cost. The C64's sitting
@@ -229,7 +234,8 @@ an 80-column grid of per-cell colour, which is the shape it was designed on.
 | **Atari Falcon030** | 640×480 on VGA, 640×400 on RGB and TV, 16 colours | 68030 | **Released** — [v0.15.0](../../releases/latest). The port that **deletes the most**: no overlays, no banking, no filesystem of our own, an 8×16 font out of ROM and GEMDOS for storage. **Picks its mode from `VgetMonitor()`**; ST monochrome is refused. See [`falcon/README.md`](falcon/README.md) |
 | **CoCo 3 + SuperSprite FM+** | V9958 GRAPHIC6, 512×212, 16 colours per pixel | 6809 | **Released** — [v0.15.0](../../releases/latest). **A filesystem of its own** (Disk BASIC's, written from scratch, and shared with the stock CoCo 3 port), a **first-stage loader** for a 44K image BASIC cannot place, far memory in the card's VRAM, and eleven overlays. **It was the slowest port here until the stock CoCo 3 arrived** — that one's string pool lives on the diskette. See [`coco3/README.md`](coco3/README.md) |
 | **Commodore 64** | VIC-II 40×25 text, 16 colours per cell | 6510 | **Released** — [v0.16.0](../../releases/latest). The first port that is mostly *another port*: the C128's 40-column driver and eight shared files, behind four `#ifdef`s. String pool in the RAM under the KERNAL — **writes always reach RAM on this machine**, so one KERNAL LOAD fills it and reading back is a `memcpy`. **6,112 bytes spare against the 40-column C128's 304**. **The console is in two halves** — `C` shows the chart page, any key returns. See [`c64/README.md`](c64/README.md) |
-| **Commodore 64 + REU** | VIC-II 40×25 text, 16 colours per cell | 6510 + REU | **Built and played; in the next release.** The C64 port with its overlays in an REU: twenty of them, and **one may call another** through a thunk the build patches into the linked ELF, so the engine and the console drawing leave resident memory — **21,823 bytes resident against the C64's 40,856**. Twice as fast once started, after a 47-second load. `make reucheck` plays one pinned game on both and compares every screen. See [`c64reu/README.md`](c64reu/README.md) |
+| **Commodore 64 + REU** | VIC-II 40×25 text, 16 colours per cell | 6510 + REU | **Released** — [v0.23.0](../../releases/latest). The C64 port with its overlays in an REU: twenty of them, and **one may call another** through a thunk the build patches into the linked ELF, so the engine and the console drawing leave resident memory — **21,823 bytes resident against the C64's 40,856**. Twice as fast once started, after a 47-second load. `make reucheck` plays one pinned game on both and compares every screen. See [`c64reu/README.md`](c64reu/README.md) |
+| **C64 OS** 1.08, on a C64 + REU | C64 OS's 40×25 text screen and font, 16 colours per cell | 6510 + REU | **Released** — [v0.23.0](../../releases/latest), as `egatrek.car`, which C64 OS unpacks into Applications. The C64 + REU port made into a **C64 OS application**: two REU banks from C64 OS's `bkalloc_`, keys from both of its queues, files through its record of the app's folder, fifteen of its icon slots lent the console's box lines. **C64 OS loads an app over its own pages rather than refuse one**, so the file ends below `$5C00` — `main()` itself is an overlay. See [`c64os/README.md`](c64os/README.md) |
 | **Atari ST / STE** | 320×200 bitmap, 16 colours | 68000 | **Released** — [v0.17.0](../../releases/latest). **One file.** Every seam but the video driver comes from the Falcon port — `vc +tos` *is* the ST target, the sound is the same YM2149 through the same XBIOS call, storage is GEMDOS. The planes are word-interleaved as on the Falcon; the 8×8 glyphs are the Amiga's. **This line was ruled out in August for being "only 40 columns"** — a rule that no longer exists. See [`st/README.md`](st/README.md) |
 | **CoCo 3, stock** | GIME 640×192 text, 8 per-cell colours | 6809 | **Released** — [v0.18.1](../../releases/latest), and **the first port here to run on hardware somebody actually owns** — a real CoCo 3 from a CoCo SDC. It drives the WD1773 directly; FujiNet and DriveWire do not work. The string pool lives on the disk, which is what makes a 45K program, a 4,000-byte screen and 7K of text fit in 64K at once. See [`coco3gime/README-release.txt`](coco3gime/README-release.txt) |
 | **Apple IIgs** | Super Hi-Res 320×200, 8×8 cells, EGA's own palette | 65816 | **Released** — [v0.19.0](../../releases/latest). **No ProDOS on the disk**: block 0 is this port's own loader and the slot's block driver reads the game, so there is nothing to type. Ensoniq 5503 on two oscillators. **PAL and NTSC are detected** from the VGC line counter — and the *minimum* discriminates, not the maximum. See [`iigs/README.md`](iigs/README.md) |
@@ -294,7 +300,8 @@ width and colour must not be bundled; **TI-99/4A** — the TMS9918A colours
 overruns the 256 codes it has.
 
 **Not machines:** MS-DOS is the reference oracle and never a build target;
-C64 OS is the C64 again.
+C64 OS is the C64 again -- and ships anyway, since v0.23.0, as an application
+of that operating system rather than a new machine.
 
 #### Swept 2026-09-16: what the list still gets wrong
 

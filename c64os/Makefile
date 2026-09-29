@@ -1,15 +1,16 @@
-# EGA Trek as a C64 OS application -- NOT YET A PORT. It is being built.
+# EGA Trek as a C64 OS application, the sixteenth port.
 #
-# THE C64 + REU PORT (../c64reu) MOVED INTO C64 OS. Same C, same twenty
-# overlays swapped from the REU by the same manager (../c64reu/src/reuovl.s);
-# what is this directory's is where the machine is C64 OS's rather than the
+# THE C64 + REU PORT (../c64reu) MOVED INTO C64 OS. Same C, same overlays
+# swapped from the REU by the same manager (../c64reu/src/reuovl.s); what
+# is this directory's is where the machine is C64 OS's rather than the
 # C64's:
 #
-#   src/app.s      the application header, the KERNAL link table, and the
-#                  crossings between C64 OS and the game's C
-#   src/osvid.c    the screen, drawn into C64 OS's buffers, with fifteen
-#                  box-drawing glyphs its font does not have
-#   src/osinput.c  keys from C64 OS's queue
+#   src/app.s      the application header, the KERNAL link table, the
+#                  crossings between C64 OS and the game's C, both key
+#                  queues, and quitting from inside the event loop
+#   src/osvid.c    the screen, drawn into C64 OS's buffers and font, with
+#                  fifteen box-drawing glyphs the font does not have
+#   src/osinput.c  keys from C64 OS's queues
 #   src/osfile.c   the app's folder, its two REU banks, the far store and
 #                  the message log, both in the REU
 #   src/osovl.c    c64reu's one-time overlay load, from the app's folder
@@ -17,8 +18,10 @@
 # The measurements every choice here rests on are in NOTES.md, "C64 OS PORT".
 #
 #   make           build/bundle/ -- everything the app's folder holds
+#   make car       build/egatrek.car -- the bundle as C64 OS installs it
+#   make release   build/egatrek-c64os.zip -- the .car and README.txt
 #   make install   onto a COPY of your C64 OS disk, every byte read back
-#   make run       boot C64 OS in VICE; double-click "ega trek"
+#   make run       boot C64 OS in VICE; double-click "EGA Trek"
 #
 # C64 OS, its disk image and the ROMs are yours: C64OS_ROMS (tools/rig.py).
 .DEFAULT_GOAL := all
@@ -28,7 +31,16 @@ CC       = $(LLVM_MOS)/bin/mos-c64-clang
 OBJCOPY  = $(LLVM_MOS)/bin/llvm-objcopy
 NM       = $(LLVM_MOS)/bin/llvm-nm
 
-APP = ega trek
+# The folder the player sees in //os/applications, and the name inside the
+# .car that C64 OS's extractor makes it from.
+APP = EGA Trek
+VERSION  = 0.23.0
+CAR_DATE = 2026-09-28
+# Up here, not beside its rule: `verify` names it as a prerequisite, and
+# make expands a prerequisite list when it reads the rule -- defined below
+# `verify`, this was empty there, and verify ran from clean before anything
+# was built. It passed until the release cut wiped build/.
+CAR = build/egatrek.car
 
 CFLAGS  = -Oz -nostartfiles -mlto-zp=0 -I src -I ../c128/src -I ../core -Wall -Werror \
           -DTREK_OVERLAYS -DTREK_40COL -DTREK_C64OS \
@@ -50,7 +62,7 @@ BUNDLE = build/bundle
 OVERLAYS = eval hof front info repair msgs planet cmds title events xtra \
            enemy move view panel nav time turn laser torp main dlg io
 
-.PHONY: all install run clean
+.PHONY: all car verify release release-test install run clean
 
 all: $(BUNDLE)/files.txt
 
@@ -106,11 +118,57 @@ $(BUNDLE)/files.txt: $(BUNDLE)/main.o build/strings.dat ../c128/build/music.dat 
 	cp ../c128/src/briefing40.txt $(BUNDLE)/brief.txt
 	@python3 -c "import sys; sys.stdout.buffer.write(b''.join(b'.'*25 + b'\r\n0\r\n' for _ in range(10)))" > $(BUNDLE)/trek.scr
 	python3 tools/c64os_meta.py menu src/menu.json > $(BUNDLE)/menu.m
-	python3 tools/c64os_meta.py about "EGA Trek" 0.1 2026 "Nels Anderson" > $(BUNDLE)/about.t
+	python3 tools/c64os_meta.py about "EGA Trek" $(VERSION) 2026 "Nels Anderson" > $(BUNDLE)/about.t
 	@( echo "main.o,p"; echo "menu.m,s"; echo "about.t,s"; \
 	   echo "strings.dat,s"; echo "music.dat,s"; echo "brief.txt,s"; echo "trek.scr,s"; \
 	   for o in $(OVERLAYS); do echo "ovl$$o,p"; done ) > $@
 	@echo "bundle: $(BUNDLE), `wc -l < $@ | tr -d ' '` files"
+
+# The checks the link cannot make -- the file ceiling, the window, the
+# archive against the bundle, the music. See tools/verify_c64os.py.
+verify: $(CAR)
+	python3 tools/verify_c64os.py
+
+# THE RELEASE IS A .car, as C64 OS apps ship: copied to //os/applications
+# and double-clicked, C64 OS's extractor makes the EGA Trek folder there.
+# tools/mkcar.py writes it the way the third-party app archives on C64 OS
+# 1.08's own volume are built, and reads it back -- every record, and the
+# CRC32 trailer -- before anything is allowed to ship it. CAR_DATE is fixed
+# so the same bundle makes the same archive byte for byte.
+car: $(CAR)
+
+$(CAR): $(BUNDLE)/files.txt tools/mkcar.py
+	python3 tools/mkcar.py write $(BUNDLE) "$(APP)" "EGA Trek for C64 OS v$(VERSION)" $(CAR_DATE) $@
+	python3 tools/mkcar.py read $@ > /dev/null
+
+# The zip carries the .car and README.txt in an egatrek-c64os folder, as the
+# other zip ports do. The .car keeps a lowercase name, as all three sample
+# archives have: it is copied onto a C64 filesystem, often off an SD card.
+# Clears its own build/egatrek-*.zip first: the root Makefile lists
+# artefacts with a glob.
+REL = build/release
+
+release: verify README-release.txt
+	@rm -f build/egatrek-*.zip
+	@rm -rf $(REL) && mkdir -p $(REL)/egatrek-c64os
+	@cp $(CAR) $(REL)/egatrek-c64os/egatrek.car
+	@cp README-release.txt $(REL)/egatrek-c64os/README.txt
+	@cd $(REL) && zip -q -r ../egatrek-c64os.zip egatrek-c64os
+	@echo "release: build/egatrek-c64os.zip"
+	@unzip -l build/egatrek-c64os.zip | tail -n +4
+
+# THE RELEASE, TESTED THE WAY A PLAYER INSTALLS IT: egatrek.car taken out
+# of the ZIP (not build/), put into //os/applications on a FRESH copy of the
+# C64 OS disk, and C64 OS left to extract it -- double-click egatrek.car,
+# then EGA Trek. `make release-test ZIP=path` tests a zip from anywhere.
+ZIP ?= build/egatrek-c64os.zip
+release-test:
+	rm -rf build/cartest && mkdir -p build/cartest
+	unzip -o -j -q "$(ZIP)" egatrek-c64os/egatrek.car -d build/cartest
+	echo "egatrek.car,p" > build/cartest/files.txt
+	rm -f build/work.dhd
+	python3 tools/rig.py install build/cartest ""
+	python3 tools/rig.py play
 
 install: $(BUNDLE)/files.txt
 	python3 tools/rig.py install $(BUNDLE) "$(APP)"
@@ -119,4 +177,5 @@ run:
 	python3 tools/rig.py boot --human
 
 clean:
-	rm -rf build/bundle build/*.elf build/*.map build/*.bin build/*.raw build/*.dat
+	rm -rf build/bundle build/*.elf build/*.map build/*.bin build/*.raw build/*.dat \
+	    build/*.car build/release build/egatrek-*.zip

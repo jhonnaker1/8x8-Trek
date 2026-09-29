@@ -23,7 +23,7 @@
 160 open3,10,3,n$+","+t$+",r"
 165 input#15,d,d$,d1,d2:if d then print#4,n$;" open to verify: ";d;d$
 170 sys 49155
-190 m=peek(50160)+256*peek(50161):e=peek(50162):c=peek(50163)+256*peek(50164)
+190 m=peek(50160)+256*peek(50161)+65536*peek(50166):e=peek(50162):c=peek(50163)+256*peek(50164)
 210 close3
 215 if (m<>xl or c<>xs or e) and a<3 then 110
 220 print#4,n$;" len";m;"sum";c;"err";e;"tries";a

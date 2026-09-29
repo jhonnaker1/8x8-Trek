@@ -94,9 +94,8 @@ is a copy by the REU's own DMA rather than a disk read. Because of that, one
 overlay may call another here -- the ship's engine and the console drawing
 live in the REU too -- which the disk version cannot allow.
 
-It is also the first step towards a C64 OS version, which does not exist yet:
-C64 OS lets an application have about thirty kilobytes, and this is the shape
-of the game that fits in them.
+It is also the game the C64 OS version is built from: egatrek-c64os.zip,
+released alongside it, is this port made into a C64 OS application.
 
 TESTED IN VICE, with its REU, and not yet on a real one. If you run it on
 hardware, the project would like to hear how it went.

@@ -96,6 +96,11 @@ PORTS = (
     # another. Its verify reads the thunks back out of the link as well as
     # the memory map -- see c64reu/tools/verify_c64reu.py.
     ("c64reu", "verify",  "CC"),
+    # The sixteenth: c64reu made into a C64 OS application. Its verify holds
+    # the file under $5C00 -- C64 OS loads an app over its own pages rather
+    # than refuse it -- and reads egatrek.car back against the bundle; see
+    # c64os/tools/verify_c64os.py.
+    ("c64os",  "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

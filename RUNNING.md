@@ -1,6 +1,6 @@
 # How to run each one
 
-Twenty-one assets, fifteen machines. Every port plays the same game from the same
+Twenty-two assets, sixteen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Six assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The nine `.zip` assets carry theirs inside as `README.txt`.
+put one. The ten `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -143,6 +143,27 @@ all twenty of its code overlays into the REU — the screen counts them — abou
 an order that took three to six seconds on the C64 disk takes about one.
 
 **Tested in VICE, not yet on a real REU.**
+
+### `egatrek-c64os.zip` — C64 OS
+
+The zip holds `egatrek.car`, a C64 OS archive. **Copy it into
+`//os/applications/` on your C64 OS volume and double-click it**: C64 OS
+unpacks it into an `EGA Trek` folder there. Then open EGA Trek from
+Applications.
+
+**It needs C64 OS with a RAM Expansion Unit, and two 64K banks of it free**
+after C64 OS's own bank and its fast app switching slots — so a 512K REU allows
+at most five slots, 1M at most thirteen. Without the room it says so and
+returns to C64 OS. Built and tested against **C64 OS 1.08**.
+
+It is the Commodore 64 with an REU above, made into a C64 OS application: it
+loads its 23 overlays into the REU before the title, then plays on C64 OS's
+screen, keys and files, and returns to C64 OS when you quit. **While it plays
+it takes the whole machine** — C64 OS's menu bar and fast app switching come
+back when you leave. RUN/STOP is ESC.
+
+**Tested in VICE** — C64 OS 1.08 on a CMD HD image, a 16MB REU, eight fast
+app switching slots — and played through. Not yet on real hardware.
 
 ### `egatrek-plus4.d64` — Commodore Plus/4
 

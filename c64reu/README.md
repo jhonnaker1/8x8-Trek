@@ -5,9 +5,12 @@ instead of on the disk. Same machine as [`../c64`](../c64), same game, same
 C. What differs is where the code lives. Because of that, this one plays
 **twice as fast once started**.
 
-It is also the shape of the game that fits in C64 OS, which gives an app
-30,976 bytes. A C64 OS port would start from here. See `NOTES.md`, *"THE
-TRIAL LINK"* and *"THE REU OVERLAY MANAGER"*.
+It is also the shape of the game that fits in C64 OS, and the
+[`../c64os`](../c64os) port is built on it. C64 OS's page map showed 30,976
+free bytes; what an app can actually have is less -- C64 OS loads an app over
+its own pages rather than refuse one, and that port's file has to end below
+`$5C00`, 21,248 bytes. See `NOTES.md`, *"THE TRIAL LINK"*, *"THE REU OVERLAY
+MANAGER"* and *"THE FILE WAS TOO BIG"*.
 
 The player's instructions are in [`README-release.txt`](README-release.txt).
 
@@ -54,8 +57,9 @@ are linked from `../c64/src`. Four things are this port's:
     `ovl_load` does nothing.
   * The shared code's `load_X(); f();` pairs still compile. The thunk on
     `f` does the swap now.
-  * It is the only machine-specific part. A C64 OS port would fill the REU
-    through C64 OS's file API and keep the rest.
+  * It is the only machine-specific part. The C64 OS port fills the REU
+    through C64 OS's files and REU banks and keeps the rest -- see
+    `../c64os/src/osovl.c`.
 * **Seven overlay groups**: view, panel, nav, time, turn, laser and torp.
   They are marked `OVL_CODE_REU` in the shared sources, a macro that is empty
   on every other port. Twenty overlays in all, each inside the 4K window.

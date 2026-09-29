@@ -13654,6 +13654,47 @@ title track on and advancing, effects starting in combat, `$01` = `$36` --
 and VICE's log shows its audio open. rig v9 records VICE's output to a WAV
 (`rig.py loudness`), so the next run says whether sound leaves the SID.
 
+**RESOLVED:** Jamie's speakers were muted. With them on, the music was
+choppy under `rig.py watch` and smooth under `rig.py play`: the WAV, recorded
+in emulated time, was clean all along, and the choppiness was the watch
+pausing VICE ten times a second through the monitor. Listen with `play`.
+
+### RELEASED, v0.23.0, 2026-09-28: THE .car, AND WHAT THE CUT FOUND
+
+**C64 OS APPS SHIP AS A `.car`**, and Jamie's installs confirmed how players
+use one: copied to //os/applications and double-clicked, or unpacked
+elsewhere and the folder moved in. `c64os/tools/mkcar.py` writes and reads
+the format, measured from the three third-party app archives on C64 OS 1.08's
+own volume -- a 48-byte header (type, "C64Archive", version 3, date, a
+30-character note), 22-byte records (D/S/P, lock, 24-bit size or child
+count, a 16-byte $A0-padded name, compression), and a trailer that turned out
+to be a plain CRC32 of everything before it, little-endian, on all three.
+The reader was proved to fail on a flipped byte first. The release is
+`egatrek-c64os.zip`: `egatrek.car` (lowercase, as all three samples are
+named -- it crosses a FAT card on its way) and README.txt. The folder it
+makes is `EGA Trek`. **C64 OS's own extractor unpacked the STAGED zip's
+`.car` on a fresh disk and the game ran from the folder it made** --
+`make release-test`, then Jamie: "works perfect".
+
+**THE CUT FOUND TWO BUGS OF MY OWN, both passing until build/ was wiped:**
+
+- `verify: $(CAR)` sat above `CAR = build/egatrek.car` in the Makefile, and
+  make expands a prerequisite list as it reads the rule -- so verify had no
+  prerequisites and passed only because the archive happened to exist.
+  `make release-clean` then ran it before anything was built.
+- **The installer's readback counted length in 16 bits.** Every game file is
+  under 64K; the `.car` is 102,523 bytes, read back as 36,987 -- exactly
+  64K short -- with the RIGHT sum, and failed three times. The file on the
+  disk was correct; the instrument could not see past 64K. The copier keeps
+  a third byte at $C3F6 now.
+
+**WHAT ELSE MOVED, measured against the published v0.22.0 by content:** the
+C128's `trek128` changed at the same length -- bisected in fresh worktrees to
+881d9e9, the `volatile` VDC registers, `c293d62d` -> `89153c48` -- and booted
+from the staged disk to its full title. The MSX2's disk image differs in 19
+bytes, all FAT volume serial and directory dates: every file on it is
+identical. Every other carried asset is identical in content.
+
 ## SCOPE: an MSX2 port (2026-09-19) -- RELEASED v0.22.0, 2026-09-25
 
 **RELEASED, the fourteenth port.** Jamie played the release disk on

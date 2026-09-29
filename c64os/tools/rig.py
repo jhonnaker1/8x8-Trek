@@ -154,6 +154,14 @@ def install(bundle, app):
         cur.append(it)
     lines.append(cur)
     data = "\n".join("%d data %s" % (350 + i, ",".join(l)) for i, l in enumerate(lines))
+    if not app:
+        # NO FOLDER: the files go into //os/applications itself, which is
+        # where a player puts a .car before double-clicking it -- the one
+        # test of a release that C64 OS's own extractor gets to take.
+        for line in ('80 print#15,"md:{APP}"', '90 print#15,"cd//os/applications/{APP}"'):
+            if line not in bas:
+                sys.exit("rig: install.bas no longer has %r" % line)
+            bas = bas.replace(line, line[:2] + " rem")
     bas = bas.replace("{APP}", app).replace("350 data {FILES}", data)
     open(os.path.join(FS8, "install.txt"), "w").write(bas)
     subprocess.check_call(["petcat", "-w2", "-o", os.path.join(FS8, "install"),
