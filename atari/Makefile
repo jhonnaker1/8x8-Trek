@@ -1,10 +1,10 @@
 # EGA Trek for the Atari 800XL + VBXE.
 #
-# Fifth port and, on the numbers, the TIGHTEST. VBXE's MEMAC window is mapped
-# INTO the 6502 address space -- vbxevid.c opens it at $2000, 8K -- so the
-# program gets $4000..$BFFF = 32,768 bytes, about 4.8K LESS than the C128,
-# which holds the whole game with 211 bytes spare. See NOTES.md, "SCOPE:
-# Atari 800XL + VBXE".
+# Fifth port and, on the numbers when it was built, the TIGHTEST. VBXE's
+# MEMAC window is mapped INTO the 6502 address space -- vbxevid.c opens it
+# at $2000, 8K -- so the program gets $4000..$BFFF = 32,768 bytes, about
+# 4.8K LESS than the C128, which holds the whole game with 211 bytes
+# spare. See NOTES.md, "SCOPE: Atari 800XL + VBXE".
 #
 # THE LOAD ADDRESS COMES FROM atari.ld, NOT FROM A FLAG. This comment used to
 # say "--start-addr 0x4000 IS NOT OPTIONAL" -- describing a flag this Makefile
@@ -19,7 +19,8 @@
 LLVM_MOS ?= $(HOME)/llvm-mos
 ATARICC   = $(LLVM_MOS)/bin/mos-atari8-dos-clang
 
-# THE TWO OPT-IN OVERLAYS, and this is the only port that turns them on.
+# THE TWO OPT-IN OVERLAYS, and this was the first port to turn them on (the
+# F256K and the two REU ports do too).
 # Both page code on the HOT PATH -- the enemy turn runs on essentially every
 # command and MOVE is the commonest thing a player types -- which is ruinous
 # where a swap is a disk read and costs milliseconds where it is a copy out of

@@ -311,7 +311,7 @@
    hurt. It cost the CoCo 3 a fortnight of failures read as other things.
 
    WHY NOT RETURN A STATUS AND LET THE CALLER DECIDE. It was written that way
-   first, and the X16 -- the tightest port -- OVERFLOWED ITS RAM BY 140 BYTES:
+   first, and the X16 -- then the tightest port -- OVERFLOWED ITS RAM BY 140 BYTES:
    eleven call sites each paying for a test, a branch and a call. No caller
    could have done anything with the answer anyway, so the cost bought
    nothing. The loader knows it failed; the loader says so. */

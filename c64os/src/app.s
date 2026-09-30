@@ -126,8 +126,10 @@ app_msgcmd:
 app_willquit:
     rts
 
-; C64 OS would call these from its event loop, which does not run while the
-; game plays. They are here because a layer must have them.
+; C64 OS calls these from its event loop, which does not run while the game
+; plays -- only once it is over, and then layer_draw is where app_exit's quit
+; request is made (see app_exit). The rest are here because a layer must have
+; them.
 layer_draw:
     lda     quit_pending        ; app_exit asked: see there
     beq     1f

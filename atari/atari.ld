@@ -20,8 +20,9 @@
  * what reported it, which is a long way from where the mistake was.
  *
  * WHAT IT COSTS: $4000..$BFFF is 32,768 bytes, about 4.8K LESS than the C128,
- * which holds this same game in 37,823 with 211 spare. That makes this the
- * tightest target in the project and it is why the FIRST thing built here was
+ * which holds this same game in 37,823 with 211 spare. That made this the
+ * tightest target in the project when it was built, and it is why the FIRST
+ * thing built here was
  * a measurement rather than a driver -- see tools/budget.py.
  *
  * $C000 up is the XL's OS ROM. BASIC at $A000 must be disabled, which is what
@@ -145,8 +146,8 @@ SECTIONS {
        READ-ONLY DATA GOES LOW TOO. .rodata is 2,161 bytes of tables and
        literals that never compete for anything except address space, and
        address space below $2000 is what dropping DOS bought. Moving it out
-       of $3000 is 2,161 more bytes of CODE on the tightest target in the
-       project -- which had 218 free without this.
+       of $3000 is 2,161 more bytes of CODE on what was then the tightest
+       target in the project -- which had 218 free without this.
 
        It is placed BEFORE .data so it sits at the bottom of the region, and
        so OUTPUT_FORMAT's second segment can be `$0A00 .. __rodata_end`: the

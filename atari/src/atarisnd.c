@@ -20,7 +20,7 @@
  *
  * The cost is one 32-bit divide per NOTE -- a handful of times a second, not
  * per tick -- and that is a trade this target can afford in time even though
- * it is the tightest in the project for space.
+ * it is tight for space.
  *
  * TWO VOICES OUT OF FOUR CHANNELS. Joining 1+2 and 3+4 uses all of POKEY, and
  * two voices is exactly what this seam exists for: music on one, effects on

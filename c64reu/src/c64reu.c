@@ -23,10 +23,10 @@
  * call. The first call does the one-time load instead; main() makes it,
  * before any overlay has run, so the window is free.
  *
- * THE LOOP BELOW IS THE ONLY PART THAT IS THIS MACHINE'S. A C64 OS port
- * would fill the REU through C64 OS's file API, into banks C64 OS allocates
- * it, and keep the thunks and reu_xfer as they are -- which is why the
- * manager is in its own file. */
+ * THE LOOP BELOW IS THE ONLY PART THAT IS THIS MACHINE'S. The C64 OS port
+ * (../c64os/src/osovl.c) fills the REU through C64 OS's files, into banks C64
+ * OS allocates it, and keeps the thunks and reu_xfer as they are -- which is
+ * why the manager is in its own file. */
 
 #define DEV      8
 #define LFN_OVL  1

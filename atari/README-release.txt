@@ -42,8 +42,8 @@ THERE IS NO DOS ON THIS DISK
 Atari's DOS is Atari's, so a disk carrying it would not be ours to give away.
 This one carries its own boot record and its own directory instead, and talks
 to the drive through SIO directly. That also freed $0700-$1FFF, which is
-where the program's data now lives -- on the tightest target in this project,
-that is the difference between fitting and not.
+where the program's data now lives -- and on this machine that is the
+difference between fitting and not.
 
 The disk holds:
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Cut the overlay images out of the link and pack them into OVERLAYS.BIN.
 
-PACKED BY ACTUAL SIZE, NOT PADDED TO THE WINDOW, which every other port does.
+PACKED BY ACTUAL SIZE, NOT PADDED TO THE WINDOW, as the X16, the MEGA65 and
+the two REU ports pad theirs.
 Thirteen windows of 4,608 is 59,904 bytes, and with the string pool and the
 music ahead of it in the far store that is 67,600 -- past the 65,535 the
 seam's 16-bit offsets can address. It overflowed silently once and the tail of

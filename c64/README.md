@@ -118,6 +118,7 @@ would cost an interrupts-off bank switch.
 The same game with its overlays in an REU instead of on the disk, and twice
 as fast once started, is its own port: [`../c64reu`](../c64reu). It links
 this port's `c64mem.c` and `c64log.c` and changes nothing here.
+That port made into a C64 OS application is [`../c64os`](../c64os).
 
 ## Watch out for
 

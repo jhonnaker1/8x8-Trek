@@ -220,8 +220,9 @@ half at a time. What a machine actually has to carry is **enough colour** —
 and, as of 2026-09-14, that no longer separates the candidates either. See
 *What is left* below.
 
-**Released, in the order they shipped.** The C64, the ST, the IIgs and the
-Plus/4 page the console across 40-column halves; every other port puts it on
+**Released, in the order they shipped.** The C64, the ST, the IIgs, the
+Plus/4, the C64 with an REU and C64 OS page the console across 40-column
+halves; every other port puts it on
 an 80-column grid of per-cell colour, which is the shape it was designed on.
 
 | Platform | Display | CPU | Status |
@@ -564,7 +565,7 @@ is ordered by **what each actually costs**, cheapest first:
    mode is real: 80×25 with per-cell foreground and background from 1024
    colours, confirmed on hardware emulation including that all twenty-five rows
    fit — and now confirmed again by this port's own first light. It is last
-   because it has **the tightest code budget of any target**: VBXE's VRAM
+   because its **code budget is smaller than the game**: VBXE's VRAM
    window occupies part of the 6502 address space, and even narrowed to 4K at
    `$2000–$2FFF` that leaves 36,864 bytes against the 37,612 the C128 build
    needs. More code has to move into overlays than on any port yet built. It

@@ -7570,6 +7570,14 @@ no concept for that yet. Introduce one deliberately:
 
 ### Would an REU help? No -- asked and answered
 
+**CORRECTED 2026-09-29, by a port that disproves it.** The reasoning below --
+that an REU "does nothing about the 81% that is code" -- was wrong. It need
+not execute code to help with code: `c64reu/` keeps twenty CODE overlays in an
+REU and swaps each into a 4K window by DMA, about 4ms a swap, which let one
+overlay call another and took the C64 build from 40,856 bytes resident to
+21,823. The answer for the C128 in August still stands on its other grounds
+(bank 1 and the VDC's spare RAM are on every C128; an REU is not).
+
 An REU is a DMA store and **the 8502 cannot execute from it**. It moves data
 between main RAM and expansion RAM, and data is 2% of our problem. It does
 nothing about the 81% that is code.
@@ -12833,7 +12841,11 @@ discrepancy that was not there. **Mixing two builds' output is its own way of
 seeing nothing**, and the tell was a rebuild that shifted every address by the
 two bytes an added `.init` section had cost.
 
-## SCOPE: a C64 OS port (2026-09-19) -- A RECORD, NOT A CANDIDATE
+## SCOPE: a C64 OS port (2026-09-19) -- A RECORD THEN; BUILT AND RELEASED IN v0.23.0
+
+**Since:** Jamie asked for it on 2026-09-26 and it shipped as v0.23.0's
+sixteenth port -- see "C64 OS PORT" below. What follows is the record as it
+stood on 2026-09-19.
 
 Asked for by Jamie the day after the port list closed, and it is filed on the
 same footing as everything else on that closed list: **nothing here is a reason
@@ -13206,7 +13218,12 @@ input model does not transfer either: uno rewrote its game as a state machine
 driven by key events, which it can because its `main.c` is its own. EGA
 Trek's `ui.c` is shared and blocks in `kb_waitkey()`.
 
-### THE TRIAL LINK, 2026-09-26: WITH REU OVERLAYS IT FITS, WITH ~7,200 SPARE
+### THE TRIAL LINK, 2026-09-26: WITH REU OVERLAYS IT LINKED, ~7,200 UNDER A LIMIT THAT WAS NOT THE REAL ONE
+
+**Superseded 2026-09-28:** the spare below was measured against 30,976 bytes,
+C64 OS's free pages as the probe saw them. C64 OS loads an app over its own
+pages rather than refuse it, and the real ceiling was `$5C00`, 21,248 bytes --
+see "THE FILE WAS TOO BIG". The link below is still the shape that shipped.
 
 Asked for by Jamie after the section above. The 37,518 was the best split
 **under the disk-overlay rules**, which exist because a load from a 1541

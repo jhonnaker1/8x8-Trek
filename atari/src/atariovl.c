@@ -30,12 +30,13 @@
  * not a space optimisation for its own sake -- it is what makes this port fit
  * at all.
  *
- * Every other port pads each image to the window and indexes the file as
- * `which * OVL_SIZE`. Thirteen windows of 4,608 is 59,904 bytes, and with the
- * string pool and the music ahead of it in the far store that is 67,600 --
- * past the 65,535 the seam's 16-bit offsets can address. It overflowed
- * SILENTLY: the tail of the images landed on the string pool and the game drew
- * every panel with no text in it. See the guard in src/atarimem.c.
+ * The X16, the MEGA65 and the two REU ports give each image a window-sized
+ * slot and index it as `which * OVL_SIZE`. Thirteen windows of 4,608 is
+ * 59,904 bytes, and with the string pool and the music ahead of it in the
+ * far store that is 67,600 -- past the 65,535 the seam's 16-bit offsets
+ * can address. It overflowed SILENTLY: the tail of the images landed on the
+ * string pool and the game drew every panel with no text in it. See the
+ * guard in src/atarimem.c.
  *
  * Packed, the same thirteen are 36,444 bytes. That is 23,460 bytes of VRAM and
  * 188 disk sectors back, and one fewer thing that can quietly wrap.

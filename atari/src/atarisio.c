@@ -33,8 +33,8 @@
  * FORMAT, rather than by nobody having tried it.
  *
  * TWO SECTORS OF DIRECTORY, ONE BUFFER. dirbuf holds whichever sector was read
- * last and dir_sec says which -- 128 bytes rather than 256, on the port with
- * the tightest budget in the project.
+ * last and dir_sec says which -- 128 bytes rather than 256, on a port with
+ * a budget this tight.
  */
 #include <stdint.h>
 #include <string.h>

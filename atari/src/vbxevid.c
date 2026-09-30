@@ -65,8 +65,8 @@
  * Uno put its screen at $01000 and its font at $00800 and paid a bank
  * select on every write. Putting the screen at zero instead means every
  * scr_* call is a plain store into the window with no register write at
- * all, which on the tightest target in the project is both the fast answer
- * and the small one. */
+ * all, which on a target this tight is both the fast answer and the small
+ * one. */
 #define VRAM_SCREEN_BANK 0
 #define VRAM_XDL_OFF     0x0FA0
 #define VRAM_XDL_ADDR    0x00FA0L
@@ -411,8 +411,8 @@ static unsigned char ascii_to_screencode(char c) {
 /* NOINLINE ON EVERY scr_* ENTRY POINT, AND IT WAS MEASURED, NOT ASSUMED.
  * ui.c calls these from hundreds of sites and -Oz still inlined the address
  * arithmetic into a good many of them; pinning them down is worth 242 bytes
- * of resident space on the tightest target in the project. It is not worth
- * anything on a roomy one, which is why no other port does it.
+ * of resident space here. The other tight 6502 builds do the same -- vic.c,
+ * ted.c, f256vid.c and C64 OS's osvid.c; it buys nothing on a roomy one.
  *
  * WHAT IT DOES NOT BUY BACK is the other 3,000. Replacing the stubs with
  * this driver cost 4,636 bytes in the early link against the driver's own

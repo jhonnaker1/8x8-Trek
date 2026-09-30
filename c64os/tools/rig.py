@@ -5,9 +5,19 @@
                                          ("name,type" per line; the default is
                                          main.o, menu.m, about.t) to
                                          //os/applications/APP on the work
-                                         disk and verify every byte
+                                         disk and verify every byte; APP ""
+                                         puts them in //os/applications
+                                         itself, where a player puts a .car
     rig.py watch [--wait=S] [--quiet=S]  boot at 1x for Jamie's double-click and
-                                         print every screen the app draws
+                                         print every screen the app draws, the
+                                         startup stages, the first four REU
+                                         transfers, C64 OS's exceptions, each
+                                         key and the sound driver's state
+    rig.py play                          boot with NOTHING attached, to be
+                                         heard: the watch's polling pauses VICE
+                                         and chops the music
+    rig.py loudness                      peak level of build/sound.wav, which
+                                         every boot records, second by second
     rig.py boot [--key=HEX,HEX..] [--wait=S] [--jam] [--human]
                                          boot C64 OS, find the probe's record,
                                          and print what the running system
