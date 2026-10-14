@@ -65,6 +65,11 @@ WHAT IS IN THE FOLDER
 
 SAVE writes EGATREK.SAV beside them, so the folder must not be read-only.
 
+RUNNING IT FROM A FLOPPY needs v0.23.1 or later. Before that, the sound
+driver switched the floppy drive off as the music started, so the first file
+read failed with "Drive A: is not responding". Played on a real 520 STE from a
+720K floppy since the fix.
+
 
 ABOUT THIS PORT
 

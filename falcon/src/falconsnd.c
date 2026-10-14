@@ -60,14 +60,21 @@
 
 /* MIXER BITS ARE ACTIVE LOW, AND TWO OF THEM ARE NOT THE MIXER AT ALL.
  * Bits 0-2 enable tones A/B/C and 3-5 the noise generators, a 0 enabling in
- * both cases. Bits 6 and 7 are the PSG's PORT DIRECTION, and on this machine
- * port A drives floppy select, side select and the printer strobe -- so bit 7
- * MUST stay 1 (port A output) or the drive stops answering. Writing 0x00 here
- * to "turn everything off" is the classic way to lose the floppy.
+ * both cases. Bits 6 and 7 are the PSG's PORT DIRECTION, 1 for output: bit 6
+ * is port A and bit 7 port B (NetBSD's atari/dev/ym2149reg.h: PA_OUT 0x40,
+ * PB_OUT 0x80). Port A drives floppy side select, drive select and the
+ * printer strobe, so BIT 6 MUST STAY 1 or the floppy stops answering.
  *
- * 0xBC: port A out, port B in, all three noise channels off, tone C off. Then
- * clearing bit 0 enables the music voice and bit 1 the effects voice. */
-#define MIX_BASE  0xBC
+ * THIS COMMENT ONCE SAID BIT 7, and the mixer was 0xBC: port A an INPUT.
+ * Every test ran the game from Hatari's GEMDOS drive, which needs no drive
+ * select, so nothing failed until Jamie ran it from a floppy on his 520 STE:
+ * the first file read after snd_init got "Drive A: is not responding".
+ *
+ * So the direction bits are TOS's own, read back at snd_init, with port A
+ * forced out. MIX_SND is all three noise channels and tone C off; clearing
+ * bit 0 then enables the music voice and bit 1 the effects voice. */
+#define MIX_PA_OUT 0x40
+#define MIX_SND    0x3C
 
 /* The PSG clock, MEASURED (see the header). A note's period is
    clock / (16 * Hz), and the track format is tens of Hz. */
@@ -75,7 +82,8 @@
 #define PERIOD_MAX  4095U          /* 12 bits, and 90Hz wants 1389 */
 
 static unsigned char enabled = 1;
-static unsigned char mixer = MIX_BASE | 0x03;   /* both voices silent */
+static unsigned char mix_base = MIX_PA_OUT | MIX_SND;
+static unsigned char mixer = MIX_PA_OUT | MIX_SND | 0x03;   /* both voices silent */
 
 static unsigned int  mus_base, mus_head, mus, sfx;
 static unsigned char mus_ok, mus_on, sfx_on;
@@ -122,7 +130,8 @@ static void voice_note(unsigned char v, unsigned char tenths)
 
 void snd_init(void)
 {
-    mixer = MIX_BASE | 0x03;
+    mix_base = (unsigned char)((Giaccess(0, R_MIXER) & 0xC0) | MIX_PA_OUT | MIX_SND);
+    mixer = mix_base | 0x03;
     PSG_W(R_MIXER, mixer);
     PSG_W(R_A_VOL, 0);
     PSG_W(R_B_VOL, 0);

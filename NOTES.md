@@ -14484,3 +14484,36 @@ MSX2 disk is `cc5947dc5e0fb88f` (SHA-1), the composition, read out of the
 image's own FAT; and the STAGED disk, unzipped and booted with the README's
 command line, drew the title and the console.
 
+
+## THE ST ON A REAL 520 STE: the sound driver switched the floppy off (2026-10-14, v0.23.1)
+
+**The first EGA Trek port on real Atari hardware**, and the first run failed.
+Jamie's machine is a 520 STE with 4MB. He wrote a raw 720K `.st` image to a
+floppy with a USB drive on the Mac. The image was made the way TOS formats a
+disk: 9 sectors, 2 sides, two FATs of 5 sectors, 112 root entries, a random
+serial at bytes 8-10, plain 8.3 entries and no VFAT. mtools added long-name
+entries even with `MTOOLS_NO_VFAT=1`, so the image was written directly. The
+desktop listed A:, `EGATREK.PRG` loaded, and then: *Drive A: is not
+responding*, and a lock-up.
+
+**The disk was fine. The cause was `falcon/src/falconsnd.c`.** `MIX_BASE` was
+`0xBC`, which clears R7 bit 6. **Bit 6 is port A's direction and bit 7 port
+B's**: NetBSD's `atari/dev/ym2149reg.h` defines `PA_OUT 0x40` and
+`PB_OUT 0x80`. Port A is the floppy's side select and drive select, so
+`snd_init` made it an input and the drive dropped off the bus. **The comment
+above it said "bit 7 MUST stay 1 (port A output)"**: the trap was known, and
+the bit number was wrong. `falcon/README.md` repeated the claim.
+
+**Why nothing caught it.** Hatari does not model the PSG's port direction.
+Every run had used its GEMDOS drive, which needs no drive select. Booting
+the floppy image in Hatari under TOS 2.06 and EmuTOS passed as well, with the
+bug still in. **So the emulator-from-floppy test I ran before handing Jamie
+the disk could not have failed** (instrument #74's shape). The only instrument
+that sees this is the chip read back. `make sndtest` now prints FAIL when R7
+bit 6 is clear, and it was proved both ways: `$BE` on the old driver, `$FE`
+on the fix.
+
+**The fix:** `snd_init` reads R7 through `Giaccess`, keeps TOS's bits 6-7 and
+forces `0x40`. On the STE that gives `$FE`: port B's bit is TOS's, port A is
+out. **Confirmed on the real 520 STE the same day.** The Falcon shares the
+driver and had the same bug. It has still never run on real hardware.

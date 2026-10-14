@@ -104,6 +104,10 @@ int main(void)
     say("");
     say("   R7 bit 0 CLEAR = channel A tone on (the bits are active low).");
     say("   R8 zero = silent however good the period is.");
+    /* Hatari ignores the port direction, so only this can catch it: with
+       bit 6 clear, port A is an input and a real ST loses its floppy. */
+    say((PSG_R(7) & 0x40) ? "   R7 bit 6 SET: port A out (floppy)."
+                          : "   FAIL: R7 bit 6 CLEAR, port A is IN.");
     say("");
     say("Press a key.");
     Cconin();

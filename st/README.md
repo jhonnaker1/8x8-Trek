@@ -15,6 +15,17 @@ the desktop pixels it had saved under the pointer — the game painted the cell
 and an interrupt painted over it. `$A00A` hides it; `$A009` gives it back on
 the way out. Fixed before the port shipped.
 
+**And it runs on a real 520 STE** (4MB, from a floppy), since v0.23.1 —
+2026-10-14, the first EGA Trek port on real Atari hardware. **The first try
+failed**: the desktop listed the disk, the program loaded, and the next file
+read got *Drive A: is not responding*. The shared sound driver
+(`falcon/src/falconsnd.c`) wrote `0xBC` to the mixer, clearing R7 bit 6 —
+port A's direction, and port A is the floppy's drive and side select. Its
+comment said bit 7. **Hatari does not model the port direction**, so every
+emulated run passed, from the GEMDOS drive and from a floppy image alike.
+`make sndtest` now reads R7 back and prints FAIL if bit 6 is clear: red
+(`$BE`) on the old driver, green (`$FE`) on the fix.
+
 ```sh
 make            # build/EGATREK.PRG + the three data files
 make verify     # the cheap gate, no emulator: what `make ports` runs

@@ -35,6 +35,10 @@ GEMDOS, so they are looked for in the current directory -- double-clicking
 EGATREK.PRG from the folder it lives in is what you want. (The Amiga port
 finds its files through PROGDIR: and does not care; this one does.)
 
+FROM A FLOPPY, use v0.23.1 or later. Before that, the sound driver switched
+the floppy drive off as the music started -- found when the ST port, which
+shares it, was run from a floppy on a real STE.
+
 FOUR FILES, and the game reads them at startup:
 
     EGATREK.PRG    the program

@@ -136,10 +136,18 @@ fixed rate, so the tempo would wander with whatever the game was doing. The
 C128 and MEGA65 both lost time to a tempo bug.
 
 **Two mixer bits are not the mixer.** Bits 6 and 7 of R7 are the PSG's port
-direction, and on this machine port A drives floppy select, side select and
-the printer strobe — so bit 7 must stay 1 or the drive stops answering.
-Writing `0x00` there to "turn everything off" is the classic way to lose the
-floppy.
+direction, 1 for output — **bit 6 is port A** and bit 7 port B. Port A drives
+floppy side select, drive select and the printer strobe, so bit 6 must stay 1
+or the drive stops answering.
+
+**This paragraph said bit 7 until v0.23.1**, and the driver wrote `0xBC`:
+port A an input. Hatari does not model the port direction, and every run here
+was from its GEMDOS drive, so nothing failed until Jamie ran the ST port —
+which shares this driver — **from a floppy on a real 520 STE**: the first file
+read after the music started got *Drive A: is not responding*. `snd_init` now
+keeps TOS's own direction bits and forces port A out, and the ST's
+`make sndtest` reads R7 back and fails if bit 6 is clear — the one instrument
+that can see it.
 
 ## SAVE and restore, witnessed
 
@@ -207,7 +215,9 @@ fail.**
 
 **All five are closed and the list is empty.** The one thing this port has
 never had is a second pair of hands: it has been played once, by Jamie, on an
-emulated Falcon under Hatari. Nobody has run it on real hardware, and the VGA
+emulated Falcon under Hatari. Nobody has run it on real hardware — though the
+ST port, which shares its sound driver, found on a real STE that the driver
+switched the floppy off, fixed in v0.23.1 (see the sound section). The VGA
 mode follows VgetMonitor(): 640x480 on VGA, 640x400 interlaced on RGB and
 TV (which flickers, being interlaced), and a refusal on ST monochrome, which
 would need a one-plane driver rather than another mode. All four checked under
