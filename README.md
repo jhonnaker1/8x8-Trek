@@ -13,9 +13,11 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs**, the
 > **Commodore Plus/4**, the **Foenix F256K**, the **MSX2**, the **Commodore 64
 > with an REU** and **C64 OS** are feature complete and released as
-> [v0.23.1](../../releases/latest), 2026-10-14 — a patch to v0.23.0 that
-> stops the Atari ST and Falcon sound driver switching the floppy drive off,
-> found by the ST's first run on a real 520 STE.
+> [v0.23.2](../../releases/latest), 2026-10-21. Two patches to v0.23.0 came
+> from first runs on real hardware: v0.23.1 stops the Atari ST and Falcon
+> sound driver switching the floppy drive off (a real 520 STE), and v0.23.2
+> lets the X16 port find its files in a subdirectory and quit to a readable
+> BASIC (an OtterX, an X16-compatible machine).
 > **The two new ones are one game in two shapes.** The **C64 with an REU** is
 > the C64 port with its twenty overlays in an REU, where one overlay may call
 > another, so the engine and the console drawing leave resident memory —
@@ -230,7 +232,7 @@ an 80-column grid of per-cell colour, which is the shape it was designed on.
 | Platform | Display | CPU | Status |
 |---|---|---|---|
 | **Commodore 128** (VDC) | 80×25 text, 16 colours per cell | 8502 | **Released** — [v0.15.0](../../releases/latest); the first port, and the one the others are a diff against. See [`c128/README.md`](c128/README.md) |
-| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.15.0](../../releases/latest); see [`x16/README.md`](x16/README.md) |
+| **Commander X16** | VERA text 80×60, per-cell fg+bg from 256 | 65C02 | **Released** — [v0.15.0](../../releases/latest). **Runs on an OtterX** (X16-compatible) from an SD card subdirectory since v0.23.2. See [`x16/README.md`](x16/README.md) |
 | **Amiga** (OCS/ECS, KS2.0+) | 640×256 bitmap, 16 colours | 68000 | **Released** — [v0.15.0](../../releases/latest); see [`amiga/README.md`](amiga/README.md) |
 | **MEGA65**, native C65 mode | 80×25, VIC-IV H640, colour on all 2000 cells | 45GS02 | **Released** — [v0.15.0](../../releases/latest); one D81, see [`mega65/README.md`](mega65/README.md) |
 | **Atari 800XL + [VBXE](https://vbxe.atari.org/)** | 80×25 text, per-cell fg+bg from 1024 colours | 6502 | **Released** — [v0.15.0](../../releases/latest). A **self-booting disk with no Atari DOS on it**: its own boot record and directory, SIO underneath. **About two minutes to load on a stock 1050**, seconds on an emulator or a fast-SIO drive; see [`atari/README.md`](atari/README.md) |

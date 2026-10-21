@@ -17,8 +17,20 @@ inside it, so that HostFS can see them:
     cd egatrek-x16
     x16emu -prg trekx16.prg -run
 
-On real hardware, copy the whole folder to the SD card and LOAD "TREKX16.PRG"
-from that directory.
+On real hardware, copy the whole folder to the SD card, then CHANGE INTO IT
+before loading -- the game opens its files from DOS's current directory, and
+loading the program by its path does not change that. If the folder is
+GAMES/EGATREK-X16:
+
+    DOS"CD:GAMES"
+    DOS"CD:EGATREK-X16"
+    LOAD"TREKX16.PRG"
+    RUN
+
+Run on an OtterX from a folder two levels down, SAVE and restore included.
+Versions before v0.23.2 could not find OVERLAYS.BIN in any folder but the
+card's root on that machine's ROM, and on every X16 they left the screen
+unreadable after quitting to BASIC.
 
 ALL FIVE FILES ARE REQUIRED and the game reads them at startup:
 

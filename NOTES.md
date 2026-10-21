@@ -14517,3 +14517,47 @@ on the fix.
 forces `0x40`. On the STE that gives `$FE`: port B's bit is TOS's, port A is
 out. **Confirmed on the real 520 STE the same day.** The Falcon shares the
 driver and had the same bug. It has still never run on real hardware.
+
+## THE X16 ON A REAL OTTERX: a drive prefix and an unreadable quit (2026-10-21, v0.23.2)
+
+**The X16 port's first run on real hardware.** The machine is Jamie's OtterX,
+an X16-compatible kit; its ROM reports `git 67d01662`, which is in neither
+X16Community/x16-rom nor any of its forks. The folder was
+`GAMES-JAMIE/egatrek-x16`, reached by two `DOS"CD:..."` commands, and LOAD
+worked. **Two bugs, and HostFS could see neither**, because it serves
+device 8 from a host directory without running CMDR-DOS.
+
+**1. OVERLAYS.BIN IS MISSING.** `x16storage.c` built names as
+`0:NAME,S,R`, the form that came over from the C128. A BASIC probe on the
+OtterX separated the parts. In the subdirectory, `0:OVERLAYS.BIN,S,R` gave
+62 FILE NOT FOUND, while `OVERLAYS.BIN,S,R` and `OVERLAYS.BIN` both gave
+00 OK. x16emu's R48 with `-sdcard` accepts all three, so this ROM differs.
+The probe was checked both ways in the emulator first: 00 inside the folder
+and 62 at the root. The fix drops the drive prefix from every name, including
+the scratch (`S:NAME`). The storage self-test passes from the nested folder
+on an SD image, and its file lands in that folder.
+
+**First, a wrong lead.** Before Jamie described his steps, I reproduced the
+same error by LOADing the program by path from the root. That also leaves
+DOS's current directory where it was, and it is a real trap worth
+documenting (the release README now spells out `CD`). But it was not his
+bug: he had changed directory. **Reproducing a symptom is not reproducing
+the user's steps.**
+
+**2. Quitting left BASIC unreadable.** The screen showed PETSCII graphics on
+the EGA palette's brown, in double-height rows, because `vdc_shutdown()`
+only cleared. x16emu shows this too; no test had ever quit to BASIC and
+looked at the result. The fix calls CINT (`$FF81`), which reloads the
+charset, the palette and the NVRAM display profile. The editor's mode byte
+at `$0372` reads 2 at power-on and 2 after the quit. A hand-written save and
+restore of the palette, VSCALE and charset also worked, but it cost
+146 bytes of low RAM. **`make verify` caught that**: the soft stack's
+headroom fell from 153 bytes to 7, against a measured demand of 86. CINT
+costs 3 bytes. The fix was proved both ways with the autoplay table extended
+past the farewell, built in a scratch worktree: the old driver left graphics
+on brown, the new one a blue READY.
+
+**The SD card rig:** take x16emu's own `sdcard.img.zip`, place files with
+mtools at `sdcard.img@@1048576`, type commands with `-bas` (it drops its
+first line), and capture the last frame with `-gif` plus ffmpeg. Confirmed
+on the OtterX: load, play, SAVE and restore, and quit.

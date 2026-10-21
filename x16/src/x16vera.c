@@ -123,6 +123,26 @@ static unsigned long cell_addr(unsigned char x, unsigned char y) {
    address in this file are unaffected. */
 static void stretch_rows(void) { VERA_DC_VSCALE = VSCALE_2X; }
 
+/* WHAT THE GAME CHANGES, PUT BACK ON THE WAY OUT. Until 2026-10-21 shutdown
+ * only cleared the screen, so quitting left BASIC drawing through the PETSCII
+ * graphics charset, in double-height rows, on the EGA palette's brown -- an
+ * unreadable READY. Jamie saw it on his OtterX; x16emu shows it too, it was
+ * just never quit to BASIC and looked at.
+ *
+ * CINT ($FF81) IS THE WHOLE FIX: the screen editor's own initialisation --
+ * R48 kernal/cbm/editor.s `cint` -- reloads the default charset and palette,
+ * takes the display registers (scale included) back from the NVRAM profile,
+ * and clears. Saving and restoring the palette, scale and charset by hand was
+ * tried first and worked, but cost 146 bytes of low RAM and took the soft
+ * stack's headroom from 153 bytes to 7 against a measured 86. One jsr costs
+ * nothing, and the ROM -- not this file -- knows what "the default" is on a
+ * machine whose ROM is not R48. The editor comes back in PETSCII upper-case
+ * -- mode byte $0372 reads 2, exactly what it reads at power-on (measured in
+ * x16emu R48 before and after a quit). */
+static void reset_screen_editor(void) {
+    __asm__ volatile("jsr $FF81\n" ::: "a", "x", "y", "memory", "p");
+}
+
 void vdc_init(void) {
     /* GOLDEN RAM IS OUTSIDE .bss, SO THE CRT DOES NOT ZERO IT. x16.ld moves
        io_buf and the hall-of-fame table to $0400..$07FF to reclaim 906 bytes
@@ -145,6 +165,7 @@ void plat_exit(void) { }
 
 void vdc_shutdown(void) {
     scr_clear();
+    reset_screen_editor();
 }
 
 /* Waits one frame, off the KERNAL's jiffy clock.

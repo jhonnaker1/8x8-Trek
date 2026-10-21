@@ -16,10 +16,18 @@
  * the sequence below is the one a wrapper would have run regardless.
  *
  * Device 8, and the caller's opaque token becomes a CBM DOS filename here and
- * nowhere else. `0:` selects drive 0 of the unit -- a 1541 has only one drive
- * but wants the prefix anyway, and a 1571 or an SD2IEC needs it. `,S,R` and
- * `,S,W` name a SEQuential file opened for Read or Write; without the type
- * the DOS guesses, and what it guesses for a write is a PRG.
+ * nowhere else. `,S,R` and `,S,W` name a SEQuential file opened for Read or
+ * Write; without the type the DOS guesses, and what it guesses for a write is
+ * a PRG.
+ *
+ * NO `0:` DRIVE PREFIX, and that is measured. The C128 code this came from
+ * writes `0:NAME`, and it went into this port unchanged. On Jamie's OtterX
+ * (an X16-compatible machine whose ROM reports `git 67d01662`), inside a
+ * subdirectory of the SD card, `0:OVERLAYS.BIN,S,R` answered 62 FILE NOT
+ * FOUND while `OVERLAYS.BIN,S,R` answered 00 OK. The R48 ROM in x16emu
+ * accepts both, and HostFS never runs CMDR-DOS at all, so no emulated run
+ * could see it. Without a prefix the DOS uses its current partition AND its
+ * current directory, which is what `DOS"CD:..."` set.
  *
  * Rewriting an existing file is a SCRATCH followed by a fresh create, not a
  * `@` replace -- see scratch() below, where the measurement that settled that
@@ -35,7 +43,7 @@
 #define LFN_DATA 2
 #define LFN_CMD  15
 
-/* Long enough for "0:" + a 16-character CBM name + ",S,W" + NUL. */
+/* Long enough for a 16-character CBM name + ",S,W" + NUL, with room over. */
 static char fname[24];
 
 /* SETBNK, and it is NOT optional on this machine.
@@ -60,8 +68,8 @@ static char fname[24];
 static const char *cbm_name(const char *name, char mode) {
     char *p = fname;
 
-    /* No '@' -- see scratch() above for why replace is not used. */
-    *p++ = '0'; *p++ = ':';
+    /* No '@' -- see scratch() above for why replace is not used -- and no
+       `0:` prefix, for the reason in the header. */
     strcpy(p, name);
     p += strlen(name);
     *p++ = ','; *p++ = 'S';
@@ -163,7 +171,7 @@ static void scratch(const char *name) {
     char cmd[20];
     char *p = cmd;
 
-    *p++ = 'S'; *p++ = '0'; *p++ = ':';
+    *p++ = 'S'; *p++ = ':';         /* no drive number: see the header */
     strcpy(p, name);
     cmd_send(cmd);
     (void)cmd_status();          /* consume it; the value is not interesting */

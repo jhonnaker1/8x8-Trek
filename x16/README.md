@@ -1,7 +1,7 @@
 # EGA Trek — Commander X16
 
-Second port, **released in v0.10.0** and shipping in
-[v0.13.2](../../../releases/latest). The modern 8-bit machine: a 65C02, a
+Second port, **released in v0.10.0**, and since v0.23.2 **run on real
+hardware** -- an OtterX, below. The modern 8-bit machine: a 65C02, a
 CBM-compatible KERNAL, and VERA — a video chip with per-cell foreground and
 background colour, so the nine-panel console renders as designed with no
 mapping.
@@ -195,6 +195,34 @@ against 440, and a duty cycle reading 49.7% against 50. Those say the numbers
 agree with each other. They cannot say the music sounds like music, and this
 port had been a full octave flat for four months without any measurement
 noticing, because every measurement was of the thing that was wrong.
+
+## On real hardware: an OtterX (2026-10-21, v0.23.2)
+
+Jamie ran it on his **OtterX**, an X16-compatible kit whose ROM reports
+`git 67d01662`, from `GAMES-JAMIE/egatrek-x16` on the SD card. Two bugs, and
+**x16emu could see neither through HostFS** -- which bypasses CMDR-DOS
+entirely and starts in the game's folder:
+
+* **OVERLAYS.BIN IS MISSING.** `x16storage.c` named files `0:NAME,S,R`, the
+  C128's form. On the OtterX, inside a subdirectory, his BASIC probe got
+  `62, FILE NOT FOUND` for `0:OVERLAYS.BIN,S,R` and `00, OK` for
+  `OVERLAYS.BIN,S,R` and `OVERLAYS.BIN`. x16emu's R48 accepts all three. No
+  drive prefix now, for reading, writing and the scratch before a write.
+* **Quitting left BASIC unreadable** -- PETSCII graphics, the EGA brown,
+  double-height rows -- because `vdc_shutdown()` only cleared. It now calls
+  CINT (`$FF81`), which reloads the charset, palette and display profile. A
+  hand save-and-restore worked too but cost 146 bytes of low RAM and took the
+  soft stack from 153 bytes of headroom to 7; `make verify` caught it. x16emu
+  showed this one as well; nothing had ever quit to BASIC and looked.
+
+**`x16emu -sdcard` DOES run the ROM's CMDR-DOS**: the emulator's own
+`sdcard.img.zip` template, with files placed by mtools at
+`sdcard.img@@1048576` and commands typed with `-bas` (its first line is
+dropped -- lead with a blank one). That is the rig for anything about the SD
+card. Confirmed on the OtterX: load, play, SAVE and restore, and quit.
+
+**On real hardware, CD into the folder first** -- loading the program by path
+leaves DOS's current directory where it was, and the game looks there.
 
 ## What is open
 

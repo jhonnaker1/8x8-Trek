@@ -207,7 +207,13 @@ the `.d81` on the SD card and mount it the same way.
 
 Unzip first and run it **from the unzipped folder** — `OVERLAYS.BIN`,
 `STRINGS.DAT`, `MUSIC.DAT` and `BRIEF.TXT` are opened by bare name from the
-current directory. Needs the emulator's own `rom.bin`. Real hardware works.
+current directory. Needs the emulator's own `rom.bin`.
+
+**On real hardware, `CD` into the folder first** — `DOS"CD:EGATREK-X16"`, then
+`LOAD"TREKX16.PRG"` and `RUN`. Loading it by path from elsewhere leaves DOS's
+current directory where it was, and the game looks there. Run on an OtterX
+from a folder two levels down; before v0.23.2 that machine's ROM could not find
+`OVERLAYS.BIN` anywhere but the root of the card.
 
 ### `egatrek-atari.atr` — Atari 800XL **+ VBXE**
 
