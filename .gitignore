@@ -37,6 +37,8 @@ falcon/src/music_data.h
 falcon/src/music_data.c
 coco3/src/music_data.h
 coco3/src/music_data.c
+mac/src/music_data.h
+mac/src/music_data.c
 
 # cmoc's intermediate 6809 assembly. It writes <basename>.s beside its output
 # and removes it on success, so a run from the repository ROOT clobbers

@@ -1,6 +1,6 @@
 # How to run each one
 
-Twenty-two assets, sixteen machines. Every port plays the same game from the same
+Twenty-three assets, seventeen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Six assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The ten `.zip` assets carry theirs inside as `README.txt`.
+put one. The eleven `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -500,6 +500,43 @@ into the V9938 and the console drawn in 6×8 cells; a full console takes about
 two seconds. Sound is the PSG, music on one channel and effects on another.
 `MSXDOS2.SYS` is MSX-DOS 2 as Nextor distributes it, included under
 `NEXTOR-LICENSE.txt` beside the disk — free of charge and not for sale.
+
+### `egatrek-mac.zip` — colour Macintosh
+
+**A Mac with Color QuickDraw and 32-Bit QuickDraw** (built into System 7; an
+extension on System 6.0.x), **a 640×480 screen set to 16 colours or more**, and
+768K for the program. The zip holds two copies of one application:
+
+- `egatrek.dsk` — an 800K floppy image with nothing on it but the application.
+  Mount it beside any System 6 or 7 startup disk and double-click **EGA Trek**.
+- `egatrek.bin` — the same application as **MacBinary**, for a real Mac's hard
+  disk: decode it on the Mac (StuffIt Expander does), don't copy the `.bin`
+  as it is. Into a disk image from a modern machine, Retro68's or anyone's
+  hfsutils will do it: `hcopy -m egatrek.bin :`
+
+**The game's data is inside the program**, so there are no other files to keep
+beside it; saves and the hall of fame are written beside it.
+
+Under QEMU's Quadra 800, with your own Quadra 800 ROM and a System 7 hard disk
+image (an Apple partition map with HFS as partition 1), copy the application
+in with hfsutils and boot:
+
+    hmount system7.img 1 && hcopy -m egatrek.bin : && humount
+    qemu-system-m68k -M q800 -bios Quadra800.rom -m 64 -g 640x480x8 \
+        -drive file=pram.img,format=raw,if=mtd \
+        -device scsi-hd,scsi-id=0,drive=hd0 \
+        -drive file=system7.img,media=disk,format=raw,if=none,id=hd0
+
+`pram.img` is any 256-byte file; QEMU keeps the Mac's PRAM in it. That is
+what it was played on: System 7.6.1, 256 colours. **A Mac II-class
+machine under System 6 has not been tried.** A Mac that falls short — no
+colour, no 32-Bit QuickDraw, a small screen, too few colours — is told so in
+words and the program returns to the Finder. A Mac Plus, SE or Classic has no
+colour and is not supported.
+
+It is a window with a menu bar; **Quit in the File menu leaves an unsaved
+game**, so SAVE first. The text is the Mac's own Monaco; the music is the
+Sound Manager's square wave, two channels.
 
 ---
 

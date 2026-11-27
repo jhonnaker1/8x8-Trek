@@ -14561,3 +14561,109 @@ on brown, the new one a blue READY.
 mtools at `sdcard.img@@1048576`, type commands with `-bas` (it drops its
 first line), and capture the last frame with `-gif` plus ffmpeg. Confirmed
 on the OtterX: load, play, SAVE and restore, and quit.
+
+## SCOPE: the colour Macintosh (2026-11-26) -- FIRST LIGHT, and the whole game already boots
+
+**Jamie asked for it after commodore-uno shipped a classic Mac port the same
+day, and chose:** colour Macs only, and the data files INSIDE the program.
+No Mac Plus tier, so no 6x12 glyphs and no question of what replaces the
+department colours on one bit.
+
+**The plan was the Amiga's shape with UNO's shell:** Retro68 (gcc for
+m68k-apple-macos, on the Retro68 sparse bundle on Crucial Win), the shared
+core unchanged, far memory and overlays linked straight from `amiga/src/`
+(pure C, nothing to copy), and three new files -- `macvid.c` (window, event
+loop, offscreen console), `macinput.c`, `macstorage.c`. `wait_vsync()` IS the
+Toolbox event loop, the trick commodore-uno/mac found: kb_waitkey already
+calls it between polls, so the game runs under a cooperative GUI unchanged.
+
+**MEASURED on QEMU's Quadra 800, System 7.6.1, 256 colours** (`make -C mac
+smoke`, `mac/tools/q800.sh`):
+
+* **80x25 of 8x16 in a 640x400 window fits 640x480** under the menu bar and
+  a title bar. The Falcon's geometry and the Falcon's box glyphs; joins,
+  ship, disc, bars and the hollow missing-glyph box all as designed.
+* **A 4-bit GWorld whose colour table IS EGA's** (TREK_COLOUR_IS_EGA), written
+  directly -- a cell row is four bytes at x*4, no plane arithmetic -- and
+  CopyBits'd to the window. A tolerance-0 Palette asks the CLUT for EGA's
+  exact colours. All sixteen distinct on screen, brown brown.
+* **Text is the Mac's own Monaco 12, captured into 8x16 cells at start-up**
+  (ascent 12, descent 3, widMax 7, leading 1 -- fits with no padding). No
+  font ships, as on the Falcon.
+* **Data resources by file name:** STRINGS.DAT 7483, MUSIC.DAT 412,
+  BRIEF.TXT streamed 10557 -- the exact file sizes; the pool loads and the
+  panel titles are real. Retro68's Rez has NO `read` statement (the token is
+  declared, no rule uses it); `data 'EGAd' (128, "NAME") { $$read("file") };`
+  is the way in.
+* **A file beside the app** (found through GetAppParms + PBGetFCBInfo, not
+  the default directory) writes and reads back equal; an oversize read is
+  STOR_ERROR, a missing file STOR_NOTFOUND -- storage.h's contract.
+* **TWO square-wave channels open and MIX.** Recorded through QEMU's wav
+  audiodev: channel 1 played 220.0 / 440.0 / 880.0 Hz for MIDI 57/69/81
+  while channel 2 held 329.4 Hz under all three, equal amplitude, odd
+  harmonics only (660, 988.8, 1320). THREE POINTS: note 69 is A440 exactly,
+  and music and effects can have a voice each. No fractional pitch is
+  needed: tools/make_music.py composes on equal-tempered semitones, so the
+  nearest MIDI note to each stored Hz/10 recovers the note intended.
+* **Keys:** a->65 (folded), B->66, 1->49, up->1, down->2, backspace AND
+  forward delete->20 (KB_DELETE), comma->44, Z->90, Esc->27, keypad Enter
+  ends a field as Return does.
+
+**THE 32K SEGMENT QUESTION IS ANSWERED BY RUNNING IT.** Retro68 splits CODE
+by library; all of the game lands in one `Main` segment of **72,672 bytes**,
+over twice the classic limit, and it LOADS: the full game linked with a stub
+sound driver (scratch only) reached the title (with the Anderson credit and
+"TO THE MACINTOSH."), the setup prompts, and the nine-panel console in
+colour, helm message in its department's colour.
+
+**Rig traps:** every run ends with `quit` down QEMU's monitor, so System 7
+puts up "not shut down properly" on the next boot and Startup Items wait
+behind it -- send Return at ~85 s. The audiodev's WAV header lengths are
+left 0 on quit; read the samples raw from offset 44 (44.1 kHz stereo s16).
+The setup prompts begin with the BRIEFING question, not RESTORE.
+
+### Later the same day: the game target, with sound
+
+`make -C mac` builds `build/EGATREK.bin` (MacBinary) and `build/EGATREK.dsk`
+(800K, the application alone), both BYTE-REPRODUCIBLE (two builds, same
+hashes) with commodore-uno's setbundle.py/fixdates.py.
+
+* **Sound: `macsnd.c`, falconsnd.c's shape.** Each note: flushCmd + quietCmd
+  IMMEDIATE, then noteCmd with a 16 s hold; the next note replaces it. The
+  tick is TickCount() at 60.15 Hz: 18207/60147 of a track tick per Mac tick.
+  RECORDED: the title's arpeggio D3 146.9 / A3 220.3 / D4 293.8 / F4 ~350,
+  and steady-state durations 660 / 1300 / 1340 / 640 / 1320 ms against the
+  track's 659 / 1318 / 1318 / 659 / 1318. The first ~2.5 s after launch ran
+  slow (~300 ms for 165 ms notes) -- QEMU's guest clock lagging its
+  real-time audio while the app launches is the suspect, UNCONFIRMED.
+* **Hz/10 -> MIDI is `midinote.c`, integer, with a host test** (`make -C mac
+  test`, red with `BREAK=1`). Below ~G3 two notes can share a byte (E3 and
+  D#3 both store as 16); of the 25 bytes MUSIC.DAT uses, one is shared (9,
+  in the torpedo effect). **THE FIRST VERSION OVERFLOWED 32 BITS** --
+  440*256*127341 is 1.4e10 -- and the host test PASSED, because a host
+  `unsigned long` is 64 bits. The recording heard 932/880/1760 Hz where the
+  title starts at 147. Now uint32_t throughout, which wraps at 32 bits on
+  the host as on the 68000, and the unfixed arithmetic turns the test red.
+* **Partition MEASURED:** a -DMAC_MEMPROBE build put FreeMem's lowest value
+  in the window title; in 640K it never fell below 113,184. SIZE is now
+  768K preferred / 640K minimum. Of the ~527K in use, 84K code + 44K
+  data/statics + 128K offscreen are known; **~270K is unaccounted for**.
+* **About box** (code-drawn, credit first) and **Finder icon** (ICN# + icl4
+  from `tools/mkicon.py`, the Amiga icon's ship; `--sheet` prints it).
+* `tools/q800play.sh APP` boots the Quadra for a person: sound on the
+  speakers, screen in Screen Sharing over VNC (password `egatrek`).
+
+**Played and released the same day.** Jamie played it in Screen Sharing,
+asked to check the beep, the About box, the icon and save and restore:
+*"works perfectly"*.
+Released in **v0.24.0** as `egatrek-mac.zip` (the floppy, the MacBinary, the
+README). The staged application's resource fork was compared with the copy
+Jamie played, read back off the System 7 disk with hfsutils, and with the
+copy on the staged floppy: all three byte-identical. The floppy mounts in
+MAME's Mac Plus under System 6.0.8 (MAME's Mac II mounts no floppy at all in
+this rig, UNO's included). `make -C mac verify` is in `make ports`: the
+Falcon's glyph sweep imported, and the data resources byte for byte against
+the files built beside them -- both made to FAIL before being trusted.
+
+**Still open:** the ~270K of the partition that is unaccounted for; the
+first ~2.5 s of music running slow under QEMU; and a System 6 / 68020 run.

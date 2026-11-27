@@ -101,6 +101,11 @@ PORTS = (
     # than refuse it -- and reads egatrek.car back against the bundle; see
     # c64os/tools/verify_c64os.py.
     ("c64os",  "verify",  "CC"),
+    # The seventeenth: the colour Macintosh, a Toolbox application built with
+    # Retro68. Its verify is the Falcon's glyph sweep imported, plus the data
+    # resources checked byte for byte against the files built beside them --
+    # see mac/tools/verify_mac.py.
+    ("mac",    "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when
