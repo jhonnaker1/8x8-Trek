@@ -528,15 +528,18 @@ in with hfsutils and boot:
         -drive file=system7.img,media=disk,format=raw,if=none,id=hd0
 
 `pram.img` is any 256-byte file; QEMU keeps the Mac's PRAM in it. That is
-what it was played on: System 7.6.1, 256 colours. **A Mac II-class
-machine under System 6 has not been tried.** A Mac that falls short — no
+what it was played on: System 7.6.1, 256 colours. It has also been played
+on MAME's Mac II under System 6.0.8 (`mame macii -hard system608.chd`), whose
+32-Bit QuickDraw 1.2 must be installed. Set 256 colours in Monitors; a
+setting of millions came back as black and white after a restart there. A Mac that falls short — no
 colour, no 32-Bit QuickDraw, a small screen, too few colours — is told so in
 words and the program returns to the Finder. A Mac Plus, SE or Classic has no
 colour and is not supported.
 
 It is a window with a menu bar; **Quit in the File menu leaves an unsaved
 game**, so SAVE first. The text is the Mac's own Monaco; the music is the
-Sound Manager's square wave, two channels.
+Sound Manager's square wave, two channels (System 6 grants one: effects then
+share it, as the original's single PC speaker voice does).
 
 ---
 

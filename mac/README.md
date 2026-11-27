@@ -1,9 +1,12 @@
 # EGA Trek for the colour Macintosh
 
 **Status: released in v0.24.0 (2026-11-26), and played** -- Jamie, on QEMU's
-Quadra 800 under System 7.6.1 in 256 colours: *"works perfectly"*. A Mac
-II-class machine on System 6 has not been tried. See NOTES.md, "SCOPE: the
-colour Macintosh", for what was measured.
+Quadra 800 under System 7.6.1 in 256 colours: *"works perfectly"*. **Since
+then also run on MAME's Mac II (68020) under System 6.0.8** with 32-Bit
+QuickDraw 1.2, 256 colours, and played there by Jamie (*"works great"*)
+-- after fixing three faults that only System 6 shows (NOTES.md, "System 6 on
+a Mac II"). Not yet on real hardware. See NOTES.md, "SCOPE: the colour
+Macintosh", for what was measured.
 
 A Toolbox application: a window holding the 80x25 console, a menu bar
 (About, Quit, an Edit menu for desk accessories), and the game's data built

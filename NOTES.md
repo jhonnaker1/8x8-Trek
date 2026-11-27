@@ -14666,4 +14666,43 @@ Falcon's glyph sweep imported, and the data resources byte for byte against
 the files built beside them -- both made to FAIL before being trusted.
 
 **Still open:** the ~270K of the partition that is unaccounted for; the
-first ~2.5 s of music running slow under QEMU; and a System 6 / 68020 run.
+first ~2.5 s of music running slow under QEMU.
+
+**System 6 on a Mac II (2026-11-26, after v0.24.0).** MAME's `macii` (68020,
+2 MB, Display Card 8•24) booting the Ample `macos608.chd` -- System 6.0.8 with
+the 32-Bit QuickDraw 1.2 INIT already installed. EGA Trek made the startup
+application by writing its name into the boot blocks' bbHelloName (offset 90
+of the HFS partition's first block; offset 26 is the SHELL, which stays
+Finder). Depth set by PRAM byte $48 ($80 one bit, $83 eight, $84 millions --
+millions did not survive a restart). uno's `mactest/hd608.raw` is NOT the
+pristine CHD and does not boot; extract `macos608.chd` with chdman instead.
+At one bit the refusal came up in words, as designed. At 256 colours the
+release build failed three ways the Quadra under System 7 never showed:
+
+* **The screen scrambled, and the Finder at 256 colours did not** (the
+  control). A scratch -DMAC_DIAG build drew the GWorld's PixMap fields over
+  the window: pmVersion $8801, baseAddr $3E7C2000, rowBytes $7E00,
+  pixelSize $39. **GetGWorldPixMap is a System 7 call; under 32-Bit
+  QuickDraw 1.2 its selector returned garbage**, and every scr_put wrote
+  there. Now the PixMap is the port's own `portPixMap`, the base address and
+  the 32-bit flag are read from the PixMap, keepLocal is passed, and a
+  32-bit-only PixMap in 24-bit mode is refused in words. (keepLocal ALONE
+  was tried first, on a wrong theory, and changed nothing.)
+* **Every note of the music held for sixteen seconds** (a MAME -wavwrite:
+  D3 148 Hz, then A4 439 Hz ~16 s later). Notes were noteCmd HOLD 32767 cut
+  short by flushCmd + quietCmd; System 6.0.8's Sound Manager does not cut a
+  playing note. Each note now carries its own length (ticks x 109.85
+  half-ms). Re-recorded: the tune, at pitch, on both machines.
+* **The second noteSynth channel fails -201** (notEnoughHardwareErr; the
+  smoke test's facts line), so every effect was silent and the beep fell to
+  SysBeep. Effects now share the music's channel when there is only one,
+  taking it while they play; the music keeps its place silently.
+
+The Quadra under 7.6.1 re-run with the fixed build: same title screen, same
+tune. Jamie then played the fixed build on the Mac II: *"seems to run good"*;
+and, given a list (effects over music, SAVE/quit/restore, the hall of fame,
+About and a desk accessory over the window, a 640K partition, SND), played it
+again: *"works great"*.
+Observed, not chased: on the Mac II the fast notes SOUND ~120 ms against the
+Quadra's ~160 ms (the tempo is the same; the starts are tick-driven). Not yet
+on real hardware.

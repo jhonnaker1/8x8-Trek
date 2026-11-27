@@ -44,13 +44,25 @@
 #define V_SFX 1
 #define AMP   0xC0          /* of 255: uno's level, loud enough, short of harsh */
 
-/* Far longer than any note, in noteCmd's half-milliseconds; the next note or
-   a quietCmd ends it. 32767 is the most a short holds: sixteen seconds. */
-#define HOLD  32767
+/* A NOTE IS GIVEN ITS OWN LENGTH, in noteCmd's half-milliseconds: ticks of
+   18.2065 Hz are 109.85 each (255 ticks, the longest, is 28,012 -- inside a
+   short). It used to be HOLD, sixteen seconds, ended early by flushCmd +
+   quietCmd. System 7 obeys those; System 6.0.8's Sound Manager does NOT cut
+   a playing note, so on a Mac II every note of the music played for sixteen
+   seconds (measured: MAME's Mac II, a WAV, D3 148 Hz then A4 439 Hz ~16 s
+   apart). The flush and quiet stay, for the systems that honour them. */
+#define HALF_MS(ticks) ((short)(((long)(ticks) * 10985L) / 100L))
 
 uint8_t snd_region = REGION_NTSC;   /* the seam's; nothing here depends on it */
 
 static SndChannelPtr chan[2];
+/* THE VOICE EFFECTS PLAY ON. System 6's Sound Manager gives a Mac II ONE
+   noteSynth channel -- the second SndNewChannel fails -201,
+   notEnoughHardwareErr (measured: MAME's Mac II, 6.0.8). Then effects share
+   the music's channel and take it while they play, as the original's one PC
+   speaker voice does; the music keeps its place silently and sounds again at
+   its next note. Two channels (the Quadra, System 7): unchanged. */
+static unsigned char v_sfx = V_SFX;
 static unsigned char midi[256];
 static unsigned char enabled = 1;
 
@@ -78,7 +90,7 @@ static void voice_off(unsigned char v)
 }
 
 /* `tenths` is the track format's frequency: tens of Hz, 0 for a rest. */
-static void voice_note(unsigned char v, unsigned char tenths)
+static void voice_note(unsigned char v, unsigned char tenths, short half_ms)
 {
     SndCommand sc;
 
@@ -86,7 +98,7 @@ static void voice_note(unsigned char v, unsigned char tenths)
     if (!enabled || tenths == 0 || !chan[v])
         return;
     sc.cmd = noteCmd;
-    sc.param1 = HOLD;
+    sc.param1 = half_ms;
     sc.param2 = ((long)AMP << 24) | midi[tenths];
     SndDoCommand(chan[v], &sc, false);
 }
@@ -99,6 +111,7 @@ void snd_init(void)
     for (v = 0; v < 2; v++)
         if (SndNewChannel(&chan[v], noteSynth, 0, NULL) != noErr)
             chan[v] = NULL;
+    v_sfx = chan[V_SFX] ? V_SFX : V_MUS;
     last_tick = TickCount();
     acc = 0;
 }
@@ -159,13 +172,13 @@ void snd_beep(void)
 
     if (!enabled)
         return;
-    if (!chan[V_SFX]) { SysBeep(10); return; }
+    if (!chan[v_sfx]) { SysBeep(10); return; }
     sfx_on = 0;                 /* a refusal cancels whatever else was playing */
-    voice_note(V_SFX, BEEP_TENTHS);
+    voice_note(v_sfx, BEEP_TENTHS, 500);          /* 250 ms */
     t0 = TickCount();
     while (TickCount() - t0 < BEEP_TICKS)
         ;
-    voice_off(V_SFX);
+    voice_off(v_sfx);
 }
 
 /* One 18.2065 Hz tick -- the same function as falconsnd.c's. */
@@ -183,7 +196,8 @@ static void music_tick(void)
                 if (note[0] == 0) { mus_on = 0; voice_off(V_MUS); return; }
             }
             note_left = note[0];
-            voice_note(V_MUS, note[1]);
+            if (!(sfx_on && v_sfx == V_MUS))  /* an effect holds the shared voice */
+                voice_note(V_MUS, note[1], HALF_MS(note[0]));
             mus += 2;
         }
     }
@@ -192,9 +206,9 @@ static void music_tick(void)
         if (sfx_left) sfx_left--;
         if (!sfx_left) {
             far_read(sfx, note, 2);
-            if (note[0] == 0) { sfx_on = 0; voice_off(V_SFX); return; }
+            if (note[0] == 0) { sfx_on = 0; voice_off(v_sfx); return; }
             sfx_left = note[0];
-            voice_note(V_SFX, note[1]);
+            voice_note(v_sfx, note[1], HALF_MS(note[0]));
             sfx += 2;
         }
     }

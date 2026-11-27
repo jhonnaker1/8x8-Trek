@@ -59,6 +59,12 @@
 #include "../../c128/src/sid.h"
 #include "macvid.h"
 
+#define GW_KEEP_LOCAL 8   /* GWorldFlags keepLocal */
+
+/* Low memory MMU32Bit: nonzero when the Mac runs in 32-bit mode. Read through
+   a volatile POINTER because gcc -O2 refuses a constant low-memory address
+   (-Werror=array-bounds, the LMGetCurApRefNum trap); GetMMUMode has no glue. */
+static volatile unsigned char *volatile mmu32bit = (volatile unsigned char *)0x0CB2;
 #define CELL_W   8
 #define CELL_H   16
 #define CON_W    (VDC_COLS * CELL_W)   /* 640 */
@@ -589,14 +595,30 @@ void vdc_init(void)
     /* The offscreen: 640x400 at four bits, with EGA's colour table. */
     ct = ega_ctab();
     SetRect(&b, 0, 0, CON_W, CON_H);
-    facts.gworld_err = ct ? NewGWorld(&off, 4, &b, ct, NULL, 0) : memFullErr;
+    /* keepLocal (Inside Macintosh's bit 3; Multiversal names none of the
+       GWorld flags) keeps the pixels in main memory, never on a NuBus
+       card: scr_put writes them directly, which Inside Macintosh allows
+       only for pixels the CPU can address as they are. */
+    facts.gworld_err = ct ? NewGWorld(&off, 4, &b, ct, NULL, GW_KEEP_LOCAL)
+                          : memFullErr;
     if (facts.gworld_err != noErr || !off)
         refuse("Not enough memory for the console.",
                "Give EGA Trek more memory in its Get Info window.");
-    off_pm = GetGWorldPixMap(off);
+    /* THE PIXMAP COMES FROM THE PORT, NOT FROM GetGWorldPixMap: that is a
+       System 7 call, and under System 6's 32-Bit QuickDraw (1.2) its
+       selector returned garbage -- MEASURED on MAME's Mac II, 6.0.8: a
+       "PixMap" with pixelSize $39 and baseAddr $3E7C2000, every console
+       write went there, and the screen scrambled. The Quadra under System
+       7 never showed it. A GWorld IS a CGrafPort, and its portPixMap is
+       the same handle on every version. The base address and the 32-bit
+       flag are read out of the PixMap for the same reason. */
+    off_pm = ((CGrafPtr)off)->portPixMap;
     LockPixels(off_pm);
-    facts.pixels_32bit = PixMap32Bit(off_pm);
-    off_base = (unsigned char *)GetPixBaseAddr(off_pm);
+    facts.pixels_32bit = (**off_pm).pmVersion == 4;    /* baseAddr32 */
+    if (facts.pixels_32bit && !*mmu32bit)
+        refuse("EGA Trek cannot reach its console's memory",
+               "in 24-bit mode: turn on 32-bit addressing in Memory.");
+    off_base = (unsigned char *)(**off_pm).baseAddr;
     off_rowbytes = (long)((**off_pm).rowBytes & 0x3FFF);
     memset(off_base, 0, off_rowbytes * CON_H);
 

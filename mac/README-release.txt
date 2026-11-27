@@ -19,8 +19,9 @@ A colour Macintosh with:
     the screen set to 16 colours or more, in the Monitors control panel
     768K of memory for the program (640K at the least)
 
-It has been run on a Quadra 800 under System 7.6.1, in QEMU. A Mac II-class
-machine on System 6 has NOT been tried yet.
+It has been run on a Quadra 800 under System 7.6.1 (in QEMU), and on a
+Mac II under System 6.0.8 with 32-Bit QuickDraw (in MAME), both in 256
+colours. It has not yet been run on real hardware.
 
 A Mac that falls short is told so in words, naming what it lacks, and the
 program goes back to the Finder rather than painting a screen you
@@ -90,7 +91,9 @@ while you sat thinking about your next order.
 Sound is the Sound Manager's square-wave synthesizer on two channels -- a
 square wave, because the original is one square wave out of a PC speaker.
 Music on one channel and effects on the other, so a laser does not cut the
-music off. SND at the command line turns it off and on.
+music off. System 6 grants only one channel; there the effects share it and
+take it while they play, as the original's single speaker does. SND at the
+command line turns sound off and on.
 
 The text is the Mac's own Monaco, read at startup into 8x16 cells. The
 seventeen box-drawing and badge glyphs are this port's own artwork, and so is
