@@ -27,7 +27,10 @@ OVERLAYS = eval hof front info repair msgs planet cmds title events xtra
 # the shared ui.c, which pushed low RAM up and left the soft stack 114 bytes
 # against a 144 floor. Same trade as the 2026-09-06 trim -- the window has
 # margin and the low-RAM gap has none. Largest overlay msgs 3,811 + 2 stamp.
-OVL_WINDOW = 3856
+# 3,824: 32 more on 2026-11-27, for the arrow keys in the shared ui.c (an
+# arrow on an empty command line is a whole order), which left the soft
+# stack 121 against the 144 floor. msgs still fits, 11 spare.
+OVL_WINDOW = 3824
 
 SMOKE_SRC = src/smoke.c src/x16vera.c ../c128/src/layout.c
 SMOKE_OUT = build/smoke.prg

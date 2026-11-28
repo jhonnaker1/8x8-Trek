@@ -106,6 +106,13 @@ PORTS = (
     # resources checked byte for byte against the files built beside them --
     # see mac/tools/verify_mac.py.
     ("mac",    "verify",  "CC"),
+    # The eighteenth: the NeXT, a NeXTSTEP 3.3 application compiled ON the
+    # NeXT, so nothing here can link it. Its verify is what the host CAN see:
+    # the Falcon's glyph sweep, C89 over every C file the NeXT's gcc 2.5.8
+    # compiles, the deploy list against what Makefile.next reaches, the
+    # <stdint.h> stand-in and the icon -- see next/tools/verify_next.py. Its
+    # compiler variable is the HOST's cc, which that check runs.
+    ("next",   "verify",  "CC"),
 )
 
 # Lines worth surfacing from a passing run: the numbers that go stale when

@@ -1,0 +1,125 @@
+# EGA Trek for the NeXT -- THE BUILD THAT RUNS ON THE NeXT, with NeXTSTEP
+# 3.3's own cc from the Developer tools (cc-437.2.6, which is gcc 2.5.8).
+# No compiler on the host makes 68k Mach-O for NeXTSTEP, so the host's
+# Makefile copies this folder and the shared sources it names onto the
+# NeXT (`make deploy`), and this is run there:
+#
+#     make -f Makefile.next          EGATrek.app, the application wrapper
+#     make -f Makefile.next clean
+#
+# commodore-uno/next's recipe: one rule per file, because NeXTSTEP's make
+# has no % pattern rules, and every object depends on every header, because
+# a missed dependency is a stale object.
+CC = cc
+# -DTREK_COLOUR_IS_EGA: a colour name IS its EGA index, as on the Mac.
+# src/compat holds the <stdint.h> NeXTSTEP 3.3 does not have.
+CFLAGS = -O -Wall -DTREK_COLOUR_IS_EGA -Isrc/compat -Isrc -I../c128/src -I../core
+LIBS = -lNeXT_s -lsys_s
+
+APP = EGATrek.app
+
+# The application's icon goes into the program itself, in an __ICON
+# segment, as NeXTSTEP's own app makefiles put it: a header naming the
+# program and its icon, and the icon, a TIFF made by tools/mkicon.py on the
+# host (the NeXT has no Python) and kept in the repository.
+ICONFLAGS = -sectcreate __ICON __header EGATrek.iconheader -segprot __ICON r r \
+            -sectcreate __ICON app EGATrek.tiff
+
+OBJ = obj/main.o obj/ui.o obj/layout.o obj/strpool.o \
+      obj/trek.o obj/planet.o obj/hof.o obj/serial.o \
+      obj/amigafarmem.o obj/amigaovl.o \
+      obj/nextvid.o obj/nextinput.o obj/nextstorage.o obj/nextsnd.o \
+      obj/music_data.o obj/midinote.o
+
+HDRS = src/compat/stdint.h src/nextvid.h src/music_data.h ../mac/src/midinote.h \
+       ../c128/src/vdc.h ../c128/src/sid.h ../c128/src/input.h \
+       ../c128/src/ui.h ../c128/src/layout.h ../c128/src/strdata.h \
+       ../c128/src/egavdc.h \
+       ../core/trek.h ../core/planet.h ../core/hof.h ../core/serial.h \
+       ../core/storage.h ../core/farmem.h ../core/overlay.h ../core/ega.h \
+       ../core/strpool.h ../core/lowmem.h
+
+DATA = data/STRINGS.DAT data/MUSIC.DAT data/BRIEF.TXT
+
+all: $(APP)/EGATrek
+
+# THE GAME'S main() IS NOT THE PROGRAM'S: the AppKit's is, in nextvid.m,
+# and it calls this one as trek_main() once the application has started.
+obj/main.o: ../c128/src/main.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -Dmain=trek_main -c ../c128/src/main.c -o obj/main.o
+
+obj/ui.o: ../c128/src/ui.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../c128/src/ui.c -o obj/ui.o
+
+obj/layout.o: ../c128/src/layout.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../c128/src/layout.c -o obj/layout.o
+
+obj/strpool.o: ../c128/src/strpool.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../c128/src/strpool.c -o obj/strpool.o
+
+obj/trek.o: ../core/trek.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../core/trek.c -o obj/trek.o
+
+obj/planet.o: ../core/planet.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../core/planet.c -o obj/planet.o
+
+obj/hof.o: ../core/hof.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../core/hof.c -o obj/hof.o
+
+obj/serial.o: ../core/serial.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../core/serial.c -o obj/serial.o
+
+# Pure C with no machine in it, linked from the Amiga as the Mac links them:
+# far memory is a plain array and ovl_load is empty.
+obj/amigafarmem.o: ../amiga/src/amigafarmem.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../amiga/src/amigafarmem.c -o obj/amigafarmem.o
+
+obj/amigaovl.o: ../amiga/src/amigaovl.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../amiga/src/amigaovl.c -o obj/amigaovl.o
+
+# The track byte -> MIDI note table, linked from the Mac: pure C, and
+# tested on the host there (mac/test/test_midi.c).
+obj/midinote.o: ../mac/src/midinote.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c ../mac/src/midinote.c -o obj/midinote.o
+
+obj/nextvid.o: src/nextvid.m $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c src/nextvid.m -o obj/nextvid.o
+
+obj/nextinput.o: src/nextinput.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c src/nextinput.c -o obj/nextinput.o
+
+obj/nextstorage.o: src/nextstorage.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c src/nextstorage.c -o obj/nextstorage.o
+
+obj/nextsnd.o: src/nextsnd.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c src/nextsnd.c -o obj/nextsnd.o
+
+obj/music_data.o: src/music_data.c $(HDRS)
+	@-mkdir obj 2>/dev/null
+	$(CC) $(CFLAGS) -c src/music_data.c -o obj/music_data.o
+
+# THE DATA GOES INSIDE THE WRAPPER, beside the program: STRINGS.DAT,
+# MUSIC.DAT and BRIEF.TXT, built on the host (they need Python) and
+# copied here by `make deploy`.
+$(APP)/EGATrek: $(OBJ) $(DATA) EGATrek.iconheader EGATrek.tiff
+	@-mkdir $(APP) 2>/dev/null
+	$(CC) $(CFLAGS) $(ICONFLAGS) -o $(APP)/EGATrek $(OBJ) $(LIBS)
+	cp $(DATA) $(APP)
+
+clean:
+	rm -rf obj $(APP)

@@ -101,3 +101,9 @@ egatrek-*/
 cfg/
 nvram/
 snap/
+
+# The NeXT port: generated note table, and what the NeXT build leaves if run in place.
+next/src/music_data.h
+next/src/music_data.c
+next/obj/
+next/EGATrek.app/

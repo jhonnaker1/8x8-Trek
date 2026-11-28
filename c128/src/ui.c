@@ -17,7 +17,13 @@
  * and the only way to guarantee that is to ask the table. */
 #define ON_PAGE(idx)  do { if (panel40_page[idx] != layout40_page) return; } while (0)
 #else
-#define ON_PAGE(idx)  do { } while (0)
+/* EIGHTY COLUMNS: every panel is on the one page and there is nothing to
+ * test. The expansion is a DECLARATION, not a statement, because ON_PAGE()
+ * opens its function AHEAD of the declarations, and a C89 compiler rejects a
+ * statement there -- the NeXT's gcc 2.5.8 did, at every one of the ten. A
+ * block-scope FUNCTION declaration generates no code on any compiler, and
+ * unlike an extern variable gcc 2.5.8 does not warn that it is unused. */
+#define ON_PAGE(idx)  extern void on_page_unused_(void)
 #endif
 #include "ui.h"
 #include "../../core/strpool.h"
@@ -1275,6 +1281,18 @@ void ui_read_command(char *buf, uint8_t max) {
                 scr_put((unsigned char)(x0 + 5 + n), y, SC_SPACE, COL_VALUE);
             }
             continue;
+        }
+        /* AN ARROW ON AN EMPTY LINE IS A WHOLE ORDER -- shields up or down,
+           the original's primary binding -- and goes to main() at once, as
+           the original acts on the key. KB_UP and KB_DOWN are 1 and 2, so
+           the control-code filter below threw them away and main()'s arrow
+           dispatch could never fire, on any port, from the day it was
+           written: found 2026-11-27 by the NeXT port's key log. */
+        if ((c == KB_UP || c == KB_DOWN) && n == 0) {
+            scr_put((unsigned char)(x0 + 5), y, SC_SPACE, COL_VALUE);
+            buf[0] = c;
+            buf[1] = '\0';
+            return;
         }
         if (n + 1 >= max) continue;
         if (c < 32) continue;
