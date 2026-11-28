@@ -1,6 +1,6 @@
 # How to run each one
 
-Twenty-three assets, seventeen machines. Every port plays the same game from the same
+Twenty-four assets, eighteen machines. Every port plays the same game from the same
 `core/`; what differs is how the machine is asked to start it.
 
 **None of these ship a ROM.** Where an emulator needs one — a Kickstart, a TOS
@@ -10,7 +10,7 @@ fact what this port was developed against.
 
 **Six assets are bare disk images, and their READMEs ship beside them** as
 `egatrek-<port>.txt`, because a `.d64`, a `.d81` and an `.atr` have nowhere to
-put one. The eleven `.zip` assets carry theirs inside as `README.txt`.
+put one. The twelve `.zip` assets carry theirs inside as `README.txt`.
 
 **This file is the source for the release page.** `make running-section` emits
 it with the heading demoted, so the GitHub release body is generated from here
@@ -540,6 +540,35 @@ It is a window with a menu bar; **Quit in the File menu leaves an unsaved
 game**, so SAVE first. The text is the Mac's own Monaco; the music is the
 Sound Manager's square wave, two channels (System 6 grants one: effects then
 share it, as the original's single PC speaker voice does).
+
+---
+
+### `egatrek-next.zip` — colour NeXT
+
+**A colour NeXT running NeXTSTEP 3.3:** a NeXTstation Color or Turbo Color, or
+a NeXT with a NeXTdimension board. The zip holds `egatrek-next.tar`, which is
+**EGATrek.app**, a NeXTSTEP application. Copy the tar onto the NeXT, and in a
+Terminal, in the folder you want the game in:
+
+    tar xf egatrek-next.tar
+
+then double-click **EGATrek.app** in the Workspace. **The game's data is inside
+the application** (an application is a folder on the NeXT), so copying
+EGATrek.app is the whole installation; saves and the hall of fame are written
+in the folder that holds it, which must be one you can write to.
+
+In the [Previous](http://previous.alternative-system.com/) emulator, set up a
+NeXTstation Turbo Color with your own Rev 3.3 ROM and a NeXTSTEP 3.3 hard disk
+image, with networking on: the host's shared folder then appears on the NeXT as
+`/Net/nfs`, so the tar can be unpacked straight from there. That is what it was
+played on, inside BMNeXT's simulator: NeXTSTEP 3.3 on a Turbo Color. A NeXT
+with no colour screen — a NeXT Computer, a NeXTcube, a mono NeXTstation — is
+told so in an alert panel and the program quits.
+
+It is a window with the NeXT's own menu: Info, Hide, Quit. **Quit, or closing
+the window, leaves an unsaved game**, so SAVE first. The text is the NeXT's
+own Courier; the music is two square-wave voices mixed into the NeXT's 16-bit
+sound.
 
 ---
 

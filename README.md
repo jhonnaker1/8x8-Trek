@@ -7,21 +7,32 @@ input layer, following the architecture of
 
 The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 
-> **Status: seventeen ports released.** The **Commodore 128**, **Commander X16**,
+> **Status: eighteen ports released.** The **Commodore 128**, **Commander X16**,
 > **Amiga**, **MEGA65**, the **Atari 800XL + VBXE**, the **Atari Falcon030**,
 > the **Tandy CoCo 3 + SuperSprite FM+**, the plain **Commodore 64**, the
 > **Atari ST/STE**, the **stock CoCo 3**, the **Apple IIgs**, the
 > **Commodore Plus/4**, the **Foenix F256K**, the **MSX2**, the **Commodore 64
-> with an REU**, **C64 OS** and the **colour Macintosh** are feature complete
-> and released as [v0.24.0](../../releases/latest), 2026-11-26.
-> **The new one is the colour Macintosh**: a real Toolbox application — a
-> window, a menu bar, an About box, its own Finder icon — with the game's data
-> built into the program, so copying it is the whole installation. Built with
-> [Retro68](https://github.com/autc04/Retro68); the console is the Falcon's
-> 80×25 of 8×16 in a 640×400 window, in EGA's own sixteen colours, with the
-> Mac's Monaco as the font and the Sound Manager's square wave on two channels.
-> Needs Color QuickDraw and 32-Bit QuickDraw, 640×480 and 16 colours. See
-> [`mac/README.md`](mac/README.md).
+> with an REU**, **C64 OS**, the **colour Macintosh** and the **colour NeXT**
+> are feature complete and released as [v0.25.0](../../releases/latest),
+> 2026-11-27.
+> **The new one is the NeXT**: a NeXTSTEP 3.3 application, `EGATrek.app`,
+> with the NeXT's own menu, Info panel and icon, and the game's data inside the
+> application's folder. It is **compiled on the NeXT itself**, by NeXTSTEP's
+> own 1993 gcc, because no compiler here makes 68k Mach-O for NeXTSTEP. The
+> console is the Mac's 80×25 of 8×16 in a 640×400 window, drawn as a 12-bit
+> bitmap that holds EGA's sixteen colours exactly. Sound is two square-wave
+> voices mixed into one continuous 16-bit stream. Colour NeXTs only. See
+> [`next/README.md`](next/README.md).
+> **Porting it found a fault in every port: the arrow keys never worked.**
+> Shields up and down are the original's arrow keys, and every port maps its
+> arrows to the codes the game dispatches on, but the command line threw those
+> codes away before the dispatch could see them. **From v0.25.0 the up and down
+> arrows raise and lower shields on every port**, which is why every asset is
+> new in this release; it has been exercised on the NeXT.
+> **The colour Macintosh came before it** (v0.24.0, with v0.24.1 for System 6):
+> a Toolbox application built with [Retro68](https://github.com/autc04/Retro68),
+> the same console in a window, the Mac's Monaco and the Sound Manager's square
+> wave. See [`mac/README.md`](mac/README.md).
 > Two patches to v0.23.0 came from first runs on real hardware: v0.23.1 stops
 > the Atari ST and Falcon sound driver switching the floppy drive off (a real
 > 520 STE), and v0.23.2 lets the X16 port find its files in a subdirectory and
@@ -51,7 +62,7 @@ The name is the galaxy: 8×8 quadrants of 8×8 sectors.
 > 8×8. See [`f256k/README.md`](f256k/README.md).
 > Every port colours each message line by the department that speaks it, as the
 > original does.
-> **All seventeen have been played by a person**, and that is where the faults
+> **All eighteen have been played by a person**, and that is where the faults
 > have come from: the CoCo 3's sitting found a console repaint taking **12
 > seconds** that no benchmark here had ever timed, because the benchmark
 > measured the blit and the blit was a third of the cost. The C64's sitting
@@ -256,6 +267,7 @@ an 80-column grid of per-cell colour, which is the shape it was designed on.
 | **Foenix F256K** | Tiny Vicky 80×30 text at **8×16**, EGA's own palette | W65C02S | **Released** — [v0.21.0](../../releases/latest). **448K of RAM and the code is still banked**, because the 6502 still sees 64K — but a swap is **one store to an MMU slot**, so the card is read once at startup and the music plays through a load. The screen is 80×60 at 8×8, so the port doubles the cell instead: **the closest any 8-bit port gets to the original's 8×14 proportions.** Sound is the SN76489 PSG, which every owner has; the SID sockets are not used. See [`f256k/README.md`](f256k/README.md) |
 | **MSX2** + MSX-DOS 2 (Nextor) | V9938 SCREEN 7, 512×212, 80×25 in 6×8 cells, EGA's own palette | Z80 | **Released** — [v0.22.0](../../releases/latest). **The first Z80, and no overlays at all**: SDCC cannot express this project's per-function overlays, and the whole game plus every driver fits the TPA with 343 bytes to spare at release — **as the boot disk's `COMMAND2.COM`**, because the command interpreter keeps 1,280 bytes of any program it runs. Far memory in VRAM page 1; the console drawn by the V9938's command engine, one HMMC a character; the PSG on two channels. **A stock MSX2 cannot run it** — the disk needs Nextor or the MSX-DOS 2 cartridge. See [`msx2/README.md`](msx2/README.md) |
 | **Colour Macintosh** (Color QuickDraw, 32-Bit QuickDraw) | an 80×25 window of 8×16 cells, 640×400, EGA's own sixteen colours | 68020 and up | **Released** — [v0.24.0](../../releases/latest). **A Toolbox application, not a takeover of the machine**: a window, a menu bar, an About box, its own Finder icon. **The data is inside the program** as resources named after the files every other port ships, so the shared code asks for `STRINGS.DAT` here as everywhere. The event loop lives in `wait_vsync()`, so the game runs under a cooperative GUI unchanged. Retro68 puts the whole game in **one 75K code segment, past the classic 32K limit, and it loads**. Sound Manager square waves on two channels (one on System 6, shared), MIDI 69 measured at 440.0 Hz. Played on a Quadra 800 under System 7.6.1 and on a Mac II (68020) under System 6.0.8, both emulated. See [`mac/README.md`](mac/README.md) |
+| **Colour NeXT** (NeXTstation Color / Turbo Color, NeXTdimension) | an 80×25 window of 8×16 cells, 640×400, EGA's own sixteen colours | 68030 / 68040 | **Released** — [v0.25.0](../../releases/latest). **A NeXTSTEP 3.3 application compiled on the NeXT**: no compiler on the host makes NeXTSTEP's 68k Mach-O, so `make deploy` copies the sources to the NeXT's shared folder and NeXTSTEP's own gcc 2.5.8 builds them there, and `make release` packs that build only when it is provably from the same tree. The Mac's design in Display PostScript: a 12-bit bitmap drawn with `NXDrawBitmap`, the NeXT's Courier read into 8×16 cells, the event loop in `wait_vsync()`. Two square-wave voices mixed into one continuous stream. Played on a NeXTstation Turbo Color under NeXTSTEP 3.3, emulated. See [`next/README.md`](next/README.md) |
 
 
 ### How much colour the console actually needs

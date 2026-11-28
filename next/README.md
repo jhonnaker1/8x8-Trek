@@ -1,7 +1,8 @@
 # EGA Trek for the NeXT
 
-**Status: played by Jamie in emulation, 2026-11-27: *"works great"*; not
-released.** It runs in BMNeXT's host simulator (Previous inside) as a
+**Status: released in v0.25.0 (2026-11-27), and played** -- Jamie, in
+emulation: *"works great"*, and of the sound, after it was rewritten as one
+stream, *"sound is perfect now"*. It runs in BMNeXT's host simulator (Previous inside) as a
 NeXTstation Turbo Color under NeXTSTEP 3.3. Not yet tried: OPENSTEP 4.2,
 the hall of fame's file being written, and real hardware.
 
@@ -52,8 +53,6 @@ has), checks the deploy list against everything `Makefile.next` and the
 sources reach, and checks the `<stdint.h>` stand-in and the icon. Each of the
 last four was made to fail on purpose.
 
-Not yet done for a release: `RUNNING.md`, the root `RELEASE_PORTS`, and the
-count sweep that an eighteenth port makes stale.
 
 In Previous or BMNeXT the host's shared folder is `/Net/nfs` on the NeXT.
 Here it is BMNeXT's simulated SD card on Crucial Win,

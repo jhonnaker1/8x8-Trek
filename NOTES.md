@@ -14706,3 +14706,44 @@ again: *"works great"*.
 Observed, not chased: on the Mac II the fast notes SOUND ~120 ms against the
 Quadra's ~160 ms (the tempo is the same; the starts are tick-driven). Not yet
 on real hardware.
+
+
+## THE NeXT (2026-11-27) -- RELEASED v0.25.0, the eighteenth port
+
+Jamie: "start the NeXT port ... look at uno as we just created a NeXT port
+for that." commodore-uno/next settled the shape before a line was written: a
+NeXTSTEP 3.3 application compiled ON the NeXT (BMNeXT's simulator, Previous
+inside) by NeXTSTEP's own cc, gcc 2.5.8, from a folder shared over NFS.
+`next/README.md` has the design; what is worth keeping here is what it found.
+
+* **THE ARROW KEYS NEVER WORKED, ON ANY PORT.** `KB_UP`/`KB_DOWN` are 1 and
+  2 (since 2026-08-23) and `ui_read_command()` dropped every code below 32,
+  so `main()`'s shields-on-arrows dispatch (2026-08-24) could never fire.
+  Every port's README said otherwise. Found by the NeXT's key log, the first
+  instrument that showed the arrows arriving and nothing happening. An
+  arrow on an empty command line is now a whole order. The X16 paid 32
+  bytes of overlay window for it (soft stack 121 -> 153, floor 144).
+* **gcc 2.5.8 is the strictest compiler any port has.** It rejected
+  `ON_PAGE()`, a statement ahead of declarations, in ten functions of
+  `ui.c`; on 80 columns it is now a declaration. `next/tools/verify_next.py`
+  puts every C file the NeXT compiles through `-std=c89
+  -Werror=declaration-after-statement` on the host, which `make c89-check`
+  does only for `core/`.
+* **THE FONT IMAGE READS BACK BOTTOM ROW FIRST** (NXImage ->
+  NXBitmapImageRep); the first build stood every letter on its head.
+  NXDrawBitmap's data, by contrast, is top row first.
+* **ONE SOUND PER NOTE IS CHOPPY ON A NeXT, and the recording hid it.**
+  The output stops between two SNDStartPlaying() sounds; BMNeXT's `/audio`
+  yields samples only while it runs, so the gaps were cut out and the notes
+  looked back to back (8.3 s of samples from about 9 s of music). Jamie heard
+  it. Now two voices are mixed into 46 ms chunks kept three deep in the
+  library's queue, paced by its end callbacks; measured as samples per wall
+  second, and Jamie: "sound is perfect now". **`/audio` is drained by
+  whoever asks**: a recorder running beside the live page makes both choppy.
+* **Colour only, Jamie's decision, as on every port**: a NeXT with no colour
+  screen gets an alert panel and the program quits.
+
+**Still open:** the colour-screen refusal has not been seen (it needs a mono
+NeXT setup); OPENSTEP 4.2; the hall of fame's file written; real hardware;
+whether NeXTSTEP's cc builds the same program twice (commodore-uno found it
+does, not re-measured here).
